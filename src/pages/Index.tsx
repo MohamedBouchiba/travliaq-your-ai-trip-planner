@@ -1,10 +1,22 @@
 import { Button } from "@/components/ui/button";
 import { MapPin, Clock, Sparkles, Users, Star, Mail } from "lucide-react";
 import heroImage from "@/assets/hero-travliaq.jpg";
+import logo from "@/assets/logo-travliaq.png";
 
 const Index = () => {
   return (
     <div className="min-h-screen bg-background">
+      {/* Header with Logo */}
+      <header className="absolute top-0 left-0 right-0 z-20 p-6">
+        <div className="container mx-auto">
+          <img 
+            src={logo} 
+            alt="Logo Travliaq" 
+            className="h-12 w-auto"
+          />
+        </div>
+      </header>
+
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
@@ -32,7 +44,7 @@ const Index = () => {
             className="animate-adventure-float"
             asChild
           >
-            <a href="https://YOUR-LINK.typeform.com" target="_blank" rel="noopener noreferrer">
+            <a href="https://form.typeform.com/to/w3660YhR" target="_blank" rel="noopener noreferrer">
               <Sparkles className="mr-2" />
               Crée ton itinéraire
             </a>
