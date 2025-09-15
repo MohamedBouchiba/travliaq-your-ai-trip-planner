@@ -50,20 +50,23 @@ const Index = () => {
       {/* Comment ça marche Section */}
       <section className="py-20 bg-gradient-subtle">
         <div className="container mx-auto px-6">
-          <h2 className="text-4xl md:text-5xl font-montserrat font-bold text-center mb-16 text-travliaq-deep-blue">
+          <h2 className="text-4xl md:text-5xl font-montserrat font-bold text-center mb-6 text-travliaq-deep-blue">
             Comment ça marche ?
           </h2>
+          <p className="text-xl text-center mb-16 text-muted-foreground max-w-2xl mx-auto">
+            Travliaq organise votre voyage personnalisé en 4 étapes simples…
+          </p>
           
-          <div className="grid md:grid-cols-3 gap-12 max-w-6xl mx-auto">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
             <div className="text-center group hover:transform hover:scale-105 transition-adventure">
               <div className="bg-travliaq-turquoise w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-adventure group-hover:shadow-deep">
                 <MapPin className="w-10 h-10 text-white" />
               </div>
-              <h3 className="text-2xl font-montserrat font-bold mb-4 text-travliaq-deep-blue">
-                1. Tu indiques
+              <h3 className="text-xl font-montserrat font-bold mb-4 text-travliaq-deep-blue">
+                1. Vos envies
               </h3>
-              <p className="text-lg text-muted-foreground leading-relaxed">
-                Ta destination, tes dates et ton budget — c'est tout ce qu'il nous faut pour commencer l'aventure.
+              <p className="text-base text-muted-foreground leading-relaxed">
+                Indique destination, dates, budget, style de voyage.
               </p>
             </div>
 
@@ -71,11 +74,11 @@ const Index = () => {
               <div className="bg-travliaq-golden-sand w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-golden group-hover:shadow-deep">
                 <Sparkles className="w-10 h-10 text-travliaq-deep-blue" />
               </div>
-              <h3 className="text-2xl font-montserrat font-bold mb-4 text-travliaq-deep-blue">
-                2. L'IA analyse
+              <h3 className="text-xl font-montserrat font-bold mb-4 text-travliaq-deep-blue">
+                2. Recherche intelligente
               </h3>
-              <p className="text-lg text-muted-foreground leading-relaxed">
-                Travliaq analyse en temps réel vols, hôtels, météo et activités pour trouver la combinaison parfaite.
+              <p className="text-base text-muted-foreground leading-relaxed">
+                Scan vols, hôtels, météo, activités en temps réel.
               </p>
             </div>
 
@@ -83,11 +86,23 @@ const Index = () => {
               <div className="bg-travliaq-light-blue w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-deep group-hover:shadow-adventure">
                 <Clock className="w-10 h-10 text-white" />
               </div>
-              <h3 className="text-2xl font-montserrat font-bold mb-4 text-travliaq-deep-blue">
-                3. Tu reçois
+              <h3 className="text-xl font-montserrat font-bold mb-4 text-travliaq-deep-blue">
+                3. Itinéraire optimisé
               </h3>
-              <p className="text-lg text-muted-foreground leading-relaxed">
-                Un itinéraire personnalisé et optimisé, prêt à être vécu — plus qu'à faire tes bagages !
+              <p className="text-base text-muted-foreground leading-relaxed">
+                Jour par jour, budget maîtrisé, astuces locales.
+              </p>
+            </div>
+
+            <div className="text-center group hover:transform hover:scale-105 transition-adventure">
+              <div className="bg-travliaq-turquoise w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-adventure group-hover:shadow-deep">
+                <Mail className="w-10 h-10 text-white" />
+              </div>
+              <h3 className="text-xl font-montserrat font-bold mb-4 text-travliaq-deep-blue">
+                4. Voyage prêt à réserver
+              </h3>
+              <p className="text-base text-muted-foreground leading-relaxed">
+                Itinéraire envoyé par email + liens directs.
               </p>
             </div>
           </div>
