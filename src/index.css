@@ -8,12 +8,12 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Travliaq Brand Colors */
-    --travliaq-deep-blue: 210 65% 11%;
-    --travliaq-light-blue: 213 45% 18%;
-    --travliaq-turquoise: 194 100% 42%;
-    --travliaq-golden-sand: 47 100% 71%;
-    --travliaq-white: 0 0% 100%;
+    /* Travliaq Brand Colors - Charte Graphique Officielle */
+    --travliaq-deep-blue: 214 51% 11%;     /* #0D1B2A */
+    --travliaq-light-blue: 214 35% 17%;    /* #1B263B */
+    --travliaq-turquoise: 193 100% 42%;    /* #00B4D8 */
+    --travliaq-golden-sand: 45 100% 70%;   /* #FFD166 */
+    --travliaq-white: 0 0% 100%;           /* #FFFFFF */
     
     /* Design System Colors */
     --background: var(--travliaq-white);
