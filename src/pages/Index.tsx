@@ -2,8 +2,45 @@ import { Button } from "@/components/ui/button";
 import { MapPin, Clock, Sparkles, Users, Star, Mail } from "lucide-react";
 import heroImage from "@/assets/hero-travliaq.jpg";
 import logo from "@/assets/logo-travliaq.png";
+import GoogleLoginPopup from "@/components/GoogleLoginPopup";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { User } from "@supabase/supabase-js";
 
 const Index = () => {
+  const [showLoginPopup, setShowLoginPopup] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    // Check if user is already logged in
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      
+      // Show popup only if user is not logged in
+      if (!user) {
+        // Show popup after 2 seconds
+        const timer = setTimeout(() => {
+          setShowLoginPopup(true);
+        }, 2000);
+        
+        return () => clearTimeout(timer);
+      }
+    };
+
+    checkUser();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        setShowLoginPopup(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header with Logo */}
@@ -277,6 +314,11 @@ const Index = () => {
           </div>
         </div>
       </footer>
+
+      {/* Google Login Popup */}
+      {showLoginPopup && !user && (
+        <GoogleLoginPopup onClose={() => setShowLoginPopup(false)} />
+      )}
     </div>
   );
 };
