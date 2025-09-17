@@ -97,7 +97,7 @@ const IndexEN = () => {
           {/* Description box */}
           <div className="max-w-5xl mx-auto mb-16">
             <div className="bg-gradient-to-r from-purple-100 to-blue-50 border-2 border-purple-300 rounded-lg p-6 text-center">
-              <p className="text-lg text-travliaq-deep-blue leading-relaxed font-inter">Travliaq organizes your personalized trip in 4 simple steps: you share your preferences, we compare flights, accommodations and activities in real-time (prices, weather, distances), we assemble a logical day-by-day itinerary within your budget, then you receive everything by email with ready-to-book links. Fewer tabs, more adventure. Perfect for backpackers andolo travelers: fast, flexible, no credit card required.</p>
+              <p className="text-lg text-travliaq-deep-blue leading-relaxed font-inter">Travliaq organizes your personalized trip in 4 simple steps: you share your preferences, we compare flights, accommodations and activities in real-time (prices, weather, distances), we assemble a logical day-by-day itinerary within your budget, then you receive everything by email with ready-to-book links. Fewer tabs, more adventure. Perfect for backpackers and solo travelers: fast, flexible, no credit card required.</p>
             </div>
           </div>
           
