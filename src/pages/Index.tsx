@@ -45,12 +45,15 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       {/* Header with Logo */}
       <header className="absolute top-0 left-0 right-0 z-20 p-6">
-        <div className="container mx-auto">
+        <div className="container mx-auto flex justify-between items-center">
           <img 
             src={logo} 
             alt="Logo Travliaq" 
             className="h-20 w-auto"
           />
+          <a href="/en" className="text-white hover:text-travliaq-golden-sand transition-colors font-inter">
+            English
+          </a>
         </div>
       </header>
 
