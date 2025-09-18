@@ -99,12 +99,12 @@ const IndexEN = () => {
           {/* Description box */}
           <div className="max-w-5xl mx-auto mb-16">
             <div className="bg-gradient-to-r from-purple-100 to-blue-50 border-2 border-purple-300 rounded-lg p-6 text-center">
-              <p className="text-lg text-travliaq-deep-blue leading-relaxed font-inter">Travliaq makes travel simple in 4 steps:
-1️⃣ Share your travel preferences (destination, budget, style).
-2️⃣ We compare flights, stays, and activities in real time (prices, weather, distances).
-3️⃣ We craft a day-by-day itinerary that’s clear, optimized, and budget-friendly.
-4️⃣ You receive a personalized proposal with a detailed price and one single link to book everything in just a few clicks.
-
+              <p className="text-lg text-travliaq-deep-blue leading-relaxed font-inter text-center">Travliaq makes travel simple in 4 steps:
+ 
+1️⃣ Share your travel preferences (destination, budget, style). 
+2️⃣ We compare flights, stays, and activities in real time (prices, weather, distances). 
+3️⃣ We craft a day-by-day itinerary that’s clear, optimized, and budget-friendly. 
+4️⃣ You receive a personalized proposal with a detailed price and one single link to book everything in just a few clicks. 
 Fewer tabs, more adventure. 🎒</p>
             </div>
           </div>
