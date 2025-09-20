@@ -337,13 +337,8 @@ const IndexEN = () => {
           </div>
 
           {/* Final call-to-action with free text */}
-          <div className="text-center space-y-4">
-            <Button 
-              variant="hero" 
-              size="xl" 
-              className="bg-travliaq-golden-sand text-travliaq-deep-blue hover:bg-travliaq-golden-sand/90 font-bold px-8 py-4"
-              asChild
-            >
+          <div className="text-center">
+            <Button variant="hero" size="xl" className="bg-travliaq-golden-sand text-travliaq-deep-blue hover:bg-travliaq-golden-sand/90 font-bold px-8 py-4" asChild>
               <a href="https://form.typeform.com/to/w3660YhR" target="_blank" rel="noopener noreferrer">
                 <Sparkles className="mr-2" />
                 Create my itinerary
