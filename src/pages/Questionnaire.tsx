@@ -717,8 +717,8 @@ const Questionnaire = () => {
     // Step 1: Qui voyage
     if (step === stepCounter) {
       return (
-        <div className="space-y-8 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+        <div className="space-y-4 animate-fade-up">
+          <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
             Qui voyage ? 👥
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
@@ -751,8 +751,8 @@ const Questionnaire = () => {
     if ((answers.travelGroup === "Famille (enfants <12)" || answers.travelGroup === "Groupe 3-5") && step === stepCounter) {
       if (answers.travelGroup === "Famille (enfants <12)") {
         return (
-          <div className="space-y-8 animate-fade-up">
-            <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+          <div className="space-y-4 animate-fade-up">
+            <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
               Nombre de personnes (enfants inclus) 👨‍👩‍👧‍👦
             </h2>
             <div className="max-w-xl mx-auto space-y-4">
@@ -904,11 +904,11 @@ const Questionnaire = () => {
     // Step 2c: Destination précise (si Oui)
     if (answers.hasDestination === "Oui" && step === stepCounter) {
       return (
-        <div className="space-y-8 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+        <div className="space-y-4 animate-fade-up">
+          <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
             Ton trajet ✈️
           </h2>
-          <div className="max-w-xl mx-auto space-y-6">
+          <div className="max-w-xl mx-auto space-y-3">
             {/* Departure Location */}
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -1073,8 +1073,8 @@ const Questionnaire = () => {
     // Step 2c: Climat préféré (si Non - pas de destination en tête) - MULTI-CHOIX
     if (answers.hasDestination === "Non" && step === stepCounter) {
       return (
-        <div className="space-y-8 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+        <div className="space-y-4 animate-fade-up">
+          <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
             Quel type de climat recherches-tu ? 🌡️
           </h2>
           <p className="text-center text-muted-foreground">Sélection multiple possible</p>
@@ -1132,8 +1132,8 @@ const Questionnaire = () => {
     // Step 2d: Affinités de voyage (si Non - multi-choix)
     if (answers.hasDestination === "Non" && step === stepCounter) {
       return (
-        <div className="space-y-8 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+        <div className="space-y-4 animate-fade-up">
+          <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
             Qu'est-ce qui t'attire le plus ? 🎯
           </h2>
           <p className="text-center text-muted-foreground">Sélectionnez jusqu'à 5 affinités</p>
@@ -1281,11 +1281,11 @@ const Questionnaire = () => {
       } : undefined;
 
       return (
-        <div className="space-y-8 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+        <div className="space-y-4 animate-fade-up">
+          <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
             Sélectionnez vos dates de voyage 🗓️
           </h2>
-          <div className="max-w-2xl mx-auto space-y-6">
+          <div className="max-w-2xl mx-auto space-y-3">
             <div className="space-y-2">
               <label className="block text-sm font-medium text-travliaq-deep-blue text-center">
                 Cliquez sur votre date de départ puis sur votre date de retour ✈️
@@ -1361,8 +1361,8 @@ const Questionnaire = () => {
     // Step 3c: Flexibilité (si flexible)
     if (answers.datesType === "Je suis flexible" && step === stepCounter) {
       return (
-        <div className="space-y-8 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+        <div className="space-y-4 animate-fade-up">
+          <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
             Quelle souplesse ? 🔄
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
@@ -1428,11 +1428,11 @@ const Questionnaire = () => {
         : undefined;
 
       return (
-        <div className="space-y-8 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+        <div className="space-y-4 animate-fade-up">
+          <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
             Quelle est votre date de départ approximative ? 📆
           </h2>
-          <div className="max-w-2xl mx-auto space-y-6">
+          <div className="max-w-2xl mx-auto space-y-3">
             <p className="text-center text-sm text-muted-foreground">
               Cliquez sur une date (cette date servira de référence pour votre flexibilité)
             </p>
@@ -2291,8 +2291,8 @@ const Questionnaire = () => {
     // Step 16: Zone ouverte - SANS LIMITE DE CARACTÈRES
     if (step === stepCounter) {
       return (
-        <div className="space-y-8 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+        <div className="space-y-4 animate-fade-up">
+          <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
             Dis-nous l'essentiel en plus 💬
           </h2>
           <p className="text-center text-muted-foreground">
@@ -2396,17 +2396,17 @@ const Questionnaire = () => {
         </div>
       </div>
 
-      {/* Header compact */}
-      <div className="pt-24 pb-2 px-4">
+      {/* Header ultra-compact */}
+      <div className="pt-20 pb-3 px-4">
         <div className="max-w-3xl mx-auto">
-          <h1 className="text-xl md:text-2xl font-montserrat font-bold text-travliaq-deep-blue text-center mb-2">
-            VOTRE VOYAGE SUR MESURE
-          </h1>
-          <div className="flex items-center justify-center gap-3">
-            <p className="text-sm text-travliaq-deep-blue/70 font-medium">
-              Étape {step} sur {totalSteps}
-            </p>
-            <div className="bg-travliaq-golden-sand/20 px-3 py-1 rounded-full">
+          <div className="flex items-center justify-center gap-4">
+            <h1 className="text-lg md:text-xl font-montserrat font-bold text-travliaq-deep-blue">
+              VOTRE VOYAGE SUR MESURE
+            </h1>
+            <div className="flex items-center gap-2 bg-travliaq-golden-sand/20 px-3 py-1 rounded-full">
+              <span className="text-xs text-travliaq-deep-blue/70 font-medium">
+                {step}/{totalSteps}
+              </span>
               <span className="text-xs font-bold text-travliaq-deep-blue">
                 {Math.round(progress)}%
               </span>
@@ -2415,20 +2415,21 @@ const Questionnaire = () => {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-3xl mx-auto px-4 py-4">
+      {/* Content compact */}
+      <div className="max-w-3xl mx-auto px-4 py-2">
         {step > 1 && (
           <Button
             variant="ghost"
+            size="sm"
             onClick={prevStep}
-            className="mb-3 text-travliaq-deep-blue hover:text-travliaq-deep-blue/80"
+            className="mb-2 text-travliaq-deep-blue hover:text-travliaq-deep-blue/80"
           >
-            <ChevronLeft className="mr-2" />
+            <ChevronLeft className="mr-1 h-4 w-4" />
             Retour
           </Button>
         )}
 
-        <div className="bg-white rounded-2xl shadow-adventure p-6 md:p-8 min-h-[350px]">
+        <div className="bg-white rounded-xl shadow-adventure p-5 md:p-6">
           {renderStep()}
         </div>
       </div>
