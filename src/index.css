@@ -136,15 +136,15 @@ All colors MUST be HSL.
 
 /* Themed, responsive brand scrollbars */
 .themed-scroll {
-  /* Default mobile size - ultra fine */
-  --scroll-size: 3px;
+  /* Default mobile size */
+  --scroll-size: 6px;
   scrollbar-width: thin; /* Firefox */
-  scrollbar-color: hsl(var(--primary) / 0.4) transparent;
+  scrollbar-color: hsl(var(--primary) / 0.5) transparent;
 }
 
 @media (min-width: 768px) {
   .themed-scroll {
-    --scroll-size: 4px; /* Tablet - still very thin */
+    --scroll-size: 8px; /* Tablet */
   }
 }
 
@@ -153,16 +153,18 @@ All colors MUST be HSL.
 }
 
 .themed-scroll::-webkit-scrollbar-track {
-  background: transparent;
+  background: hsl(var(--background) / 0.4);
   border-radius: 9999px;
 }
 
 .themed-scroll::-webkit-scrollbar-thumb {
-  background: hsl(var(--primary) / 0.4);
+  background: hsl(var(--primary) / 0.5);
   border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 .themed-scroll::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--primary) / 0.6);
+  background: hsl(var(--primary) / 0.65);
 }
 
