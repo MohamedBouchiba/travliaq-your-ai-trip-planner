@@ -186,25 +186,58 @@ const Booking = () => {
             <div className="md:col-span-2">
               <Card className="bg-white/10 backdrop-blur-md border-travliaq-turquoise/30 p-8">
                 <div className="mb-6">
-                  <div className="flex items-center gap-3 mb-4">
+                  <div className="flex items-center gap-3 mb-6">
                     <Users className="h-6 w-6 text-travliaq-turquoise" />
                     <h2 className="text-2xl font-bold text-white font-montserrat">
                       {travelers > 1 
                         ? `Voyageur ${currentTraveler + 1} sur ${travelers}`
-                        : "Information Voyageur"
+                        : "Informations Voyageur"
                       }
                     </h2>
                   </div>
                   
-                  {/* Barre de progression */}
-                  <div className="w-full bg-white/20 rounded-full h-2 mb-4">
-                    <div
-                      className="bg-travliaq-turquoise h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${((currentTraveler + 1) / travelers) * 100}%` }}
-                    />
-                  </div>
+                  {/* Progression visuelle élégante */}
+                  {travelers > 1 && (
+                    <div className="mb-6">
+                      {/* Barre de progression */}
+                      <div className="relative w-full h-3 bg-white/10 rounded-full overflow-hidden mb-4">
+                        <div
+                          className="absolute top-0 left-0 h-full bg-gradient-to-r from-travliaq-turquoise to-travliaq-golden-sand rounded-full transition-all duration-500 shadow-glow"
+                          style={{ width: `${((currentTraveler + 1) / travelers) * 100}%` }}
+                        />
+                      </div>
 
-                  <p className="text-white/80 font-inter">
+                      {/* Étapes visuelles */}
+                      <div className="flex justify-between items-center">
+                        {Array.from({ length: travelers }).map((_, index) => (
+                          <div key={index} className="flex flex-col items-center gap-2">
+                            <div
+                              className={`
+                                w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all duration-300
+                                ${index < currentTraveler 
+                                  ? 'bg-travliaq-turquoise text-travliaq-deep-blue shadow-glow' 
+                                  : index === currentTraveler 
+                                  ? 'bg-gradient-to-br from-travliaq-turquoise to-travliaq-golden-sand text-travliaq-deep-blue shadow-glow animate-pulse' 
+                                  : 'bg-white/10 text-white/50'
+                                }
+                              `}
+                            >
+                              {index < currentTraveler ? (
+                                <CheckCircle2 className="h-5 w-5" />
+                              ) : (
+                                index + 1
+                              )}
+                            </div>
+                            <span className={`text-xs font-inter ${index <= currentTraveler ? 'text-white' : 'text-white/40'}`}>
+                              Voyageur {index + 1}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-white/80 font-inter text-sm">
                     {currentTraveler === 0 
                       ? "Veuillez remplir vos informations personnelles (voyageur principal)"
                       : `Veuillez remplir les informations du voyageur ${currentTraveler + 1}`
@@ -614,14 +647,20 @@ const Booking = () => {
                           onClick={handlePrevious}
                           className="flex-1 border-travliaq-turquoise/50 text-white hover:bg-travliaq-turquoise/20"
                         >
-                          Précédent
+                          <ArrowLeft className="h-4 w-4 mr-2" />
+                          Voyageur précédent
                         </Button>
                       )}
                       <Button
                         type="submit"
-                        className="flex-1 bg-travliaq-turquoise hover:bg-travliaq-turquoise/80 text-travliaq-deep-blue font-semibold"
+                        className="flex-1 bg-gradient-to-r from-travliaq-turquoise to-travliaq-golden-sand hover:opacity-90 text-travliaq-deep-blue font-semibold shadow-glow"
                       >
-                        {currentTraveler < travelers - 1 ? "Suivant" : "Terminer"}
+                        {travelers === 1 
+                          ? "Valider mes informations" 
+                          : currentTraveler < travelers - 1 
+                          ? "Informations voyageur suivant" 
+                          : "Valider les informations"
+                        }
                       </Button>
                     </div>
                   </form>
