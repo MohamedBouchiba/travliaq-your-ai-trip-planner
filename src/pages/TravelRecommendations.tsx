@@ -677,7 +677,7 @@ const TravelRecommendations = () => {
         </section>
 
         <div className="relative">
-          {travelData.days.map((day, index) => (
+          {regularSteps.map((day, index) => (
             <DaySection
               key={day.id}
               day={day}
