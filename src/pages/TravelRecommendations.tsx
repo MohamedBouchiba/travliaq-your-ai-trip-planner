@@ -394,14 +394,13 @@ const TravelRecommendations = () => {
         const s = el.querySelector(`[data-day-id="${i}"]`) as HTMLElement | null;
         if (s) arr.push({ id: i, top: getTop(s) });
       }
-      // Removed phantom summary tracking to avoid blank extra step
 
       arr.sort((a, b) => a.top - b.top);
       offsetsRef.current = arr;
     };
 
     const handleScroll = () => {
-      const scrollTop = el.scrollTop + 1; // petite tolérance
+      const scrollTop = el.scrollTop + 1;
       const documentHeight = el.scrollHeight - el.clientHeight;
       const progress = (scrollTop / documentHeight) * 100;
       setScrollProgress(progress);
@@ -410,7 +409,7 @@ const TravelRecommendations = () => {
 
       // Avant l'étape 1 -> pas de widgets
       const first = offsetsRef.current.find(o => o.id === 1)?.top ?? 0;
-      if (scrollTop < first) {
+      if (scrollTop < first - 50) { // Tolérance de 50px pour activer plus tôt
         setActiveDay(0);
         return;
       }
@@ -418,16 +417,16 @@ const TravelRecommendations = () => {
       // Trouver la dernière section dont le top est passé
       let currentId = 1;
       for (const o of offsetsRef.current) {
-        if (scrollTop >= o.top) currentId = o.id; else break;
+        if (scrollTop >= o.top - 100) currentId = o.id; else break;
       }
       
-      // Si on est au footer summary, currentId = summaryId
+      // Si on est au footer summary
       const summaryElement = el.querySelector(`[data-day-id="summary"]`) as HTMLElement | null;
       if (summaryElement) {
         const summaryTop = summaryElement.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
-        if (scrollTop >= summaryTop - 100) { // 100px de tolérance
+        if (scrollTop >= summaryTop - 100) {
           const maxStepId = Math.max(...travelData.days.filter(d => !(d as any).isSummary).map(d => d.id), 0);
-          currentId = maxStepId + 1; // summaryId
+          currentId = maxStepId + 1;
         }
       }
       
@@ -440,13 +439,14 @@ const TravelRecommendations = () => {
     el.addEventListener('scroll', handleScroll, { passive: true } as AddEventListenerOptions);
     window.addEventListener('resize', onResize, { passive: true } as AddEventListenerOptions);
 
+    // Initialiser handleScroll immédiatement
     handleScroll();
 
     return () => {
       el.removeEventListener('scroll', handleScroll as any);
       window.removeEventListener('resize', onResize as any);
     };
-  }, [travelData.days.length]);
+  }, [travelData.days.length, summaryId]);
 
   // Show loading or error states AFTER all hooks
   if (loading && code) {
