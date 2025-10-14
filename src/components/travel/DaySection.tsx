@@ -127,7 +127,12 @@ const DaySection = ({ day, index, isActive }: DaySectionProps) => {
           {/* Image Slider (si présent) */}
           {day.images && day.images.length > 0 && (
             <div 
-              className="mb-3"
+              className="mb-3 overscroll-contain select-none"
+              onPointerDownCapture={(e) => e.stopPropagation()}
+              onPointerMoveCapture={(e) => e.stopPropagation()}
+              onPointerUpCapture={(e) => e.stopPropagation()}
+              onTouchStartCapture={(e) => e.stopPropagation()}
+              onWheelCapture={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
               onTouchMove={(e) => e.stopPropagation()}
               onTouchEnd={(e) => e.stopPropagation()}
