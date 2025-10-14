@@ -2,7 +2,6 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams, useParams, useNavigate } from "react-router-dom";
 import HeroHeader from "@/components/travel/HeroHeader";
 import DaySection from "@/components/travel/DaySection";
-import TimelineSync from "@/components/travel/TimelineSync";
 import FooterSummary from "@/components/travel/FooterSummary";
 import MapView from "@/components/travel/MapView";
 import TravelCalendar from "@/components/travel/TravelCalendar";
@@ -501,16 +500,6 @@ const TravelRecommendations = () => {
 
   return (
     <div className="relative min-h-screen bg-background">
-      {/* Fixed sidebar with Timeline (mobile bottom, desktop left) */}
-      {activeDay >= 1 && activeDay <= regularSteps.length && (
-        <TimelineSync
-          days={allSteps}
-          activeDay={activeDay}
-          scrollProgress={scrollProgress}
-          onScrollToDay={scrollToDay}
-        />
-      )}
-
       {/* Fixed step tracker (top, visible only from step 1) */}
       {activeDay >= 1 && (
         <div className="hidden lg:flex fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
