@@ -8,6 +8,7 @@ const resources = {
       // Navigation
       "nav.home": "Accueil",
       "nav.blog": "Blog",
+      "nav.discover": "Découvrir",
       "nav.admin": "Admin",
       "nav.login": "Se connecter",
       "nav.logout": "Déconnexion",
@@ -108,6 +109,7 @@ const resources = {
       // Navigation
       "nav.home": "Home",
       "nav.blog": "Blog",
+      "nav.discover": "Discover",
       "nav.admin": "Admin",
       "nav.login": "Login",
       "nav.logout": "Logout",

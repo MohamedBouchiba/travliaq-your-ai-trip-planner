@@ -51,6 +51,18 @@ const Navigation = ({ variant = 'default' }: NavigationProps) => {
           </Button>
           
           <Button
+            variant="ghost"
+            size="sm"
+            asChild
+            className="text-white hover:text-white/80 transition-colors flex items-center gap-1"
+          >
+            <a href="/discover">
+              <span className="text-lg">✨</span>
+              {t('nav.discover')}
+            </a>
+          </Button>
+          
+          <Button
             variant="hero"
             size="sm"
             asChild
@@ -129,6 +141,19 @@ const Navigation = ({ variant = 'default' }: NavigationProps) => {
                 onClick={closeMenu}
               >
                 <a href="/blog">{t('nav.blog')}</a>
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="lg"
+                asChild
+                className="text-white hover:text-white/80 transition-colors justify-start flex items-center gap-2"
+                onClick={closeMenu}
+              >
+                <a href="/discover">
+                  <span className="text-lg">✨</span>
+                  {t('nav.discover')}
+                </a>
               </Button>
               
               <Button

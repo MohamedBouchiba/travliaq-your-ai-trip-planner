@@ -18,6 +18,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import TravelRecommendations from "./pages/TravelRecommendations";
 import Booking from "./pages/Booking";
+import Discover from "./pages/Discover";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/discover" element={<Discover />} />
             <Route path="/recommendations" element={<TravelRecommendations />} />
             <Route path="/recommendations/:code" element={<TravelRecommendations />} />
             <Route path="/booking" element={<Booking />} />
