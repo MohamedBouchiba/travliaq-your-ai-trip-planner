@@ -811,7 +811,7 @@ const Booking = () => {
                   className="w-full bg-travliaq-turquoise hover:bg-travliaq-turquoise/90 text-travliaq-deep-blue font-bold text-lg py-6 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
                 >
                   <Shield className="h-5 w-5 mr-2" />
-                  Procéder au paiement sécurisé
+                  Procéder au paiement
                 </Button>
                 
                 {!allTravelersFilled && (
