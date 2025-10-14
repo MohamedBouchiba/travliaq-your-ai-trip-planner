@@ -390,9 +390,14 @@ const TravelRecommendations = () => {
     const recomputeOffsets = () => {
       const getTop = (node: HTMLElement) => node.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
       const arr: Array<{ id: number; top: number }> = [];
-      for (let i = 1; i <= travelData.days.length; i++) {
-        const s = el.querySelector(`[data-day-id="${i}"]`) as HTMLElement | null;
-        if (s) arr.push({ id: i, top: getTop(s) });
+
+      const nodes = Array.from(el.querySelectorAll('[data-day-id]')) as HTMLElement[];
+      for (const node of nodes) {
+        const idAttr = node.getAttribute('data-day-id');
+        if (!idAttr || idAttr === '0' || idAttr === 'summary') continue; // ignore hero and summary footer
+        const idNum = Number(idAttr);
+        if (Number.isNaN(idNum)) continue;
+        arr.push({ id: idNum, top: getTop(node) });
       }
 
       arr.sort((a, b) => a.top - b.top);
@@ -409,6 +414,9 @@ const TravelRecommendations = () => {
 
       // Avant l'étape 1 -> pas de widgets (activeDay = 0)
       const first = offsetsRef.current.find(o => o.id === 1)?.top ?? 0;
+      if (typeof window !== 'undefined') {
+        console.debug('[ScrollSync] firstTop, scrollTop, offsetsCount', first, scrollTop, offsetsRef.current.length);
+      }
       if (scrollTop < first - 200) {
         setActiveDay(0);
         return;
@@ -418,6 +426,9 @@ const TravelRecommendations = () => {
       const summaryElement = el.querySelector(`[data-day-id="summary"]`) as HTMLElement | null;
       if (summaryElement) {
         const summaryTop = summaryElement.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+        if (typeof window !== 'undefined') {
+          console.debug('[ScrollSync] summaryTop, scrollTop', summaryTop, scrollTop);
+        }
         if (scrollTop >= summaryTop - 200) {
           setActiveDay(summaryId);
           return;
@@ -428,6 +439,9 @@ const TravelRecommendations = () => {
       let currentId = 1;
       for (const o of offsetsRef.current) {
         if (scrollTop >= o.top - 150) currentId = o.id; else break;
+      }
+      if (typeof window !== 'undefined') {
+        console.debug('[ScrollSync] currentId', currentId);
       }
       
       setActiveDay(currentId);
@@ -488,7 +502,7 @@ const TravelRecommendations = () => {
   return (
     <div className="relative min-h-screen bg-background">
       {/* Fixed sidebar with Timeline (mobile bottom, desktop left) */}
-      {activeDay >= 1 && (
+      {activeDay >= 1 && activeDay <= regularSteps.length && (
         <TimelineSync
           days={allSteps}
           activeDay={activeDay}
