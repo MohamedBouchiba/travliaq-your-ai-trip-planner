@@ -152,15 +152,6 @@ const Booking = () => {
       <Navigation language="fr" />
       
       <div className="container mx-auto px-4 py-24">
-        <Button
-          variant="ghost"
-          onClick={() => navigate(-1)}
-          className="mb-8 text-white hover:text-travliaq-turquoise"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Retour
-        </Button>
-
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8">
             <h1 className="font-montserrat text-4xl md:text-5xl font-bold text-white mb-4">
@@ -179,7 +170,10 @@ const Booking = () => {
                   <div className="flex items-center gap-3 mb-4">
                     <Users className="h-6 w-6 text-travliaq-turquoise" />
                     <h2 className="text-2xl font-bold text-white font-montserrat">
-                      Voyageur {currentTraveler + 1} sur {travelers}
+                      {travelers > 1 
+                        ? `Voyageur ${currentTraveler + 1} sur ${travelers}`
+                        : "Information Voyageur"
+                      }
                     </h2>
                   </div>
                   
@@ -656,33 +650,33 @@ const Booking = () => {
                   <div className="space-y-3">
                     <p className="text-white font-semibold text-sm mb-2">Détail du prix</p>
                     
-                    {trip.price_flights && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-white/70 text-sm">Billets d'avion</span>
-                        <span className="text-white font-medium">{trip.price_flights}</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between items-center">
+                      <span className="text-white/70 text-sm">Billets d'avion</span>
+                      <span className="text-white font-medium">
+                        {trip.price_flights || "1 450 €"}
+                      </span>
+                    </div>
                     
-                    {trip.price_hotels && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-white/70 text-sm">Hôtels</span>
-                        <span className="text-white font-medium">{trip.price_hotels}</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between items-center">
+                      <span className="text-white/70 text-sm">Hébergement</span>
+                      <span className="text-white font-medium">
+                        {trip.price_hotels || "890 €"}
+                      </span>
+                    </div>
                     
-                    {trip.price_transport && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-white/70 text-sm">Transport</span>
-                        <span className="text-white font-medium">{trip.price_transport}</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between items-center">
+                      <span className="text-white/70 text-sm">Transferts & Transport</span>
+                      <span className="text-white font-medium">
+                        {trip.price_transport || "320 €"}
+                      </span>
+                    </div>
                     
-                    {trip.price_activities && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-white/70 text-sm">Activités</span>
-                        <span className="text-white font-medium">{trip.price_activities}</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between items-center">
+                      <span className="text-white/70 text-sm">Activités & Excursions</span>
+                      <span className="text-white font-medium">
+                        {trip.price_activities || "540 €"}
+                      </span>
+                    </div>
                   </div>
                   
                   {trip.total_price && (
@@ -699,11 +693,11 @@ const Booking = () => {
                 </div>
 
                 {/* Avertissement non-annulation */}
-                <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                   <div className="flex items-start gap-3">
-                    <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+                    <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
                     <div className="text-white/90 text-sm">
-                      <p className="font-semibold mb-1">Politique d'annulation stricte</p>
+                      <p className="font-semibold mb-1">Politique d'annulation</p>
                       <p className="text-white/70 text-xs">
                         Aucune annulation ou modification n'est possible après le paiement (vols, hôtels, activités, transports). Veuillez vérifier attentivement toutes les informations avant de procéder au paiement.
                       </p>
