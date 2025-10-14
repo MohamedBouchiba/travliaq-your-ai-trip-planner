@@ -784,78 +784,130 @@ GROUP BY t.id, t.code, t.destination;
 
 ## Statistiques Dynamiques du Footer
 
-Le système calcule automatiquement les statistiques affichées dans le footer du voyage. Voici comment elles sont générées :
+Le système supporte des statistiques **flexibles et personnalisables** pour chaque trip via le champ `summary_stats` dans l'étape summary.
 
-### Stats par défaut
+### Configuration des Stats
 
-Si vous ne spécifiez pas de stats personnalisées, le système calcule automatiquement :
+Les statistiques sont définies dans l'étape `is_summary: true` via le champ `summary_stats` (array de stats).
 
-```typescript
-// Stats calculées depuis les données du trip
-const defaultStats = [
-  createSummaryStats.days(trip.total_days),           // Depuis trips.total_days
-  createSummaryStats.budget(trip.total_budget),       // Depuis trips.total_budget
-  createSummaryStats.weather(trip.average_weather),   // Depuis trips.average_weather
-  createSummaryStats.style(trip.travel_style),        // Depuis trips.travel_style
-  createSummaryStats.activities(steps.length),        // Nombre de steps
-];
+Chaque stat a un `type` :
+- **Prédéfinis**: `days`, `budget`, `weather`, `style`, `cities`, `people`, `activities`
+- **Personnalisé**: `custom` (avec `icon`, `label`, `color`)
+
+**Exemple avec 8 stats variées** :
+
+```json
+{
+  "step_number": 16,
+  "day_number": 7,
+  "title": "Résumé du voyage",
+  "is_summary": true,
+  "main_image": "...",
+  "summary_stats": [
+    { "type": "days", "value": 7 },
+    { "type": "budget", "value": "3 200 €" },
+    { "type": "weather", "value": "21°C" },
+    { "type": "style", "value": "Culture & Gastronomie" },
+    { "type": "cities", "value": 3 },
+    { "type": "people", "value": 2 },
+    { "type": "activities", "value": 15 },
+    { "type": "custom", "value": "Direct", "icon": "Plane", "label": "VOL", "color": "golden" }
+  ]
+}
 ```
 
-### Helper pour créer des stats personnalisées
-
-Utilisez `createSummaryStats` depuis `src/lib/tripStats.ts` :
-
-```typescript
-import { createSummaryStats } from "@/lib/tripStats";
-import { Plane, Hotel } from "lucide-react";
-
-// Stats personnalisées
-const customStats = [
-  createSummaryStats.days(7),
-  createSummaryStats.budget("3 200 €"),
-  createSummaryStats.weather("21°C"),
-  createSummaryStats.style("Culture & Gastronomie"),
-  createSummaryStats.people(2),
-  createSummaryStats.activities(13),
-  createSummaryStats.cities(2),
-  createSummaryStats.custom(Plane, "Direct", "VOL", 'golden'),
-  createSummaryStats.custom(Hotel, "4.6★", "HÔTEL", 'turquoise')
-];
-```
-
-### Méthodes disponibles
-
-| Méthode | Paramètre | Description | Couleur |
-|---------|-----------|-------------|---------|
-| `days(value: number)` | Nombre de jours | Affiche le nombre de jours | Turquoise |
-| `budget(value: string)` | Budget | Affiche le budget total | Golden |
-| `weather(value: string)` | Météo | Affiche la météo moyenne | Turquoise |
-| `style(value: string)` | Style | Affiche le style de voyage | Golden |
-| `cities(value: number)` | Nombre de villes | Affiche le nombre de villes | Turquoise |
-| `people(value: number)` | Nombre de personnes | Affiche le nombre de voyageurs | Golden |
-| `activities(value: number)` | Nombre d'activités | Affiche le nombre d'étapes | Turquoise |
-| `custom(icon, value, label, color)` | Personnalisé | Stat entièrement personnalisée | Au choix |
-
-### Calcul automatique depuis la base de données
-
-Pour calculer automatiquement les stats à partir des données :
+**Insertion SQL** :
 
 ```sql
--- Stats calculées en SQL
-SELECT 
-  t.code,
-  t.total_days,
-  t.total_budget,
-  t.average_weather,
-  t.travel_style,
-  COUNT(s.id) as total_activities,
-  COUNT(DISTINCT s.day_number) as total_days_with_activities,
-  SUM(s.price) as total_activities_cost
-FROM trips t
-LEFT JOIN steps s ON s.trip_id = t.id
-WHERE t.code = 'TOKYO2025'
-GROUP BY t.id;
+INSERT INTO steps (
+  trip_id, step_number, day_number, title, is_summary, main_image, summary_stats
+) VALUES (
+  (SELECT id FROM trips WHERE code = 'TOKYO2025'),
+  16, 7, 'Résumé du voyage', true,
+  'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=1920&q=80',
+  '[
+    {"type": "days", "value": 7},
+    {"type": "budget", "value": "3 200 €"},
+    {"type": "weather", "value": "21°C"},
+    {"type": "style", "value": "Culture & Gastronomie"},
+    {"type": "cities", "value": 3},
+    {"type": "people", "value": 2},
+    {"type": "activities", "value": 15},
+    {"type": "custom", "value": "Direct", "icon": "Plane", "label": "VOL", "color": "golden"}
+  ]'::jsonb
+);
 ```
+
+### Types de Stats Disponibles
+
+| Type | Description | Couleur | Exemple |
+|------|-------------|---------|---------|
+| `days` | Nombre de jours | Turquoise | `{"type": "days", "value": 7}` |
+| `budget` | Budget total | Golden | `{"type": "budget", "value": "3 200 €"}` |
+| `weather` | Météo moyenne | Turquoise | `{"type": "weather", "value": "21°C"}` |
+| `style` | Style de voyage | Golden | `{"type": "style", "value": "Culture"}` |
+| `cities` | Nombre de villes | Turquoise | `{"type": "cities", "value": 3}` |
+| `people` | Nombre de voyageurs | Golden | `{"type": "people", "value": 2}` |
+| `activities` | Nombre d'étapes | Turquoise | `{"type": "activities", "value": 15}` |
+| `custom` | Stat personnalisée | Au choix | `{"type": "custom", "value": "5★", "icon": "Hotel", "label": "HÔTEL", "color": "golden"}` |
+
+### Exemples de Configurations
+
+**Trip Culturel Complet (8 stats)** :
+```json
+[
+  {"type": "days", "value": 7},
+  {"type": "budget", "value": "3 200 €"},
+  {"type": "weather", "value": "21°C"},
+  {"type": "style", "value": "Culture & Gastronomie"},
+  {"type": "cities", "value": 3},
+  {"type": "people", "value": 2},
+  {"type": "activities", "value": 15},
+  {"type": "custom", "value": "Direct", "icon": "Plane", "label": "VOL", "color": "golden"}
+]
+```
+
+**Trip Aventure Minimaliste (5 stats)** :
+```json
+[
+  {"type": "days", "value": 10},
+  {"type": "weather", "value": "15°C"},
+  {"type": "style", "value": "Aventure & Randonnée"},
+  {"type": "people", "value": 4},
+  {"type": "activities", "value": 8}
+]
+```
+
+**Trip Luxe avec Détails (8 stats)** :
+```json
+[
+  {"type": "days", "value": 5},
+  {"type": "budget", "value": "5 500 €"},
+  {"type": "weather", "value": "28°C"},
+  {"type": "style", "value": "Luxe & Détente"},
+  {"type": "people", "value": 2},
+  {"type": "custom", "value": "1", "icon": "Plane", "label": "ESCALE", "color": "turquoise"},
+  {"type": "custom", "value": "5★", "icon": "Hotel", "label": "HÔTEL", "color": "golden"},
+  {"type": "custom", "value": "Spa inclus", "icon": "Sparkles", "label": "BONUS", "color": "turquoise"}
+]
+```
+
+### Comportement par Défaut
+
+Si `summary_stats` n'est **pas défini**, le système génère automatiquement 5 stats depuis les données du trip :
+1. `days` (depuis `trips.total_days`)
+2. `budget` (depuis `trips.total_budget`)
+3. `weather` (depuis `trips.average_weather`)
+4. `style` (depuis `trips.travel_style`)
+5. `activities` (nombre de steps non-summary)
+
+### Recommandations
+
+- **Nombre**: 4-8 stats (idéal : 6-8)
+- **Alternance**: Variez turquoise/golden pour un rendu harmonieux
+- **Pertinence**: Choisissez les stats qui **mettent en valeur** votre trip
+
+📖 **Guide détaillé** : Voir `docs/SUMMARY_STATS_GUIDE.md` pour tous les exemples et la liste complète des icônes.
 
 ---
 

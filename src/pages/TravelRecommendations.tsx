@@ -321,13 +321,14 @@ const TravelRecommendations = () => {
       rating: trip.hotel_rating || 0
     },
     totalPrice: trip.total_price || "",
-    days: steps.map(step => ({
+      days: steps.map(step => ({
       id: step.step_number,
       day: step.day_number,
       title: step.title,
       subtitle: step.subtitle || "",
       image: step.main_image || "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=1920&q=80",
       isSummary: step.is_summary || false,
+      summaryStats: step.summary_stats || undefined,
       coordinates: (step.latitude && step.longitude) 
         ? [step.longitude, step.latitude] as [number, number]
         : [0, 0] as [number, number],
@@ -687,6 +688,7 @@ const TravelRecommendations = () => {
         </div>
 
         <FooterSummary 
+          stats={(summaryStep as any)?.summaryStats}
           summary={travelData.summary}
           travelers={2}
           activities={regularSteps.length}

@@ -28,6 +28,14 @@ interface Trip {
   price_activities?: string;
 }
 
+interface SummaryStat {
+  type: 'days' | 'budget' | 'weather' | 'style' | 'cities' | 'people' | 'activities' | 'custom';
+  value: string | number;
+  icon?: string;
+  label?: string;
+  color?: 'turquoise' | 'golden';
+}
+
 interface Step {
   id: string;
   trip_id: string;
@@ -57,6 +65,7 @@ interface Step {
   duration: string | null;
   images: string[];
   step_type?: string;
+  summary_stats?: SummaryStat[];
 }
 
 export const useTripData = (code: string | null) => {
@@ -134,7 +143,8 @@ export const useTripData = (code: string | null) => {
           // Transform data to match interface
           const transformedSteps = (stepsData || []).map(step => ({
             ...step,
-            images: (Array.isArray(step.images) ? step.images : []) as string[]
+            images: (Array.isArray(step.images) ? step.images : []) as string[],
+            summary_stats: (Array.isArray(step.summary_stats) ? step.summary_stats as unknown as SummaryStat[] : undefined)
           })) as Step[];
           setSteps(transformedSteps);
         }
