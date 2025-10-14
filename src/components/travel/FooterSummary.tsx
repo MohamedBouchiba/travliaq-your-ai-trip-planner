@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar, DollarSign, CloudSun, Sparkles, MapPin, Users, Activity, Plane } from "lucide-react";
 import { LucideIcon } from "lucide-react";
 import { TripShareButtons } from "./TripShareButtons";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 export interface SummaryStat {
   icon: LucideIcon;
@@ -28,6 +28,8 @@ interface FooterSummaryProps {
   // For sharing
   destination?: string;
   tripTitle?: string;
+  // Trip code for booking
+  tripCode?: string | null;
 }
 
 const FooterSummary = ({ 
@@ -38,14 +40,15 @@ const FooterSummary = ({
   cities = 0, 
   stopovers = 0,
   destination = "votre destination",
-  tripTitle = "Votre voyage"
+  tripTitle = "Votre voyage",
+  tripCode
 }: FooterSummaryProps) => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const code = searchParams.get("code");
 
   const handleBooking = () => {
-    navigate(`/booking?code=${code}`);
+    if (tripCode) {
+      navigate(`/booking?code=${encodeURIComponent(tripCode)}`);
+    }
   };
 
   // Generate 8 comprehensive stats

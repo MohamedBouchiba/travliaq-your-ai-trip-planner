@@ -673,6 +673,7 @@ const TravelRecommendations = () => {
           stopovers={travelData.flight?.type?.toLowerCase().includes('direct') ? 0 : 1}
           destination={travelData.destination}
           tripTitle={`Voyage à ${travelData.destination} - ${travelData.summary.totalDays} jours`}
+          tripCode={code}
         />
       </div>
     </div>
