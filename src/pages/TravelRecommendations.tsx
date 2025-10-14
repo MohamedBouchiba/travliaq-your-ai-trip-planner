@@ -11,13 +11,6 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Map as MapIcon, Calendar as CalendarIcon, CreditCard } from "lucide-react";
 import { useTripData } from "@/hooks/useTripData";
-import { useIsMobile } from "@/hooks/use-mobile";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  type CarouselApi
-} from "@/components/ui/carousel";
 
 // Mock data - sera remplacé par les vraies données IA
 const mockTravelData = {
@@ -295,7 +288,6 @@ const TravelRecommendations = () => {
   const rawCode = searchParams.get("code") ?? (params as any).code ?? null;
   const code = rawCode ? decodeURIComponent(rawCode).replace(/^=+/, '').trim() : null;
   const { trip, steps, loading } = useTripData(code);
-  const isMobile = useIsMobile();
   const navigate = useNavigate();
   
   const [activeDay, setActiveDay] = useState(0);
@@ -304,8 +296,6 @@ const TravelRecommendations = () => {
   const [widgetTab, setWidgetTab] = useState<'map' | 'calendar'>('map');
   const scrollRef = useRef<HTMLDivElement>(null);
   const offsetsRef = useRef<Array<{ id: number; top: number }>>([]);
-  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
-  const [carouselCurrent, setCarouselCurrent] = useState(0);
 
   // Départ du planning fixé au lundi de la semaine courante
   const getMonday = (d: Date = new Date()) => {
@@ -377,23 +367,6 @@ const TravelRecommendations = () => {
 
   // Fonction scrollToDay - DOIT être avant les returns
   const scrollToDay = useCallback((dayId: number | string) => {
-    // Mobile: use carousel
-    if (isMobile && carouselApi) {
-      // dayId 0 = hero, 1-n = days, summaryId = footer
-      if (dayId === 0) {
-        carouselApi.scrollTo(0);
-      } else if (dayId === summaryId) {
-        carouselApi.scrollTo(regularSteps.length + 1); // hero + steps + footer
-      } else {
-        const stepIndex = regularSteps.findIndex(d => d.id === dayId);
-        if (stepIndex !== -1) {
-          carouselApi.scrollTo(stepIndex + 1); // +1 car hero est à l'index 0
-        }
-      }
-      return;
-    }
-
-    // Desktop: use scroll
     const el = scrollRef.current;
     if (!el) return;
 
@@ -408,37 +381,7 @@ const TravelRecommendations = () => {
       top: targetTop,
       behavior: 'smooth'
     });
-  }, [isMobile, carouselApi, summaryId, regularSteps]);
-
-  // Carousel effect for mobile - DOIT être avant les returns
-  useEffect(() => {
-    if (!carouselApi || !isMobile) return;
-
-    const onSelect = () => {
-      const current = carouselApi.selectedScrollSnap();
-      setCarouselCurrent(current);
-      
-      // Update activeDay based on carousel position
-      if (current === 0) {
-        setActiveDay(0); // Hero
-      } else if (current <= regularSteps.length) {
-        setActiveDay(regularSteps[current - 1]?.id || 0);
-      } else {
-        setActiveDay(summaryId); // Footer
-      }
-      
-      // Update progress
-      const progress = (current / (regularSteps.length + 1)) * 100;
-      setScrollProgress(progress);
-    };
-
-    carouselApi.on("select", onSelect);
-    onSelect(); // Initial call
-
-    return () => {
-      carouselApi.off("select", onSelect);
-    };
-  }, [carouselApi, isMobile, regularSteps, summaryId]);
+  }, [summaryId]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -716,96 +659,41 @@ const TravelRecommendations = () => {
         </DrawerContent>
       </Drawer>
 
-      {/* Mobile: Horizontal carousel swipe */}
-      {isMobile ? (
-        <Carousel
-          setApi={setCarouselApi}
-          opts={{
-            align: "start",
-            loop: false,
-            dragFree: false,
-          }}
-          orientation="horizontal"
-          className="h-screen w-full"
-        >
-          <CarouselContent className="h-screen">
-            {/* Hero */}
-            <CarouselItem className="h-screen basis-full">
-              <section data-day-id="0" className="h-screen">
-                <HeroHeader
-                  destination={travelData.destination}
-                  mainImage={travelData.mainImage}
-                  flight={travelData.flight}
-                  hotel={travelData.hotel}
-                  totalPrice={travelData.totalPrice}
-                  tripCode={code}
-                />
-              </section>
-            </CarouselItem>
-
-            {/* Steps */}
-            {travelData.days.map((day, index) => (
-              <CarouselItem key={day.id} className="h-screen basis-full">
-                <DaySection
-                  day={day}
-                  index={index}
-                  isActive={carouselCurrent === index + 1}
-                />
-              </CarouselItem>
-            ))}
-
-            {/* Footer */}
-            <CarouselItem className="h-screen basis-full">
-              <FooterSummary 
-                summary={travelData.summary}
-                travelers={2}
-                activities={regularSteps.length}
-                cities={new Set(regularSteps.map(d => d.title.split(' ')[0])).size}
-                stopovers={travelData.flight?.type?.toLowerCase().includes('direct') ? 0 : 1}
-                destination={travelData.destination}
-                tripTitle={`Voyage à ${travelData.destination} - ${travelData.summary.totalDays} jours`}
-                tripCode={code}
-              />
-            </CarouselItem>
-          </CarouselContent>
-        </Carousel>
-      ) : (
-        /* Desktop: Vertical scroll */
-        <div ref={scrollRef} className="h-screen overflow-y-auto scroll-smooth snap-y snap-mandatory themed-scroll pb-24 md:pb-28 lg:pb-0">
-          <section data-day-id="0" className="h-screen snap-start">
-            <HeroHeader
-              destination={travelData.destination}
-              mainImage={travelData.mainImage}
-              flight={travelData.flight}
-              hotel={travelData.hotel}
-              totalPrice={travelData.totalPrice}
-              tripCode={code}
-            />
-          </section>
-
-          <div className="relative">
-            {travelData.days.map((day, index) => (
-              <DaySection
-                key={day.id}
-                day={day}
-                index={index}
-                isActive={activeDay === day.id}
-              />
-            ))}
-          </div>
-
-          <FooterSummary 
-            summary={travelData.summary}
-            travelers={2}
-            activities={regularSteps.length}
-            cities={new Set(regularSteps.map(d => d.title.split(' ')[0])).size}
-            stopovers={travelData.flight?.type?.toLowerCase().includes('direct') ? 0 : 1}
+      {/* Vertical scroll for all devices */}
+      <div ref={scrollRef} className="h-screen overflow-y-auto scroll-smooth snap-y snap-mandatory themed-scroll pb-24 md:pb-28 lg:pb-0">
+        <section data-day-id="0" className="h-screen snap-start">
+          <HeroHeader
             destination={travelData.destination}
-            tripTitle={`Voyage à ${travelData.destination} - ${travelData.summary.totalDays} jours`}
+            mainImage={travelData.mainImage}
+            flight={travelData.flight}
+            hotel={travelData.hotel}
+            totalPrice={travelData.totalPrice}
             tripCode={code}
           />
+        </section>
+
+        <div className="relative">
+          {travelData.days.map((day, index) => (
+            <DaySection
+              key={day.id}
+              day={day}
+              index={index}
+              isActive={activeDay === day.id}
+            />
+          ))}
         </div>
-      )}
+
+        <FooterSummary 
+          summary={travelData.summary}
+          travelers={2}
+          activities={regularSteps.length}
+          cities={new Set(regularSteps.map(d => d.title.split(' ')[0])).size}
+          stopovers={travelData.flight?.type?.toLowerCase().includes('direct') ? 0 : 1}
+          destination={travelData.destination}
+          tripTitle={`Voyage à ${travelData.destination} - ${travelData.summary.totalDays} jours`}
+          tripCode={code}
+        />
+      </div>
     </div>
   );
 };
