@@ -8,17 +8,25 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
   MapPin, 
-  Calendar, 
-  TrendingUp, 
+  Users, 
+  Mountain, 
   Search, 
-  Share2, 
   Sparkles,
   Globe2,
   Clock,
-  DollarSign
+  DollarSign,
+  Compass,
+  Palmtree,
+  Building2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Trip {
   id: string;
@@ -42,23 +50,56 @@ const Discover = () => {
   const [filteredTrips, setFilteredTrips] = useState<Trip[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+
+  const filters = [
+    { id: "budget", label: "< 800€", icon: DollarSign, filter: (t: Trip) => {
+      const price = parseFloat(t.total_price || t.total_budget || "9999");
+      return price < 800;
+    }},
+    { id: "group", label: "En groupe", icon: Users, filter: (t: Trip) => 
+      t.travel_style?.toLowerCase().includes("groupe") || t.travel_style?.toLowerCase().includes("group")
+    },
+    { id: "adventure", label: "Aventure", icon: Mountain, filter: (t: Trip) => 
+      t.travel_style?.toLowerCase().includes("aventure") || t.travel_style?.toLowerCase().includes("adventure")
+    },
+    { id: "nature", label: "Nature", icon: Palmtree, filter: (t: Trip) => 
+      t.travel_style?.toLowerCase().includes("nature") || t.destination.toLowerCase().includes("montagne")
+    },
+    { id: "culture", label: "Culture", icon: Building2, filter: (t: Trip) => 
+      t.travel_style?.toLowerCase().includes("culture") || t.travel_style?.toLowerCase().includes("découverte")
+    },
+    { id: "exploration", label: "Exploration", icon: Compass, filter: (t: Trip) => 
+      t.travel_style?.toLowerCase().includes("exploration") || t.travel_style?.toLowerCase().includes("découverte")
+    }
+  ];
 
   useEffect(() => {
     fetchTrips();
   }, []);
 
   useEffect(() => {
+    let filtered = trips;
+
+    // Apply search
     if (searchTerm) {
-      const filtered = trips.filter(
+      filtered = filtered.filter(
         (trip) =>
           trip.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
           trip.travel_style?.toLowerCase().includes(searchTerm.toLowerCase())
       );
-      setFilteredTrips(filtered);
-    } else {
-      setFilteredTrips(trips);
     }
-  }, [searchTerm, trips]);
+
+    // Apply active filter
+    if (activeFilter) {
+      const filterObj = filters.find(f => f.id === activeFilter);
+      if (filterObj) {
+        filtered = filtered.filter(filterObj.filter);
+      }
+    }
+
+    setFilteredTrips(filtered);
+  }, [searchTerm, trips, activeFilter]);
 
   const fetchTrips = async () => {
     try {
@@ -86,18 +127,27 @@ const Discover = () => {
     navigate(`/recommendations/${code}`);
   };
 
-  const handleShare = async (trip: Trip, e: React.MouseEvent) => {
+  const handleShare = (trip: Trip, platform: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const url = `${window.location.origin}/recommendations/${trip.code}`;
+    const text = `Découvrez ce voyage incroyable : ${trip.destination}`;
     
-    try {
-      await navigator.clipboard.writeText(url);
+    const shareUrls: Record<string, string> = {
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+      twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,
+      whatsapp: `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`,
+      telegram: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,
+      copy: url
+    };
+
+    if (platform === 'copy') {
+      navigator.clipboard.writeText(url);
       toast({
         title: "Lien copié ! 🎉",
         description: "Le lien du voyage a été copié dans votre presse-papier",
       });
-    } catch (error) {
-      console.error("Error copying to clipboard:", error);
+    } else {
+      window.open(shareUrls[platform], '_blank', 'width=600,height=400');
     }
   };
 
@@ -130,21 +180,21 @@ const Discover = () => {
 
       <div className="relative z-10 container mx-auto px-4 pt-32 pb-20">
         {/* Hero Section */}
-        <div className="text-center mb-16 animate-fade-in">
-          <div className="flex items-center justify-center mb-6">
-            <Globe2 className="w-12 h-12 text-travliaq-turquoise animate-pulse mr-4" />
-            <h1 className="text-5xl md:text-7xl font-montserrat font-bold bg-gradient-to-r from-travliaq-turquoise via-travliaq-golden-sand to-travliaq-turquoise bg-clip-text text-transparent animate-gradient">
+        <div className="text-center mb-12 animate-fade-in">
+          <div className="flex items-center justify-center mb-4">
+            <Globe2 className="w-8 h-8 text-travliaq-turquoise animate-pulse mr-3" />
+            <h1 className="text-3xl md:text-5xl font-montserrat font-bold bg-gradient-to-r from-travliaq-turquoise via-travliaq-golden-sand to-travliaq-turquoise bg-clip-text text-transparent animate-gradient">
               DÉCOUVREZ LES VOYAGES
             </h1>
-            <Sparkles className="w-12 h-12 text-travliaq-golden-sand animate-pulse ml-4" />
+            <Sparkles className="w-8 h-8 text-travliaq-golden-sand animate-pulse ml-3" />
           </div>
-          <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+          <p className="text-lg text-gray-300 max-w-2xl mx-auto">
             Explorez notre collection de voyages uniques, conçus sur mesure pour des expériences inoubliables
           </p>
         </div>
 
         {/* Search Bar */}
-        <div className="max-w-2xl mx-auto mb-12">
+        <div className="max-w-2xl mx-auto mb-8">
           <div className="relative group">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-travliaq-turquoise group-hover:text-travliaq-golden-sand transition-colors" />
             <Input
@@ -152,48 +202,34 @@ const Discover = () => {
               placeholder="Rechercher une destination, un style de voyage..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-12 pr-4 py-6 bg-white/5 border-2 border-travliaq-turquoise/30 rounded-2xl text-white placeholder:text-gray-400 focus:border-travliaq-golden-sand focus:ring-2 focus:ring-travliaq-golden-sand/50 backdrop-blur-sm hover:bg-white/10 transition-all"
+              className="pl-12 pr-4 py-5 bg-white/5 border-2 border-travliaq-turquoise/30 rounded-2xl text-white placeholder:text-gray-400 focus:border-travliaq-golden-sand focus:ring-2 focus:ring-travliaq-golden-sand/50 backdrop-blur-sm hover:bg-white/10 transition-all"
             />
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16 max-w-4xl mx-auto">
-          <Card className="bg-white/5 border-travliaq-turquoise/30 backdrop-blur-sm p-6 hover:bg-white/10 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-travliaq-turquoise/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm mb-1">Destinations</p>
-                <p className="text-3xl font-bold text-travliaq-turquoise">{trips.length}</p>
-              </div>
-              <MapPin className="w-10 h-10 text-travliaq-turquoise/50" />
-            </div>
-          </Card>
-          <Card className="bg-white/5 border-travliaq-golden-sand/30 backdrop-blur-sm p-6 hover:bg-white/10 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-travliaq-golden-sand/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm mb-1">Nouveaux cette semaine</p>
-                <p className="text-3xl font-bold text-travliaq-golden-sand">
-                  {trips.filter(t => {
-                    const weekAgo = new Date();
-                    weekAgo.setDate(weekAgo.getDate() - 7);
-                    return new Date(t.created_at) > weekAgo;
-                  }).length}
-                </p>
-              </div>
-              <TrendingUp className="w-10 h-10 text-travliaq-golden-sand/50" />
-            </div>
-          </Card>
-          <Card className="bg-white/5 border-purple-500/30 backdrop-blur-sm p-6 hover:bg-white/10 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm mb-1">Styles de voyage</p>
-                <p className="text-3xl font-bold text-purple-400">
-                  {new Set(trips.map(t => t.travel_style).filter(Boolean)).size}
-                </p>
-              </div>
-              <Sparkles className="w-10 h-10 text-purple-400/50" />
-            </div>
-          </Card>
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3 justify-center mb-12 max-w-4xl mx-auto">
+          {filters.map((filter) => {
+            const Icon = filter.icon;
+            const isActive = activeFilter === filter.id;
+            return (
+              <Button
+                key={filter.id}
+                onClick={() => setActiveFilter(isActive ? null : filter.id)}
+                className={`
+                  ${isActive 
+                    ? 'bg-gradient-to-r from-travliaq-turquoise to-travliaq-golden-sand text-white' 
+                    : 'bg-white/5 text-gray-300 hover:bg-white/10'
+                  }
+                  border-2 ${isActive ? 'border-travliaq-turquoise' : 'border-white/20'}
+                  backdrop-blur-sm transition-all hover:scale-105 px-4 py-2 rounded-xl
+                `}
+              >
+                <Icon className="w-4 h-4 mr-2" />
+                {filter.label}
+              </Button>
+            );
+          })}
         </div>
 
         {/* Trips Grid */}
@@ -203,7 +239,7 @@ const Discover = () => {
             <p className="text-gray-400 text-xl">Aucun voyage trouvé</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredTrips.map((trip, index) => (
               <Card
                 key={trip.id}
@@ -212,7 +248,7 @@ const Discover = () => {
                 style={{ animationDelay: `${index * 0.1}s` }}
               >
                 {/* Image */}
-                <div className="relative h-64 overflow-hidden">
+                <div className="relative h-48 overflow-hidden">
                   <img
                     src={trip.main_image}
                     alt={trip.destination}
@@ -233,25 +269,46 @@ const Discover = () => {
                   )}
 
                   {/* Share Button */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => handleShare(trip, e)}
-                    className="absolute top-4 right-4 bg-white/20 backdrop-blur-sm hover:bg-white/40 text-white border border-white/30 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300"
-                  >
-                    <Share2 className="w-4 h-4" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute top-4 right-4 bg-white/20 backdrop-blur-sm hover:bg-white/40 text-white border border-white/30 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="bg-black/90 border-travliaq-turquoise/30 backdrop-blur-sm">
+                      <DropdownMenuItem onClick={(e) => handleShare(trip, 'facebook', e)} className="text-white hover:text-travliaq-turquoise cursor-pointer">
+                        Facebook
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => handleShare(trip, 'twitter', e)} className="text-white hover:text-travliaq-turquoise cursor-pointer">
+                        X (Twitter)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => handleShare(trip, 'whatsapp', e)} className="text-white hover:text-travliaq-turquoise cursor-pointer">
+                        WhatsApp
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => handleShare(trip, 'telegram', e)} className="text-white hover:text-travliaq-turquoise cursor-pointer">
+                        Telegram
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => handleShare(trip, 'copy', e)} className="text-white hover:text-travliaq-turquoise cursor-pointer">
+                        Copier le lien
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
                   {/* Destination */}
                   <div className="absolute bottom-4 left-4 right-4">
-                    <h3 className="text-2xl font-bold text-white mb-2 drop-shadow-lg">
+                    <h3 className="text-xl font-bold text-white drop-shadow-lg">
                       {trip.destination}
                     </h3>
                   </div>
                 </div>
 
                 {/* Info */}
-                <div className="p-6 space-y-4">
+                <div className="p-4 space-y-3">
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center text-travliaq-turquoise">
                       <Clock className="w-4 h-4 mr-2" />
@@ -283,11 +340,11 @@ const Discover = () => {
                   )}
 
                   <Button
-                    className="w-full bg-gradient-to-r from-travliaq-turquoise to-travliaq-deep-blue hover:from-travliaq-golden-sand hover:to-travliaq-turquoise text-white font-semibold py-3 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-travliaq-turquoise/50"
+                    className="w-full bg-gradient-to-r from-travliaq-turquoise to-travliaq-deep-blue hover:from-travliaq-golden-sand hover:to-travliaq-turquoise text-white font-semibold py-2 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-travliaq-turquoise/50 text-sm"
                     onClick={() => handleTripClick(trip.code)}
                   >
-                    Découvrir ce voyage
-                    <Sparkles className="w-4 h-4 ml-2" />
+                    Découvrir
+                    <Sparkles className="w-3 h-3 ml-2" />
                   </Button>
                 </div>
 
