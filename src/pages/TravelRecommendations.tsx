@@ -471,7 +471,9 @@ const TravelRecommendations = () => {
     const el = scrollRef.current;
     if (!el) return;
 
-    const target = el.querySelector(`[data-day-id="${dayId}"]`) as HTMLElement | null;
+    // Si c'est le summaryId, scroller vers la section summary
+    const targetSelector = dayId === summaryId ? '[data-day-id="summary"]' : `[data-day-id="${dayId}"]`;
+    const target = el.querySelector(targetSelector) as HTMLElement | null;
     if (!target) return;
 
     const getTop = (node: HTMLElement) => node.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;

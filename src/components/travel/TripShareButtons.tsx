@@ -94,30 +94,52 @@ export const TripShareButtons = ({
           Partager cet itinéraire
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuItem onClick={() => handleShare("twitter")}>
-          <FaXTwitter className="h-4 w-4 mr-2" />
-          X (Twitter)
+      <DropdownMenuContent 
+        align="end" 
+        className="w-64 bg-travliaq-deep-blue/95 backdrop-blur-md border-travliaq-turquoise/30 shadow-glow z-[100]"
+      >
+        <DropdownMenuItem 
+          onClick={() => handleShare("twitter")}
+          className="text-white hover:bg-travliaq-turquoise/20 hover:text-travliaq-turquoise focus:bg-travliaq-turquoise/20 focus:text-travliaq-turquoise cursor-pointer py-3 px-4 font-inter transition-all duration-200"
+        >
+          <FaXTwitter className="h-5 w-5 mr-3" />
+          <span className="font-medium">X (Twitter)</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleShare("facebook")}>
-          <Facebook className="h-4 w-4 mr-2" />
-          Facebook
+        <DropdownMenuItem 
+          onClick={() => handleShare("facebook")}
+          className="text-white hover:bg-travliaq-turquoise/20 hover:text-travliaq-turquoise focus:bg-travliaq-turquoise/20 focus:text-travliaq-turquoise cursor-pointer py-3 px-4 font-inter transition-all duration-200"
+        >
+          <Facebook className="h-5 w-5 mr-3" />
+          <span className="font-medium">Facebook</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleShare("whatsapp")}>
-          <MessageCircle className="h-4 w-4 mr-2" />
-          WhatsApp
+        <DropdownMenuItem 
+          onClick={() => handleShare("whatsapp")}
+          className="text-white hover:bg-travliaq-turquoise/20 hover:text-travliaq-turquoise focus:bg-travliaq-turquoise/20 focus:text-travliaq-turquoise cursor-pointer py-3 px-4 font-inter transition-all duration-200"
+        >
+          <MessageCircle className="h-5 w-5 mr-3" />
+          <span className="font-medium">WhatsApp</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleShare("telegram")}>
-          <Send className="h-4 w-4 mr-2" />
-          Telegram
+        <DropdownMenuItem 
+          onClick={() => handleShare("telegram")}
+          className="text-white hover:bg-travliaq-turquoise/20 hover:text-travliaq-turquoise focus:bg-travliaq-turquoise/20 focus:text-travliaq-turquoise cursor-pointer py-3 px-4 font-inter transition-all duration-200"
+        >
+          <Send className="h-5 w-5 mr-3" />
+          <span className="font-medium">Telegram</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleInstagramShare}>
-          <Instagram className="h-4 w-4 mr-2" />
-          Instagram
+        <DropdownMenuItem 
+          onClick={handleInstagramShare}
+          className="text-white hover:bg-travliaq-golden-sand/20 hover:text-travliaq-golden-sand focus:bg-travliaq-golden-sand/20 focus:text-travliaq-golden-sand cursor-pointer py-3 px-4 font-inter transition-all duration-200"
+        >
+          <Instagram className="h-5 w-5 mr-3" />
+          <span className="font-medium">Instagram</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleCopyLink}>
-          <Copy className="h-4 w-4 mr-2" />
-          Copier le lien
+        <div className="h-px bg-white/10 my-1" />
+        <DropdownMenuItem 
+          onClick={handleCopyLink}
+          className="text-travliaq-golden-sand hover:bg-travliaq-golden-sand/20 focus:bg-travliaq-golden-sand/20 cursor-pointer py-3 px-4 font-inter transition-all duration-200"
+        >
+          <Copy className="h-5 w-5 mr-3" />
+          <span className="font-medium">Copier le lien</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
