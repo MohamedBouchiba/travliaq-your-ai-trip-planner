@@ -137,14 +137,14 @@ All colors MUST be HSL.
 /* Themed, responsive brand scrollbars */
 .themed-scroll {
   /* Default mobile size - ultra fine */
-  --scroll-size: 2px;
+  --scroll-size: 1px;
   scrollbar-width: thin; /* Firefox */
-  scrollbar-color: hsl(var(--primary) / 0.3) transparent;
+  scrollbar-color: hsl(var(--primary) / 0.2) transparent;
 }
 
 @media (min-width: 768px) {
   .themed-scroll {
-    --scroll-size: 3px; /* Tablet - still very thin */
+    --scroll-size: 2px; /* Tablet - still very thin */
   }
 }
 
