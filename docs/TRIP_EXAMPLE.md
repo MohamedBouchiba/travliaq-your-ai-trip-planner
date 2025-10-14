@@ -22,7 +22,12 @@ Ce fichier présente un exemple complet d'un trip avec **tous** les paramètres 
   "average_weather": "21°C",
   "travel_style": "Culture & Gastronomie",
   "travel_style_en": "Culture & Gastronomy",
-  "start_date": "2025-04-15"
+  "start_date": "2025-04-15",
+  "travelers": 2,
+  "price_flights": "800 €",
+  "price_hotels": "1 400 €",
+  "price_transport": "300 €",
+  "price_activities": "700 €"
 }
 ```
 
@@ -46,7 +51,12 @@ INSERT INTO trips (
   average_weather,
   travel_style,
   travel_style_en,
-  start_date
+  start_date,
+  travelers,
+  price_flights,
+  price_hotels,
+  price_transport,
+  price_activities
 ) VALUES (
   'COMPLETE2025',
   'Tokyo & Kyoto',
@@ -64,7 +74,12 @@ INSERT INTO trips (
   '21°C',
   'Culture & Gastronomie',
   'Culture & Gastronomy',
-  '2025-04-15'
+  '2025-04-15',
+  2,
+  '800 €',
+  '1 400 €',
+  '300 €',
+  '700 €'
 );
 ```
 
@@ -81,6 +96,8 @@ Tous les autres champs sont optionnels :
 - **Vol** : `flight_from`, `flight_to`, `flight_duration`, `flight_type`
 - **Hébergement** : `hotel_name`, `hotel_rating`
 - **Tarification** : `total_price`, `total_budget`
+- **Budget détaillé** : `price_flights`, `price_hotels`, `price_transport`, `price_activities`
+- **Voyageurs** : `travelers` (nombre de voyageurs)
 - **Météo** : `average_weather`
 - **Style** : `travel_style`, `travel_style_en`
 - **Date** : `start_date`

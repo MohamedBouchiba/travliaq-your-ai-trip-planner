@@ -119,6 +119,32 @@ Schéma JSON conforme à **JSON Schema Draft 7** définissant la structure compl
       "format": "date",
       "examples": ["2025-04-15", "2024-12-01"]
     },
+    "travelers": {
+      "type": ["integer", "null"],
+      "description": "Nombre de voyageurs",
+      "minimum": 1,
+      "examples": [1, 2, 4]
+    },
+    "price_flights": {
+      "type": ["string", "null"],
+      "description": "Prix des vols (avec devise)",
+      "examples": ["800 €", "$1,200", "€650"]
+    },
+    "price_hotels": {
+      "type": ["string", "null"],
+      "description": "Prix des hébergements (avec devise)",
+      "examples": ["1 400 €", "$2,000", "€1,100"]
+    },
+    "price_transport": {
+      "type": ["string", "null"],
+      "description": "Prix des transports sur place (avec devise)",
+      "examples": ["300 €", "$350", "€250"]
+    },
+    "price_activities": {
+      "type": ["string", "null"],
+      "description": "Prix des activités (avec devise)",
+      "examples": ["700 €", "$800", "€600"]
+    },
     "steps": {
       "type": "array",
       "description": "Liste des étapes du voyage",
@@ -278,6 +304,7 @@ Voici un exemple JSON complet basé sur le trip **TOKYO2025** actuellement en ba
 {
   "code": "TOKYO2025",
   "destination": "Tokyo & Kyoto",
+  "destination_en": "Tokyo & Kyoto",
   "total_days": 7,
   "main_image": "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=1920&q=80",
   "flight_from": "Paris",
@@ -290,7 +317,13 @@ Voici un exemple JSON complet basé sur le trip **TOKYO2025** actuellement en ba
   "total_budget": "3 200 €",
   "average_weather": "21°C",
   "travel_style": "Culture & Gastronomie",
+  "travel_style_en": "Culture & Gastronomy",
   "start_date": "2025-04-15",
+  "travelers": 2,
+  "price_flights": "800 €",
+  "price_hotels": "1 400 €",
+  "price_transport": "300 €",
+  "price_activities": "700 €",
   "steps": [
     {
       "step_number": 1,
@@ -606,7 +639,12 @@ BEGIN
     average_weather,
     travel_style,
     travel_style_en,
-    start_date
+    start_date,
+    travelers,
+    price_flights,
+    price_hotels,
+    price_transport,
+    price_activities
   ) VALUES (
     trip_data->>'code',
     trip_data->>'destination',
@@ -624,7 +662,12 @@ BEGIN
     NULLIF(trip_data->>'average_weather', ''),
     NULLIF(trip_data->>'travel_style', ''),
     NULLIF(trip_data->>'travel_style_en', ''),
-    NULLIF(trip_data->>'start_date', '')::date
+    NULLIF(trip_data->>'start_date', '')::date,
+    NULLIF(trip_data->>'travelers', '')::integer,
+    NULLIF(trip_data->>'price_flights', ''),
+    NULLIF(trip_data->>'price_hotels', ''),
+    NULLIF(trip_data->>'price_transport', ''),
+    NULLIF(trip_data->>'price_activities', '')
   ) RETURNING id INTO new_trip_id;
   
   -- Insertion des steps

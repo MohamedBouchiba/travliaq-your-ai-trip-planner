@@ -25,8 +25,15 @@ Contient les informations principales du voyage.
 - `hotel_rating` (numeric) : Note de l'hôtel (ex: 4.6)
 - `total_price` (text) : Prix total (ex: "2 500 € TTC")
 - `total_budget` (text) : Budget total (ex: "3 200 €")
+- `travelers` (integer) : Nombre de voyageurs
+- `price_flights` (text) : Prix des vols (ex: "800 €")
+- `price_hotels` (text) : Prix des hébergements (ex: "1 400 €")
+- `price_transport` (text) : Prix des transports sur place (ex: "300 €")
+- `price_activities` (text) : Prix des activités (ex: "700 €")
 - `average_weather` (text) : Météo moyenne (ex: "21°C")
 - `travel_style` (text) : Style de voyage (ex: "Culture & Gastronomie")
+- `travel_style_en` (text) : Traduction anglaise du style de voyage
+- `destination_en` (text) : Traduction anglaise de la destination
 - `start_date` (date) : Date de début du voyage
 
 ### Table `steps`

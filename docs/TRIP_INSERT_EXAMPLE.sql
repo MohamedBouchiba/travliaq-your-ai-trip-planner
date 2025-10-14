@@ -25,7 +25,12 @@ INSERT INTO trips (
   average_weather,        -- Météo moyenne
   travel_style,           -- Style du voyage
   travel_style_en,        -- Traduction anglaise du style
-  start_date              -- Date de début
+  start_date,             -- Date de début
+  travelers,              -- Nombre de voyageurs
+  price_flights,          -- Prix des vols
+  price_hotels,           -- Prix des hébergements
+  price_transport,        -- Prix des transports
+  price_activities        -- Prix des activités
 ) VALUES (
   'BALI2025',
   'Bali',
@@ -43,7 +48,12 @@ INSERT INTO trips (
   '28°C',
   'Relaxation & Aventure',
   'Relaxation & Adventure',
-  '2025-07-15'
+  '2025-07-15',
+  2,
+  '1 200 €',
+  '1 800 €',
+  '400 €',
+  '600 €'
 );
 
 -- ========================================
