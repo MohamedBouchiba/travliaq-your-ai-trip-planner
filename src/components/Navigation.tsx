@@ -1,35 +1,25 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Menu, X, LogOut } from 'lucide-react';
+import { Menu, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import logo from '@/assets/logo-travliaq.png';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from './LanguageSwitcher';
 
-interface NavigationProps {
-  language: 'fr' | 'en';
-}
-
-const Navigation = ({ language }: NavigationProps) => {
+const Navigation = () => {
   const { user, signOut } = useAuth();
   const { isAdmin, loading: roleLoading } = useUserRole();
   const [isOpen, setIsOpen] = useState(false);
-
-  const isFrench = language === 'fr';
-  const langSwitchUrl = isFrench ? '/en' : '/';
-  const langSwitchText = isFrench ? 'English' : 'Français';
-  const homeText = isFrench ? 'Accueil' : 'Home';
-  const loginText = isFrench ? 'Se connecter' : 'Login';
-  const blogText = isFrench ? 'Blog' : 'Blog';
-  const adminText = isFrench ? 'Admin' : 'Admin';
-  const logoutText = isFrench ? 'Déconnexion' : 'Logout';
+  const { t } = useTranslation();
 
   const closeMenu = () => setIsOpen(false);
 
   return (
     <header className="absolute top-0 left-0 right-0 z-20 p-4 md:p-6">
       <div className="container mx-auto flex justify-between items-center">
-        <a href={isFrench ? '/' : '/en'}>
+        <a href="/">
           <img src={logo} alt="Logo Travliaq" className="h-16 md:h-20 w-auto" />
         </a>
 
@@ -41,7 +31,7 @@ const Navigation = ({ language }: NavigationProps) => {
             asChild
             className="text-white hover:text-white/80 transition-colors"
           >
-            <a href={isFrench ? '/' : '/en'}>{homeText}</a>
+            <a href="/">{t('nav.home')}</a>
           </Button>
           
           <Button
@@ -50,7 +40,7 @@ const Navigation = ({ language }: NavigationProps) => {
             asChild
             className="text-white hover:text-white/80 transition-colors"
           >
-            <a href="/blog">{blogText}</a>
+            <a href="/blog">{t('nav.blog')}</a>
           </Button>
           
           {user && !roleLoading && isAdmin && (
@@ -60,7 +50,7 @@ const Navigation = ({ language }: NavigationProps) => {
               asChild
               className="text-white hover:text-white/80 transition-colors"
             >
-              <a href="/admin/blog">{adminText}</a>
+              <a href="/admin/blog">{t('nav.admin')}</a>
             </Button>
           )}
           
@@ -71,7 +61,7 @@ const Navigation = ({ language }: NavigationProps) => {
               asChild
               className="text-white hover:text-white/80 transition-colors"
             >
-              <a href="/auth">{loginText}</a>
+              <a href="/auth">{t('nav.login')}</a>
             </Button>
           )}
           
@@ -83,16 +73,11 @@ const Navigation = ({ language }: NavigationProps) => {
               className="text-white hover:text-white/80 transition-colors"
             >
               <LogOut className="w-4 h-4 mr-2" />
-              {logoutText}
+              {t('nav.logout')}
             </Button>
           )}
           
-          <a
-            href={langSwitchUrl}
-            className="text-white hover:text-white/80 transition-colors font-inter"
-          >
-            {langSwitchText}
-          </a>
+          <LanguageSwitcher />
         </nav>
 
         {/* Mobile Navigation */}
@@ -115,7 +100,7 @@ const Navigation = ({ language }: NavigationProps) => {
                 className="text-white hover:text-white/80 transition-colors justify-start"
                 onClick={closeMenu}
               >
-                <a href={isFrench ? '/' : '/en'}>{homeText}</a>
+                <a href="/">{t('nav.home')}</a>
               </Button>
               
               <Button
@@ -125,7 +110,7 @@ const Navigation = ({ language }: NavigationProps) => {
                 className="text-white hover:text-white/80 transition-colors justify-start"
                 onClick={closeMenu}
               >
-                <a href="/blog">{blogText}</a>
+                <a href="/blog">{t('nav.blog')}</a>
               </Button>
               
               {user && !roleLoading && isAdmin && (
@@ -136,7 +121,7 @@ const Navigation = ({ language }: NavigationProps) => {
                   className="text-white hover:text-white/80 transition-colors justify-start"
                   onClick={closeMenu}
                 >
-                  <a href="/admin/blog">{adminText}</a>
+                  <a href="/admin/blog">{t('nav.admin')}</a>
                 </Button>
               )}
               
@@ -148,7 +133,7 @@ const Navigation = ({ language }: NavigationProps) => {
                   className="text-white hover:text-white/80 transition-colors justify-start"
                   onClick={closeMenu}
                 >
-                  <a href="/auth">{loginText}</a>
+                  <a href="/auth">{t('nav.login')}</a>
                 </Button>
               )}
               
@@ -163,19 +148,13 @@ const Navigation = ({ language }: NavigationProps) => {
                   className="text-white hover:text-white/80 transition-colors justify-start"
                 >
                   <LogOut className="w-4 h-4 mr-2" />
-                  {logoutText}
+                  {t('nav.logout')}
                 </Button>
               )}
               
-              <Button
-                variant="ghost"
-                size="lg"
-                asChild
-                className="text-white hover:text-white/80 transition-colors justify-start"
-                onClick={closeMenu}
-              >
-                <a href={langSwitchUrl}>{langSwitchText}</a>
-              </Button>
+              <div className="flex justify-start">
+                <LanguageSwitcher />
+              </div>
             </nav>
           </SheetContent>
         </Sheet>
