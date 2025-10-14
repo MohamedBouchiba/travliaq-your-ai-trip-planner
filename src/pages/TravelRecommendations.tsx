@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef, useCallback } from "react";
-import { useSearchParams, useParams, useNavigate } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
+import { useSearchParams, useParams } from "react-router-dom";
 import HeroHeader from "@/components/travel/HeroHeader";
 import DaySection from "@/components/travel/DaySection";
 import TimelineSync from "@/components/travel/TimelineSync";
@@ -9,7 +9,7 @@ import TravelCalendar from "@/components/travel/TravelCalendar";
 import TravelDayCalendar from "@/components/travel/TravelDayCalendar";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
-import { Map as MapIcon, Calendar as CalendarIcon, CreditCard } from "lucide-react";
+import { Map as MapIcon, Calendar as CalendarIcon } from "lucide-react";
 import { useTripData } from "@/hooks/useTripData";
 
 // Mock data - sera remplacé par les vraies données IA
@@ -288,7 +288,6 @@ const TravelRecommendations = () => {
   const rawCode = searchParams.get("code") ?? (params as any).code ?? null;
   const code = rawCode ? decodeURIComponent(rawCode).replace(/^=+/, '').trim() : null;
   const { trip, steps, loading } = useTripData(code);
-  const navigate = useNavigate();
   
   const [activeDay, setActiveDay] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
@@ -353,36 +352,6 @@ const TravelRecommendations = () => {
     }
   } : mockTravelData;
 
-  // Separate summary step from regular steps - AVANT les hooks
-  const regularSteps = travelData.days.filter(d => !(d as any).isSummary);
-  const summaryStep = travelData.days.find(d => (d as any).isSummary);
-  
-  // ID spécial pour le footer summary (après toutes les étapes régulières)
-  const summaryId = Math.max(...regularSteps.map(d => d.id), 0) + 1;
-  
-  const allSteps = [
-    ...regularSteps.map(d => ({ id: d.id, title: d.title, isSummary: false })),
-    { id: summaryId, title: 'Validation', isSummary: true }
-  ];
-
-  // Fonction scrollToDay - DOIT être avant les returns
-  const scrollToDay = useCallback((dayId: number | string) => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    const targetSelector = dayId === summaryId ? '[data-day-id="summary"]' : `[data-day-id="${dayId}"]`;
-    const target = el.querySelector(targetSelector) as HTMLElement | null;
-    if (!target) return;
-
-    const getTop = (node: HTMLElement) => node.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
-    const targetTop = getTop(target);
-    
-    el.scrollTo({
-      top: targetTop,
-      behavior: 'smooth'
-    });
-  }, [summaryId]);
-
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -390,58 +359,45 @@ const TravelRecommendations = () => {
     const recomputeOffsets = () => {
       const getTop = (node: HTMLElement) => node.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
       const arr: Array<{ id: number; top: number }> = [];
-
-      const nodes = Array.from(el.querySelectorAll('[data-day-id]')) as HTMLElement[];
-      for (const node of nodes) {
-        const idAttr = node.getAttribute('data-day-id');
-        if (!idAttr || idAttr === '0' || idAttr === 'summary') continue; // ignore hero and summary footer
-        const idNum = Number(idAttr);
-        if (Number.isNaN(idNum)) continue;
-        arr.push({ id: idNum, top: getTop(node) });
+      for (let i = 1; i <= travelData.days.length; i++) {
+        const s = el.querySelector(`[data-day-id="${i}"]`) as HTMLElement | null;
+        if (s) arr.push({ id: i, top: getTop(s) });
       }
+      // Removed phantom summary tracking to avoid blank extra step
 
       arr.sort((a, b) => a.top - b.top);
       offsetsRef.current = arr;
     };
 
     const handleScroll = () => {
-      const scrollTop = el.scrollTop + 1;
+      const scrollTop = el.scrollTop + 1; // petite tolérance
       const documentHeight = el.scrollHeight - el.clientHeight;
       const progress = (scrollTop / documentHeight) * 100;
       setScrollProgress(progress);
 
       if (!offsetsRef.current.length) recomputeOffsets();
 
-      // Avant l'étape 1 -> pas de widgets (activeDay = 0)
+      // Avant l'étape 1 -> pas de widgets
       const first = offsetsRef.current.find(o => o.id === 1)?.top ?? 0;
-      if (typeof window !== 'undefined') {
-        console.debug('[ScrollSync] firstTop, scrollTop, offsetsCount', first, scrollTop, offsetsRef.current.length);
-      }
-      if (scrollTop < first - 200) {
+      if (scrollTop < first) {
         setActiveDay(0);
         return;
-      }
-
-      // Si on est au footer summary -> activeDay = summaryId pour cacher les widgets
-      const summaryElement = el.querySelector(`[data-day-id="summary"]`) as HTMLElement | null;
-      if (summaryElement) {
-        const summaryTop = summaryElement.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
-        if (typeof window !== 'undefined') {
-          console.debug('[ScrollSync] summaryTop, scrollTop', summaryTop, scrollTop);
-        }
-        if (scrollTop >= summaryTop - 200) {
-          setActiveDay(summaryId);
-          return;
-        }
       }
 
       // Trouver la dernière section dont le top est passé
       let currentId = 1;
       for (const o of offsetsRef.current) {
-        if (scrollTop >= o.top - 150) currentId = o.id; else break;
+        if (scrollTop >= o.top) currentId = o.id; else break;
       }
-      if (typeof window !== 'undefined') {
-        console.debug('[ScrollSync] currentId', currentId);
+      
+      // Si on est au footer summary, currentId = summaryId
+      const summaryElement = el.querySelector(`[data-day-id="summary"]`) as HTMLElement | null;
+      if (summaryElement) {
+        const summaryTop = summaryElement.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+        if (scrollTop >= summaryTop - 100) { // 100px de tolérance
+          const maxStepId = Math.max(...travelData.days.filter(d => !(d as any).isSummary).map(d => d.id), 0);
+          currentId = maxStepId + 1; // summaryId
+        }
       }
       
       setActiveDay(currentId);
@@ -453,14 +409,13 @@ const TravelRecommendations = () => {
     el.addEventListener('scroll', handleScroll, { passive: true } as AddEventListenerOptions);
     window.addEventListener('resize', onResize, { passive: true } as AddEventListenerOptions);
 
-    // Initialiser handleScroll immédiatement
     handleScroll();
 
     return () => {
       el.removeEventListener('scroll', handleScroll as any);
       window.removeEventListener('resize', onResize as any);
     };
-  }, [travelData.days.length, summaryId]);
+  }, [travelData.days.length]);
 
   // Show loading or error states AFTER all hooks
   if (loading && code) {
@@ -499,10 +454,41 @@ const TravelRecommendations = () => {
     );
   }
 
+  // Separate summary step from regular steps
+  const regularSteps = travelData.days.filter(d => !(d as any).isSummary);
+  const summaryStep = travelData.days.find(d => (d as any).isSummary);
+  
+  // ID spécial pour le footer summary (après toutes les étapes régulières)
+  const summaryId = Math.max(...regularSteps.map(d => d.id), 0) + 1;
+  
+  const allSteps = [
+    ...regularSteps.map(d => ({ id: d.id, title: d.title, isSummary: false })),
+    { id: summaryId, title: 'Validation', isSummary: true }
+  ];
+
+
+  const scrollToDay = (dayId: number | string) => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    // Si c'est le summaryId, scroller vers la section summary
+    const targetSelector = dayId === summaryId ? '[data-day-id="summary"]' : `[data-day-id="${dayId}"]`;
+    const target = el.querySelector(targetSelector) as HTMLElement | null;
+    if (!target) return;
+
+    const getTop = (node: HTMLElement) => node.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+    const targetTop = getTop(target);
+    
+    el.scrollTo({
+      top: targetTop,
+      behavior: 'smooth'
+    });
+  };
+
   return (
     <div className="relative min-h-screen bg-background">
       {/* Fixed sidebar with Timeline (mobile bottom, desktop left) */}
-      {activeDay >= 1 && activeDay <= regularSteps.length && (
+      {activeDay >= 1 && (
         <TimelineSync
           days={allSteps}
           activeDay={activeDay}
@@ -590,22 +576,6 @@ const TravelRecommendations = () => {
                 <CalendarIcon className="h-4 w-4" />
                 <span>Planning</span>
               </Button>
-              <Button
-                variant="default"
-                size="sm"
-                className="flex-1 justify-center gap-2 bg-travliaq-golden-sand hover:bg-travliaq-golden-sand/90 active:bg-travliaq-golden-sand text-white font-montserrat font-semibold shadow-[0_4px_12px_rgba(245,158,11,0.3)]"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (code) {
-                    navigate(`/booking?code=${encodeURIComponent(code)}`);
-                  }
-                }}
-                aria-label="Réserver le voyage"
-              >
-                <CreditCard className="h-4 w-4" />
-                <span>Réserver</span>
-              </Button>
             </div>
             
             {/* Step indicator ultra compact EN DESSOUS */}
@@ -673,7 +643,6 @@ const TravelRecommendations = () => {
         </DrawerContent>
       </Drawer>
 
-      {/* Vertical scroll for all devices */}
       <div ref={scrollRef} className="h-screen overflow-y-auto scroll-smooth snap-y snap-mandatory themed-scroll pb-24 md:pb-28 lg:pb-0">
         <section data-day-id="0" className="h-screen snap-start">
           <HeroHeader

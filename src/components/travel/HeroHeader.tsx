@@ -100,7 +100,7 @@ const HeroHeader = ({ destination, mainImage, flight, hotel, totalPrice, tripCod
           Réserver tout en un clic
         </Button>
 
-        {/* Indicateur de scroll vers le bas */}
+        {/* Indicateur de scroll */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
           <div className="h-12 w-8 rounded-full border-2 border-white/50 flex items-start justify-center p-2">
             <div className="h-2 w-2 rounded-full bg-white/50 animate-pulse" />
