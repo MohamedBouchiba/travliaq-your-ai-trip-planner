@@ -805,14 +805,23 @@ const Booking = () => {
                   </label>
                 </div>
 
-                <Button
-                  onClick={handlePayment}
-                  disabled={!canProceedToPayment}
-                  className="w-full bg-travliaq-turquoise hover:bg-travliaq-turquoise/90 text-travliaq-deep-blue font-bold text-lg py-6 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-                >
-                  <Shield className="h-5 w-5 mr-2" />
-                  Procéder au paiement
-                </Button>
+                {/* Bouton de paiement professionnel */}
+                <div className="relative group">
+                  {/* Effet de glow au survol */}
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-travliaq-turquoise via-travliaq-golden-sand to-travliaq-turquoise rounded-xl opacity-0 group-hover:opacity-100 blur transition duration-500" />
+                  
+                  <Button
+                    onClick={handlePayment}
+                    disabled={!canProceedToPayment}
+                    className="relative w-full bg-gradient-to-r from-travliaq-deep-blue via-travliaq-deep-blue/95 to-travliaq-deep-blue text-white font-montserrat font-bold text-base py-7 disabled:opacity-40 disabled:cursor-not-allowed border border-travliaq-turquoise/30 rounded-xl hover:border-travliaq-turquoise/60 transition-all duration-300 group-hover:shadow-[0_8px_30px_rgba(56,189,248,0.25)] disabled:hover:border-travliaq-turquoise/30 disabled:hover:shadow-none"
+                  >
+                    <div className="flex items-center justify-center gap-3">
+                      <Lock className="h-5 w-5 text-travliaq-turquoise group-hover:text-travliaq-golden-sand transition-colors duration-300" />
+                      <span className="tracking-wide">Procéder au paiement sécurisé</span>
+                      <CreditCard className="h-5 w-5 text-travliaq-turquoise/70 group-hover:text-travliaq-golden-sand transition-colors duration-300" />
+                    </div>
+                  </Button>
+                </div>
                 
                 {!allTravelersFilled && (
                   <p className="text-white/60 text-xs text-center mt-2">
