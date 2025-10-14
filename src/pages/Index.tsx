@@ -65,8 +65,8 @@ const Index = () => {
           <p className="text-xl md:text-2xl mb-10 max-w-3xl mx-auto font-inter leading-relaxed opacity-90">
             {user && user.user_metadata?.full_name ? (
               <span className="animate-fade-in">
-                <strong className="text-travliaq-golden-sand">{user.user_metadata.full_name.split(' ')[0]}</strong>
-                {', ' + t('hero.subtitle.user', { name: '' }).replace(', ', '')}
+                <strong className="text-travliaq-golden-sand">{user.user_metadata.full_name.split(' ')[0]}</strong>{' '}
+                {t('hero.subtitle.afterName')}
               </span>
             ) : t('hero.subtitle')}
           </p>
@@ -338,7 +338,7 @@ const Index = () => {
             
             <div className="text-center">
               <p className="text-white/60 text-sm">
-                Gratuit • Sans engagement • Résultat en 24h
+                {t('footer.ribbon')}
               </p>
             </div>
           </div>
@@ -354,7 +354,7 @@ const Index = () => {
             <div className="text-center mb-16">
               <img src={logo} alt="Logo Travliaq" className="h-16 w-auto mx-auto mb-6" />
               <p className="text-xl text-white/80 font-inter max-w-2xl mx-auto">
-                L'intelligence artificielle au service de vos voyages exceptionnels
+                {t('footer.tagline')}
               </p>
             </div>
 
@@ -364,17 +364,17 @@ const Index = () => {
               {/* Navigation */}
               <div className="text-center md:text-left">
                 <h4 className="text-lg font-montserrat font-bold mb-6 text-travliaq-golden-sand">
-                  Navigation
+                  {t('footer.nav')}
                 </h4>
                 <div className="space-y-4">
                   <a href="/" className="block text-white/90 hover:text-travliaq-turquoise transition-colors">
-                    Accueil
+                    {t('nav.home')}
                   </a>
                   <a href="/questionnaire" className="block text-white/90 hover:text-travliaq-turquoise transition-colors">
-                    Créer un itinéraire
+                    {t('footer.create')}
                   </a>
                   <a href="/blog" className="block text-white/90 hover:text-travliaq-turquoise transition-colors">
-                    Blog
+                    {t('nav.blog')}
                   </a>
                 </div>
               </div>
@@ -382,7 +382,7 @@ const Index = () => {
               {/* Contact */}
               <div className="text-center md:text-left">
                 <h4 className="text-lg font-montserrat font-bold mb-6 text-travliaq-golden-sand">
-                  Contact
+                  {t('footer.contact')}
                 </h4>
                 <div className="space-y-4">
                   <a href="mailto:hello@travliaq.com" className="flex items-center gap-2 text-white/90 hover:text-travliaq-turquoise transition-colors justify-center md:justify-start">
@@ -395,17 +395,17 @@ const Index = () => {
               {/* Légal */}
               <div className="text-center">
                 <h4 className="text-lg font-montserrat font-bold mb-6 text-travliaq-golden-sand">
-                  Informations légales
+                  {t('footer.legal')}
                 </h4>
                 <div className="space-y-4">
                   <a href="/cgv" className="block text-white/90 hover:text-travliaq-turquoise transition-colors">
-                    Conditions Générales de Vente
+                    {t('footer.terms')}
                   </a>
                   <a href="/mentions-legales" className="block text-white/90 hover:text-travliaq-turquoise transition-colors">
-                    Mentions légales
+                    {t('footer.imprint')}
                   </a>
                   <a href="/confidentialite" className="block text-white/90 hover:text-travliaq-turquoise transition-colors">
-                    Politique de confidentialité
+                    {t('footer.privacy')}
                   </a>
                 </div>
               </div>
@@ -413,7 +413,7 @@ const Index = () => {
               {/* Réseaux sociaux */}
               <div className="text-center md:text-right">
                 <h4 className="text-lg font-montserrat font-bold mb-6 text-travliaq-golden-sand">
-                  Suivez-nous
+                  {t('footer.follow')}
                 </h4>
                 <div className="flex gap-4 justify-center md:justify-end">
                   <a href="https://instagram.com/travliaq" target="_blank" rel="noopener noreferrer" className="w-12 h-12 bg-white/10 hover:bg-travliaq-turquoise rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110">
@@ -443,7 +443,7 @@ const Index = () => {
             {/* Copyright */}
             <div className="border-t border-travliaq-light-blue pt-8 text-center">
               <p className="text-white/60 font-inter">
-                © 2025 Travliaq. Tous droits réservés. Fait avec ❤️ pour les voyageurs authentiques
+                {t('footer.copyright')}
               </p>
             </div>
           </div>

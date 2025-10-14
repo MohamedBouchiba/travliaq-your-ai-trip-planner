@@ -85,6 +85,22 @@ const resources = {
       "toast.login": "Connectez-vous avec Google pour sauvegarder vos préférences",
       "toast.loginButton": "Se connecter",
       "toast.loginError": "Erreur de connexion: {{error}}",
+
+      // Hero name suffix
+      "hero.subtitle.afterName": ", découvre ton prochain itinéraire personnalisé — vols, hôtels, météo, activités, tout en un seul clic.",
+
+      // Footer
+      "footer.ribbon": "Gratuit • Sans engagement • Résultat en 24h",
+      "footer.tagline": "L'intelligence artificielle au service de vos voyages exceptionnels",
+      "footer.nav": "Navigation",
+      "footer.contact": "Contact",
+      "footer.legal": "Informations légales",
+      "footer.follow": "Suivez-nous",
+      "footer.create": "Créer un itinéraire",
+      "footer.terms": "Conditions Générales de Vente",
+      "footer.imprint": "Mentions légales",
+      "footer.privacy": "Politique de confidentialité",
+      "footer.copyright": "© 2025 Travliaq. Tous droits réservés. Fait avec ❤️ pour les voyageurs authentiques"
     }
   },
   en: {
@@ -169,6 +185,22 @@ const resources = {
       "toast.login": "Sign in with Google to save your preferences",
       "toast.loginButton": "Sign in",
       "toast.loginError": "Login error: {{error}}",
+
+      // Hero name suffix
+      "hero.subtitle.afterName": ", discover your next personalized itinerary — flights, hotels, weather, activities, all in one click.",
+
+      // Footer
+      "footer.ribbon": "Free • No commitment • Result in 24h",
+      "footer.tagline": "Artificial intelligence at the service of your exceptional travels",
+      "footer.nav": "Navigation",
+      "footer.contact": "Contact",
+      "footer.legal": "Legal information",
+      "footer.follow": "Follow us",
+      "footer.create": "Create an itinerary",
+      "footer.terms": "Terms and Conditions",
+      "footer.imprint": "Legal Notice",
+      "footer.privacy": "Privacy Policy",
+      "footer.copyright": "© 2025 Travliaq. All rights reserved. Made with ❤️ for authentic travelers"
     }
   }
 };
