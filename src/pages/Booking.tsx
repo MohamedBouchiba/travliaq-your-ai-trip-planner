@@ -14,11 +14,42 @@ import { ArrowLeft, Users, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const travelerSchema = z.object({
+  // Informations personnelles
   firstName: z.string().min(2, "Le prénom doit contenir au moins 2 caractères").max(50),
   lastName: z.string().min(2, "Le nom doit contenir au moins 2 caractères").max(50),
-  email: z.string().email("Email invalide"),
-  passportNumber: z.string().min(6, "Le numéro de passeport doit contenir au moins 6 caractères").max(20),
   dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format de date invalide (YYYY-MM-DD)"),
+  nationality: z.string().min(2, "La nationalité est requise").max(50),
+  
+  // Contact
+  email: z.string().email("Email invalide"),
+  phone: z.string().min(10, "Le numéro de téléphone doit contenir au moins 10 chiffres").max(20),
+  
+  // Passeport
+  passportNumber: z.string().min(6, "Le numéro de passeport doit contenir au moins 6 caractères").max(20),
+  passportIssueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format de date invalide"),
+  passportExpiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format de date invalide"),
+  passportCountry: z.string().min(2, "Le pays d'émission est requis").max(50),
+  
+  // Adresse
+  address: z.string().min(5, "L'adresse doit contenir au moins 5 caractères").max(200),
+  city: z.string().min(2, "La ville est requise").max(100),
+  postalCode: z.string().min(3, "Le code postal est requis").max(20),
+  country: z.string().min(2, "Le pays est requis").max(50),
+  
+  // Adresse de facturation
+  billingAddressSame: z.boolean().default(true),
+  billingAddress: z.string().optional(),
+  billingCity: z.string().optional(),
+  billingPostalCode: z.string().optional(),
+  billingCountry: z.string().optional(),
+}).refine((data) => {
+  if (!data.billingAddressSame) {
+    return data.billingAddress && data.billingCity && data.billingPostalCode && data.billingCountry;
+  }
+  return true;
+}, {
+  message: "Veuillez remplir tous les champs de l'adresse de facturation",
+  path: ["billingAddress"],
 });
 
 const Booking = () => {
@@ -39,9 +70,23 @@ const Booking = () => {
     defaultValues: {
       firstName: "",
       lastName: "",
-      email: "",
-      passportNumber: "",
       dateOfBirth: "",
+      nationality: "",
+      email: "",
+      phone: "",
+      passportNumber: "",
+      passportIssueDate: "",
+      passportExpiryDate: "",
+      passportCountry: "",
+      address: "",
+      city: "",
+      postalCode: "",
+      country: "",
+      billingAddressSame: true,
+      billingAddress: "",
+      billingCity: "",
+      billingPostalCode: "",
+      billingCountry: "",
     },
   });
 
@@ -152,17 +197,102 @@ const Booking = () => {
 
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    <div className="grid md:grid-cols-2 gap-4">
+                    {/* Informations personnelles */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-travliaq-turquoise">Informations personnelles</h3>
+                      
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="firstName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-white">Prénom *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  placeholder="Jean"
+                                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="lastName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-white">Nom *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  placeholder="Dupont"
+                                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="dateOfBirth"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-white">Date de naissance *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  type="date"
+                                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="nationality"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-white">Nationalité *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  placeholder="Française"
+                                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Contact */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-travliaq-turquoise">Contact</h3>
+                      
                       <FormField
                         control={form.control}
-                        name="firstName"
+                        name="email"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-white">Prénom</FormLabel>
+                            <FormLabel className="text-white">Adresse email *</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
-                                placeholder="Jean"
+                                type="email"
+                                placeholder="jean.dupont@example.com"
                                 className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
@@ -173,14 +303,15 @@ const Booking = () => {
 
                       <FormField
                         control={form.control}
-                        name="lastName"
+                        name="phone"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-white">Nom</FormLabel>
+                            <FormLabel className="text-white">Numéro de téléphone *</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
-                                placeholder="Dupont"
+                                type="tel"
+                                placeholder="+33 6 12 34 56 78"
                                 className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                               />
                             </FormControl>
@@ -190,60 +321,270 @@ const Booking = () => {
                       />
                     </div>
 
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-white">Adresse email</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="email"
-                              placeholder="jean.dupont@example.com"
-                              className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    {/* Passeport */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-travliaq-turquoise">Informations du passeport</h3>
+                      
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="passportNumber"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-white">Numéro de passeport *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  placeholder="12AB34567"
+                                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-                    <FormField
-                      control={form.control}
-                      name="passportNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-white">Numéro de passeport</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="12AB34567"
-                              className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                        <FormField
+                          control={form.control}
+                          name="passportCountry"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-white">Pays d'émission *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  placeholder="France"
+                                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
 
-                    <FormField
-                      control={form.control}
-                      name="dateOfBirth"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-white">Date de naissance</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="date"
-                              className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="passportIssueDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-white">Date d'émission *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  type="date"
+                                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="passportExpiryDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-white">Date d'expiration *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  type="date"
+                                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Adresse */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-travliaq-turquoise">Adresse</h3>
+                      
+                      <FormField
+                        control={form.control}
+                        name="address"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-white">Adresse complète *</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="123 Rue de la République"
+                                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="grid md:grid-cols-3 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="city"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-white">Ville *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  placeholder="Paris"
+                                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="postalCode"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-white">Code postal *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  placeholder="75001"
+                                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="country"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-white">Pays *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  placeholder="France"
+                                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Adresse de facturation */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-travliaq-turquoise">Adresse de facturation</h3>
+                      
+                      <FormField
+                        control={form.control}
+                        name="billingAddressSame"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <input
+                                type="checkbox"
+                                checked={field.value}
+                                onChange={field.onChange}
+                                className="h-4 w-4 rounded border-white/20 bg-white/10 text-travliaq-turquoise focus:ring-travliaq-turquoise"
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel className="text-white">
+                                L'adresse de facturation est la même que l'adresse ci-dessus
+                              </FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+
+                      {!form.watch("billingAddressSame") && (
+                        <>
+                          <FormField
+                            control={form.control}
+                            name="billingAddress"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-white">Adresse de facturation *</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    {...field}
+                                    placeholder="123 Rue de Facturation"
+                                    className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <div className="grid md:grid-cols-3 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="billingCity"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-white">Ville *</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      placeholder="Paris"
+                                      className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
                             />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
+
+                            <FormField
+                              control={form.control}
+                              name="billingPostalCode"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-white">Code postal *</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      placeholder="75001"
+                                      className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="billingCountry"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-white">Pays *</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      placeholder="France"
+                                      className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </>
                       )}
-                    />
+                    </div>
 
                     <div className="flex gap-4 pt-4">
                       {currentTraveler > 0 && (
