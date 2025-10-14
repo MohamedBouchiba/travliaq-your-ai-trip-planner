@@ -407,27 +407,27 @@ const TravelRecommendations = () => {
 
       if (!offsetsRef.current.length) recomputeOffsets();
 
-      // Avant l'étape 1 -> pas de widgets
+      // Avant l'étape 1 -> pas de widgets (activeDay = 0)
       const first = offsetsRef.current.find(o => o.id === 1)?.top ?? 0;
-      if (scrollTop < first - 50) { // Tolérance de 50px pour activer plus tôt
+      if (scrollTop < first - 200) {
         setActiveDay(0);
         return;
+      }
+
+      // Si on est au footer summary -> activeDay = summaryId pour cacher les widgets
+      const summaryElement = el.querySelector(`[data-day-id="summary"]`) as HTMLElement | null;
+      if (summaryElement) {
+        const summaryTop = summaryElement.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+        if (scrollTop >= summaryTop - 200) {
+          setActiveDay(summaryId);
+          return;
+        }
       }
 
       // Trouver la dernière section dont le top est passé
       let currentId = 1;
       for (const o of offsetsRef.current) {
-        if (scrollTop >= o.top - 100) currentId = o.id; else break;
-      }
-      
-      // Si on est au footer summary
-      const summaryElement = el.querySelector(`[data-day-id="summary"]`) as HTMLElement | null;
-      if (summaryElement) {
-        const summaryTop = summaryElement.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
-        if (scrollTop >= summaryTop - 100) {
-          const maxStepId = Math.max(...travelData.days.filter(d => !(d as any).isSummary).map(d => d.id), 0);
-          currentId = maxStepId + 1;
-        }
+        if (scrollTop >= o.top - 150) currentId = o.id; else break;
       }
       
       setActiveDay(currentId);
