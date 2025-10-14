@@ -163,8 +163,29 @@ const Booking = () => {
     );
   }
 
-  const allTravelersFilled = travelersData.length === travelers && currentTraveler === travelers - 1;
-  const canProceedToPayment = allTravelersFilled && acceptedCGV;
+  const allTravelersFilled = travelersData.length === travelers;
+  const isCurrentFormValid = form.formState.isValid;
+  const canProceedToPayment = (travelers === 1 ? isCurrentFormValid : allTravelersFilled) && acceptedCGV;
+
+  const handlePayment = () => {
+    if (travelers === 1) {
+      // Valider le formulaire avant le paiement pour un seul voyageur
+      form.handleSubmit((values) => {
+        setTravelersData([values]);
+        // TODO: Procéder au paiement
+        toast({
+          title: "Paiement",
+          description: "Le paiement sera disponible prochainement.",
+        });
+      })();
+    } else {
+      // TODO: Procéder au paiement pour plusieurs voyageurs
+      toast({
+        title: "Paiement",
+        description: "Le paiement sera disponible prochainement.",
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-travliaq-deep-blue to-travliaq-deep-blue/80">
@@ -639,30 +660,29 @@ const Booking = () => {
                       </div>
                     )}
 
-                    <div className="flex gap-4 pt-4">
-                      {currentTraveler > 0 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handlePrevious}
-                          className="flex-1 border-travliaq-turquoise/50 text-white hover:bg-travliaq-turquoise/20"
-                        >
-                          <ArrowLeft className="h-4 w-4 mr-2" />
-                          Voyageur précédent
-                        </Button>
-                      )}
-                      <Button
-                        type="submit"
-                        className="flex-1 bg-gradient-to-r from-travliaq-turquoise to-travliaq-golden-sand hover:opacity-90 text-travliaq-deep-blue font-semibold shadow-glow"
-                      >
-                        {travelers === 1 
-                          ? "Continuer" 
-                          : currentTraveler < travelers - 1 
-                          ? "Voyageur suivant" 
-                          : "Continuer"
-                        }
-                      </Button>
-                    </div>
+                    {travelers > 1 && (
+                      <div className="flex gap-4 pt-4">
+                        {currentTraveler > 0 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handlePrevious}
+                            className="flex-1 border-travliaq-turquoise/50 text-white hover:bg-travliaq-turquoise/20"
+                          >
+                            <ArrowLeft className="h-4 w-4 mr-2" />
+                            Voyageur précédent
+                          </Button>
+                        )}
+                        {currentTraveler < travelers - 1 && (
+                          <Button
+                            type="submit"
+                            className="flex-1 bg-travliaq-turquoise hover:bg-travliaq-turquoise/90 text-travliaq-deep-blue font-semibold"
+                          >
+                            Voyageur suivant
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </form>
                 </Form>
               </Card>
@@ -786,11 +806,12 @@ const Booking = () => {
                 </div>
 
                 <Button
+                  onClick={handlePayment}
                   disabled={!canProceedToPayment}
-                  className="w-full bg-travliaq-golden-sand hover:bg-travliaq-golden-sand/80 text-travliaq-deep-blue font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-travliaq-turquoise hover:bg-travliaq-turquoise/90 text-travliaq-deep-blue font-bold text-lg py-6 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
                 >
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Payer avec Stripe
+                  <Shield className="h-5 w-5 mr-2" />
+                  Procéder au paiement sécurisé
                 </Button>
                 
                 {!allTravelersFilled && (
