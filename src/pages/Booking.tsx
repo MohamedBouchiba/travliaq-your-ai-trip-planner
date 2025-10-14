@@ -656,10 +656,10 @@ const Booking = () => {
                         className="flex-1 bg-gradient-to-r from-travliaq-turquoise to-travliaq-golden-sand hover:opacity-90 text-travliaq-deep-blue font-semibold shadow-glow"
                       >
                         {travelers === 1 
-                          ? "Valider mes informations" 
+                          ? "Continuer" 
                           : currentTraveler < travelers - 1 
-                          ? "Informations voyageur suivant" 
-                          : "Valider les informations"
+                          ? "Voyageur suivant" 
+                          : "Continuer"
                         }
                       </Button>
                     </div>
