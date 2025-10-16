@@ -1377,7 +1377,7 @@ const Questionnaire = () => {
           <div className="max-w-2xl mx-auto space-y-3">
             <div className="space-y-2">
               <label className="block text-sm font-medium text-travliaq-deep-blue text-center">
-                Cliquez sur votre date de départ puis sur votre date de retour ✈️
+                {t('questionnaire.dates.clickInstruction')}
               </label>
               <div className="flex flex-col items-center gap-3">
                 <DateRangePicker
@@ -1414,7 +1414,7 @@ const Questionnaire = () => {
                     }}
                   >
                     <span className="mr-2">🔄</span>
-                    Réinitialiser les dates
+                    {t('questionnaire.dates.reset')}
                   </Button>
                 )}
               </div>
@@ -1424,8 +1424,8 @@ const Questionnaire = () => {
             {departureDate && returnDate && (
               <div className="text-center p-4 bg-travliaq-sky-blue/10 rounded-lg border border-travliaq-deep-blue/20">
                 <p className="text-lg text-travliaq-deep-blue">
-                  <span className="font-semibold">Durée du séjour :</span>{" "}
-                  {Math.ceil((returnDate.getTime() - departureDate.getTime()) / (1000 * 60 * 60 * 24))} jours
+                  <span className="font-semibold">{t('questionnaire.dates.duration')}</span>{" "}
+                  {Math.ceil((returnDate.getTime() - departureDate.getTime()) / (1000 * 60 * 60 * 24))} {t('questionnaire.dates.days')}
                 </p>
               </div>
             )}
@@ -1484,17 +1484,17 @@ const Questionnaire = () => {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
-            Avez-vous une date de départ approximative ? 📅
+            {t('questionnaire.flexibility.hasApproxDate')}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
             {[
-              { label: "Oui, j'ai une idée", icon: "✅" },
-              { label: "Non, pas encore", icon: "❌" }
+              { label: t('questionnaire.flexibility.hasApproxDate.yes'), icon: "✅" },
+              { label: t('questionnaire.flexibility.hasApproxDate.no'), icon: "❌" }
             ].map((option) => (
               <Card
                 key={option.label}
                 className="p-6 cursor-pointer hover:shadow-golden hover:border-travliaq-deep-blue transition-all hover:scale-105"
-                onClick={() => handleChoice("hasApproximateDepartureDate", option.label === "Oui, j'ai une idée" ? "Oui" : "Non")}
+                onClick={() => handleChoice("hasApproximateDepartureDate", option.label === t('questionnaire.flexibility.hasApproxDate.yes') ? t('q.step8.approx.yes') : t('q.step8.approx.no'))}
               >
                 <div className="flex items-center space-x-4">
                   <span className="text-4xl">{option.icon}</span>
@@ -2382,21 +2382,21 @@ const Questionnaire = () => {
       return (
         <div className="space-y-4 animate-fade-up">
           <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
-            Dis-nous l'essentiel en plus 💬
+            {t('questionnaire.additionalInfo.title')}
           </h2>
           <p className="text-center text-muted-foreground">
-            Ce qu'on doit absolument respecter (ex: éviter escales, ville à inclure/exclure, allergie, événement à ne pas rater…)
+            {t('questionnaire.additionalInfo.description')}
           </p>
           <div className="max-w-xl mx-auto space-y-4">
             <Textarea
-              placeholder="Partagez vos besoins spécifiques..."
+              placeholder={t('questionnaire.additionalInfo.placeholder')}
               className="min-h-[150px] text-base"
               value={answers.additionalInfo || ""}
               onChange={(e) => setAnswers({ ...answers, additionalInfo: e.target.value })}
             />
             {answers.additionalInfo && (
               <div className="text-sm text-muted-foreground text-center">
-                {answers.additionalInfo.length} caractères
+                {answers.additionalInfo.length} {t('questionnaire.additionalInfo.characters')}
               </div>
             )}
             <div className="flex justify-center gap-4">

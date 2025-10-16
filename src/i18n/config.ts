@@ -455,14 +455,24 @@ const resources = {
       
       // Flexibility
       "questionnaire.flexibility.title": "Flexibilité des dates ⏰",
-      "questionnaire.flexibility.3days": "±3 jours",
+      "questionnaire.flexibility.souplesse": "Quelle souplesse ? 🔄",
+      "questionnaire.flexibility.0days": "±0j",
+      "questionnaire.flexibility.3days": "±3j",
+      "questionnaire.flexibility.7days": "±7j",
+      "questionnaire.flexibility.14days": "±14j",
+      "questionnaire.flexibility.30days": "±30j",
       "questionnaire.flexibility.week": "±1 semaine",
       "questionnaire.flexibility.2weeks": "±2 semaines",
       "questionnaire.flexibility.month": "±1 mois",
-      "questionnaire.flexibility.hasApproxDate": "As-tu une date de départ approximative ? 📆",
+      "questionnaire.flexibility.hasApproxDate": "Avez-vous une date de départ approximative ? 📅",
+      "questionnaire.flexibility.hasApproxDate.yes": "Oui, j'ai une idée",
+      "questionnaire.flexibility.hasApproxDate.no": "Non, pas encore",
       "questionnaire.flexibility.approxDate": "Quelle est votre date de départ approximative ? 📆",
       "questionnaire.flexibility.clickDate": "Cliquez sur une date (cette date servira de référence pour votre flexibilité)",
       "questionnaire.flexibility.dateSelected": "Date sélectionnée :",
+      "questionnaire.dates.clickInstruction": "Cliquez sur votre date de départ puis sur votre date de retour ✈️",
+      "questionnaire.dates.duration": "Durée du séjour :",
+      "questionnaire.dates.days": "jours",
       
       // Duration
       "questionnaire.duration.title": "Durée du séjour 🌙",
@@ -623,10 +633,12 @@ const resources = {
       "questionnaire.constraints.dontMind": "Peu importe",
       
       // Additional info
-      "questionnaire.additionalInfo.title": "Informations complémentaires 💭",
+      "questionnaire.additionalInfo.title": "Dis-nous l'essentiel en plus 💬",
+      "questionnaire.additionalInfo.description": "Ce qu'on doit absolument respecter (ex: éviter escales, ville à inclure/exclure, allergie, événement à ne pas rater…)",
       "questionnaire.additionalInfo.optional": "Zone libre (optionnel)",
-      "questionnaire.additionalInfo.placeholder": "Partage tes envies, inspirations, contraintes particulières...",
+      "questionnaire.additionalInfo.placeholder": "Partagez vos besoins spécifiques...",
       "questionnaire.additionalInfo.skip": "Passer",
+      "questionnaire.additionalInfo.characters": "caractères",
       
       // Email step
       "questionnaire.email.title": "Recevoir mon itinéraire 📧",
@@ -1088,14 +1100,24 @@ const resources = {
       
       // Flexibility
       "questionnaire.flexibility.title": "Date flexibility ⏰",
-      "questionnaire.flexibility.3days": "±3 days",
+      "questionnaire.flexibility.souplesse": "What flexibility? 🔄",
+      "questionnaire.flexibility.0days": "±0d",
+      "questionnaire.flexibility.3days": "±3d",
+      "questionnaire.flexibility.7days": "±7d",
+      "questionnaire.flexibility.14days": "±14d",
+      "questionnaire.flexibility.30days": "±30d",
       "questionnaire.flexibility.week": "±1 week",
       "questionnaire.flexibility.2weeks": "±2 weeks",
       "questionnaire.flexibility.month": "±1 month",
-      "questionnaire.flexibility.hasApproxDate": "Do you have an approximate departure date? 📆",
+      "questionnaire.flexibility.hasApproxDate": "Do you have an approximate departure date? 📅",
+      "questionnaire.flexibility.hasApproxDate.yes": "Yes, I have an idea",
+      "questionnaire.flexibility.hasApproxDate.no": "Not yet",
       "questionnaire.flexibility.approxDate": "What is your approximate departure date? 📆",
       "questionnaire.flexibility.clickDate": "Click on a date (this date will serve as a reference for your flexibility)",
       "questionnaire.flexibility.dateSelected": "Date selected:",
+      "questionnaire.dates.clickInstruction": "Click on your departure date then on your return date ✈️",
+      "questionnaire.dates.duration": "Trip duration:",
+      "questionnaire.dates.days": "days",
       
       // Duration
       "questionnaire.duration.title": "Trip duration 🌙",
@@ -1256,10 +1278,12 @@ const resources = {
       "questionnaire.constraints.dontMind": "Don't mind",
       
       // Additional info
-      "questionnaire.additionalInfo.title": "Additional information 💭",
+      "questionnaire.additionalInfo.title": "Tell us the essentials 💬",
+      "questionnaire.additionalInfo.description": "What we absolutely must respect (ex: avoid stopovers, city to include/exclude, allergy, event not to miss...)",
       "questionnaire.additionalInfo.optional": "Free text (optional)",
-      "questionnaire.additionalInfo.placeholder": "Share your wishes, inspirations, special constraints...",
+      "questionnaire.additionalInfo.placeholder": "Share your specific needs...",
       "questionnaire.additionalInfo.skip": "Skip",
+      "questionnaire.additionalInfo.characters": "characters",
       
       // Email step
       "questionnaire.email.title": "Receive my itinerary 📧",
