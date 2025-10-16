@@ -1,15 +1,18 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams, useParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import HeroHeader from "@/components/travel/HeroHeader";
 import DaySection from "@/components/travel/DaySection";
 import FooterSummary from "@/components/travel/FooterSummary";
 import MapView from "@/components/travel/MapView";
 import TravelCalendar from "@/components/travel/TravelCalendar";
 import TravelDayCalendar from "@/components/travel/TravelDayCalendar";
+import Navigation from "@/components/Navigation";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Map as MapIcon, Calendar as CalendarIcon, CreditCard } from "lucide-react";
 import { useTripData } from "@/hooks/useTripData";
+import logo from "@/assets/logo-travliaq.png";
 
 // Mock data - sera remplacé par les vraies données IA
 const mockTravelData = {
@@ -288,6 +291,8 @@ const TravelRecommendations = () => {
   const code = rawCode ? decodeURIComponent(rawCode).replace(/^=+/, '').trim() : null;
   const { trip, steps, loading } = useTripData(code);
   const navigate = useNavigate();
+  const { i18n } = useTranslation();
+  const isEnglish = i18n.language === 'en';
   
   const [activeDay, setActiveDay] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
@@ -306,9 +311,9 @@ const TravelRecommendations = () => {
   };
   const startMonday = getMonday();
 
-  // Transform database data to component format
+  // Transform database data to component format with language support
   const travelData = trip && steps.length > 0 ? {
-    destination: trip.destination,
+    destination: isEnglish ? (trip.destination_en || trip.destination) : trip.destination,
     mainImage: trip.main_image || "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=1920&q=80",
     flight: {
       from: trip.flight_from || "",
@@ -324,22 +329,22 @@ const TravelRecommendations = () => {
       days: steps.map(step => ({
       id: step.step_number,
       day: step.day_number,
-      title: step.title,
-      subtitle: step.subtitle || "",
+      title: isEnglish ? (step.title_en || step.title) : step.title,
+      subtitle: isEnglish ? (step.subtitle_en || step.subtitle || "") : (step.subtitle || ""),
       image: step.main_image || "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=1920&q=80",
       isSummary: step.is_summary || false,
       summaryStats: step.summary_stats || undefined,
       coordinates: (step.latitude && step.longitude) 
         ? [step.longitude, step.latitude] as [number, number]
         : [0, 0] as [number, number],
-      why: step.why || "",
-      tips: step.tips || "",
-      transfer: step.transfer || "",
-      suggestion: step.suggestion || "",
+      why: isEnglish ? (step.why_en || step.why || "") : (step.why || ""),
+      tips: isEnglish ? (step.tips_en || step.tips || "") : (step.tips || ""),
+      transfer: isEnglish ? (step.transfer_en || step.transfer || "") : (step.transfer || ""),
+      suggestion: isEnglish ? (step.suggestion_en || step.suggestion || "") : (step.suggestion || ""),
       weather: {
         icon: step.weather_icon || "🌤️",
         temp: step.weather_temp || "",
-        description: step.weather_description || ""
+        description: isEnglish ? (step.weather_description_en || step.weather_description || "") : (step.weather_description || "")
       },
       price: step.price !== null ? Number(step.price) : undefined,
       duration: step.duration || undefined,
@@ -349,7 +354,7 @@ const TravelRecommendations = () => {
       totalDays: trip.total_days,
       totalBudget: trip.total_budget || "",
       averageWeather: trip.average_weather || "",
-      travelStyle: trip.travel_style || ""
+      travelStyle: isEnglish ? (trip.travel_style_en || trip.travel_style || "") : (trip.travel_style || "")
     }
   } : mockTravelData;
 
@@ -501,6 +506,21 @@ const TravelRecommendations = () => {
 
   return (
     <div className="relative min-h-screen bg-background">
+      {/* Logo / Navigation */}
+      <div className="fixed top-0 left-0 right-0 z-30 p-4">
+        {/* Mobile: Full navigation with menu */}
+        <div className="md:hidden">
+          <Navigation />
+        </div>
+        
+        {/* Desktop: Just logo */}
+        <div className="hidden md:block">
+          <a href="/" className="inline-block hover:opacity-80 transition-opacity">
+            <img src={logo} alt="Travliaq" className="h-12 w-auto" />
+          </a>
+        </div>
+      </div>
+      
       {/* Fixed step tracker (top, visible only from step 1) */}
       {activeDay >= 1 && (
         <div className="hidden lg:flex fixed top-4 left-1/2 transform -translate-x-1/2 z-50">

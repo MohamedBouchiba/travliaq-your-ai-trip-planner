@@ -40,7 +40,7 @@ const GoogleLoginPopup = ({ onClose, onSuccess }: GoogleLoginPopupProps) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in">
+    <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 p-4 pb-24 animate-fade-in">
       <Card className="max-w-md w-full bg-white p-8 relative animate-scale-in">
         <button
           onClick={onClose}
