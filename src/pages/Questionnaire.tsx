@@ -433,13 +433,13 @@ const Questionnaire = () => {
   const getTotalSteps = (): number => {
     let total = 1; // Step 1: Qui voyage
     
-    if (answers.travelGroup === t('q.step1.family') || answers.travelGroup === t('q.step1.group')) total++; // Step 1b: Nombre exact
+    if (answers.travelGroup === t('questionnaire.family') || answers.travelGroup === t('questionnaire.group35')) total++; // Step 1b: Nombre exact
     total++; // Step 2: Destination en tête
     total++; // Step 2b: Comment Travliaq peut aider (vols/hébergement/activités)
     
-    if (answers.hasDestination === t('q.step3.yes')) {
+    if (answers.hasDestination === t('questionnaire.yes')) {
       total++; // Step 2c: Quelle destination
-    } else if (answers.hasDestination === t('q.step3.no')) {
+    } else if (answers.hasDestination === t('questionnaire.no')) {
       total++; // Step 2d: Climat préféré
       total++; // Step 2e: Affinités de voyage
       total++; // Step 2f: Ambiance recherchée
@@ -452,7 +452,7 @@ const Questionnaire = () => {
     } else if (answers.datesType === t('questionnaire.dates.flexible')) {
       total++; // Step 3c: Flexibilité
       total++; // Step 3d: Date de départ approximative
-      if (answers.hasApproximateDepartureDate === t('q.step8.approx.yes')) total++; // Step 3e: Saisie date approximative
+      if (answers.hasApproximateDepartureDate === t('questionnaire.flexibility.hasApproxDate.yes')) total++; // Step 3e: Saisie date approximative
       total++; // Step 4: Durée
       if (answers.duration === t('questionnaire.duration.more14')) total++; // Step 4b: Nombre exact
     }
@@ -461,12 +461,12 @@ const Questionnaire = () => {
     if (answers.budgetType === t('questionnaire.budget.precise')) total++; // Step 5b: Montant exact
     
     const helpWith = answers.helpWith || [];
-    const needsFlights = helpWith.includes(t('q.step2.flights'));
-    const needsAccommodation = helpWith.includes(t('q.step2.accommodation'));
-    const needsActivities = helpWith.includes(t('q.step2.activities'));
+    const needsFlights = helpWith.includes(t('questionnaire.flights'));
+    const needsAccommodation = helpWith.includes(t('questionnaire.accommodation'));
+    const needsActivities = helpWith.includes(t('questionnaire.activities'));
     
     // Step 6: Style (seulement si destination précise ET activités sélectionnées)
-    if (answers.hasDestination === t('q.step3.yes') && needsActivities) {
+    if (answers.hasDestination === t('questionnaire.yes') && needsActivities) {
       total++; // Step 6: Style
     }
     
@@ -486,7 +486,7 @@ const Questionnaire = () => {
     // Step 11-14: Hébergement (seulement si hébergement sélectionné)
     if (needsAccommodation) {
       total++; // Step 11: Type hébergement
-      if ((answers.accommodationType || []).includes("Hôtel")) total++; // Step 11b: Préférences hôtel
+      if ((answers.accommodationType || []).includes(t('questionnaire.accommodationType.hotel'))) total++; // Step 11b: Préférences hôtel
       total++; // Step 12: Confort
       total++; // Step 13: Quartier
       total++; // Step 14: Équipements
@@ -551,9 +551,9 @@ const Questionnaire = () => {
     if (answers.numberOfTravelers) return answers.numberOfTravelers;
     
     switch(answers.travelGroup) {
-      case "Solo": return 1;
-      case "Duo": return 2;
-      case "Groupe 3-5": return 4; // Default middle
+      case t('questionnaire.solo'): return 1;
+      case t('questionnaire.duo'): return 2;
+      case t('questionnaire.group35'): return 4; // Default middle
       default: return 1;
     }
   };
@@ -837,8 +837,8 @@ const Questionnaire = () => {
     stepCounter++;
 
     // Step 1b: Nombre exact de voyageurs (si Famille ou Groupe 3-5)
-    if ((answers.travelGroup === t('q.step1.family') || answers.travelGroup === t('q.step1.group')) && step === stepCounter) {
-      if (answers.travelGroup === t('q.step1.family')) {
+    if ((answers.travelGroup === t('questionnaire.family') || answers.travelGroup === t('questionnaire.group35')) && step === stepCounter) {
+      if (answers.travelGroup === t('questionnaire.family')) {
         return (
           <div className="space-y-4 animate-fade-up">
             <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
@@ -903,7 +903,7 @@ const Questionnaire = () => {
         );
       }
     }
-    if (answers.travelGroup === t('q.step1.family') || answers.travelGroup === t('q.step1.group')) stepCounter++;
+    if (answers.travelGroup === t('questionnaire.family') || answers.travelGroup === t('questionnaire.group35')) stepCounter++;
 
     // Step 2: Destination en tête ?
     if (step === stepCounter) {
@@ -991,7 +991,7 @@ const Questionnaire = () => {
     stepCounter++;
 
     // Step 2c: Destination précise (si Oui)
-    if (answers.hasDestination === t('q.step3.yes') && step === stepCounter) {
+    if (answers.hasDestination === t('questionnaire.yes') && step === stepCounter) {
       return (
         <div className="space-y-4 animate-fade-up">
           <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
@@ -1157,10 +1157,10 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if (answers.hasDestination === t('q.step3.yes')) stepCounter++;
+    if (answers.hasDestination === t('questionnaire.yes')) stepCounter++;
 
     // Step 2c: Climat préféré (si Non - pas de destination en tête) - MULTI-CHOIX
-    if (answers.hasDestination === t('q.step3.no') && step === stepCounter) {
+    if (answers.hasDestination === t('questionnaire.no') && step === stepCounter) {
       return (
         <div className="space-y-4 animate-fade-up">
           <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
@@ -1216,10 +1216,10 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if (answers.hasDestination === t('q.step3.no')) stepCounter++;
+    if (answers.hasDestination === t('questionnaire.no')) stepCounter++;
 
     // Step 2d: Affinités de voyage (si Non - multi-choix)
-    if (answers.hasDestination === t('q.step3.no') && step === stepCounter) {
+    if (answers.hasDestination === t('questionnaire.no') && step === stepCounter) {
       return (
         <div className="space-y-4 animate-fade-up">
           <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
@@ -1283,10 +1283,10 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if (answers.hasDestination === t('q.step3.no')) stepCounter++;
+    if (answers.hasDestination === t('questionnaire.no')) stepCounter++;
 
     // Step 2e: Ambiance recherchée (si Non)
-    if (answers.hasDestination === t('q.step3.no') && step === stepCounter) {
+    if (answers.hasDestination === t('questionnaire.no') && step === stepCounter) {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
@@ -1323,7 +1323,7 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if (answers.hasDestination === t('q.step3.no')) stepCounter++;
+    if (answers.hasDestination === t('questionnaire.no')) stepCounter++;
 
     // Step 3: Dates
     if (step === stepCounter) {
@@ -1494,7 +1494,7 @@ const Questionnaire = () => {
               <Card
                 key={option.label}
                 className="p-6 cursor-pointer hover:shadow-golden hover:border-travliaq-deep-blue transition-all hover:scale-105"
-                onClick={() => handleChoice("hasApproximateDepartureDate", option.label === t('questionnaire.flexibility.hasApproxDate.yes') ? t('q.step8.approx.yes') : t('q.step8.approx.no'))}
+                onClick={() => handleChoice("hasApproximateDepartureDate", option.label)}
               >
                 <div className="flex items-center space-x-4">
                   <span className="text-4xl">{option.icon}</span>
@@ -1511,7 +1511,7 @@ const Questionnaire = () => {
     if (answers.datesType === t('questionnaire.dates.flexible')) stepCounter++;
 
     // Step 3e: Saisie date approximative (si l'utilisateur a dit "Oui")
-    if (answers.hasApproximateDepartureDate === t('q.step8.approx.yes') && step === stepCounter) {
+    if (answers.hasApproximateDepartureDate === t('questionnaire.flexibility.hasApproxDate.yes') && step === stepCounter) {
       const approximateDate = answers.approximateDepartureDate 
         ? new Date(answers.approximateDepartureDate) 
         : undefined;
@@ -1578,7 +1578,7 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if (answers.hasApproximateDepartureDate === t('q.step8.approx.yes')) stepCounter++;
+    if (answers.hasApproximateDepartureDate === t('questionnaire.flexibility.hasApproxDate.yes')) stepCounter++;
 
     // Step 4: Durée (only if flexible dates)
     if (answers.datesType === t('questionnaire.dates.flexible') && step === stepCounter) {
@@ -1769,7 +1769,7 @@ const Questionnaire = () => {
     if (answers.budgetType === t('questionnaire.budget.precise')) stepCounter++;
 
     // Step 6: Style (max 5 au lieu de 3) - SEULEMENT si destination précise ET activités sélectionnées
-    if (answers.hasDestination === t('q.step3.yes') && (answers.helpWith || []).includes(t('q.step2.activities')) && step === stepCounter) {
+    if (answers.hasDestination === t('questionnaire.yes') && (answers.helpWith || []).includes(t('questionnaire.activities')) && step === stepCounter) {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
@@ -1827,10 +1827,10 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if (answers.hasDestination === t('q.step3.yes') && (answers.helpWith || []).includes(t('q.step2.activities'))) stepCounter++;
+    if (answers.hasDestination === t('questionnaire.yes') && (answers.helpWith || []).includes(t('questionnaire.activities'))) stepCounter++;
 
     // Step 7: Rythme - SEULEMENT si activités sélectionnées
-    if ((answers.helpWith || []).includes(t('q.step2.activities')) && step === stepCounter) {
+    if ((answers.helpWith || []).includes(t('questionnaire.activities')) && step === stepCounter) {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
@@ -1862,10 +1862,10 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if ((answers.helpWith || []).includes(t('q.step2.activities'))) stepCounter++;
+    if ((answers.helpWith || []).includes(t('questionnaire.activities'))) stepCounter++;
 
     // Step 8: Vols - SEULEMENT si vols sélectionnés
-    if ((answers.helpWith || []).includes(t('q.step2.flights')) && step === stepCounter) {
+    if ((answers.helpWith || []).includes(t('questionnaire.flights')) && step === stepCounter) {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
@@ -1894,10 +1894,10 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if ((answers.helpWith || []).includes(t('q.step2.flights'))) stepCounter++;
+    if ((answers.helpWith || []).includes(t('questionnaire.flights'))) stepCounter++;
 
     // Step 9: Bagages par voyageur - AVEC OPTION OBJET PERSONNEL - SEULEMENT si vols sélectionnés
-    if ((answers.helpWith || []).includes(t('q.step2.flights')) && step === stepCounter) {
+    if ((answers.helpWith || []).includes(t('questionnaire.flights')) && step === stepCounter) {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
@@ -1910,7 +1910,7 @@ const Questionnaire = () => {
             {Array.from({ length: getNumberOfTravelers() }).map((_, index) => (
               <div key={index} className="space-y-2">
                 <label className="block text-sm font-medium">
-                  {t('questionnaire.luggage.traveler')} {index + 1} {index === 0 && answers.travelGroup === t('q.step1.duo') ? "👤" : index === 1 && answers.travelGroup === t('q.step1.duo') ? "👥" : "👤"}
+                  {t('questionnaire.luggage.traveler')} {index + 1} {index === 0 && answers.travelGroup === t('questionnaire.duo') ? "👤" : index === 1 && answers.travelGroup === t('questionnaire.duo') ? "👥" : "👤"}
                 </label>
                 <div className="grid grid-cols-3 gap-3">
                   {[
@@ -1957,7 +1957,7 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if ((answers.helpWith || []).includes(t('q.step2.flights'))) stepCounter++;
+    if ((answers.helpWith || []).includes(t('questionnaire.flights'))) stepCounter++;
 
     // Step 10: Mobilité (multi-choix + exhaustif)
     if (step === stepCounter) {
@@ -2036,7 +2036,7 @@ const Questionnaire = () => {
     stepCounter++;
 
     // Step 11: Type hébergement (max 2 + "Peu importe") - SEULEMENT si hébergement sélectionné
-    if ((answers.helpWith || []).includes(t('q.step2.accommodation')) && step === stepCounter) {
+    if ((answers.helpWith || []).includes(t('questionnaire.accommodation')) && step === stepCounter) {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
@@ -2116,10 +2116,10 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if ((answers.helpWith || []).includes(t('q.step2.accommodation'))) stepCounter++;
+    if ((answers.helpWith || []).includes(t('questionnaire.accommodation'))) stepCounter++;
 
     // Step 11b: Détails hôtel (SI Hôtel est sélectionné ET hébergement sélectionné)
-    if ((answers.helpWith || []).includes(t('q.step2.accommodation')) && (answers.accommodationType || []).includes(t('questionnaire.accommodationType.hotel')) && step === stepCounter) {
+    if ((answers.helpWith || []).includes(t('questionnaire.accommodation')) && (answers.accommodationType || []).includes(t('questionnaire.accommodationType.hotel')) && step === stepCounter) {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
@@ -2171,10 +2171,10 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if ((answers.helpWith || []).includes(t('q.step2.accommodation')) && (answers.accommodationType || []).includes(t('questionnaire.accommodationType.hotel'))) stepCounter++;
+    if ((answers.helpWith || []).includes(t('questionnaire.accommodation')) && (answers.accommodationType || []).includes(t('questionnaire.accommodationType.hotel'))) stepCounter++;
 
     // Step 12: Confort - SEULEMENT si hébergement sélectionné
-    if ((answers.helpWith || []).includes(t('q.step2.accommodation')) && step === stepCounter) {
+    if ((answers.helpWith || []).includes(t('questionnaire.accommodation')) && step === stepCounter) {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
@@ -2204,10 +2204,10 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if ((answers.helpWith || []).includes(t('q.step2.accommodation'))) stepCounter++;
+    if ((answers.helpWith || []).includes(t('questionnaire.accommodation'))) stepCounter++;
 
     // Step 13: Quartier - SEULEMENT si hébergement sélectionné
-    if ((answers.helpWith || []).includes(t('q.step2.accommodation')) && step === stepCounter) {
+    if ((answers.helpWith || []).includes(t('questionnaire.accommodation')) && step === stepCounter) {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
@@ -2237,10 +2237,10 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if ((answers.helpWith || []).includes(t('q.step2.accommodation'))) stepCounter++;
+    if ((answers.helpWith || []).includes(t('questionnaire.accommodation'))) stepCounter++;
 
     // Step 14: Équipements (plus laïc) - SEULEMENT si hébergement sélectionné
-    if ((answers.helpWith || []).includes(t('q.step2.accommodation')) && step === stepCounter) {
+    if ((answers.helpWith || []).includes(t('questionnaire.accommodation')) && step === stepCounter) {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
@@ -2298,7 +2298,7 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if ((answers.helpWith || []).includes(t('q.step2.accommodation'))) stepCounter++;
+    if ((answers.helpWith || []).includes(t('questionnaire.accommodation'))) stepCounter++;
 
     // Step 15: Contraintes & préférences (plus laïc et inclusif)
     if (step === stepCounter) {
