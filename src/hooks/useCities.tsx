@@ -28,12 +28,27 @@ export const useCities = () => {
 
 export const useFilteredCities = (searchTerm: string, cities: City[] | undefined) => {
   if (!cities) return [];
-  if (!searchTerm) return cities.slice(0, 50); // Show first 50 by default
+
+  // Prioritize popular cities (ensures Paris appears first)
+  const priorityNames = new Set([
+    'Paris','Marseille','Lyon','Toulouse','Nice','Bordeaux','Lille','Nantes','Strasbourg','Montpellier','Rennes','Reims','Le Havre','Saint-Étienne','Toulon','Grenoble','Dijon','Angers','Nîmes','Villeurbanne','Pau',
+    'London','Manchester','Birmingham','Edinburgh','Glasgow','Cardiff','Belfast',
+    'New York','Los Angeles','Chicago','San Francisco','Miami','Boston','Seattle','Washington','Dallas','Houston','Philadelphia','Phoenix','San Diego','San Jose','Austin','Orlando','Denver',
+    'Berlin','Munich','Hamburg','Cologne','Frankfurt','Stuttgart','Düsseldorf','Dortmund','Leipzig','Bremen','Dresden','Nuremberg','Hanover'
+  ]);
+
+  if (!searchTerm) {
+    return cities
+      .slice(0, 50)
+      .sort((a, b) => (priorityNames.has(b.name) ? 1 : 0) - (priorityNames.has(a.name) ? 1 : 0));
+  }
 
   const lowerSearch = searchTerm.toLowerCase();
   return cities
-    .filter(city => 
-      city.search_text.includes(lowerSearch)
+    .filter((city) =>
+      city.search_text.includes(lowerSearch) ||
+      city.name.toLowerCase().includes(lowerSearch) ||
+      city.country.toLowerCase().includes(lowerSearch)
     )
-    .slice(0, 100); // Limit results to 100
+    .slice(0, 100);
 };

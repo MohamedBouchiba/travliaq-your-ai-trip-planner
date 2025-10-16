@@ -452,6 +452,9 @@ const resources = {
       "questionnaire.dates.return": "Retour :",
       "questionnaire.dates.nights": "nuits",
       "questionnaire.dates.reset": "Réinitialiser les dates",
+      "questionnaire.dates.pickDeparture": "Sélectionne ta date de départ",
+      "questionnaire.dates.pickReturn": "Maintenant, sélectionne ta date de retour",
+      "questionnaire.dates.selectedMsg": "Dates sélectionnées !",
       
       // Flexibility
       "questionnaire.flexibility.title": "Flexibilité des dates ⏰",
@@ -1097,6 +1100,9 @@ const resources = {
       "questionnaire.dates.return": "Return:",
       "questionnaire.dates.nights": "nights",
       "questionnaire.dates.reset": "Reset dates",
+      "questionnaire.dates.pickDeparture": "Select your departure date",
+      "questionnaire.dates.pickReturn": "Now select your return date",
+      "questionnaire.dates.selectedMsg": "Dates selected!",
       
       // Flexibility
       "questionnaire.flexibility.title": "Date flexibility ⏰",
