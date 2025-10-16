@@ -1169,12 +1169,12 @@ const Questionnaire = () => {
           <p className="text-center text-muted-foreground">{t('questionnaire.multipleSelectionPossible')}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
             {[
-              { label: "Chaud & ensoleillé", icon: "☀️", desc: "25-35°C" },
-              { label: "Tempéré & doux", icon: "🌤️", desc: "15-25°C" },
-              { label: "Froid & neigeux", icon: "❄️", desc: "<10°C" },
-              { label: "Tropical & humide", icon: "🌴", desc: "Plages & jungle" },
-              { label: "Montagne & altitude", icon: "⛰️", desc: "Air pur" },
-              { label: "Peu importe", icon: "🤷", desc: "Je suis flexible" }
+              { label: t('questionnaire.climate.hotSunny'), icon: "☀️", desc: t('questionnaire.climate.hotSunny.desc') },
+              { label: t('questionnaire.climate.mildSweet'), icon: "🌤️", desc: t('questionnaire.climate.mildSweet.desc') },
+              { label: t('questionnaire.climate.coldSnowy'), icon: "❄️", desc: t('questionnaire.climate.coldSnowy.desc') },
+              { label: t('questionnaire.climate.tropicalHumid'), icon: "🌴", desc: t('questionnaire.climate.tropicalHumid.desc') },
+              { label: t('questionnaire.climate.mountainAltitude'), icon: "⛰️", desc: t('questionnaire.climate.mountainAltitude.desc') },
+              { label: t('questionnaire.climate.dontMind'), icon: "🤷", desc: t('questionnaire.climate.dontMind.desc') }
             ].map((option) => {
               const isSelected = (answers.climatePreference || []).includes(option.label);
               return (
@@ -1210,7 +1210,7 @@ const Questionnaire = () => {
               disabled={!answers.climatePreference || answers.climatePreference.length === 0}
               className="bg-travliaq-deep-blue"
             >
-              Continuer
+              {t('questionnaire.continue')}
             </Button>
           </div>
         </div>
@@ -1223,27 +1223,27 @@ const Questionnaire = () => {
       return (
         <div className="space-y-4 animate-fade-up">
           <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
-            Qu'est-ce qui t'attire le plus ? 🎯
+            {t('questionnaire.affinities.title')}
           </h2>
-          <p className="text-center text-muted-foreground">Sélectionnez jusqu'à 5 affinités</p>
+          <p className="text-center text-muted-foreground">{t('questionnaire.affinities.selectUpTo5')}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
             {[
-              { label: "Plages paradisiaques", icon: "🏖️" },
-              { label: "Villes historiques", icon: "🏛️" },
-              { label: "Nature & randonnées", icon: "🥾" },
-              { label: "Ski & sports d'hiver", icon: "⛷️" },
-              { label: "Safari & animaux", icon: "🦁" },
-              { label: "Gastronomie locale", icon: "🍽️" },
-              { label: "Shopping & mode", icon: "🛍️" },
-              { label: "Festivals & événements", icon: "🎭" },
-              { label: "Architecture moderne", icon: "🏙️" },
-              { label: "Temples & spiritualité", icon: "🕌" },
-              { label: "Parcs d'attractions", icon: "🎢" },
-              { label: "Plongée & snorkeling", icon: "🤿" },
-              { label: "Road trip & liberté", icon: "🚗" },
-              { label: "Vignobles & œnotourisme", icon: "🍷" },
-              { label: "Déserts & paysages lunaires", icon: "🏜️" },
-              { label: "Îles & archipels", icon: "🏝️" }
+              { label: t('questionnaire.affinities.paradiseBeaches'), icon: "🏖️" },
+              { label: t('questionnaire.affinities.historicCities'), icon: "🏛️" },
+              { label: t('questionnaire.affinities.natureHiking'), icon: "🥾" },
+              { label: t('questionnaire.affinities.skiWinterSports'), icon: "⛷️" },
+              { label: t('questionnaire.affinities.safariAnimals'), icon: "🦁" },
+              { label: t('questionnaire.affinities.localGastronomy'), icon: "🍽️" },
+              { label: t('questionnaire.affinities.shoppingFashion'), icon: "🛍️" },
+              { label: t('questionnaire.affinities.festivalsEvents'), icon: "🎭" },
+              { label: t('questionnaire.affinities.modernArchitecture'), icon: "🏙️" },
+              { label: t('questionnaire.affinities.templesSpirituality'), icon: "🕌" },
+              { label: t('questionnaire.affinities.amusementParks'), icon: "🎢" },
+              { label: t('questionnaire.affinities.divingSnorkeling'), icon: "🤿" },
+              { label: t('questionnaire.affinities.roadTripFreedom'), icon: "🚗" },
+              { label: t('questionnaire.affinities.vineyardsWine'), icon: "🍷" },
+              { label: t('questionnaire.affinities.desertsLunar'), icon: "🏜️" },
+              { label: t('questionnaire.affinities.islandsArchipelagos'), icon: "🏝️" }
             ].map((option) => {
               const isSelected = (answers.travelAffinities || []).includes(option.label);
               const isDisabled = !isSelected && (answers.travelAffinities || []).length >= 5;
@@ -1277,7 +1277,7 @@ const Questionnaire = () => {
               disabled={!answers.travelAffinities || answers.travelAffinities.length === 0}
               className="bg-travliaq-deep-blue"
             >
-              Continuer
+              {t('questionnaire.continue')}
             </Button>
           </div>
         </div>
@@ -1290,16 +1290,16 @@ const Questionnaire = () => {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
-            Quelle ambiance recherches-tu ? 🎨
+            {t('questionnaire.ambiance.title')}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
             {[
-              { label: "Aventure & dépaysement", icon: "🧭", desc: "Sortir de ma zone de confort" },
-              { label: "Détente & relaxation", icon: "🧘", desc: "Me ressourcer totalement" },
-              { label: "Romance & intimité", icon: "💕", desc: "Moments à deux" },
-              { label: "Découverte culturelle", icon: "🎭", desc: "Apprendre et m'enrichir" },
-              { label: "Fête & vie nocturne", icon: "🎉", desc: "Faire la fête" },
-              { label: "Famille & convivialité", icon: "👨‍👩‍👧‍👦", desc: "Moments en famille" }
+              { label: t('questionnaire.ambiance.adventureExotic'), icon: "🧭", desc: t('questionnaire.ambiance.adventureExotic.desc') },
+              { label: t('questionnaire.ambiance.relaxation'), icon: "🧘", desc: t('questionnaire.ambiance.relaxation.desc') },
+              { label: t('questionnaire.ambiance.romanceIntimacy'), icon: "💕", desc: t('questionnaire.ambiance.romanceIntimacy.desc') },
+              { label: t('questionnaire.ambiance.culturalDiscovery'), icon: "🎭", desc: t('questionnaire.ambiance.culturalDiscovery.desc') },
+              { label: t('questionnaire.ambiance.partyNightlife'), icon: "🎉", desc: t('questionnaire.ambiance.partyNightlife.desc') },
+              { label: t('questionnaire.ambiance.familyConviviality'), icon: "👨‍👩‍👧‍👦", desc: t('questionnaire.ambiance.familyConviviality.desc') }
             ].map((option) => (
               <Card
                 key={option.label}
@@ -1330,12 +1330,12 @@ const Questionnaire = () => {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
-            Dates de voyage 📅
+            {t('questionnaire.dates.title')}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
             {[
-              { label: "Dates fixes", icon: "📆" },
-              { label: "Je suis flexible", icon: "🔄" }
+              { label: t('questionnaire.dates.fixed'), icon: "📆" },
+              { label: t('questionnaire.dates.flexible'), icon: "🔄" }
             ].map((option) => (
               <Card
                 key={option.label}
@@ -1372,7 +1372,7 @@ const Questionnaire = () => {
       return (
         <div className="space-y-4 animate-fade-up">
           <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
-            Sélectionnez vos dates de voyage 🗓️
+            {t('questionnaire.dates.selectDates')}
           </h2>
           <div className="max-w-2xl mx-auto space-y-3">
             <div className="space-y-2">
@@ -1585,19 +1585,19 @@ const Questionnaire = () => {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
-            Durée du séjour 🌙
+            {t('questionnaire.duration.title')}
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
             {[
-              { label: "2 nuits", icon: "🌙" },
-              { label: "3 nuits", icon: "🌙🌙" },
-              { label: "4 nuits", icon: "🌃" },
-              { label: "5 nuits", icon: "🌃" },
-              { label: "6 nuits", icon: "🌆" },
-              { label: "7 nuits", icon: "🌆" },
-              { label: "8-10 nuits", icon: "🌇" },
-              { label: "11-14 nuits", icon: "🌇" },
-              { label: ">14 nuits", icon: "🌉" }
+              { label: t('questionnaire.duration.2nights'), icon: "🌙" },
+              { label: t('questionnaire.duration.3nights'), icon: "🌙🌙" },
+              { label: t('questionnaire.duration.4nights'), icon: "🌃" },
+              { label: t('questionnaire.duration.5nights'), icon: "🌃" },
+              { label: t('questionnaire.duration.6nights'), icon: "🌆" },
+              { label: t('questionnaire.duration.7nights'), icon: "🌆" },
+              { label: t('questionnaire.duration.8to10'), icon: "🌇" },
+              { label: t('questionnaire.duration.11to14'), icon: "🌇" },
+              { label: t('questionnaire.duration.more14'), icon: "🌉" }
             ].map((option) => (
               <Card
                 key={option.label}
@@ -1623,7 +1623,7 @@ const Questionnaire = () => {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
-            Combien de nuits exactement ? 🌉
+            {t('questionnaire.duration.exactNights')}
           </h2>
           <div className="max-w-xl mx-auto space-y-4">
             <Input
@@ -1644,7 +1644,7 @@ const Questionnaire = () => {
                 disabled={!answers.exactNights || answers.exactNights < 15}
                 className="bg-travliaq-deep-blue"
               >
-                Continuer
+                {t('questionnaire.continue')}
               </Button>
             </div>
           </div>
@@ -1658,19 +1658,19 @@ const Questionnaire = () => {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
-            Budget par personne 💰
+            {t('questionnaire.budget.title')}
           </h2>
-          <p className="text-center text-muted-foreground">Hors achats personnels</p>
+          <p className="text-center text-muted-foreground">{t('questionnaire.budget.excluding')}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
             {[
-              { label: "<300€", icon: "💵" },
-              { label: "300-600€", icon: "💶" },
-              { label: "600-900€", icon: "💷" },
-              { label: "900-1 200€", icon: "💴" },
-              { label: "1 200-1 800€", icon: "💸" },
-              { label: ">1 800€", icon: "💎" },
-              { label: "Je ne sais pas", icon: "🤷" },
-              { label: "Budget précis", icon: "🎯" }
+              { label: t('questionnaire.budget.less300'), icon: "💵" },
+              { label: t('questionnaire.budget.300to600'), icon: "💶" },
+              { label: t('questionnaire.budget.600to900'), icon: "💷" },
+              { label: t('questionnaire.budget.900to1200'), icon: "💴" },
+              { label: t('questionnaire.budget.1200to1800'), icon: "💸" },
+              { label: t('questionnaire.budget.more1800'), icon: "💎" },
+              { label: t('questionnaire.budget.dontKnow'), icon: "🤷" },
+              { label: t('questionnaire.budget.precise'), icon: "🎯" }
             ].map((option) => (
               <Card
                 key={option.label}
@@ -1704,12 +1704,12 @@ const Questionnaire = () => {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
-            Quel est votre budget total ? 💵
+            {t('questionnaire.budget.totalBudget')}
           </h2>
-          <p className="text-center text-muted-foreground">Pour l'ensemble du voyage</p>
+          <p className="text-center text-muted-foreground">{t('questionnaire.budget.entireTrip')}</p>
           <div className="max-w-xl mx-auto space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Montant</label>
+              <label className="block text-sm font-medium mb-2">{t('questionnaire.budget.amount')}</label>
               <Input
                 type="number"
                 min="0"
@@ -1722,7 +1722,7 @@ const Questionnaire = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Devise</label>
+              <label className="block text-sm font-medium mb-2">{t('questionnaire.budget.currency')}</label>
               <div className="grid grid-cols-3 gap-4">
                 {[
                   { label: "EUR", icon: "€" },
@@ -1759,7 +1759,7 @@ const Questionnaire = () => {
                 disabled={!answers.budgetAmount || !answers.budgetCurrency}
                 className="bg-travliaq-deep-blue"
               >
-                Continuer
+                {t('questionnaire.continue')}
               </Button>
             </div>
           </div>
@@ -1773,21 +1773,21 @@ const Questionnaire = () => {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
-            Style de voyage 🎨
+            {t('questionnaire.styles.title')}
           </h2>
-          <p className="text-center text-muted-foreground">Sélectionnez jusqu'à 5 styles</p>
+          <p className="text-center text-muted-foreground">{t('questionnaire.styles.selectUpTo5')}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
             {[
-              { label: "Nature", icon: "🌲" },
-              { label: "Culture & musées", icon: "🏛️" },
-              { label: "Food", icon: "🍽️" },
-              { label: "Plage", icon: "🏖️" },
-              { label: "Montagne & rando", icon: "⛰️" },
-              { label: "Photo spots", icon: "📸" },
-              { label: "Vie locale & marchés", icon: "🏪" },
-              { label: "Sport & outdoor", icon: "🚴" },
-              { label: "Bien-être & spa", icon: "🧘" },
-              { label: "Vie nocturne", icon: "🎉" }
+              { label: t('questionnaire.styles.nature'), icon: "🌲" },
+              { label: t('questionnaire.styles.cultureMuseums'), icon: "🏛️" },
+              { label: t('questionnaire.styles.food'), icon: "🍽️" },
+              { label: t('questionnaire.styles.beach'), icon: "🏖️" },
+              { label: t('questionnaire.styles.mountainHiking'), icon: "⛰️" },
+              { label: t('questionnaire.styles.photoSpots'), icon: "📸" },
+              { label: t('questionnaire.styles.localMarkets'), icon: "🏪" },
+              { label: t('questionnaire.styles.sportOutdoor'), icon: "🚴" },
+              { label: t('questionnaire.styles.wellnessSpa'), icon: "🧘" },
+              { label: t('questionnaire.styles.nightlife'), icon: "🎉" }
             ].map((option) => {
               const isSelected = (answers.styles || []).includes(option.label);
               const isDisabled = !isSelected && (answers.styles || []).length >= 5;
@@ -1821,7 +1821,7 @@ const Questionnaire = () => {
               disabled={!answers.styles || answers.styles.length === 0}
               className="bg-travliaq-deep-blue"
             >
-              Continuer
+              {t('questionnaire.continue')}
             </Button>
           </div>
         </div>
@@ -1834,13 +1834,13 @@ const Questionnaire = () => {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
-            Rythme souhaité ⏱️
+            {t('questionnaire.rhythm.title')}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
             {[
-              { label: "Cool", desc: "1-2 activités/jour", icon: "🐢" },
-              { label: "Équilibré", desc: "2-3 activités/jour", icon: "🚶" },
-              { label: "Intense", desc: "3+ activités/jour", icon: "🏃" }
+              { label: t('questionnaire.rhythm.cool'), desc: t('questionnaire.rhythm.cool.desc'), icon: "🐢" },
+              { label: t('questionnaire.rhythm.balanced'), desc: t('questionnaire.rhythm.balanced.desc'), icon: "🚶" },
+              { label: t('questionnaire.rhythm.intense'), desc: t('questionnaire.rhythm.intense.desc'), icon: "🏃" }
             ].map((option) => (
               <Card
                 key={option.label}
@@ -1869,13 +1869,13 @@ const Questionnaire = () => {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
-            Vols – préférence ✈️
+            {t('questionnaire.flights.title')}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
             {[
-              { label: "Direct uniquement", icon: "✈️" },
-              { label: "Max 1 escale", icon: "🛫" },
-              { label: "Peu importe", icon: "💰" }
+              { label: t('questionnaire.flights.directOnly'), icon: "✈️" },
+              { label: t('questionnaire.flights.max1Stop'), icon: "🛫" },
+              { label: t('questionnaire.flights.dontMind'), icon: "💰" }
             ].map((option) => (
               <Card
                 key={option.label}
@@ -1901,10 +1901,10 @@ const Questionnaire = () => {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
-            Bagages par voyageur 🧳
+            {t('questionnaire.luggage.title')}
           </h2>
           <p className="text-center text-muted-foreground">
-            {getNumberOfTravelers()} voyageur{getNumberOfTravelers() > 1 ? 's' : ''}
+            {getNumberOfTravelers()} {getNumberOfTravelers() > 1 ? t('questionnaire.luggage.travelers_plural') : t('questionnaire.luggage.travelers')}
           </p>
           <div className="max-w-2xl mx-auto space-y-4">
             {Array.from({ length: getNumberOfTravelers() }).map((_, index) => (
@@ -2016,8 +2016,8 @@ const Questionnaire = () => {
                 // Si l'utilisateur a sélectionné uniquement atypique, ferry, ou les deux sans autre transport
                 if ((hasAtypical || hasFerry) && !hasOtherTransport) {
                   toast({
-                    title: "Sélection incomplète",
-                    description: "Veuillez sélectionner au moins un autre mode de transport en plus du transport atypique ou bateau/ferry.",
+                    title: t('questionnaire.mobility.incompleteSelection'),
+                    description: t('questionnaire.mobility.selectOtherTransport'),
                     variant: "destructive"
                   });
                   return;
@@ -2405,7 +2405,7 @@ const Questionnaire = () => {
                 size="lg"
                 onClick={nextStep}
               >
-                Passer
+                {t('questionnaire.additionalInfo.skip')}
               </Button>
               <Button
                 variant="hero"
@@ -2413,7 +2413,7 @@ const Questionnaire = () => {
                 onClick={nextStep}
                 className="bg-travliaq-deep-blue"
               >
-                Continuer
+                {t('questionnaire.continue')}
               </Button>
             </div>
           </div>
@@ -2427,17 +2427,17 @@ const Questionnaire = () => {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
-            Recevoir mon itinéraire 📧
+            {t('questionnaire.email.title')}
           </h2>
           <p className="text-center text-muted-foreground">
-            Nous vous enverrons votre itinéraire personnalisé sous 48h
+            {t('questionnaire.email.description')}
           </p>
           <div className="max-w-xl mx-auto space-y-4">
             <div className="relative">
               <Mail className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
               <Input
                 type="email"
-                placeholder="votre@email.com"
+                placeholder={t('questionnaire.email.placeholder')}
                 className="pl-10 h-12 text-base"
                 value={answers.email || ""}
                 onChange={(e) => setAnswers({ ...answers, email: e.target.value })}
@@ -2455,10 +2455,10 @@ const Questionnaire = () => {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Envoi en cours...
+                    {t('questionnaire.email.sending')}
                   </>
                 ) : (
-                  <>Envoyer 🚀</>
+                  <>{t('questionnaire.email.send')}</>
                 )}
               </Button>
             </div>
