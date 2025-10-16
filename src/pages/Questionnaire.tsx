@@ -594,6 +594,20 @@ const Questionnaire = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
+      // CRITICAL: Require authentication before submission
+      if (!user) {
+        toast({
+          title: "Connexion requise 🔒",
+          description: "Vous devez être connecté pour soumettre un questionnaire.",
+          variant: "destructive",
+          duration: 6000
+        });
+        setIsSubmitting(false);
+        // Show Google login popup
+        setShowGoogleLogin(true);
+        return;
+      }
+      
       // Comprehensive validation schema
       const questionnaireSchema = z.object({
         user_id: z.string().uuid().nullable(),
@@ -712,11 +726,24 @@ const Questionnaire = () => {
           title: "Quota atteint 🚫",
           description: "Vous avez atteint votre quota de 2 questionnaires par jour. Revenez demain pour planifier un autre voyage !",
           variant: "destructive",
-          duration: 8000
+          duration: 5000
         });
         setTimeout(() => {
           navigate('/');
-        }, 8500);
+        }, 5000);
+        return;
+      }
+      
+      // Check if authentication is required
+      if (error && typeof error === 'object' && 'message' in error && 
+          typeof error.message === 'string' && error.message.includes('authentication_required')) {
+        toast({
+          title: "Connexion requise 🔒",
+          description: "Vous devez être connecté pour soumettre un questionnaire.",
+          variant: "destructive",
+          duration: 6000
+        });
+        setShowGoogleLogin(true);
         return;
       }
       

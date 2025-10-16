@@ -155,13 +155,48 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    console.log('Checking daily quota for:', questionnaireData.email);
+    // CRITICAL: Require authentication - get user_id from the request
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      console.log('Missing authorization header');
+      return new Response(
+        JSON.stringify({ 
+          error: 'authentication_required',
+          message: 'Vous devez être connecté pour soumettre un questionnaire.' 
+        }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
-    // Check how many questionnaires this email has submitted in the last 24 hours
+    // Verify the JWT token and get the user
+    const supabaseClient = createClient(
+      supabaseUrl,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    
+    if (userError || !user) {
+      console.log('Invalid or expired token');
+      return new Response(
+        JSON.stringify({ 
+          error: 'authentication_required',
+          message: 'Session invalide ou expirée. Veuillez vous reconnecter.' 
+        }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    console.log('Checking daily quota for user:', user.id, 'email:', questionnaireData.email);
+    
+    // Check how many questionnaires this user+email combination has submitted in the last 24 hours
+    // Using BOTH user_id AND email as dual key for quota
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: recentSubmissions, error: countError } = await supabase
       .from('questionnaire_responses')
       .select('id', { count: 'exact', head: false })
+      .eq('user_id', user.id)
       .eq('email', questionnaireData.email)
       .gte('created_at', twentyFourHoursAgo);
     
@@ -175,7 +210,7 @@ serve(async (req) => {
     
     // Check if user has reached the daily limit of 2 submissions
     if (recentSubmissions && recentSubmissions.length >= 2) {
-      console.log('Daily quota exceeded for:', questionnaireData.email);
+      console.log('Daily quota exceeded for user:', user.id, 'email:', questionnaireData.email);
       return new Response(
         JSON.stringify({ 
           error: 'quota_exceeded',
@@ -185,7 +220,10 @@ serve(async (req) => {
       );
     }
     
-    console.log('Inserting questionnaire response for:', questionnaireData.email);
+    // Set the user_id from authenticated user
+    questionnaireData.user_id = user.id;
+    
+    console.log('Inserting questionnaire response for user:', user.id, 'email:', questionnaireData.email);
     
     // Insert the questionnaire response
     const { data, error } = await supabase

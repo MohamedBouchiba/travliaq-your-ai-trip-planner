@@ -286,6 +286,20 @@ const Questionnaire = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
+      // CRITICAL: Require authentication before submission
+      if (!user) {
+        toast({
+          title: "Login required 🔒",
+          description: "You must be logged in to submit a questionnaire.",
+          variant: "destructive",
+          duration: 6000
+        });
+        setIsSubmitting(false);
+        // Show Google login popup
+        setShowGoogleLogin(true);
+        return;
+      }
+      
       const questionnaireSchema = z.object({
         user_id: z.string().uuid().nullable(),
         email: z.string().trim().email({ message: "Invalid email" }).max(255, { message: "Email too long" }),
@@ -391,6 +405,34 @@ const Questionnaire = () => {
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error("Questionnaire submission error:", error);
+      }
+      
+      // Check if it's a quota exceeded error
+      if (error && typeof error === 'object' && 'message' in error && 
+          typeof error.message === 'string' && error.message.includes('quota_exceeded')) {
+        toast({
+          title: "Quota reached 🚫",
+          description: "You have reached your quota of 2 questionnaires per day. Come back tomorrow to plan another trip!",
+          variant: "destructive",
+          duration: 5000
+        });
+        setTimeout(() => {
+          navigate('/en');
+        }, 5000);
+        return;
+      }
+      
+      // Check if authentication is required
+      if (error && typeof error === 'object' && 'message' in error && 
+          typeof error.message === 'string' && error.message.includes('authentication_required')) {
+        toast({
+          title: "Login required 🔒",
+          description: "You must be logged in to submit a questionnaire.",
+          variant: "destructive",
+          duration: 6000
+        });
+        setShowGoogleLogin(true);
+        return;
       }
       
       if (error instanceof z.ZodError) {
