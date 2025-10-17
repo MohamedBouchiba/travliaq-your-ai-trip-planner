@@ -82,7 +82,6 @@ type Answer = {
   amenities?: string[];
   constraints?: string[];
   additionalInfo?: string;
-  openComments?: string;
   email?: string;
 };
 
@@ -681,8 +680,7 @@ const Questionnaire = () => {
         neighborhood: answers.neighborhood || null,
         amenities: answers.amenities || null,
         constraints: answers.constraints || null,
-        additional_info: answers.additionalInfo || null,
-        open_comments: answers.openComments || null
+        additional_info: answers.additionalInfo || null
       };
 
       // Validate all inputs before submission

@@ -116,7 +116,6 @@ export type Database = {
           mobility: Json | null
           neighborhood: string | null
           number_of_travelers: number | null
-          open_comments: string | null
           return_date: string | null
           rhythm: string | null
           styles: Json | null
@@ -155,7 +154,6 @@ export type Database = {
           mobility?: Json | null
           neighborhood?: string | null
           number_of_travelers?: number | null
-          open_comments?: string | null
           return_date?: string | null
           rhythm?: string | null
           styles?: Json | null
@@ -194,7 +192,6 @@ export type Database = {
           mobility?: Json | null
           neighborhood?: string | null
           number_of_travelers?: number | null
-          open_comments?: string | null
           return_date?: string | null
           rhythm?: string | null
           styles?: Json | null
