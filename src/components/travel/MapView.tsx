@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "@/styles/mapbox-overrides.css";
+import { Maximize2, Minimize2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface MapViewProps {
   days: Array<{
@@ -18,6 +20,7 @@ const MapView = ({ days, activeDay, onScrollToDay }: MapViewProps) => {
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef<{ [key: number]: mapboxgl.Marker }>({});
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     if (!mapContainer.current) return;
@@ -218,9 +221,44 @@ const MapView = ({ days, activeDay, onScrollToDay }: MapViewProps) => {
     });
   }, [activeDay, days, isLoaded]);
 
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+    // Resize map after fullscreen toggle to ensure proper rendering
+    setTimeout(() => {
+      map.current?.resize();
+    }, 100);
+  };
+
   return (
-    <div className="w-full rounded-lg overflow-hidden border border-travliaq-turquoise/20 shadow-[0_0_15px_rgba(56,189,248,0.1)] bg-gradient-to-br from-travliaq-deep-blue/70 to-travliaq-deep-blue/50 backdrop-blur-md">
-      <div ref={mapContainer} className="w-full h-56" style={{ minHeight: '224px' }} />
+    <div className={`
+      transition-all duration-300 rounded-lg overflow-hidden border border-travliaq-turquoise/20 
+      shadow-[0_0_15px_rgba(56,189,248,0.1)] bg-gradient-to-br from-travliaq-deep-blue/70 
+      to-travliaq-deep-blue/50 backdrop-blur-md
+      ${isFullscreen 
+        ? 'fixed inset-0 z-50 !rounded-none' 
+        : 'w-full'
+      }
+    `}>
+      {/* Fullscreen toggle button */}
+      <Button
+        variant="outline"
+        size="icon"
+        className="absolute top-4 right-4 z-10 bg-background/90 backdrop-blur-sm hover:bg-background"
+        onClick={toggleFullscreen}
+        title={isFullscreen ? "Quitter le plein écran" : "Plein écran"}
+      >
+        {isFullscreen ? (
+          <Minimize2 className="h-4 w-4" />
+        ) : (
+          <Maximize2 className="h-4 w-4" />
+        )}
+      </Button>
+      
+      <div 
+        ref={mapContainer} 
+        className={isFullscreen ? "w-full h-screen" : "w-full h-56"} 
+        style={!isFullscreen ? { minHeight: '224px' } : undefined} 
+      />
       <div className="bg-gradient-to-r from-travliaq-deep-blue/90 to-travliaq-deep-blue/80 backdrop-blur-md p-2 border-t border-travliaq-turquoise/20">
         <p className="font-montserrat text-white text-xs font-semibold truncate">
           {days.find((d) => d.id === activeDay)?.title || ""}

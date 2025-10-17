@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +10,7 @@ import { ShareButtons } from "@/components/blog/ShareButtons";
 import { TableOfContents } from "@/components/blog/TableOfContents";
 import { RelatedPosts } from "@/components/blog/RelatedPosts";
 import { MarkdownContent } from "@/components/blog/MarkdownContent";
+import Navigation from "@/components/Navigation";
 
 type BlogPost = {
   id: string;
@@ -24,6 +26,7 @@ type BlogPost = {
 const BlogPost = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [post, setPost] = useState<BlogPost | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -68,8 +71,10 @@ const BlogPost = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-subtle">
-        <div className="container max-w-4xl mx-auto py-8 px-4">
+      <>
+        <Navigation />
+        <div className="min-h-screen bg-gradient-subtle">
+          <div className="container max-w-4xl mx-auto py-8 px-4">
           <div className="animate-pulse space-y-8">
             <div className="h-10 bg-muted rounded w-32" />
             <div className="h-12 bg-muted rounded w-3/4" />
@@ -82,7 +87,8 @@ const BlogPost = () => {
             </div>
           </div>
         </div>
-      </div>
+        </div>
+      </>
     );
   }
 
@@ -95,6 +101,7 @@ const BlogPost = () => {
 
   return (
     <>
+      <Navigation />
       <ReadingProgress />
       <div className="min-h-screen bg-gradient-subtle">
         <div className="container max-w-7xl mx-auto py-8 px-4">
@@ -104,7 +111,7 @@ const BlogPost = () => {
             className="mb-8"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Retour au blog
+            {t('blog.backToBlog')}
           </Button>
 
           <div className="grid lg:grid-cols-[1fr_300px] gap-8">
@@ -129,12 +136,12 @@ const BlogPost = () => {
                   <span>•</span>
                   <div className="flex items-center gap-2">
                     <Clock className="h-5 w-5" />
-                    <span>{readingTime} min de lecture</span>
+                    <span>{t('blog.readingTime', { time: readingTime })}</span>
                   </div>
                   <span>•</span>
                   <div className="flex items-center gap-2">
                     <Eye className="h-5 w-5" />
-                    <span>{post.view_count} vues</span>
+                    <span>{t('blog.views', { count: post.view_count })}</span>
                   </div>
                   <div className="ml-auto">
                     <ShareButtons title={post.title} url={currentUrl} />
@@ -168,7 +175,7 @@ const BlogPost = () => {
                   variant="outline"
                   onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
                 >
-                  Retour en haut
+                  {t('common.backToTop')}
                 </Button>
               </div>
 

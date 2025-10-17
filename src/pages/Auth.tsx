@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
+import Navigation from '@/components/Navigation';
 
 const passwordSchema = z
   .string()
@@ -133,8 +134,10 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-travliaq-deep-blue via-travliaq-deep-blue/95 to-travliaq-turquoise/20 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <>
+      <Navigation />
+      <div className="min-h-screen bg-gradient-to-br from-travliaq-deep-blue via-travliaq-deep-blue/95 to-travliaq-turquoise/20 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
         <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-2xl p-8">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-white mb-2">
@@ -293,7 +296,8 @@ const Auth = () => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

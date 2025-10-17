@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { Calendar, Eye, ArrowRight, Search } from "lucide-react";
+import Navigation from "@/components/Navigation";
 
 type BlogPost = {
   id: string;
@@ -60,9 +61,11 @@ const Blog = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-subtle">
-      {/* Hero Section */}
-      <section className="bg-gradient-hero text-white py-20">
+    <>
+      <Navigation />
+      <div className="min-h-screen bg-gradient-subtle">
+        {/* Hero Section */}
+        <section className="bg-gradient-hero text-white py-20">
         <div className="container max-w-6xl mx-auto px-4">
           <div className="text-center animate-fade-up">
             <h1 className="text-5xl md:text-6xl font-bold mb-6">
@@ -179,6 +182,7 @@ const Blog = () => {
         )}
       </section>
     </div>
+    </>
   );
 };
 

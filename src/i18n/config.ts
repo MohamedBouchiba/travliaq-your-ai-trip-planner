@@ -98,6 +98,15 @@ const resources = {
       "footer.legal": "Informations légales",
       "footer.follow": "Suivez-nous",
       "footer.create": "Créer un itinéraire",
+
+      // Common
+      "common.back": "Retour",
+      "common.backToTop": "Retour en haut",
+      
+      // Blog
+      "blog.backToBlog": "Retour au blog",
+      "blog.readingTime": "{{time}} min de lecture",
+      "blog.views": "{{count}} vues",
       "footer.terms": "Conditions Générales de Vente",
       "footer.imprint": "Mentions légales",
       "footer.privacy": "Politique de confidentialité",
@@ -772,6 +781,15 @@ const resources = {
       "footer.imprint": "Legal Notice",
       "footer.privacy": "Privacy Policy",
       "footer.copyright": "© 2025 Travliaq. All rights reserved. Made with ❤️ for authentic travelers",
+      
+      // Common
+      "common.back": "Back",
+      "common.backToTop": "Back to top",
+      
+      // Blog
+      "blog.backToBlog": "Back to blog",
+      "blog.readingTime": "{{time}} min read",
+      "blog.views": "{{count}} views",
       
       // Discover page
       "discover.title": "DISCOVER TRIPS",
