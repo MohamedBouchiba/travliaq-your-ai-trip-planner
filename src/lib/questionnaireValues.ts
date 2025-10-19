@@ -107,3 +107,26 @@ export const getDatesTypeLabel = (value: string) => {
   };
   return map[normalized || ''] || value;
 };
+
+// Rhythm mapping
+export const getRhythmLabel = (value: string) => {
+  const map: Record<string, string> = {
+    'relaxed': 'questionnaire.rhythm.relaxed',
+    'balanced': 'questionnaire.rhythm.balanced',
+    'intense': 'questionnaire.rhythm.intense',
+  };
+  return map[value] || value;
+};
+
+// Schedule preferences mapping
+export const getSchedulePrefLabel = (value: string) => {
+  const map: Record<string, string> = {
+    'early_bird': 'questionnaire.schedule.earlyBird',
+    'night_owl': 'questionnaire.schedule.nightOwl',
+    'needs_siesta': 'questionnaire.schedule.needsSiesta',
+    'needs_breaks': 'questionnaire.schedule.needsBreaks',
+    'needs_free_time': 'questionnaire.schedule.needsFreeTime',
+    'flexible_schedule': 'questionnaire.schedule.flexibleSchedule',
+  };
+  return map[value] || value;
+};

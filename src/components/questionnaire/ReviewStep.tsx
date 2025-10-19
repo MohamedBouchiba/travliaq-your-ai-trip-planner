@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronUp, Edit2, Mail, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { getTravelGroupLabel, getYesNoLabel, getDatesTypeLabel } from "@/lib/questionnaireValues";
+import { getTravelGroupLabel, getYesNoLabel, getDatesTypeLabel, getRhythmLabel, getSchedulePrefLabel } from "@/lib/questionnaireValues";
 
 interface ReviewStepProps {
   answers: any;
@@ -42,6 +42,16 @@ const translateValue = (key: string, value: any, t: any): string => {
   // Codes dates type
   if (key === 'datesType') {
     return t(getDatesTypeLabel(value));
+  }
+
+  // Rhythm (relaxed/balanced/intense)
+  if (key === 'rhythm') {
+    return t(getRhythmLabel(value));
+  }
+
+  // Schedule preferences (arrays)
+  if (key === 'schedulePrefs' && Array.isArray(value)) {
+    return value.map((v) => t(getSchedulePrefLabel(v))).join(', ');
   }
   
   // Codes help_with
@@ -112,8 +122,8 @@ export const ReviewStep = ({ answers, email, onEmailChange, onEdit, onSubmit, is
       data: [
         { key: 'travelAmbiance', label: t('questionnaire.travelAmbiance'), value: formatValue(answers.travelAmbiance, t) },
         { key: 'styles', label: t('questionnaire.styles'), value: formatValue(answers.styles, t) },
-        { key: 'rhythm', label: t('questionnaire.rhythm'), value: formatValue(answers.rhythm, t) },
-        { key: 'schedulePrefs', label: t('questionnaire.schedulePrefs'), value: formatValue(answers.schedulePrefs, t) }
+        { key: 'rhythm', label: t('questionnaire.rhythm'), value: translateValue('rhythm', answers.rhythm, t) },
+        { key: 'schedulePrefs', label: t('questionnaire.schedulePrefs'), value: translateValue('schedulePrefs', answers.schedulePrefs, t) }
       ]
     },
     {
@@ -165,7 +175,7 @@ export const ReviewStep = ({ answers, email, onEmailChange, onEdit, onSubmit, is
                 value={email}
                 onChange={(e) => onEmailChange(e.target.value)}
                 placeholder={t('questionnaire.emailPlaceholder')}
-                className="w-full"
+                className="w-full h-12"
               />
               <p className="text-xs text-muted-foreground mt-1">
                 {t('questionnaire.review.emailDesc')}
@@ -177,7 +187,7 @@ export const ReviewStep = ({ answers, email, onEmailChange, onEdit, onSubmit, is
                 size="lg"
                 onClick={onSubmit}
                 disabled={isSubmitting || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)}
-                className="bg-travliaq-golden-sand text-travliaq-deep-blue hover:bg-travliaq-golden-sand/90 whitespace-nowrap"
+                className="h-12 bg-travliaq-golden-sand text-travliaq-deep-blue hover:bg-travliaq-golden-sand/90 whitespace-nowrap"
               >
                 {isSubmitting ? (
                   <>

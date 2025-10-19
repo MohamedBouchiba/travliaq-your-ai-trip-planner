@@ -1547,7 +1547,7 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if (answers.hasDestination === t('questionnaire.no')) stepCounter++;
+    if (normalizeYesNo(answers.hasDestination) === YES_NO.NO) stepCounter++;
 
     // Step 3: Dates
     if (step === stepCounter) {
@@ -1558,13 +1558,13 @@ const Questionnaire = () => {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
             {[
-              { label: t('questionnaire.dates.fixed'), icon: "📆" },
-              { label: t('questionnaire.dates.flexible'), icon: "🔄" }
+              { code: DATES_TYPE.FIXED, label: t('questionnaire.dates.fixed'), icon: "📆" },
+              { code: DATES_TYPE.FLEXIBLE, label: t('questionnaire.dates.flexible'), icon: "🔄" }
             ].map((option) => (
               <Card
-                key={option.label}
+                key={option.code}
                 className="p-6 cursor-pointer hover:shadow-golden hover:border-travliaq-deep-blue transition-all hover:scale-105"
-                onClick={() => handleChoice("datesType", option.label)}
+                onClick={() => handleChoice("datesType", option.code)}
               >
                 <div className="flex items-center space-x-4">
                   <span className="text-4xl">{option.icon}</span>
@@ -1712,13 +1712,13 @@ const Questionnaire = () => {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
             {[
-              { label: t('questionnaire.flexibility.hasApproxDate.yes'), icon: "✅" },
-              { label: t('questionnaire.flexibility.hasApproxDate.no'), icon: "❌" }
+              { code: YES_NO.YES, label: t('questionnaire.flexibility.hasApproxDate.yes'), icon: "✅" },
+              { code: YES_NO.NO, label: t('questionnaire.flexibility.hasApproxDate.no'), icon: "❌" }
             ].map((option) => (
               <Card
-                key={option.label}
+                key={option.code}
                 className="p-6 cursor-pointer hover:shadow-golden hover:border-travliaq-deep-blue transition-all hover:scale-105"
-                onClick={() => handleChoice("hasApproximateDepartureDate", option.label)}
+                onClick={() => handleChoice("hasApproximateDepartureDate", option.code)}
               >
                 <div className="flex items-center space-x-4">
                   <span className="text-4xl">{option.icon}</span>
