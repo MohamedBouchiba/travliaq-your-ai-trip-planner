@@ -72,7 +72,7 @@ const BlogPost = () => {
   if (isLoading) {
     return (
       <>
-        <Navigation />
+        <Navigation theme="light" />
         <div className="min-h-screen bg-gradient-subtle">
           <div className="container max-w-4xl mx-auto py-8 px-4">
           <div className="animate-pulse space-y-8">
@@ -101,7 +101,7 @@ const BlogPost = () => {
 
   return (
     <>
-      <Navigation />
+      <Navigation theme="light" />
       <ReadingProgress />
       <div className="min-h-screen bg-gradient-subtle">
         <div className="container max-w-7xl mx-auto py-8 px-4">

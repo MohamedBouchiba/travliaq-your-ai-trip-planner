@@ -11,9 +11,10 @@ import LanguageSwitcher from './LanguageSwitcher';
 
 interface NavigationProps {
   variant?: 'default' | 'minimal';
+  theme?: 'dark' | 'light';
 }
 
-const Navigation = ({ variant = 'default' }: NavigationProps) => {
+const Navigation = ({ variant = 'default', theme = 'dark' }: NavigationProps) => {
   const { user, signOut } = useAuth();
   const { isAdmin, loading: roleLoading } = useUserRole();
   const [isOpen, setIsOpen] = useState(false);
@@ -24,9 +25,14 @@ const Navigation = ({ variant = 'default' }: NavigationProps) => {
   
   const isMinimal = variant === 'minimal';
   const hideLogo = location.pathname === '/travel-recommendations';
+  
+  // Couleurs adaptatives selon le thème
+  const textColor = theme === 'light' ? 'text-travliaq-deep-blue' : 'text-white';
+  const hoverColor = theme === 'light' ? 'hover:text-travliaq-turquoise' : 'hover:text-white/80';
+  const bgClass = theme === 'light' ? 'bg-white/90 backdrop-blur-sm shadow-md' : '';
 
   return (
-    <header className="absolute top-0 left-0 right-0 z-20 p-2 md:p-6">
+    <header className={`absolute top-0 left-0 right-0 z-20 p-2 md:p-6 ${bgClass}`}>
       <div className="container mx-auto flex justify-between items-start md:items-center">
         <a href="/" className={hideLogo ? "hidden md:block" : "md:block"}>
           <img src={logo} alt="Logo Travliaq" className="h-16 md:h-20 w-auto" />
@@ -39,7 +45,7 @@ const Navigation = ({ variant = 'default' }: NavigationProps) => {
             variant="ghost"
             size="sm"
             asChild
-            className="text-white hover:text-white/80 transition-colors"
+            className={`${textColor} ${hoverColor} transition-colors`}
           >
             <a href="/">{t('nav.home')}</a>
           </Button>
@@ -48,7 +54,7 @@ const Navigation = ({ variant = 'default' }: NavigationProps) => {
             variant="ghost"
             size="sm"
             asChild
-            className="text-white hover:text-white/80 transition-colors"
+            className={`${textColor} ${hoverColor} transition-colors`}
           >
             <a href="/blog">{t('nav.blog')}</a>
           </Button>
@@ -57,7 +63,7 @@ const Navigation = ({ variant = 'default' }: NavigationProps) => {
             variant="ghost"
             size="sm"
             asChild
-            className="text-white hover:text-white/80 transition-colors flex items-center gap-1"
+            className={`${textColor} ${hoverColor} transition-colors flex items-center gap-1`}
           >
             <a href="/discover">
               <span className="text-lg">✨</span>
@@ -79,7 +85,7 @@ const Navigation = ({ variant = 'default' }: NavigationProps) => {
               variant="ghost"
               size="sm"
               asChild
-              className="text-white hover:text-white/80 transition-colors"
+              className={`${textColor} ${hoverColor} transition-colors`}
             >
               <a href="/admin/blog">{t('nav.admin')}</a>
             </Button>
@@ -90,7 +96,7 @@ const Navigation = ({ variant = 'default' }: NavigationProps) => {
               variant="ghost"
               size="sm"
               asChild
-              className="text-white hover:text-white/80 transition-colors"
+              className={`${textColor} ${hoverColor} transition-colors`}
             >
               <a href="/auth">{t('nav.login')}</a>
             </Button>
@@ -101,7 +107,7 @@ const Navigation = ({ variant = 'default' }: NavigationProps) => {
               onClick={signOut}
               variant="ghost"
               size="sm"
-              className="text-white hover:text-white/80 transition-colors"
+              className={`${textColor} ${hoverColor} transition-colors`}
             >
               <LogOut className="w-4 h-4 mr-2" />
               {t('nav.logout')}
@@ -119,7 +125,7 @@ const Navigation = ({ variant = 'default' }: NavigationProps) => {
             <Button
               variant="ghost"
               size="sm"
-              className="text-white hover:text-white/80 mt-1"
+              className={`${textColor} ${hoverColor} mt-1`}
             >
               <Menu className="h-6 w-6" />
             </Button>

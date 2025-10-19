@@ -300,6 +300,17 @@ const TravelRecommendations = () => {
   const [widgetTab, setWidgetTab] = useState<'map' | 'calendar'>('map');
   const scrollRef = useRef<HTMLDivElement>(null);
   const offsetsRef = useRef<Array<{ id: number; top: number }>>([]);
+  
+  // Préchargement des widgets pour éviter le lag au scroll
+  const [preloadWidgets, setPreloadWidgets] = useState(false);
+
+  useEffect(() => {
+    // Précharger les widgets après un court délai pour ne pas bloquer le rendu initial
+    const timer = setTimeout(() => {
+      setPreloadWidgets(true);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Départ du planning fixé au lundi de la semaine courante
   const getMonday = (d: Date = new Date()) => {
@@ -361,6 +372,16 @@ const TravelRecommendations = () => {
   // Separate summary step from regular steps - AVANT les hooks
   const regularSteps = travelData.days.filter(d => !(d as any).isSummary);
   const summaryStep = travelData.days.find(d => (d as any).isSummary);
+  
+  // Préchargement des images critiques
+  useEffect(() => {
+    // Précharger les 3 premières images de sections pour éviter le lag
+    const imagesToPreload = regularSteps.slice(0, 3).map(d => d.image);
+    imagesToPreload.forEach(src => {
+      const img = new Image();
+      img.src = src;
+    });
+  }, [regularSteps]);
   
   // ID spécial pour le footer summary (après toutes les étapes régulières)
   const summaryId = Math.max(...regularSteps.map(d => d.id), 0) + 1;
@@ -682,6 +703,23 @@ const TravelRecommendations = () => {
           </div>
         </DrawerContent>
       </Drawer>
+      
+      {/* Préchargement invisible des widgets pour éviter le lag */}
+      {preloadWidgets && (
+        <div className="hidden" aria-hidden="true">
+          <MapView
+            days={travelData.days.map(d => ({ id: d.id, title: d.title, coordinates: d.coordinates }))}
+            activeDay={1}
+            onScrollToDay={() => {}}
+          />
+          <TravelDayCalendar
+            days={travelData.days.map(d => ({ id: d.id, title: d.title, day: d.day }))}
+            activeDay={1}
+            startDate={startMonday}
+            onScrollToDay={() => {}}
+          />
+        </div>
+      )}
 
       {/* Vertical scroll for all devices */}
       <div ref={scrollRef} className="h-screen overflow-y-auto scroll-smooth snap-y snap-mandatory themed-scroll pb-24 md:pb-28 lg:pb-0">

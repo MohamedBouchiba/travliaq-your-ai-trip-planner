@@ -36,6 +36,29 @@ interface DaySectionProps {
 const DaySection = ({ day, index, isActive }: DaySectionProps) => {
   const sectionRef = useRef<HTMLDivElement>(null);
   const [parallaxOffset, setParallaxOffset] = useState(0);
+  const [isInView, setIsInView] = useState(false);
+
+  // Intersection Observer pour précharger avant que la section soit visible
+  useEffect(() => {
+    if (!sectionRef.current) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsInView(true);
+          }
+        });
+      },
+      {
+        rootMargin: '400px', // Précharger 400px avant que la section soit visible
+        threshold: 0
+      }
+    );
+
+    observer.observe(sectionRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -60,14 +83,16 @@ const DaySection = ({ day, index, isActive }: DaySectionProps) => {
     >
       {/* Image avec parallax */}
       <div className="absolute inset-0 overflow-hidden">
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-300"
-          style={{
-            backgroundImage: `url(${day.image})`,
-            transform: `scale(1.08)`,
-            filter: 'blur(3px)'
-          }}
-        />
+        {isInView && (
+          <div
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-300"
+            style={{
+              backgroundImage: `url(${day.image})`,
+              transform: `scale(1.08)`,
+              filter: 'blur(3px)'
+            }}
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-r from-travliaq-deep-blue/90 via-travliaq-deep-blue/70 to-transparent" />
       </div>
 
@@ -125,7 +150,7 @@ const DaySection = ({ day, index, isActive }: DaySectionProps) => {
           </div>
 
           {/* Image Slider (si présent) */}
-          {day.images && day.images.length > 0 && (
+          {isInView && day.images && day.images.length > 0 && (
             <div 
               className="mb-3 overscroll-contain select-none"
               onPointerDownCapture={(e) => e.stopPropagation()}
@@ -149,6 +174,7 @@ const DaySection = ({ day, index, isActive }: DaySectionProps) => {
                           src={img} 
                           alt={`${day.title} - Image ${idx + 1}`}
                           className="w-full h-full object-cover"
+                          loading="lazy"
                         />
                       </div>
                     </CarouselItem>
