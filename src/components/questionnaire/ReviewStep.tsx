@@ -164,9 +164,9 @@ export const ReviewStep = ({ answers, email, onEmailChange, onEdit, onSubmit, is
             <Mail className="h-5 w-5" />
             {t('questionnaire.review.contact')}
           </h3>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex-1">
-              <Label htmlFor="review-email" className="text-sm font-medium mb-2 block">
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="review-email" className="text-sm font-medium">
                 {t('questionnaire.email')} <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -177,31 +177,29 @@ export const ReviewStep = ({ answers, email, onEmailChange, onEdit, onSubmit, is
                 placeholder={t('questionnaire.emailPlaceholder')}
                 className="w-full h-12"
               />
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground">
                 {t('questionnaire.review.emailDesc')}
               </p>
             </div>
-            <div className="flex items-end">
-              <Button
-                variant="hero"
-                size="lg"
-                onClick={onSubmit}
-                disabled={isSubmitting || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)}
-                className="h-12 bg-travliaq-golden-sand text-travliaq-deep-blue hover:bg-travliaq-golden-sand/90 whitespace-nowrap"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    {t('questionnaire.submitting')}
-                  </>
-                ) : (
-                  <>
-                    <Mail className="mr-2 h-5 w-5" />
-                    {t('questionnaire.submit')}
-                  </>
-                )}
-              </Button>
-            </div>
+            <Button
+              variant="hero"
+              size="lg"
+              onClick={onSubmit}
+              disabled={isSubmitting || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)}
+              className="w-full h-12 bg-travliaq-golden-sand text-travliaq-deep-blue hover:bg-travliaq-golden-sand/90"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  {t('questionnaire.submitting')}
+                </>
+              ) : (
+                <>
+                  <Mail className="mr-2 h-5 w-5" />
+                  {t('questionnaire.submit')}
+                </>
+              )}
+            </Button>
           </div>
         </div>
       </Card>

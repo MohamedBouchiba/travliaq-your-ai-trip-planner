@@ -1098,7 +1098,7 @@ const Questionnaire = () => {
         />
       );
     }
-    if (answers.travelGroup === t('questionnaire.family') || answers.travelGroup === t('questionnaire.group35')) stepCounter++;
+    if (normalizedGroup === TRAVEL_GROUPS.FAMILY || normalizedGroup === TRAVEL_GROUPS.GROUP35) stepCounter++;
 
     // Step 2: Destination en tête ?
     if (step === stepCounter) {
@@ -2398,7 +2398,7 @@ const Questionnaire = () => {
     if ((answers.helpWith || []).includes(t('questionnaire.accommodation')) && (answers.accommodationType || []).includes(t('questionnaire.accommodationType.hotel'))) stepCounter++;
 
     // Step 12: Confort - SEULEMENT si hébergement sélectionné
-    if ((answers.helpWith || []).includes(t('questionnaire.accommodation')) && step === stepCounter) {
+    if ((answers.helpWith || []).includes(HELP_WITH.ACCOMMODATION) && step === stepCounter) {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
@@ -2434,10 +2434,10 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if ((answers.helpWith || []).includes(t('questionnaire.accommodation'))) stepCounter++;
+    if ((answers.helpWith || []).includes(HELP_WITH.ACCOMMODATION)) stepCounter++;
 
     // Step 13: Quartier - SEULEMENT si hébergement sélectionné
-    if ((answers.helpWith || []).includes(t('questionnaire.accommodation')) && step === stepCounter) {
+    if ((answers.helpWith || []).includes(HELP_WITH.ACCOMMODATION) && step === stepCounter) {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
@@ -2467,10 +2467,10 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if ((answers.helpWith || []).includes(t('questionnaire.accommodation'))) stepCounter++;
+    if ((answers.helpWith || []).includes(HELP_WITH.ACCOMMODATION)) stepCounter++;
 
     // Step 14: Équipements (plus laïc) - SEULEMENT si hébergement sélectionné
-    if ((answers.helpWith || []).includes(t('questionnaire.accommodation')) && step === stepCounter) {
+    if ((answers.helpWith || []).includes(HELP_WITH.ACCOMMODATION) && step === stepCounter) {
       return (
         <div className="space-y-8 animate-fade-up">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
@@ -2534,12 +2534,12 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if (helpWithAccommodation.includes('accommodation')) stepCounter++;
+    if ((answers.helpWith || []).includes(HELP_WITH.ACCOMMODATION)) stepCounter++;
 
     // Step 15: Sécurité & Phobies (seulement si hébergement OU activités sélectionnés, pas juste vols)
     const helpWithForSecurity = answers.helpWith || [];
-    const needsAccommodationForSecurity = helpWithForSecurity.includes('accommodation');
-    const needsActivitiesForSecurity = helpWithForSecurity.includes('activities');
+    const needsAccommodationForSecurity = helpWithForSecurity.includes(HELP_WITH.ACCOMMODATION);
+    const needsActivitiesForSecurity = helpWithForSecurity.includes(HELP_WITH.ACTIVITIES);
     const needsSecurityStep = needsAccommodationForSecurity || needsActivitiesForSecurity;
     if (needsSecurityStep && step === stepCounter) {
       return (
