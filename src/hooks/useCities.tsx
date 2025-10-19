@@ -27,17 +27,19 @@ export const useCities = () => {
 };
 
 export const useFilteredCities = (searchTerm: string, cities: City[] | undefined) => {
-  if (!cities) return [];
+  if (!cities || cities.length === 0) return [];
 
   // Prioritize popular cities with Paris as highest priority
   const topPriority = new Set(['Paris']);
   const highPriority = new Set([
-    'Marseille','Lyon','Toulouse','Nice','Bordeaux','Lille','Nantes','Strasbourg','Montpellier','Rennes','Reims','Le Havre','Saint-Étienne','Toulon','Grenoble','Dijon','Angers','Nîmes','Villeurbanne','Pau',
+    'Marseille','Lyon','Toulouse','Nice','Bordeaux','Lille','Nantes','Strasbourg','Montpellier','Rennes',
+    'Madrid','Barcelone','Séville','Valence','Malaga','Bilbao','Grenade','Saragosse','Palma de Majorque',
     'London','Manchester','Birmingham','Edinburgh','Glasgow','Cardiff','Belfast',
-    'New York','Los Angeles','Chicago','San Francisco','Miami','Boston','Seattle','Washington','Dallas','Houston','Philadelphia','Phoenix','San Diego','San Jose','Austin','Orlando','Denver',
-    'Berlin','Munich','Hamburg','Cologne','Frankfurt','Stuttgart','Düsseldorf','Dortmund','Leipzig','Bremen','Dresden','Nuremberg','Hanover'
+    'New York','Los Angeles','Chicago','San Francisco','Miami','Boston','Seattle','Washington',
+    'Berlin','Munich','Hamburg','Cologne','Frankfurt','Stuttgart','Düsseldorf'
   ]);
 
+  // If no search term, show top priority cities first
   if (!searchTerm || searchTerm.trim() === '') {
     return cities
       .slice(0, 100)
@@ -52,30 +54,49 @@ export const useFilteredCities = (searchTerm: string, cities: City[] | undefined
         if (aHigh && !bHigh) return -1;
         if (!aHigh && bHigh) return 1;
         
-        return 0;
+        return a.name.localeCompare(b.name);
       });
   }
 
-  const lowerSearch = searchTerm.toLowerCase().trim();
+  // Normalize search term (remove accents and lowercase)
+  const normalizeString = (str: string) => {
+    return str
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+  };
+
+  const normalizedSearch = normalizeString(searchTerm);
   
-  return cities
-    .filter((city) => {
-      const nameMatch = city.name.toLowerCase().includes(lowerSearch);
-      const countryMatch = city.country.toLowerCase().includes(lowerSearch);
-      const searchTextMatch = city.search_text && city.search_text.toLowerCase().includes(lowerSearch);
-      
-      return nameMatch || countryMatch || searchTextMatch;
-    })
+  // Filter cities by search term
+  const filtered = cities.filter((city) => {
+    const normalizedName = normalizeString(city.name);
+    const normalizedCountry = normalizeString(city.country);
+    const normalizedSearchText = city.search_text ? normalizeString(city.search_text) : '';
+    
+    return (
+      normalizedName.includes(normalizedSearch) ||
+      normalizedCountry.includes(normalizedSearch) ||
+      normalizedSearchText.includes(normalizedSearch)
+    );
+  });
+
+  // Sort filtered results
+  return filtered
     .sort((a, b) => {
+      const normalizedNameA = normalizeString(a.name);
+      const normalizedNameB = normalizeString(b.name);
+      
       // Prioritize exact name matches
-      const aExact = a.name.toLowerCase() === lowerSearch;
-      const bExact = b.name.toLowerCase() === lowerSearch;
+      const aExact = normalizedNameA === normalizedSearch;
+      const bExact = normalizedNameB === normalizedSearch;
       if (aExact && !bExact) return -1;
       if (!aExact && bExact) return 1;
       
       // Then prioritize name starts with search
-      const aStarts = a.name.toLowerCase().startsWith(lowerSearch);
-      const bStarts = b.name.toLowerCase().startsWith(lowerSearch);
+      const aStarts = normalizedNameA.startsWith(normalizedSearch);
+      const bStarts = normalizedNameB.startsWith(normalizedSearch);
       if (aStarts && !bStarts) return -1;
       if (!aStarts && bStarts) return 1;
       
@@ -91,7 +112,8 @@ export const useFilteredCities = (searchTerm: string, cities: City[] | undefined
       if (aHigh && !bHigh) return -1;
       if (!aHigh && bHigh) return 1;
       
-      return 0;
+      // Finally sort alphabetically
+      return a.name.localeCompare(b.name);
     })
-    .slice(0, 100);
+    .slice(0, 50); // Limit to 50 results for better performance
 };

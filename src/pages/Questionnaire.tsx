@@ -659,23 +659,34 @@ const Questionnaire = () => {
       const normalizedHasApproxDate = normalizeYesNo(answers.hasApproximateDepartureDate);
       if (normalizedHasApproxDate === YES_NO.YES) total++; // Step 3e: Saisie date approximative
       total++; // Step 4: Durée
-      if (answers.duration === t('questionnaire.duration.more14')) total++; // Step 4b: Nombre exact
+      // Check for "Plus de 14 jours" in duration
+      if (answers.duration && (
+        answers.duration.includes('14') || 
+        answers.duration.toLowerCase().includes('more') ||
+        answers.duration.toLowerCase().includes('plus')
+      )) {
+        total++; // Step 4b: Nombre exact
+      }
     }
     
     total++; // Step 5: Budget
-    if (answers.budgetType === t('questionnaire.budget.precise')) total++; // Step 5b: Montant exact
+    // Check for precise budget type
+    if (answers.budgetType && (
+      answers.budgetType.toLowerCase().includes('précis') ||
+      answers.budgetType.toLowerCase().includes('precise')
+    )) {
+      total++; // Step 5b: Montant exact
+    }
     
     const helpWith = answers.helpWith || [];
-    const needsFlights = helpWith.includes('flights') || helpWith.includes(t('questionnaire.flights'));
-    const needsAccommodation = helpWith.includes('accommodation') || helpWith.includes(t('questionnaire.accommodation'));
-    const needsActivities = helpWith.includes('activities') || helpWith.includes(t('questionnaire.activities'));
+    const needsFlights = helpWith.includes(HELP_WITH.FLIGHTS);
+    const needsAccommodation = helpWith.includes(HELP_WITH.ACCOMMODATION);
+    const needsActivities = helpWith.includes(HELP_WITH.ACTIVITIES);
     
     // Step 6: Style (seulement si destination précise ET activités sélectionnées)
     if (normalizedHasDestination === YES_NO.YES && needsActivities) {
       total++; // Step 6: Style
     }
-    
-    // Step 7 removed: unified with Rhythm & Schedules step later
     
     // Step 8-9: Vols et bagages (seulement si vols sélectionnés)
     if (needsFlights) {
@@ -688,7 +699,14 @@ const Questionnaire = () => {
     // Step 11-14: Hébergement (seulement si hébergement sélectionné)
     if (needsAccommodation) {
       total++; // Step 11: Type hébergement
-      if ((answers.accommodationType || []).includes(t('questionnaire.accommodationType.hotel'))) total++; // Step 11b: Préférences hôtel
+      // Check for hotel in accommodation type
+      if (answers.accommodationType && Array.isArray(answers.accommodationType)) {
+        const hasHotel = answers.accommodationType.some((type: string) => 
+          type.toLowerCase().includes('hôtel') || 
+          type.toLowerCase().includes('hotel')
+        );
+        if (hasHotel) total++; // Step 11b: Préférences hôtel
+      }
       total++; // Step 12: Confort
       total++; // Step 13: Quartier
       total++; // Step 14: Équipements

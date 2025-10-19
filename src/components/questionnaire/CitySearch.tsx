@@ -95,33 +95,36 @@ export const CitySearch = ({
         </div>
       )}
 
-      {showDropdown && !citiesLoading && filteredCities.length > 0 && search.length > 0 && (
-        <Card ref={dropdownRef} className="absolute z-50 w-full mt-2 max-h-60 overflow-y-auto pointer-events-auto">
-          <Command>
-            <CommandList>
-              <CommandGroup>
-                {filteredCities.slice(0, 15).map((city) => (
-                  <CommandItem
-                    key={city.id}
-                    onSelect={() => handleCitySelect(city)}
-                    className="cursor-pointer"
-                  >
-                    {city.name}, {city.country} {city.country_code}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </Card>
+      {showDropdown && !citiesLoading && search.length > 0 && (
+        <>
+          {filteredCities.length > 0 ? (
+            <Card ref={dropdownRef} className="absolute z-50 w-full mt-2 max-h-60 overflow-y-auto pointer-events-auto">
+              <Command>
+                <CommandList>
+                  <CommandGroup>
+                    {filteredCities.map((city) => (
+                      <CommandItem
+                        key={city.id}
+                        onSelect={() => handleCitySelect(city)}
+                        className="cursor-pointer"
+                      >
+                        {city.name}, {city.country} {city.country_code}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </Card>
+          ) : (
+            <Card ref={dropdownRef} className="absolute z-50 w-full mt-2 p-3 pointer-events-auto">
+              <p className="text-sm text-muted-foreground text-center">
+                {t('questionnaire.noCityFound')} "{search}"
+              </p>
+            </Card>
+          )}
+        </>
       )}
 
-      {showDropdown && !citiesLoading && search.length > 0 && filteredCities.length === 0 && (
-        <Card ref={dropdownRef} className="absolute z-50 w-full mt-2 p-3 pointer-events-auto">
-          <p className="text-sm text-muted-foreground text-center">
-            {t('questionnaire.noCityFound')} "{search}"
-          </p>
-        </Card>
-      )}
     </div>
   );
 };
