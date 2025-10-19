@@ -410,7 +410,7 @@ const Questionnaire = () => {
     return () => clearTimeout(timer);
   }, [answers, step, user]);
   
-  // 📋 LOAD DRAFT: Restore from localStorage on mount
+  // 📋 LOAD DRAFT: Restore from localStorage on mount (automatically)
   useEffect(() => {
     if (!user) return;
     
@@ -421,19 +421,20 @@ const Questionnaire = () => {
       try {
         const draft = JSON.parse(saved);
         if (draft.version === 2 && draft.answers && draft.step) {
-          const shouldResume = window.confirm(t('questionnaire.resumeDraft'));
-          if (shouldResume) {
-            setAnswers(draft.answers);
-            setStep(draft.step);
-          } else {
-            localStorage.removeItem(draftKey);
-          }
+          // Auto-restore without confirmation
+          setAnswers(draft.answers);
+          setStep(draft.step);
+          toast({
+            title: t('questionnaire.draftRestored'),
+            description: t('questionnaire.draftRestoredDesc'),
+            duration: 4000
+          });
         }
       } catch (error) {
         localStorage.removeItem(draftKey);
       }
     }
-  }, [user, t]);
+  }, [user, t, toast]);
   
   // 🧮 INFERENCE: Auto-calculate numberOfTravelers
   useEffect(() => {
@@ -832,6 +833,12 @@ const Questionnaire = () => {
         title: t('questionnaire.submittedTitle'),
         description: t('questionnaire.submittedDescription'),
       });
+
+      // 🗑️ Clear draft from localStorage after successful submission
+      if (user) {
+        const draftKey = `travliaq:qv2:${user.id}`;
+        localStorage.removeItem(draftKey);
+      }
 
       // If user is already authenticated, redirect to home after a few seconds
       // Otherwise, show Google login popup
@@ -2715,17 +2722,45 @@ const Questionnaire = () => {
 
       {/* Content compact */}
       <div className="max-w-3xl mx-auto px-4 py-2 relative z-10">
-        {step > 1 && (
+        <div className="flex items-center justify-between mb-3">
+          {step > 1 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={prevStep}
+              className="text-travliaq-deep-blue hover:text-travliaq-turquoise hover:bg-travliaq-turquoise/10 transition-all"
+            >
+              <ChevronLeft className="mr-1 h-4 w-4" />
+              {t('questionnaire.back')}
+            </Button>
+          )}
+          
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            onClick={prevStep}
-            className="mb-3 text-travliaq-deep-blue hover:text-travliaq-turquoise hover:bg-travliaq-turquoise/10 transition-all"
+            onClick={() => {
+              if (user) {
+                const draftKey = `travliaq:qv2:${user.id}`;
+                const draft = {
+                  version: 2,
+                  timestamp: Date.now(),
+                  step,
+                  answers
+                };
+                localStorage.setItem(draftKey, JSON.stringify(draft));
+                toast({
+                  title: t('questionnaire.draftSaved'),
+                  description: t('questionnaire.draftSavedDesc'),
+                  duration: 3000
+                });
+                setTimeout(() => navigate('/'), 500);
+              }
+            }}
+            className="ml-auto text-travliaq-deep-blue border-travliaq-deep-blue hover:bg-travliaq-deep-blue hover:text-white transition-all"
           >
-            <ChevronLeft className="mr-1 h-4 w-4" />
-            {t('questionnaire.back')}
+            {t('questionnaire.saveAndReturn')}
           </Button>
-        )}
+        </div>
 
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-travliaq-turquoise/20 p-6 md:p-8 transition-all hover:shadow-[0_20px_60px_-15px_rgba(56,189,248,0.3)]">
           {renderStep()}
