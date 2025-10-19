@@ -70,11 +70,20 @@ const Index = () => {
               </span>
             ) : t('hero.subtitle')}
           </p>
-          <Button variant="hero" size="xl" className="animate-adventure-float" asChild>
-            <a href="/questionnaire">
-              <Sparkles className="mr-2" />
-              {t('hero.cta')}
-            </a>
+          <Button 
+            variant="hero" 
+            size="xl" 
+            className="animate-adventure-float"
+            onClick={() => {
+              if (user) {
+                window.location.href = '/questionnaire';
+              } else {
+                window.location.href = '/auth';
+              }
+            }}
+          >
+            <Sparkles className="mr-2" />
+            {t('hero.cta')}
           </Button>
         </div>
 
@@ -214,12 +223,21 @@ const Index = () => {
 
           {/* Call-to-action après Comment ça marche */}
           <div className="text-center mt-16">
-            <Button variant="hero" size="xl" className="animate-adventure-float" asChild>
-              <a href="/questionnaire">
-                <Sparkles className="mr-2" />
-                {t('cta.start')}
-              </a>
-            </Button>
+          <Button 
+            variant="hero" 
+            size="xl" 
+            className="animate-adventure-float"
+            onClick={() => {
+              if (user) {
+                window.location.href = '/questionnaire';
+              } else {
+                window.location.href = '/auth';
+              }
+            }}
+          >
+            <Sparkles className="mr-2" />
+            {t('cta.start')}
+          </Button>
           </div>
         </div>
       </section>
@@ -329,11 +347,20 @@ const Index = () => {
 
           {/* Double call-to-action harmonieux */}
           <div className="flex flex-col md:flex-row gap-6 justify-center items-center">
-            <Button variant="hero" size="xl" className="bg-travliaq-golden-sand text-travliaq-deep-blue hover:bg-travliaq-golden-sand/90 font-bold px-8 py-4" asChild>
-              <a href="/questionnaire">
-                <Sparkles className="mr-2" />
-                {t('cta.create')}
-              </a>
+            <Button 
+              variant="hero" 
+              size="xl" 
+              className="bg-travliaq-golden-sand text-travliaq-deep-blue hover:bg-travliaq-golden-sand/90 font-bold px-8 py-4"
+              onClick={() => {
+                if (user) {
+                  window.location.href = '/questionnaire';
+                } else {
+                  window.location.href = '/auth';
+                }
+              }}
+            >
+              <Sparkles className="mr-2" />
+              {t('cta.create')}
             </Button>
             
             <div className="text-center">

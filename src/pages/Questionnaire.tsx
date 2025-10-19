@@ -388,7 +388,7 @@ const Questionnaire = () => {
         variant: "destructive",
         duration: 6000
       });
-      navigate('/', { replace: true });
+      navigate('/auth', { replace: true });
     }
   }, [user, loading, navigate, t, toast]);
   

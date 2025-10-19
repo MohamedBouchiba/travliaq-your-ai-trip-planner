@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
+import Navigation from '@/components/Navigation';
 
 const emailSchema = z.string().email('Email invalide');
 
@@ -48,9 +49,12 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-travliaq-deep-blue via-travliaq-deep-blue/95 to-travliaq-turquoise/20 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-2xl p-8">
+    <div className="min-h-screen bg-gradient-to-br from-travliaq-deep-blue via-travliaq-deep-blue/95 to-travliaq-turquoise/20">
+      <Navigation variant="minimal" />
+      
+      <div className="flex items-center justify-center p-4 pt-24">
+        <div className="w-full max-w-md">
+          <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-2xl p-8">
           <div className="mb-6">
             <Link 
               to="/auth" 
@@ -118,6 +122,7 @@ const ForgotPassword = () => {
               </button>
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>
