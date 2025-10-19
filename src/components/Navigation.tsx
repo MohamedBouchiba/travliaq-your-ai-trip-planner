@@ -6,6 +6,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import logo from '@/assets/logo-travliaq.png';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import LanguageSwitcher from './LanguageSwitcher';
 
 interface NavigationProps {
@@ -17,15 +18,17 @@ const Navigation = ({ variant = 'default' }: NavigationProps) => {
   const { isAdmin, loading: roleLoading } = useUserRole();
   const [isOpen, setIsOpen] = useState(false);
   const { t } = useTranslation();
+  const location = useLocation();
 
   const closeMenu = () => setIsOpen(false);
   
   const isMinimal = variant === 'minimal';
+  const hideLogo = location.pathname === '/travel-recommendations';
 
   return (
     <header className="absolute top-0 left-0 right-0 z-20 p-2 md:p-6">
       <div className="container mx-auto flex justify-between items-start md:items-center">
-        <a href="/" className="hidden md:block">
+        <a href="/" className={hideLogo ? "hidden md:block" : "md:block"}>
           <img src={logo} alt="Logo Travliaq" className="h-16 md:h-20 w-auto" />
         </a>
 

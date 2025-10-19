@@ -43,6 +43,9 @@ import { format, startOfToday, addMonths, startOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
 import { useCities, useFilteredCities } from "@/hooks/useCities";
+import { ChildrenDetailsStep } from "@/components/questionnaire/ChildrenDetailsStep";
+import { SecurityStep } from "@/components/questionnaire/SecurityStep";
+import { BiorhythmStep } from "@/components/questionnaire/BiorhythmStep";
 
 type LuggageChoice = {
   [travelerIndex: number]: string;
@@ -51,6 +54,7 @@ type LuggageChoice = {
 type Answer = {
   travelGroup?: string;
   numberOfTravelers?: number;
+  children?: Array<{ age: number }>; // Nouveau: détails des enfants
   hasDestination?: string;
   helpWith?: string[]; // Nouvelle question: Comment Travliaq peut aider (vols, hébergement, activités)
   destination?: string;
@@ -80,6 +84,8 @@ type Answer = {
   comfort?: string;
   neighborhood?: string;
   amenities?: string[];
+  security?: string[]; // Nouveau: contraintes de sécurité et phobies
+  biorhythm?: string[]; // Nouveau: horloge biologique et habitudes
   constraints?: string[];
   additionalInfo?: string;
   email?: string;
@@ -433,6 +439,7 @@ const Questionnaire = () => {
     let total = 1; // Step 1: Qui voyage
     
     if (answers.travelGroup === t('questionnaire.family') || answers.travelGroup === t('questionnaire.group35')) total++; // Step 1b: Nombre exact
+    if (answers.travelGroup === t('questionnaire.family')) total++; // Step 1c: Détails enfants
     total++; // Step 2: Destination en tête
     total++; // Step 2b: Comment Travliaq peut aider (vols/hébergement/activités)
     
@@ -492,9 +499,20 @@ const Questionnaire = () => {
       total++; // Step 14: Équipements
     }
     
-    total++; // Step 15: Contraintes
-    total++; // Step 16: Zone ouverte
-    total++; // Step 17: Email
+    // Step 15: Sécurité & Phobies (seulement si hébergement OU activités sélectionnés, pas juste vols)
+    const needsSecurityStep = needsAccommodation || needsActivities;
+    if (needsSecurityStep) {
+      total++; // Step 15: Sécurité
+    }
+    
+    // Step 16: Horloge biologique (seulement si activités sélectionnées)
+    if (needsActivities) {
+      total++; // Step 16: Horloge biologique
+    }
+    
+    total++; // Step 17: Contraintes
+    total++; // Step 18: Zone ouverte
+    total++; // Step 19: Email
     
     return total;
   };

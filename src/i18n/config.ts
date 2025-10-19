@@ -648,6 +648,42 @@ const resources = {
       "questionnaire.amenities.spa": "Spa/jacuzzi",
       "questionnaire.amenities.gardenTerrace": "Jardin/terrasse",
       
+      // Children details (for family)
+      "questionnaire.children.title": "Détails sur les enfants 👶",
+      "questionnaire.children.description": "Pour mieux adapter l'itinéraire",
+      "questionnaire.children.howMany": "Combien d'enfants parmi les voyageurs ?",
+      "questionnaire.children.child": "Enfant",
+      "questionnaire.children.age": "Âge",
+      "questionnaire.children.years": "an(s)",
+      "questionnaire.children.addChild": "+ Ajouter un enfant",
+      "questionnaire.children.removeChild": "Retirer",
+      
+      // Security & Safety
+      "questionnaire.security.title": "Sécurité & Phobies 🛡️",
+      "questionnaire.security.description": "Pour éviter des situations inconfortables",
+      "questionnaire.security.selectAll": "Sélectionne ce qui s'applique",
+      "questionnaire.security.none": "Aucune contrainte particulière",
+      "questionnaire.security.crowds": "Éviter les foules",
+      "questionnaire.security.heights": "Peur du vide/hauteurs",
+      "questionnaire.security.tunnels": "Phobie des tunnels",
+      "questionnaire.security.water": "Peur de l'eau/nager",
+      "questionnaire.security.animals": "Peur de certains animaux",
+      "questionnaire.security.darkness": "Peur du noir/espaces clos",
+      "questionnaire.security.unsafeAreas": "Éviter zones peu sûres",
+      "questionnaire.security.extremeActivities": "Pas d'activités extrêmes",
+      
+      // Biological clock & Habits
+      "questionnaire.biorhythm.title": "Horloge biologique & Habitudes 🕐",
+      "questionnaire.biorhythm.description": "Pour un rythme qui te correspond",
+      "questionnaire.biorhythm.selectAll": "Sélectionne ce qui te correspond",
+      "questionnaire.biorhythm.earlyBird": "Lève-tôt (matin actif)",
+      "questionnaire.biorhythm.nightOwl": "Couche-tard (nuit tardive)",
+      "questionnaire.biorhythm.naps": "Besoin de siestes",
+      "questionnaire.biorhythm.dailyFreeTime": "Temps libre quotidien indispensable",
+      "questionnaire.biorhythm.earlyTolerant": "Tolérant aux réveils matinaux",
+      "questionnaire.biorhythm.regularMeals": "Repas à heures régulières",
+      "questionnaire.biorhythm.flexible": "Flexible, je m'adapte",
+      
       // Constraints
       "questionnaire.constraints.title": "Contraintes & préférences 🎯",
       "questionnaire.constraints.selectAllImportant": "Sélectionne toutes les options importantes",
@@ -997,6 +1033,42 @@ const resources = {
       "q.step19.parking": "Parking",
       "q.step19.ac": "Air conditioning",
       "q.step19.kitchen": "Equipped kitchen",
+      
+      // Children details (for family)
+      "questionnaire.children.title": "Children Details 👶",
+      "questionnaire.children.description": "To better adapt the itinerary",
+      "questionnaire.children.howMany": "How many children among the travelers?",
+      "questionnaire.children.child": "Child",
+      "questionnaire.children.age": "Age",
+      "questionnaire.children.years": "year(s)",
+      "questionnaire.children.addChild": "+ Add a child",
+      "questionnaire.children.removeChild": "Remove",
+      
+      // Security & Safety
+      "questionnaire.security.title": "Security & Phobias 🛡️",
+      "questionnaire.security.description": "To avoid uncomfortable situations",
+      "questionnaire.security.selectAll": "Select what applies",
+      "questionnaire.security.none": "No particular constraints",
+      "questionnaire.security.crowds": "Avoid crowds",
+      "questionnaire.security.heights": "Fear of heights",
+      "questionnaire.security.tunnels": "Tunnel phobia",
+      "questionnaire.security.water": "Fear of water/swimming",
+      "questionnaire.security.animals": "Fear of certain animals",
+      "questionnaire.security.darkness": "Fear of darkness/confined spaces",
+      "questionnaire.security.unsafeAreas": "Avoid unsafe areas",
+      "questionnaire.security.extremeActivities": "No extreme activities",
+      
+      // Biological clock & Habits
+      "questionnaire.biorhythm.title": "Biological Clock & Habits 🕐",
+      "questionnaire.biorhythm.description": "For a rhythm that suits you",
+      "questionnaire.biorhythm.selectAll": "Select what fits you",
+      "questionnaire.biorhythm.earlyBird": "Early bird (active morning)",
+      "questionnaire.biorhythm.nightOwl": "Night owl (late nights)",
+      "questionnaire.biorhythm.naps": "Need naps",
+      "questionnaire.biorhythm.dailyFreeTime": "Daily free time essential",
+      "questionnaire.biorhythm.earlyTolerant": "Tolerant to early wake-ups",
+      "questionnaire.biorhythm.regularMeals": "Regular meal times",
+      "questionnaire.biorhythm.flexible": "Flexible, I adapt",
       
       // Q20: Constraints
       "q.step20.title": "Constraints & preferences 🎯",

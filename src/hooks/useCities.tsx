@@ -29,9 +29,10 @@ export const useCities = () => {
 export const useFilteredCities = (searchTerm: string, cities: City[] | undefined) => {
   if (!cities) return [];
 
-  // Prioritize popular cities (ensures Paris appears first)
-  const priorityNames = new Set([
-    'Paris','Marseille','Lyon','Toulouse','Nice','Bordeaux','Lille','Nantes','Strasbourg','Montpellier','Rennes','Reims','Le Havre','Saint-Étienne','Toulon','Grenoble','Dijon','Angers','Nîmes','Villeurbanne','Pau',
+  // Prioritize popular cities with Paris as highest priority
+  const topPriority = new Set(['Paris']);
+  const highPriority = new Set([
+    'Marseille','Lyon','Toulouse','Nice','Bordeaux','Lille','Nantes','Strasbourg','Montpellier','Rennes','Reims','Le Havre','Saint-Étienne','Toulon','Grenoble','Dijon','Angers','Nîmes','Villeurbanne','Pau',
     'London','Manchester','Birmingham','Edinburgh','Glasgow','Cardiff','Belfast',
     'New York','Los Angeles','Chicago','San Francisco','Miami','Boston','Seattle','Washington','Dallas','Houston','Philadelphia','Phoenix','San Diego','San Jose','Austin','Orlando','Denver',
     'Berlin','Munich','Hamburg','Cologne','Frankfurt','Stuttgart','Düsseldorf','Dortmund','Leipzig','Bremen','Dresden','Nuremberg','Hanover'
@@ -40,7 +41,19 @@ export const useFilteredCities = (searchTerm: string, cities: City[] | undefined
   if (!searchTerm || searchTerm.trim() === '') {
     return cities
       .slice(0, 100)
-      .sort((a, b) => (priorityNames.has(b.name) ? 1 : 0) - (priorityNames.has(a.name) ? 1 : 0));
+      .sort((a, b) => {
+        const aTop = topPriority.has(a.name);
+        const bTop = topPriority.has(b.name);
+        if (aTop && !bTop) return -1;
+        if (!aTop && bTop) return 1;
+        
+        const aHigh = highPriority.has(a.name);
+        const bHigh = highPriority.has(b.name);
+        if (aHigh && !bHigh) return -1;
+        if (!aHigh && bHigh) return 1;
+        
+        return 0;
+      });
   }
 
   const lowerSearch = searchTerm.toLowerCase().trim();
@@ -66,11 +79,17 @@ export const useFilteredCities = (searchTerm: string, cities: City[] | undefined
       if (aStarts && !bStarts) return -1;
       if (!aStarts && bStarts) return 1;
       
-      // Finally prioritize popular cities
-      const aPriority = priorityNames.has(a.name);
-      const bPriority = priorityNames.has(b.name);
-      if (aPriority && !bPriority) return -1;
-      if (!aPriority && bPriority) return 1;
+      // Top priority cities (Paris first)
+      const aTop = topPriority.has(a.name);
+      const bTop = topPriority.has(b.name);
+      if (aTop && !bTop) return -1;
+      if (!aTop && bTop) return 1;
+      
+      // High priority cities
+      const aHigh = highPriority.has(a.name);
+      const bHigh = highPriority.has(b.name);
+      if (aHigh && !bHigh) return -1;
+      if (!aHigh && bHigh) return 1;
       
       return 0;
     })
