@@ -92,10 +92,12 @@ export type Database = {
           additional_info: string | null
           amenities: Json | null
           approximate_departure_date: string | null
+          biorhythm: Json | null
           budget: string | null
           budget_amount: number | null
           budget_currency: string | null
           budget_type: string | null
+          children: Json | null
           climate_preference: string | null
           comfort: string | null
           constraints: Json | null
@@ -118,6 +120,7 @@ export type Database = {
           number_of_travelers: number | null
           return_date: string | null
           rhythm: string | null
+          security: Json | null
           styles: Json | null
           travel_affinities: Json | null
           travel_ambiance: string | null
@@ -130,10 +133,12 @@ export type Database = {
           additional_info?: string | null
           amenities?: Json | null
           approximate_departure_date?: string | null
+          biorhythm?: Json | null
           budget?: string | null
           budget_amount?: number | null
           budget_currency?: string | null
           budget_type?: string | null
+          children?: Json | null
           climate_preference?: string | null
           comfort?: string | null
           constraints?: Json | null
@@ -156,6 +161,7 @@ export type Database = {
           number_of_travelers?: number | null
           return_date?: string | null
           rhythm?: string | null
+          security?: Json | null
           styles?: Json | null
           travel_affinities?: Json | null
           travel_ambiance?: string | null
@@ -168,10 +174,12 @@ export type Database = {
           additional_info?: string | null
           amenities?: Json | null
           approximate_departure_date?: string | null
+          biorhythm?: Json | null
           budget?: string | null
           budget_amount?: number | null
           budget_currency?: string | null
           budget_type?: string | null
+          children?: Json | null
           climate_preference?: string | null
           comfort?: string | null
           constraints?: Json | null
@@ -194,6 +202,7 @@ export type Database = {
           number_of_travelers?: number | null
           return_date?: string | null
           rhythm?: string | null
+          security?: Json | null
           styles?: Json | null
           travel_affinities?: Json | null
           travel_ambiance?: string | null
