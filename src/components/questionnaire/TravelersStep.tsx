@@ -45,17 +45,17 @@ export const TravelersStep = ({ travelers, onUpdate, onNext }: TravelersStepProp
           {t('questionnaire.numberOfPeople')}
         </h2>
         <p className="text-muted-foreground">
-          Ajoute les voyageurs un par un
+          {t('questionnaire.travelers.addTravelers')}
         </p>
         <div className="flex justify-center gap-4 mt-4">
           <Badge variant="secondary" className="text-lg px-4 py-2">
             <Users className="mr-2 h-4 w-4" />
-            {adultCount} {adultCount > 1 ? 'adultes' : 'adulte'}
+            {adultCount} {adultCount > 1 ? t('questionnaire.travelers.adults') : t('questionnaire.travelers.adult')}
           </Badge>
           {childCount > 0 && (
             <Badge variant="secondary" className="text-lg px-4 py-2">
               <Baby className="mr-2 h-4 w-4" />
-              {childCount} {childCount > 1 ? 'enfants' : 'enfant'}
+              {childCount} {childCount > 1 ? t('questionnaire.travelers.children') : t('questionnaire.travelers.child')}
             </Badge>
           )}
         </div>
@@ -71,7 +71,7 @@ export const TravelersStep = ({ travelers, onUpdate, onNext }: TravelersStepProp
             <div className="flex flex-col items-center space-y-2">
               <Users className="h-8 w-8 text-travliaq-deep-blue" />
               <span className="text-base font-semibold text-travliaq-deep-blue">
-                + Adulte
+                {t('questionnaire.travelers.addAdult')}
               </span>
             </div>
           </Card>
@@ -82,7 +82,7 @@ export const TravelersStep = ({ travelers, onUpdate, onNext }: TravelersStepProp
             <div className="flex flex-col items-center space-y-2">
               <Baby className="h-8 w-8 text-travliaq-deep-blue" />
               <span className="text-base font-semibold text-travliaq-deep-blue">
-                + Enfant (&lt;18 ans)
+                {t('questionnaire.travelers.addChild')}
               </span>
             </div>
           </Card>
@@ -103,12 +103,12 @@ export const TravelersStep = ({ travelers, onUpdate, onNext }: TravelersStepProp
                   </div>
                   <div className="flex-1">
                     <div className="font-medium text-travliaq-deep-blue">
-                      {traveler.type === 'adult' ? 'Adulte' : 'Enfant'} {index + 1}
+                      {traveler.type === 'adult' ? t('questionnaire.travelers.adultLabel') : t('questionnaire.travelers.childLabel')} {index + 1}
                     </div>
                     {traveler.type === 'child' && (
                       <div className="mt-2">
                         <label className="text-sm text-muted-foreground mb-1 block">
-                          Âge de l'enfant
+                          {t('questionnaire.travelers.childAge')}
                         </label>
                         <Input
                           type="number"
@@ -117,7 +117,7 @@ export const TravelersStep = ({ travelers, onUpdate, onNext }: TravelersStepProp
                           value={traveler.age || 0}
                           onChange={(e) => updateTravelerAge(index, parseInt(e.target.value) || 0)}
                           className="w-24"
-                          placeholder="Âge"
+                          placeholder={t('questionnaire.travelers.agePlaceholder')}
                         />
                       </div>
                     )}

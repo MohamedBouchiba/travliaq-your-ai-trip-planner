@@ -425,6 +425,20 @@ const resources = {
       "questionnaire.climatePreference": "Quel type de climat recherches-tu ? 🌡️",
       "questionnaire.customTrip": "TON VOYAGE SUR MESURE",
       "questionnaire.back": "Retour",
+      "questionnaire.noCityFound": "Aucune ville trouvée pour",
+      
+      // Travelers step
+      "questionnaire.travelers.addTravelers": "Ajoute les voyageurs un par un",
+      "questionnaire.travelers.adult": "adulte",
+      "questionnaire.travelers.adults": "adultes",
+      "questionnaire.travelers.child": "enfant",
+      "questionnaire.travelers.children": "enfants",
+      "questionnaire.travelers.addAdult": "+ Adulte",
+      "questionnaire.travelers.addChild": "+ Enfant (<18 ans)",
+      "questionnaire.travelers.adultLabel": "Adulte",
+      "questionnaire.travelers.childLabel": "Enfant",
+      "questionnaire.travelers.childAge": "Âge de l'enfant",
+      "questionnaire.travelers.agePlaceholder": "Âge",
       
       // Climate options
       "questionnaire.climate.hotSunny": "Chaud & ensoleillé",
@@ -1181,6 +1195,20 @@ const resources = {
       "questionnaire.climatePreference": "What type of climate are you looking for? 🌡️",
       "questionnaire.customTrip": "YOUR CUSTOM TRIP",
       "questionnaire.back": "Back",
+      "questionnaire.noCityFound": "No city found for",
+      
+      // Travelers step
+      "questionnaire.travelers.addTravelers": "Add travelers one by one",
+      "questionnaire.travelers.adult": "adult",
+      "questionnaire.travelers.adults": "adults",
+      "questionnaire.travelers.child": "child",
+      "questionnaire.travelers.children": "children",
+      "questionnaire.travelers.addAdult": "+ Adult",
+      "questionnaire.travelers.addChild": "+ Child (<18 years)",
+      "questionnaire.travelers.adultLabel": "Adult",
+      "questionnaire.travelers.childLabel": "Child",
+      "questionnaire.travelers.childAge": "Child's age",
+      "questionnaire.travelers.agePlaceholder": "Age",
       
       // Climate options
       "questionnaire.climate.hotSunny": "Hot & sunny",

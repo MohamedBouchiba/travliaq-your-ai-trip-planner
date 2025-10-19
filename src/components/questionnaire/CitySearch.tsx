@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import { useFilteredCities, City } from "@/hooks/useCities";
 import { Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface CitySearchProps {
   value: string;
@@ -24,6 +25,7 @@ export const CitySearch = ({
   onEnterPress,
   autoFocus = false
 }: CitySearchProps) => {
+  const { t } = useTranslation();
   const [search, setSearch] = useState(value);
   const [showDropdown, setShowDropdown] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -116,7 +118,7 @@ export const CitySearch = ({
       {showDropdown && !citiesLoading && search.length > 0 && filteredCities.length === 0 && (
         <Card ref={dropdownRef} className="absolute z-50 w-full mt-2 p-3 pointer-events-auto">
           <p className="text-sm text-muted-foreground text-center">
-            Aucune ville trouvée pour "{search}"
+            {t('questionnaire.noCityFound')} "{search}"
           </p>
         </Card>
       )}
