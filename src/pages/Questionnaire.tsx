@@ -581,10 +581,7 @@ const Questionnaire = () => {
       total++; // Step 6: Style
     }
     
-    // Step 7: Rythme (seulement si activités sélectionnées)
-    if (needsActivities) {
-      total++; // Step 7: Rythme
-    }
+    // Step 7 removed: unified with Rhythm & Schedules step later
     
     // Step 8-9: Vols et bagages (seulement si vols sélectionnés)
     if (needsFlights) {
@@ -1960,40 +1957,7 @@ const Questionnaire = () => {
     }
     if (answers.hasDestination === t('questionnaire.yes') && (answers.helpWith || []).includes(t('questionnaire.activities'))) stepCounter++;
 
-    // Step 7: Rythme - SEULEMENT si activités sélectionnées
-    if ((answers.helpWith || []).includes(t('questionnaire.activities')) && step === stepCounter) {
-      return (
-        <div className="space-y-8 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
-            {t('questionnaire.rhythm.title')}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
-            {[
-              { label: t('questionnaire.rhythm.cool'), desc: t('questionnaire.rhythm.cool.desc'), icon: "🐢" },
-              { label: t('questionnaire.rhythm.balanced'), desc: t('questionnaire.rhythm.balanced.desc'), icon: "🚶" },
-              { label: t('questionnaire.rhythm.intense'), desc: t('questionnaire.rhythm.intense.desc'), icon: "🏃" }
-            ].map((option) => (
-              <Card
-                key={option.label}
-                className="p-6 cursor-pointer hover:shadow-golden hover:border-travliaq-deep-blue transition-all hover:scale-105"
-                onClick={() => handleChoice("rhythm", option.label)}
-              >
-                <div className="flex flex-col items-center space-y-2">
-                  <span className="text-4xl">{option.icon}</span>
-                  <span className="text-lg font-semibold text-travliaq-deep-blue">
-                    {option.label}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {option.desc}
-                  </span>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
-      );
-    }
-    if ((answers.helpWith || []).includes(t('questionnaire.activities'))) stepCounter++;
+    // Step 7 removed: replaced by unified RhythmStep later
 
     // Step 8: Vols - SEULEMENT si vols sélectionnés
     if ((answers.helpWith || []).includes(t('questionnaire.flights')) && step === stepCounter) {

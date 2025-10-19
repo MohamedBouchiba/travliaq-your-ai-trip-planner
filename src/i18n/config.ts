@@ -576,13 +576,29 @@ const resources = {
       "questionnaire.styles.nightlife": "Vie nocturne",
       
       // Rhythm
-      "questionnaire.rhythm.title": "Rythme souhaité ⏱️",
+      "questionnaire.rhythm.title": "Rythme & horaires ⏱️",
+      "questionnaire.rhythm.description": "Choisis le rythme qui te correspond",
+      "questionnaire.rhythm.selectRhythm": "Sélectionne ton rythme",
       "questionnaire.rhythm.cool": "Cool",
       "questionnaire.rhythm.cool.desc": "1-2 activités/jour",
+      "questionnaire.rhythm.relaxed": "Détendu",
+      "questionnaire.rhythm.relaxed.desc": "1-2 activités/jour",
       "questionnaire.rhythm.balanced": "Équilibré",
       "questionnaire.rhythm.balanced.desc": "2-3 activités/jour",
       "questionnaire.rhythm.intense": "Intense",
       "questionnaire.rhythm.intense.desc": "3+ activités/jour",
+      
+      // Schedule preferences
+      "questionnaire.optional": "Optionnel",
+      "questionnaire.schedule.title": "Préférences horaires",
+      "questionnaire.schedule.description": "Sélectionne jusqu’à 3 options",
+      "questionnaire.schedule.maxReached": "Maximum 3 préférences",
+      "questionnaire.schedule.earlyBird": "Matinal",
+      "questionnaire.schedule.nightOwl": "Couche-tard",
+      "questionnaire.schedule.needsSiesta": "Sieste nécessaire",
+      "questionnaire.schedule.needsBreaks": "Besoin de pauses",
+      "questionnaire.schedule.offSeason": "Basse saison",
+      "questionnaire.schedule.highSeason": "Haute saison",
       
       // Flights
       "questionnaire.flights.title": "Vols – préférence ✈️",
@@ -1353,12 +1369,28 @@ const resources = {
       
       // Rhythm
       "questionnaire.rhythm.title": "Desired pace ⏱️",
+      "questionnaire.rhythm.description": "Choose the pace that suits you",
+      "questionnaire.rhythm.selectRhythm": "Select your pace",
       "questionnaire.rhythm.cool": "Cool",
       "questionnaire.rhythm.cool.desc": "1-2 activities/day",
+      "questionnaire.rhythm.relaxed": "Relaxed",
+      "questionnaire.rhythm.relaxed.desc": "1-2 activities/day",
       "questionnaire.rhythm.balanced": "Balanced",
       "questionnaire.rhythm.balanced.desc": "2-3 activities/day",
       "questionnaire.rhythm.intense": "Intense",
       "questionnaire.rhythm.intense.desc": "3+ activities/day",
+      
+      // Schedule preferences
+      "questionnaire.optional": "Optional",
+      "questionnaire.schedule.title": "Schedule preferences",
+      "questionnaire.schedule.description": "Select up to 3 options",
+      "questionnaire.schedule.maxReached": "Maximum 3 preferences",
+      "questionnaire.schedule.earlyBird": "Early bird",
+      "questionnaire.schedule.nightOwl": "Night owl",
+      "questionnaire.schedule.needsSiesta": "Needs siesta",
+      "questionnaire.schedule.needsBreaks": "Needs breaks",
+      "questionnaire.schedule.offSeason": "Off season",
+      "questionnaire.schedule.highSeason": "High season",
       
       // Flights
       "questionnaire.flights.title": "Flights – preference ✈️",

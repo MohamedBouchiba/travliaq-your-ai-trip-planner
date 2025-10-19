@@ -33,7 +33,7 @@ export const RhythmStep = ({
   };
 
   const rhythmOptions = [
-    { value: 'relaxed', icon: '🌴', label: t('questionnaire.rhythm.relaxed'), desc: t('questionnaire.rhythm.relaxed.desc') },
+    { value: 'relaxed', icon: '🐢', label: t('questionnaire.rhythm.relaxed'), desc: t('questionnaire.rhythm.relaxed.desc') },
     { value: 'balanced', icon: '⚖️', label: t('questionnaire.rhythm.balanced'), desc: t('questionnaire.rhythm.balanced.desc') },
     { value: 'intense', icon: '⚡', label: t('questionnaire.rhythm.intense'), desc: t('questionnaire.rhythm.intense.desc') }
   ];
