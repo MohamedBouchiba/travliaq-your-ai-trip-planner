@@ -1086,12 +1086,12 @@ const Questionnaire = () => {
           <p className="text-center text-muted-foreground">{t('questionnaire.multipleSelectionPossible')}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
             {[
+              { label: t('questionnaire.climate.dontMind'), icon: "🤷", desc: t('questionnaire.climate.dontMind.desc'), autoNext: true },
               { label: t('questionnaire.climate.hotSunny'), icon: "☀️", desc: t('questionnaire.climate.hotSunny.desc') },
               { label: t('questionnaire.climate.mildSweet'), icon: "🌤️", desc: t('questionnaire.climate.mildSweet.desc') },
               { label: t('questionnaire.climate.coldSnowy'), icon: "❄️", desc: t('questionnaire.climate.coldSnowy.desc') },
               { label: t('questionnaire.climate.tropicalHumid'), icon: "🌴", desc: t('questionnaire.climate.tropicalHumid.desc') },
-              { label: t('questionnaire.climate.mountainAltitude'), icon: "⛰️", desc: t('questionnaire.climate.mountainAltitude.desc') },
-              { label: t('questionnaire.climate.dontMind'), icon: "🤷", desc: t('questionnaire.climate.dontMind.desc') }
+              { label: t('questionnaire.climate.mountainAltitude'), icon: "⛰️", desc: t('questionnaire.climate.mountainAltitude.desc') }
             ].map((option) => {
               const isSelected = (answers.climatePreference || []).includes(option.label);
               return (
@@ -1102,7 +1102,13 @@ const Questionnaire = () => {
                       ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
                       : "hover:shadow-golden hover:border-travliaq-deep-blue"
                   }`}
-                  onClick={() => handleMultiChoice("climatePreference", option.label)}
+                  onClick={() => {
+                    handleMultiChoice("climatePreference", option.label);
+                    // Auto-advance si "peu importe" est cliqué
+                    if ((option as any).autoNext) {
+                      setTimeout(nextStep, 300);
+                    }
+                  }}
                 >
                   <div className="flex items-center space-x-4">
                     <span className="text-4xl">{option.icon}</span>
@@ -2067,6 +2073,7 @@ const Questionnaire = () => {
           <p className="text-center text-muted-foreground">{t('questionnaire.accommodationType.select1or2')}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
             {[
+              { label: t('questionnaire.accommodationType.dontMind'), icon: "🤷" },
               { label: t('questionnaire.accommodationType.hotel'), icon: "🏨" },
               { label: t('questionnaire.accommodationType.apartment'), icon: "🏠" },
               { label: t('questionnaire.accommodationType.hostel'), icon: "🛏️" },
@@ -2074,8 +2081,7 @@ const Questionnaire = () => {
               { label: t('questionnaire.accommodationType.lodge'), icon: "🌿" },
               { label: t('questionnaire.accommodationType.camping'), icon: "⛺" },
               { label: t('questionnaire.accommodationType.bedBreakfast'), icon: "🛋️" },
-              { label: t('questionnaire.accommodationType.resort'), icon: "🏖️" },
-              { label: t('questionnaire.accommodationType.dontMind'), icon: "🤷" }
+              { label: t('questionnaire.accommodationType.resort'), icon: "🏖️" }
             ].map((option) => {
               const currentSelection = answers.accommodationType || [];
               const isSelected = currentSelection.includes(option.label);
@@ -2212,15 +2218,21 @@ const Questionnaire = () => {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
             {[
+              { label: t('questionnaire.comfort.dontMind'), icon: "🤷", autoNext: true },
               { label: t('questionnaire.comfort.rating75'), icon: "⭐" },
               { label: t('questionnaire.comfort.rating80'), icon: "⭐⭐" },
-              { label: t('questionnaire.comfort.rating85'), icon: "⭐⭐⭐" },
-              { label: t('questionnaire.comfort.dontMind'), icon: "🤷" }
+              { label: t('questionnaire.comfort.rating85'), icon: "⭐⭐⭐" }
             ].map((option) => (
               <Card
                 key={option.label}
                 className="p-6 cursor-pointer hover:shadow-golden hover:border-travliaq-deep-blue transition-all hover:scale-105"
-                onClick={() => handleChoice("comfort", option.label)}
+                onClick={() => {
+                  handleChoice("comfort", option.label);
+                  // Auto-advance si "peu importe" est cliqué
+                  if ((option as any).autoNext) {
+                    setTimeout(nextStep, 300);
+                  }
+                }}
               >
                 <div className="flex items-center space-x-4">
                   <span className="text-3xl">{option.icon}</span>
@@ -2374,6 +2386,7 @@ const Questionnaire = () => {
           <p className="text-center text-muted-foreground">{t('questionnaire.constraints.selectAllImportant')}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
             {[
+              { label: t('questionnaire.constraints.dontMind'), icon: "🤷" },
               { label: t('questionnaire.constraints.halal'), icon: "🥙" },
               { label: t('questionnaire.constraints.kosher'), icon: "✡️" },
               { label: t('questionnaire.constraints.vegetarian'), icon: "🥗" },
@@ -2387,8 +2400,7 @@ const Questionnaire = () => {
               { label: t('questionnaire.constraints.safezones'), icon: "🛡️" },
               { label: t('questionnaire.constraints.avoidCar'), icon: "🚫🚗" },
               { label: t('questionnaire.constraints.localTraditions'), icon: "🕊️" },
-              { label: t('questionnaire.constraints.foodAllergies'), icon: "⚠️" },
-              { label: t('questionnaire.constraints.dontMind'), icon: "🤷" }
+              { label: t('questionnaire.constraints.foodAllergies'), icon: "⚠️" }
             ].map((option) => {
               const currentSelection = answers.constraints || [];
               const isSelected = currentSelection.includes(option.label);
@@ -2406,6 +2418,7 @@ const Questionnaire = () => {
                     if (option.label === t('questionnaire.constraints.dontMind')) {
                       // "Peu importe" remplace toute autre sélection
                       setAnswers({ ...answers, constraints: [option.label] });
+                      setTimeout(nextStep, 300);
                     } else {
                       // Si "Peu importe" est déjà sélectionné, le retirer d'abord
                       const filteredSelection = currentSelection.filter(item => item !== t('questionnaire.constraints.dontMind'));
