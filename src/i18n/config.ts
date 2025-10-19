@@ -613,8 +613,8 @@ const resources = {
       "questionnaire.schedule.nightOwl": "Couche-tard",
       "questionnaire.schedule.needsSiesta": "Sieste nécessaire",
       "questionnaire.schedule.needsBreaks": "Besoin de pauses",
-      "questionnaire.schedule.offSeason": "Basse saison",
-      "questionnaire.schedule.highSeason": "Haute saison",
+      "questionnaire.schedule.needsFreeTime": "Besoin de temps libre",
+      "questionnaire.schedule.flexibleSchedule": "Horaires flexibles",
       
       // Flights
       "questionnaire.flights.title": "Vols – préférence ✈️",
@@ -1421,8 +1421,8 @@ const resources = {
       "questionnaire.schedule.nightOwl": "Night owl",
       "questionnaire.schedule.needsSiesta": "Needs siesta",
       "questionnaire.schedule.needsBreaks": "Needs breaks",
-      "questionnaire.schedule.offSeason": "Off season",
-      "questionnaire.schedule.highSeason": "High season",
+      "questionnaire.schedule.needsFreeTime": "Needs free time",
+      "questionnaire.schedule.flexibleSchedule": "Flexible schedule",
       
       // Flights
       "questionnaire.flights.title": "Flights – preference ✈️",

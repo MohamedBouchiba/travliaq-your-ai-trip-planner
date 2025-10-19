@@ -43,8 +43,8 @@ export const RhythmStep = ({
     { value: 'night_owl', icon: '🌙', label: t('questionnaire.schedule.nightOwl') },
     { value: 'needs_siesta', icon: '😴', label: t('questionnaire.schedule.needsSiesta') },
     { value: 'needs_breaks', icon: '☕', label: t('questionnaire.schedule.needsBreaks') },
-    { value: 'off_season', icon: '🍂', label: t('questionnaire.schedule.offSeason') },
-    { value: 'high_season', icon: '☀️', label: t('questionnaire.schedule.highSeason') }
+    { value: 'needs_free_time', icon: '🕐', label: t('questionnaire.schedule.needsFreeTime') },
+    { value: 'flexible_schedule', icon: '🔄', label: t('questionnaire.schedule.flexibleSchedule') }
   ];
 
   return (
