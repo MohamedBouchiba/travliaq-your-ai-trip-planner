@@ -126,7 +126,7 @@ export type Database = {
           travel_ambiance: string | null
           travel_group: string | null
           updated_at: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           accommodation_type?: Json | null
@@ -167,7 +167,7 @@ export type Database = {
           travel_ambiance?: string | null
           travel_group?: string | null
           updated_at?: string
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           accommodation_type?: Json | null
@@ -208,7 +208,7 @@ export type Database = {
           travel_ambiance?: string | null
           travel_group?: string | null
           updated_at?: string
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: []
       }
