@@ -661,6 +661,9 @@ const Questionnaire = () => {
         comfort: z.string().max(100).optional().nullable(),
         neighborhood: z.string().max(200).optional().nullable(),
         amenities: z.array(z.string().max(200)).max(50).optional().nullable(),
+        children: z.array(z.object({ age: z.number().int().min(0).max(17) })).max(20).optional().nullable(),
+        security: z.array(z.string().max(200)).max(20).optional().nullable(),
+        biorhythm: z.array(z.string().max(200)).max(20).optional().nullable(),
         constraints: z.array(z.string().max(200)).max(50).optional().nullable(),
         additional_info: z.string().trim().max(2000).optional().nullable(),
         open_comments: z.string().trim().max(2000).optional().nullable(),
@@ -698,6 +701,9 @@ const Questionnaire = () => {
         comfort: answers.comfort || null,
         neighborhood: answers.neighborhood || null,
         amenities: answers.amenities || null,
+        children: answers.children || null,
+        security: answers.security || null,
+        biorhythm: answers.biorhythm || null,
         constraints: answers.constraints || null,
         additional_info: answers.additionalInfo || null
       };
@@ -921,6 +927,18 @@ const Questionnaire = () => {
       }
     }
     if (answers.travelGroup === t('questionnaire.family') || answers.travelGroup === t('questionnaire.group35')) stepCounter++;
+
+    // Step 1c: Détails enfants (si Famille)
+    if (answers.travelGroup === t('questionnaire.family') && step === stepCounter) {
+      return (
+        <ChildrenDetailsStep
+          children={answers.children || []}
+          onUpdate={(children) => setAnswers({ ...answers, children })}
+          onNext={nextStep}
+        />
+      );
+    }
+    if (answers.travelGroup === t('questionnaire.family')) stepCounter++;
 
     // Step 2: Destination en tête ?
     if (step === stepCounter) {
@@ -2425,7 +2443,35 @@ const Questionnaire = () => {
     }
     if ((answers.helpWith || []).includes(t('questionnaire.accommodation'))) stepCounter++;
 
-    // Step 15: Contraintes & préférences (plus laïc et inclusif)
+    // Step 15: Sécurité & Phobies (seulement si hébergement OU activités sélectionnés, pas juste vols)
+    const helpWithForSecurity = answers.helpWith || [];
+    const needsAccommodationForSecurity = helpWithForSecurity.includes(t('questionnaire.accommodation'));
+    const needsActivitiesForSecurity = helpWithForSecurity.includes(t('questionnaire.activities'));
+    const needsSecurityStep = needsAccommodationForSecurity || needsActivitiesForSecurity;
+    if (needsSecurityStep && step === stepCounter) {
+      return (
+        <SecurityStep
+          security={answers.security || []}
+          onUpdate={(security) => setAnswers({ ...answers, security })}
+          onNext={nextStep}
+        />
+      );
+    }
+    if (needsSecurityStep) stepCounter++;
+
+    // Step 16: Horloge biologique (seulement si activités sélectionnées)
+    if (needsActivitiesForSecurity && step === stepCounter) {
+      return (
+        <BiorhythmStep
+          biorhythm={answers.biorhythm || []}
+          onUpdate={(biorhythm) => setAnswers({ ...answers, biorhythm })}
+          onNext={nextStep}
+        />
+      );
+    }
+    if (needsActivitiesForSecurity) stepCounter++;
+
+    // Step 17: Contraintes & préférences (plus laïc et inclusif)
     if (step === stepCounter) {
       return (
         <div className="space-y-8 animate-fade-up">
