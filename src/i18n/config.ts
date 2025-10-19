@@ -447,6 +447,7 @@ const resources = {
       "questionnaire.climatePreference": "Quel type de climat recherches-tu ? 🌡️",
       "questionnaire.customTrip": "TON VOYAGE SUR MESURE",
       "questionnaire.back": "Retour",
+      "questionnaire.backToReview": "Retour au récapitulatif",
       "questionnaire.noCityFound": "Aucune ville trouvée pour",
       
       // Travelers step
@@ -1255,6 +1256,7 @@ const resources = {
       "questionnaire.climatePreference": "What type of climate are you looking for? 🌡️",
       "questionnaire.customTrip": "YOUR CUSTOM TRIP",
       "questionnaire.back": "Back",
+      "questionnaire.backToReview": "Back to summary",
       "questionnaire.noCityFound": "No city found for",
       
       // Travelers step

@@ -379,6 +379,8 @@ const Questionnaire = () => {
   const { toast } = useToast();
   const { user, loading } = useAuth();
   const [, forceUpdate] = useState({});
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [returnToReviewStep, setReturnToReviewStep] = useState<number | null>(null);
   
   // Force re-render when language changes
   useEffect(() => {
@@ -636,7 +638,14 @@ const Questionnaire = () => {
   const progress = (step / totalSteps) * 100;
 
   const nextStep = () => {
-    setStep(step + 1);
+    // Si on est en mode édition et qu'on veut retourner au récapitulatif
+    if (isEditMode && returnToReviewStep !== null) {
+      setStep(returnToReviewStep);
+      setIsEditMode(false);
+      setReturnToReviewStep(null);
+    } else {
+      setStep(step + 1);
+    }
   };
 
   const prevStep = () => {
@@ -2599,6 +2608,10 @@ const Questionnaire = () => {
           email={answers.email || ""}
           onEmailChange={(email) => setAnswers({ ...answers, email })}
           onEdit={(section) => {
+            // Sauvegarder l'étape de review pour y retourner
+            setReturnToReviewStep(step);
+            setIsEditMode(true);
+            
             // Navigate back to the appropriate step based on section
             const sectionStepMap: Record<string, number> = {
               'group': 1,
@@ -2701,17 +2714,34 @@ const Questionnaire = () => {
       {/* Content compact */}
       <div className="max-w-3xl mx-auto px-4 py-2 relative z-10">
         <div className="flex items-center justify-between mb-3">
-          {step > 1 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={prevStep}
-              className="text-travliaq-deep-blue hover:text-travliaq-turquoise hover:bg-travliaq-turquoise/10 transition-all"
-            >
-              <ChevronLeft className="mr-1 h-4 w-4" />
-              {t('questionnaire.back')}
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {step > 1 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={prevStep}
+                className="text-travliaq-deep-blue hover:text-travliaq-turquoise hover:bg-travliaq-turquoise/10 transition-all"
+              >
+                <ChevronLeft className="mr-1 h-4 w-4" />
+                {t('questionnaire.back')}
+              </Button>
+            )}
+            
+            {isEditMode && returnToReviewStep !== null && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => {
+                  setStep(returnToReviewStep);
+                  setIsEditMode(false);
+                  setReturnToReviewStep(null);
+                }}
+                className="bg-travliaq-turquoise hover:bg-travliaq-turquoise/90 text-white transition-all"
+              >
+                {t('questionnaire.backToReview')}
+              </Button>
+            )}
+          </div>
           
           <Button
             variant="outline"
