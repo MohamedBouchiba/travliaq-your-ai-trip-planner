@@ -357,7 +357,7 @@ const majorCities = [
 ];
 
 const Questionnaire = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   
   // Load cities from database
@@ -378,6 +378,20 @@ const Questionnaire = () => {
   const departureInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { user, loading } = useAuth();
+  const [, forceUpdate] = useState({});
+  
+  // Force re-render when language changes
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      forceUpdate({});
+    };
+    
+    i18n.on('languageChanged', handleLanguageChange);
+    
+    return () => {
+      i18n.off('languageChanged', handleLanguageChange);
+    };
+  }, [i18n]);
   
   // ⚠️ PROTECTION AUTH: Require authentication to start questionnaire
   useEffect(() => {
