@@ -14,7 +14,7 @@ export interface City {
  * Hook pour rechercher des villes en temps réel dans la base de données avec debounce
  * Utilise la recherche trigram (pg_trgm) pour une recherche floue et performante
  */
-export const useCitySearch = (searchTerm: string) => {
+export const useCitySearch = (searchTerm: string, enabled: boolean = true) => {
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
 
   // Debounce de 300ms pour éviter trop de requêtes
@@ -100,6 +100,6 @@ export const useCitySearch = (searchTerm: string) => {
       return sorted;
     },
     staleTime: 1000 * 60 * 5, // Cache pendant 5 minutes
-    enabled: true, // Toujours activé pour permettre la recherche en temps réel
+    enabled: enabled, // Ne rechercher que quand activé (dropdown ouvert)
   });
 };

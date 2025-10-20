@@ -29,7 +29,7 @@ export const CitySearch = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Recherche en temps réel dans la base de données
-  const { data: cities, isLoading: citiesLoading, isFetching } = useCitySearch(search);
+  const { data: cities, isLoading: citiesLoading, isFetching } = useCitySearch(search, showDropdown);
 
   // Sync external value changes seulement si l'utilisateur n'est pas en train de taper
   useEffect(() => {
