@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect } from "react";
 
 export interface City {
   id: string;
@@ -10,15 +11,26 @@ export interface City {
 }
 
 /**
- * Hook pour rechercher des villes en temps réel dans la base de données
+ * Hook pour rechercher des villes en temps réel dans la base de données avec debounce
  * Utilise la recherche trigram (pg_trgm) pour une recherche floue et performante
  */
 export const useCitySearch = (searchTerm: string) => {
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
+
+  // Debounce de 300ms pour éviter trop de requêtes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   return useQuery({
-    queryKey: ["city-search", searchTerm],
+    queryKey: ["city-search", debouncedSearch],
     queryFn: async () => {
       // Si pas de recherche, retourner les villes populaires par défaut
-      if (!searchTerm || searchTerm.trim() === '') {
+      if (!debouncedSearch || debouncedSearch.trim() === '') {
         const { data, error } = await supabase
           .from("cities")
           .select("*")
@@ -34,7 +46,7 @@ export const useCitySearch = (searchTerm: string) => {
       }
 
       // Normaliser le terme de recherche
-      const normalizedSearch = searchTerm.toLowerCase().trim();
+      const normalizedSearch = debouncedSearch.toLowerCase().trim();
 
       // Recherche avec ILIKE pour correspondance partielle
       // On recherche dans name, country et search_text

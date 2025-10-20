@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
@@ -24,16 +24,19 @@ export const CitySearch = ({
   const { t } = useTranslation();
   const [search, setSearch] = useState(value);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [hasUserInput, setHasUserInput] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Recherche en temps réel dans la base de données
-  const { data: cities, isLoading: citiesLoading } = useCitySearch(search);
+  const { data: cities, isLoading: citiesLoading, isFetching } = useCitySearch(search);
 
-  // Sync external value changes
+  // Sync external value changes seulement si l'utilisateur n'est pas en train de taper
   useEffect(() => {
-    setSearch(value);
-  }, [value]);
+    if (!hasUserInput && value !== search) {
+      setSearch(value);
+    }
+  }, [value, hasUserInput, search]);
 
   // Handle click outside
   useEffect(() => {
@@ -55,22 +58,42 @@ export const CitySearch = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setSearch(newValue);
-    onChange(newValue);
+    setHasUserInput(true);
     setShowDropdown(true);
+    // Ne pas appeler onChange immédiatement pour éviter les re-renders
   };
 
   const handleCitySelect = (city: City) => {
     const cityDisplay = `${city.name}, ${city.country} ${city.country_code}`;
     setSearch(cityDisplay);
+    setHasUserInput(false);
     onChange(cityDisplay);
     setShowDropdown(false);
+    // Remettre le focus sur l'input après la sélection
+    setTimeout(() => inputRef.current?.blur(), 0);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && onEnterPress) {
+      setHasUserInput(false);
+      onChange(search);
       onEnterPress();
     }
   };
+
+  const handleBlur = () => {
+    // Mettre à jour la valeur finale uniquement au blur si l'utilisateur a tapé
+    if (hasUserInput) {
+      setHasUserInput(false);
+      onChange(search);
+    }
+  };
+
+  // Déterminer si on doit afficher le dropdown et son contenu
+  const shouldShowDropdown = showDropdown && search.length > 0;
+  const isSearching = isFetching || citiesLoading;
+  const hasCities = cities && cities.length > 0;
+  const showNoCityMessage = !isSearching && !hasCities && hasUserInput;
 
   return (
     <div className="relative">
@@ -82,20 +105,24 @@ export const CitySearch = ({
         value={search}
         onChange={handleInputChange}
         onFocus={() => setShowDropdown(true)}
+        onBlur={handleBlur}
         onKeyPress={handleKeyPress}
-        disabled={citiesLoading}
       />
       
-      {citiesLoading && (
-        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+      {isSearching && (
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
         </div>
       )}
 
-      {showDropdown && !citiesLoading && search.length > 0 && (
+      {shouldShowDropdown && (
         <>
-          {cities && cities.length > 0 ? (
-            <Card ref={dropdownRef} className="absolute z-50 w-full mt-2 max-h-60 overflow-y-auto pointer-events-auto">
+          {hasCities ? (
+            <Card 
+              ref={dropdownRef} 
+              className="absolute z-50 w-full mt-2 max-h-60 overflow-y-auto pointer-events-auto bg-background border shadow-lg"
+              onMouseDown={(e) => e.preventDefault()} // Empêche le blur de l'input
+            >
               <Command>
                 <CommandList>
                   <CommandGroup>
@@ -112,13 +139,17 @@ export const CitySearch = ({
                 </CommandList>
               </Command>
             </Card>
-          ) : (
-            <Card ref={dropdownRef} className="absolute z-50 w-full mt-2 p-3 pointer-events-auto">
+          ) : showNoCityMessage ? (
+            <Card 
+              ref={dropdownRef} 
+              className="absolute z-50 w-full mt-2 p-3 pointer-events-auto bg-background border shadow-lg"
+              onMouseDown={(e) => e.preventDefault()}
+            >
               <p className="text-sm text-muted-foreground text-center">
                 {t('questionnaire.noCityFound')} "{search}"
               </p>
             </Card>
-          )}
+          ) : null}
         </>
       )}
 
