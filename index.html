@@ -15,9 +15,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     
-    <!-- Load fonts asynchronously to avoid render blocking -->
+    <!-- Preload critical fonts for LCP element -->
     <link 
-      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" 
+      rel="preload" 
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&display=swap"
+    >
+    <link 
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&display=swap" 
+      rel="stylesheet"
+    >
+    
+    <!-- Load remaining fonts asynchronously -->
+    <link 
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&family=Inter:wght@400;500;600&display=swap" 
       rel="stylesheet"
       media="print" 
       onload="this.media='all'"
@@ -25,6 +36,16 @@
     <noscript>
       <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     </noscript>
+    
+    <!-- Inline critical CSS for font fallback -->
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+      }
+      .font-montserrat {
+        font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+    </style>
 
     <!-- Open Graph meta tags -->
     <meta property="og:title" content="Travliaq - IA de voyage pour planifier et optimiser vos voyages" />
