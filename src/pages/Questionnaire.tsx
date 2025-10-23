@@ -938,6 +938,41 @@ const Questionnaire = () => {
 
       setSubmittedResponseId(data.data.id);
       
+      // Enqueue answer_id to SQS with retry logic
+      const enqueueWithRetry = async (answerId: string, maxRetries = 3) => {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            const { data: sqsData, error: sqsError } = await supabase.functions.invoke('enqueue-answer', {
+              body: { answer_id: answerId }
+            });
+            
+            if (sqsError) throw sqsError;
+            if (sqsData?.ok) {
+              console.log(`[${new Date().toISOString()}] Answer enqueued successfully: ${answerId}`);
+              return true;
+            }
+            throw new Error('Enqueue failed');
+          } catch (err) {
+            console.error(`[${new Date().toISOString()}] Enqueue attempt ${attempt}/${maxRetries} failed:`, err);
+            if (attempt < maxRetries) {
+              // Exponential backoff: 1s, 2s, 4s
+              await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000));
+            } else {
+              console.error(`[${new Date().toISOString()}] Failed to enqueue after ${maxRetries} attempts`);
+              return false;
+            }
+          }
+        }
+        return false;
+      };
+      
+      // Fire and forget - don't block user flow
+      enqueueWithRetry(data.data.id).then(success => {
+        if (success) {
+          console.log('Answer successfully queued for processing');
+        }
+      });
+      
       // Trigger celebration animation
       triggerCelebration();
       
