@@ -35,7 +35,7 @@ const Navigation = ({ variant = 'default', theme = 'dark' }: NavigationProps) =>
     <header className={`absolute top-0 left-0 right-0 z-20 p-2 md:p-4 ${bgClass}`}>
       <div className="container mx-auto flex justify-between items-start md:items-center">
         <a href="/" className={hideLogo ? "hidden md:block" : "md:block"}>
-          <img src={logo} alt="Logo Travliaq" className="h-12 md:h-14 w-auto" />
+          <img src={logo} alt="Logo Travliaq" width="72" height="56" className="h-12 md:h-14 w-auto" />
         </a>
 
         {/* Desktop Navigation */}

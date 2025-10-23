@@ -379,7 +379,7 @@ const Index = () => {
           <div className="max-w-6xl mx-auto">
             {/* Logo et description */}
             <div className="text-center mb-16">
-              <img src={logo} alt="Logo Travliaq" className="h-16 w-auto mx-auto mb-6" />
+              <img src={logo} alt="Logo Travliaq" width="83" height="64" className="h-16 w-auto mx-auto mb-6" loading="lazy" />
               <p className="text-xl text-white/80 font-inter max-w-2xl mx-auto">
                 {t('footer.tagline')}
               </p>

@@ -537,7 +537,7 @@ const TravelRecommendations = () => {
         {/* Desktop: Just logo */}
         <div className="hidden md:block">
           <a href="/" className="inline-block hover:opacity-80 transition-opacity">
-            <img src={logo} alt="Travliaq" className="h-12 w-auto" />
+            <img src={logo} alt="Travliaq" width="62" height="48" className="h-12 w-auto" />
           </a>
         </div>
       </div>
