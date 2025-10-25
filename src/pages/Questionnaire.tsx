@@ -518,6 +518,13 @@ const Questionnaire = () => {
     }
   }, [user, t, toast]);
   
+  // 📧 INITIALIZE EMAIL: Set user's email as default if not already set
+  useEffect(() => {
+    if (user?.email && !answers.email) {
+      setAnswers(prev => ({ ...prev, email: user.email }));
+    }
+  }, [user?.email, answers.email]);
+  
   // 🧮 INFERENCE: Auto-calculate numberOfTravelers
   useEffect(() => {
     if (!answers.travelGroup) return;
@@ -2734,13 +2741,10 @@ const Questionnaire = () => {
 
     // Step final-1: Review & confirm
     if (step === stepCounter) {
-      // Pré-remplir l'email de l'utilisateur connecté s'il n'a pas encore d'email dans answers
-      const userEmail = user?.email || answers.email || "";
-      
       return (
         <ReviewStep
           answers={answers}
-          email={userEmail}
+          email={answers.email || ""}
           onEmailChange={(email) => setAnswers({ ...answers, email })}
           onEdit={(section) => {
             // Sauvegarder l'étape de review pour y retourner
