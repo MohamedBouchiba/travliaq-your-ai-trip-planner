@@ -261,11 +261,11 @@ const MapView = ({ days, activeDay, onScrollToDay, activeDayData }: MapViewProps
       <div
         ref={mapContainer}
         className={isMobileFullscreen
-          ? "fixed inset-x-0 top-0 h-[35vh] z-50"
+          ? "fixed inset-x-0 top-0 z-[70]"
           : isFullscreen
             ? "fixed inset-x-0 top-0 h-1/2 z-50"
             : "w-full h-56 rounded-lg overflow-hidden border border-travliaq-turquoise/20 shadow-[0_0_15px_rgba(56,189,248,0.1)] bg-gradient-to-br from-travliaq-deep-blue/70 to-travliaq-deep-blue/50 backdrop-blur-md"}
-        style={!isFullscreen ? { minHeight: '224px' } : undefined}
+        style={isMobileFullscreen ? { height: '35svh' } : !isFullscreen ? { minHeight: '224px' } : undefined}
       />
 
       {/* Controls and footer in normal view */}
@@ -306,7 +306,7 @@ const MapView = ({ days, activeDay, onScrollToDay, activeDayData }: MapViewProps
               </Button>
 
               {/* Bottom details panel (65% height on mobile) */}
-              <div className="fixed inset-x-0 bottom-0 z-50 h-[65vh] overflow-y-auto bg-gradient-to-b from-travliaq-deep-blue/80 to-travliaq-deep-blue/95 backdrop-blur-sm border-t-2 border-travliaq-turquoise/30">
+              <div className="fixed inset-x-0 bottom-0 z-50 overflow-y-auto bg-gradient-to-b from-travliaq-deep-blue/80 to-travliaq-deep-blue/95 backdrop-blur-sm border-t-2 border-travliaq-turquoise/30" style={{ height: '65svh' }}>
                 <div className="p-6 space-y-5">
                   {/* Title */}
                   <div className="space-y-1">
