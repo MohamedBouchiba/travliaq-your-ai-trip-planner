@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import LanguageSwitcher from './LanguageSwitcher';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface NavigationProps {
   variant?: 'default' | 'minimal';
@@ -24,8 +25,10 @@ const Navigation = ({ variant = 'default', theme = 'dark' }: NavigationProps) =>
   const closeMenu = () => setIsOpen(false);
   
   const isMinimal = variant === 'minimal';
-  const hideLogoOnMobile = location.pathname === '/recommendations';
-  
+  const isMobile = useIsMobile();
+  const onRecommendations = location.pathname.startsWith('/recommendations');
+  const hideLogoOnMobile = isMobile && onRecommendations;
+
   // Couleurs adaptatives selon le thème
   const textColor = theme === 'light' ? 'text-travliaq-deep-blue' : 'text-white';
   const hoverColor = theme === 'light' ? 'hover:text-travliaq-turquoise' : 'hover:text-white/80';
