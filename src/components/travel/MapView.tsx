@@ -236,11 +236,19 @@ const MapView = ({ days, activeDay, onScrollToDay, activeDayData }: MapViewProps
 
   const toggleFullscreen = () => {
     setIsFullscreen((prev) => !prev);
-    // Resize map after fullscreen toggle to ensure proper rendering
-    setTimeout(() => {
-      map.current?.resize();
-    }, 300);
   };
+
+  // Force map resize when fullscreen changes
+  useEffect(() => {
+    if (!map.current) return;
+    
+    // Resize map when fullscreen state changes
+    const resizeTimer = setTimeout(() => {
+      map.current?.resize();
+    }, 350);
+    
+    return () => clearTimeout(resizeTimer);
+  }, [isFullscreen, isMobileFullscreen]);
 
   // Keep map sized correctly on viewport/orientation changes
   useEffect(() => {
@@ -261,7 +269,7 @@ const MapView = ({ days, activeDay, onScrollToDay, activeDayData }: MapViewProps
       <div
         ref={mapContainer}
         className={isMobileFullscreen
-          ? "fixed inset-x-0 top-0 z-[70]"
+          ? "fixed left-0 right-0 top-0 z-[100]"
           : isFullscreen
             ? "fixed inset-x-0 top-0 h-1/2 z-50"
             : "w-full h-56 rounded-lg overflow-hidden border border-travliaq-turquoise/20 shadow-[0_0_15px_rgba(56,189,248,0.1)] bg-gradient-to-br from-travliaq-deep-blue/70 to-travliaq-deep-blue/50 backdrop-blur-md"}
@@ -294,19 +302,22 @@ const MapView = ({ days, activeDay, onScrollToDay, activeDayData }: MapViewProps
         <>
           {isMobile ? (
             <>
-              {/* Close button floating over the map (no header/backdrop on mobile) */}
+              {/* Close button floating at the very top */}
               <Button
                 variant="outline"
                 size="icon"
-                className="fixed top-3 right-3 z-[60] bg-background/90 backdrop-blur-sm hover:bg-background"
+                className="fixed top-3 right-3 z-[110] bg-background/90 backdrop-blur-sm hover:bg-background shadow-xl"
                 onClick={toggleFullscreen}
                 title="Réduire"
               >
                 <Minimize2 className="h-4 w-4" />
               </Button>
 
-              {/* Bottom details panel (65% height on mobile) */}
-              <div className="fixed inset-x-0 bottom-0 z-50 overflow-y-auto bg-gradient-to-b from-travliaq-deep-blue/80 to-travliaq-deep-blue/95 backdrop-blur-sm border-t-2 border-travliaq-turquoise/30" style={{ height: '65svh' }}>
+              {/* Bottom details panel positioned explicitly from 35svh */}
+              <div 
+                className="fixed left-0 right-0 z-[90] overflow-y-auto bg-gradient-to-b from-travliaq-deep-blue/95 to-travliaq-deep-blue backdrop-blur-sm border-t-2 border-travliaq-turquoise/30 shadow-2xl" 
+                style={{ top: 'calc(35svh)', bottom: 0 }}
+              >
                 <div className="p-6 space-y-5">
                   {/* Title */}
                   <div className="space-y-1">
