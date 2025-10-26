@@ -696,7 +696,6 @@ const TravelRecommendations = () => {
                 activeDay={activeDay >= 1 && activeDay <= travelData.days.length ? activeDay : 1}
                 onScrollToDay={(dayId) => {
                   scrollToDay(dayId);
-                  setDrawerOpen(false);
                 }}
                 activeDayData={(() => {
                   const currentActiveDay = activeDay >= 1 && activeDay <= travelData.days.length ? activeDay : 1;

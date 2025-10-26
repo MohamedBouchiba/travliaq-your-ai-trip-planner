@@ -272,49 +272,6 @@ const MapView = ({ days, activeDay, onScrollToDay, activeDayData }: MapViewProps
     };
   }, []);
 
-  // Move the map container to a body-level overlay in mobile fullscreen to avoid parent transforms
-  useEffect(() => {
-    const container = mapContainer.current;
-    if (!container) return;
-
-    if (isMobileFullscreen) {
-      // Save original position
-      originalParentRef.current = container.parentElement as HTMLElement | null;
-      originalNextSiblingRef.current = container.nextSibling;
-
-      // Create overlay root if needed
-      if (!overlayRootRef.current) {
-        overlayRootRef.current = document.createElement('div');
-      }
-      const root = overlayRootRef.current;
-      Object.assign(root.style, {
-        position: 'fixed', left: '0', right: '0', top: '0', height: '35svh', zIndex: '100',
-        pointerEvents: 'auto', background: 'transparent'
-      } as CSSStyleDeclaration);
-
-      document.body.appendChild(root);
-      root.appendChild(container);
-      // Ensure map fits new size
-      setTimeout(() => map.current?.resize(), 0);
-      setTimeout(() => map.current?.resize(), 300);
-    } else {
-      // Restore original position
-      const parent = originalParentRef.current;
-      if (parent) {
-        if (originalNextSiblingRef.current) {
-          parent.insertBefore(container, originalNextSiblingRef.current);
-        } else {
-          parent.appendChild(container);
-        }
-      }
-      // Remove overlay root if exists
-      if (overlayRootRef.current?.parentElement) {
-        overlayRootRef.current.parentElement.removeChild(overlayRootRef.current);
-      }
-      overlayRootRef.current = null;
-      setTimeout(() => map.current?.resize(), 0);
-    }
-  }, [isMobileFullscreen]);
 
   // Lock body scroll in mobile split view to prevent layout jumps when steps scroll
   useEffect(() => {
@@ -335,7 +292,7 @@ const MapView = ({ days, activeDay, onScrollToDay, activeDayData }: MapViewProps
       <div
         ref={mapContainer}
         className={isMobileFullscreen
-          ? "fixed left-0 right-0 top-0 z-[100] h-[35vh] w-screen pointer-events-auto"
+          ? "fixed left-0 right-0 top-0 z-[1000] h-[35vh] w-screen pointer-events-auto"
           : isFullscreen
             ? "fixed inset-x-0 top-0 h-1/2 z-50 pointer-events-auto"
             : "w-full h-56 rounded-lg overflow-hidden border border-travliaq-turquoise/20 shadow-[0_0_15px_rgba(56,189,248,0.1)] bg-gradient-to-br from-travliaq-deep-blue/70 to-travliaq-deep-blue/50 backdrop-blur-md"}
@@ -372,7 +329,7 @@ const MapView = ({ days, activeDay, onScrollToDay, activeDayData }: MapViewProps
               <Button
                 variant="outline"
                 size="icon"
-                className="fixed top-3 right-3 z-[110] bg-background/90 backdrop-blur-sm hover:bg-background shadow-xl"
+                className="fixed top-3 right-3 z-[1010] bg-background/90 backdrop-blur-sm hover:bg-background shadow-xl"
                 onClick={toggleFullscreen}
                 title="Réduire"
               >
@@ -381,7 +338,7 @@ const MapView = ({ days, activeDay, onScrollToDay, activeDayData }: MapViewProps
 
               {/* Bottom details panel positioned explicitly from 35svh */}
               <div 
-                className="fixed left-0 right-0 z-[95] overflow-y-auto bg-gradient-to-b from-travliaq-deep-blue/95 to-travliaq-deep-blue backdrop-blur-sm border-t-2 border-travliaq-turquoise/30 shadow-2xl" 
+                className="fixed left-0 right-0 z-[990] overflow-y-auto bg-gradient-to-b from-travliaq-deep-blue/95 to-travliaq-deep-blue backdrop-blur-sm border-t-2 border-travliaq-turquoise/30 shadow-2xl" 
                 style={{ top: 'calc(35svh)', bottom: 0 }}
               >
                 <div className="p-6 space-y-5">
@@ -474,6 +431,24 @@ const MapView = ({ days, activeDay, onScrollToDay, activeDayData }: MapViewProps
                       </p>
                     </div>
                   )}
+
+                  <div className="space-y-3 mt-2">
+                    <h4 className="font-montserrat text-white font-semibold text-lg">Toutes les étapes</h4>
+                    <ol className="space-y-2">
+                      {days.map((d) => (
+                        <li key={d.id}>
+                          <button
+                            type="button"
+                            onClick={() => onScrollToDay?.(d.id)}
+                            className="w-full text-left flex items-center gap-3 bg-white/5 hover:bg-white/10 transition-colors rounded-lg px-3 py-2 border border-travliaq-turquoise/20"
+                          >
+                            <span className="font-montserrat text-white/90 text-sm">Étape {d.id}</span>
+                            <span className="font-inter text-travliaq-turquoise/80 text-sm truncate">{d.title}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
                 </div>
               </div>
             </>
