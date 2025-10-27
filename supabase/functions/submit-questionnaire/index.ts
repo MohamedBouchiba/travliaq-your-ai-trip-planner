@@ -242,6 +242,34 @@ serve(async (req) => {
     
     console.log('Questionnaire response saved successfully:', data.id);
     
+    // Call enqueue-answer in background to send ID to SQS
+    const enqueueAnswerUrl = `${supabaseUrl}/functions/v1/enqueue-answer`;
+    const enqueueTask = async () => {
+      try {
+        console.log('Calling enqueue-answer for questionnaire ID:', data.id);
+        const enqueueResponse = await fetch(enqueueAnswerUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({ answer_id: data.id }),
+        });
+        
+        if (!enqueueResponse.ok) {
+          const errorText = await enqueueResponse.text();
+          console.error('Failed to enqueue answer:', enqueueResponse.status, errorText);
+        } else {
+          console.log('Successfully enqueued answer ID to SQS:', data.id);
+        }
+      } catch (enqueueError) {
+        console.error('Error calling enqueue-answer:', enqueueError);
+      }
+    };
+    
+    // Run enqueue task in background
+    EdgeRuntime.waitUntil(enqueueTask());
+    
     return new Response(
       JSON.stringify({ data }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
