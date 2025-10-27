@@ -866,7 +866,7 @@ const Questionnaire = () => {
       const questionnaireSchema = z.object({
         user_id: z.string().uuid().nullable(),
         email: z.string().trim().email({ message: "Email invalide" }).max(255, { message: "Email trop long" }),
-        language: z.enum(['fr', 'en']),
+        langue: z.enum(['fr', 'en']),
         travel_group: z.string().max(100).optional().nullable(),
         number_of_travelers: z.number().int().min(1).max(50).optional().nullable(),
         has_destination: z.string().max(50).optional().nullable(),
@@ -907,7 +907,7 @@ const Questionnaire = () => {
       const responseData = {
         user_id: user?.id || null,
         email: answers.email || "",
-        language: i18n.language === 'en' ? 'en' : 'fr', // Capture the current language
+        langue: i18n.language === 'en' ? 'en' : 'fr', // Capture the current language
         groupe_voyage: answers.travelGroup || null,
         nombre_voyageurs: answers.numberOfTravelers || null,
         a_destination: answers.hasDestination || null,
