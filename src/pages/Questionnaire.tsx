@@ -2895,41 +2895,43 @@ const Questionnaire = () => {
             )}
           </div>
           
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (user) {
-                const draftKey = `travliaq:qv2:${user.id}`;
-                const draft = {
-                  version: 2,
-                  timestamp: Date.now(),
-                  step,
-                  answers
-                };
-                localStorage.setItem(draftKey, JSON.stringify(draft));
-                toast({
-                  title: t('questionnaire.draftSaved'),
-                  description: t('questionnaire.draftSavedDesc'),
-                  duration: 3000
-                });
-                setTimeout(() => navigate('/'), 500);
-              }
-            }}
-            className="text-travliaq-deep-blue border-travliaq-deep-blue hover:bg-travliaq-deep-blue hover:text-white transition-all"
-          >
-            {t('questionnaire.saveAndReturn')}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (user) {
+                  const draftKey = `travliaq:qv2:${user.id}`;
+                  const draft = {
+                    version: 2,
+                    timestamp: Date.now(),
+                    step,
+                    answers
+                  };
+                  localStorage.setItem(draftKey, JSON.stringify(draft));
+                  toast({
+                    title: t('questionnaire.draftSaved'),
+                    description: t('questionnaire.draftSavedDesc'),
+                    duration: 3000
+                  });
+                  setTimeout(() => navigate('/'), 500);
+                }
+              }}
+              className="text-travliaq-deep-blue border-travliaq-deep-blue hover:bg-travliaq-deep-blue hover:text-white transition-all"
+            >
+              {t('questionnaire.saveAndReturn')}
+            </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowResetDialog(true)}
-            className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-red-500/50 h-9 px-3 text-sm ml-2"
-          >
-            <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-            Repartir de zéro
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowResetDialog(true)}
+              className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-red-500/50 h-9 px-3 text-sm"
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+              Repartir de zéro
+            </Button>
+          </div>
         </div>
 
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-travliaq-turquoise/20 p-6 md:p-8 transition-all hover:shadow-[0_20px_60px_-15px_rgba(56,189,248,0.3)]">
