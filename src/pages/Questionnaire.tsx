@@ -2572,12 +2572,12 @@ const Questionnaire = () => {
     // Step 14: Équipements (plus laïc) - SEULEMENT si hébergement sélectionné
     if ((answers.helpWith || []).includes(HELP_WITH.ACCOMMODATION) && step === stepCounter) {
       return (
-        <div className="space-y-8 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+        <div className="space-y-3 md:space-y-8 animate-fade-up">
+          <h2 className="text-xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
             {t('questionnaire.amenities.title')}
           </h2>
-          <p className="text-center text-muted-foreground">{t('questionnaire.amenities.selectAll')}</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+          <p className="text-center text-sm md:text-base text-muted-foreground">{t('questionnaire.amenities.selectAll')}</p>
+          <div className="grid grid-cols-2 md:grid-cols-2 gap-2 md:gap-4 max-w-2xl mx-auto">
             {[
               { label: t('questionnaire.amenities.dontMind'), icon: "🤷", autoNext: true },
               { label: t('questionnaire.amenities.reliableWifi'), icon: "📶" },
@@ -2598,7 +2598,7 @@ const Questionnaire = () => {
               return (
                 <Card
                   key={option.label}
-                  className={`p-4 cursor-pointer transition-all hover:scale-105 ${
+                  className={`p-2 md:p-4 cursor-pointer transition-all hover:scale-105 ${
                     isSelected 
                       ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
                       : "hover:shadow-golden hover:border-travliaq-deep-blue"
@@ -2611,9 +2611,9 @@ const Questionnaire = () => {
                     }
                   }}
                 >
-                  <div className="flex items-center space-x-3">
-                    <span className="text-2xl">{option.icon}</span>
-                    <span className="text-base font-semibold text-travliaq-deep-blue">
+                  <div className="flex items-center space-x-2 md:space-x-3">
+                    <span className="text-lg md:text-2xl">{option.icon}</span>
+                    <span className="text-xs md:text-base font-semibold text-travliaq-deep-blue">
                       {option.label}
                     </span>
                   </div>
@@ -2621,7 +2621,7 @@ const Questionnaire = () => {
               );
             })}
           </div>
-          <div className="flex justify-center pt-4">
+          <div className="flex justify-center pt-2 md:pt-4">
             <Button
               variant="hero"
               size="lg"
@@ -2669,12 +2669,12 @@ const Questionnaire = () => {
     // Step 17: Contraintes & préférences (plus laïc et inclusif)
     if (step === stepCounter) {
       return (
-        <div className="space-y-8 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+        <div className="space-y-3 md:space-y-8 animate-fade-up">
+          <h2 className="text-xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
             {t('questionnaire.constraints.title')}
           </h2>
-          <p className="text-center text-muted-foreground">{t('questionnaire.constraints.selectAllImportant')}</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+          <p className="text-center text-sm md:text-base text-muted-foreground">{t('questionnaire.constraints.selectAllImportant')}</p>
+          <div className="grid grid-cols-2 md:grid-cols-2 gap-2 md:gap-4 max-w-2xl mx-auto">
             {[
               { label: t('questionnaire.constraints.dontMind'), icon: "🤷" },
               { label: t('questionnaire.constraints.halal'), icon: "🥙" },
@@ -2699,7 +2699,7 @@ const Questionnaire = () => {
               return (
                 <Card
                   key={option.label}
-                  className={`p-4 cursor-pointer transition-all hover:scale-105 ${
+                  className={`p-2 md:p-4 cursor-pointer transition-all hover:scale-105 ${
                     isSelected 
                       ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
                       : "hover:shadow-golden hover:border-travliaq-deep-blue"
@@ -2719,9 +2719,9 @@ const Questionnaire = () => {
                     }
                   }}
                 >
-                  <div className="flex items-center space-x-3">
-                    <span className="text-2xl">{option.icon}</span>
-                    <span className="text-base font-semibold text-travliaq-deep-blue">
+                  <div className="flex items-center space-x-2 md:space-x-3">
+                    <span className="text-lg md:text-2xl">{option.icon}</span>
+                    <span className="text-xs md:text-base font-semibold text-travliaq-deep-blue">
                       {option.label}
                     </span>
                   </div>
@@ -2729,7 +2729,7 @@ const Questionnaire = () => {
               );
             })}
           </div>
-          <div className="flex justify-center pt-4">
+          <div className="flex justify-center pt-2 md:pt-4">
             <Button
               variant="hero"
               size="lg"
