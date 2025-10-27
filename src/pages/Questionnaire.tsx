@@ -1095,8 +1095,8 @@ const Questionnaire = () => {
     
     // Notification
     toast({
-      title: t('questionnaire.resetSuccess') || '✨ Nouveau départ !',
-      description: t('questionnaire.resetSuccessDesc') || 'Votre questionnaire a été réinitialisé avec succès.',
+      title: '✨ Nouveau départ !',
+      description: 'Votre questionnaire a été réinitialisé avec succès.',
       duration: 3000
     });
   };
@@ -2925,10 +2925,10 @@ const Questionnaire = () => {
             variant="outline"
             size="sm"
             onClick={() => setShowResetDialog(true)}
-            className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-red-500/50"
+            className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-red-500/50 h-9 px-3 text-sm"
           >
-            <Trash2 className="w-4 h-4 mr-2" />
-            {t('questionnaire.resetQuestionnaire') || 'Repartir de zéro'}
+            <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+            Repartir de zéro
           </Button>
         </div>
 
@@ -2954,23 +2954,23 @@ const Questionnaire = () => {
                 <AlertTriangle className="w-6 h-6 text-red-600" />
               </div>
               <AlertDialogTitle className="text-2xl text-red-600">
-                {t('questionnaire.resetConfirmTitle') || 'Repartir de zéro ?'}
+                Repartir de zéro ?
               </AlertDialogTitle>
             </div>
             <AlertDialogDescription className="text-base pt-2">
-              {t('questionnaire.resetConfirmDesc') || 'Êtes-vous sûr de vouloir recommencer le questionnaire ? Toutes vos réponses actuelles seront définitivement supprimées.'}
+              Êtes-vous sûr de vouloir recommencer le questionnaire ? Toutes vos réponses actuelles seront définitivement supprimées.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-2">
             <AlertDialogCancel className="hover:scale-105 transition-transform">
-              {t('questionnaire.cancel') || 'Annuler'}
+              Annuler
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleResetQuestionnaire}
               className="bg-red-600 hover:bg-red-700 hover:scale-105 transition-all shadow-lg hover:shadow-red-500/50"
             >
               <Trash2 className="w-4 h-4 mr-2" />
-              {t('questionnaire.confirmReset') || 'Oui, tout supprimer'}
+              Oui, tout supprimer
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
