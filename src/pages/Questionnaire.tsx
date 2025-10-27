@@ -18,7 +18,9 @@ import {
   Mail,
   User,
   Loader2,
-  Info
+  Info,
+  Trash2,
+  AlertTriangle
 } from "lucide-react";
 import confetti from 'canvas-confetti';
 import {
@@ -49,6 +51,16 @@ import { RhythmStep } from "@/components/questionnaire/RhythmStep";
 import { TravelersStep } from "@/components/questionnaire/TravelersStep";
 import { CitySearch } from "@/components/questionnaire/CitySearch";
 import { ReviewStep } from "@/components/questionnaire/ReviewStep";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type LuggageChoice = {
   [travelerIndex: number]: string;
@@ -365,6 +377,7 @@ const Questionnaire = () => {
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showGoogleLogin, setShowGoogleLogin] = useState(false);
+  const [showResetDialog, setShowResetDialog] = useState(false);
   const [submittedResponseId, setSubmittedResponseId] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -1054,6 +1067,38 @@ const Questionnaire = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleResetQuestionnaire = () => {
+    // Effacer toutes les réponses
+    setAnswers({});
+    
+    // Supprimer le draft du localStorage
+    if (user) {
+      const draftKey = `travliaq:qv2:${user.id}`;
+      localStorage.removeItem(draftKey);
+    }
+    
+    // Revenir à l'étape 1
+    setStep(1);
+    
+    // Fermer le dialog
+    setShowResetDialog(false);
+    
+    // Petit effet confetti pour célébrer le nouveau départ
+    confetti({
+      particleCount: 50,
+      spread: 60,
+      origin: { y: 0.5 },
+      colors: ['#38BDF8', '#F59E0B', '#10B981']
+    });
+    
+    // Notification
+    toast({
+      title: t('questionnaire.resetSuccess') || '✨ Nouveau départ !',
+      description: t('questionnaire.resetSuccessDesc') || 'Votre questionnaire a été réinitialisé avec succès.',
+      duration: 3000
+    });
   };
 
   const handleGoogleLoginSuccess = async () => {
@@ -2871,9 +2916,19 @@ const Questionnaire = () => {
                 setTimeout(() => navigate('/'), 500);
               }
             }}
-            className="ml-auto text-travliaq-deep-blue border-travliaq-deep-blue hover:bg-travliaq-deep-blue hover:text-white transition-all"
+            className="text-travliaq-deep-blue border-travliaq-deep-blue hover:bg-travliaq-deep-blue hover:text-white transition-all"
           >
             {t('questionnaire.saveAndReturn')}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowResetDialog(true)}
+            className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-red-500/50"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            {t('questionnaire.resetQuestionnaire') || 'Repartir de zéro'}
           </Button>
         </div>
 
@@ -2889,6 +2944,37 @@ const Questionnaire = () => {
           onSuccess={handleGoogleLoginSuccess}
         />
       )}
+
+      {/* Reset Confirmation Dialog */}
+      <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+        <AlertDialogContent className="animate-scale-in border-2 border-red-500/20 shadow-2xl shadow-red-500/20">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 bg-red-100 rounded-full animate-pulse">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <AlertDialogTitle className="text-2xl text-red-600">
+                {t('questionnaire.resetConfirmTitle') || 'Repartir de zéro ?'}
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-base pt-2">
+              {t('questionnaire.resetConfirmDesc') || 'Êtes-vous sûr de vouloir recommencer le questionnaire ? Toutes vos réponses actuelles seront définitivement supprimées.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel className="hover:scale-105 transition-transform">
+              {t('questionnaire.cancel') || 'Annuler'}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetQuestionnaire}
+              className="bg-red-600 hover:bg-red-700 hover:scale-105 transition-all shadow-lg hover:shadow-red-500/50"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              {t('questionnaire.confirmReset') || 'Oui, tout supprimer'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
