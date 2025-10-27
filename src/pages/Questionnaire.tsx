@@ -1902,11 +1902,11 @@ const Questionnaire = () => {
     // Step 4: Durée (only if flexible dates)
     if (normalizeDatesType(answers.datesType) === DATES_TYPE.FLEXIBLE && step === stepCounter) {
       return (
-        <div className="space-y-8 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+        <div className="space-y-3 md:space-y-8 animate-fade-up">
+          <h2 className="text-xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
             {t('questionnaire.duration.title')}
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4 max-w-3xl mx-auto">
             {[
               { label: t('questionnaire.duration.2nights'), icon: "🌙" },
               { label: t('questionnaire.duration.3nights'), icon: "🌙🌙" },
@@ -1920,12 +1920,12 @@ const Questionnaire = () => {
             ].map((option) => (
               <Card
                 key={option.label}
-                className="p-4 cursor-pointer hover:shadow-golden hover:border-travliaq-deep-blue transition-all hover:scale-105"
+                className="p-2 md:p-4 cursor-pointer hover:shadow-golden hover:border-travliaq-deep-blue transition-all hover:scale-105"
                 onClick={() => handleChoice("duration", option.label)}
               >
-                <div className="flex flex-col items-center space-y-2">
-                  <span className="text-2xl">{option.icon}</span>
-                  <span className="text-center font-semibold text-travliaq-deep-blue text-sm">
+                <div className="flex flex-col items-center space-y-1 md:space-y-2">
+                  <span className="text-xl md:text-2xl">{option.icon}</span>
+                  <span className="text-center font-semibold text-travliaq-deep-blue text-xs md:text-sm">
                     {option.label}
                   </span>
                 </div>
@@ -2263,12 +2263,11 @@ const Questionnaire = () => {
     const onlyFlights = helpWithMobility.length === 1 && helpWithMobility.includes('flights');
     if (!onlyFlights && step === stepCounter) {
       return (
-        <div className="space-y-8 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+        <div className="space-y-3 md:space-y-8 animate-fade-up">
+          <h2 className="text-xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
             {t('questionnaire.mobility.title')}
           </h2>
-          <p className="text-center text-muted-foreground">{t('questionnaire.mobility.selectMultiple')}</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 max-w-2xl mx-auto">
             {[
               { label: t('questionnaire.mobility.dontMind'), icon: "🤷", autoNext: true },
               { label: t('questionnaire.mobility.walking'), icon: "🚶" },
@@ -2286,7 +2285,7 @@ const Questionnaire = () => {
               return (
                 <Card
                   key={option.label}
-                  className={`p-4 cursor-pointer transition-all hover:scale-105 ${
+                  className={`p-2 md:p-4 cursor-pointer transition-all hover:scale-105 ${
                     isSelected 
                       ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
                       : "hover:shadow-golden hover:border-travliaq-deep-blue"
@@ -2299,9 +2298,9 @@ const Questionnaire = () => {
                     }
                   }}
                 >
-                  <div className="flex items-center space-x-3">
-                    <span className="text-3xl">{option.icon}</span>
-                    <span className="text-lg font-semibold text-travliaq-deep-blue">
+                  <div className="flex items-center space-x-2 md:space-x-3">
+                    <span className="text-2xl md:text-3xl">{option.icon}</span>
+                    <span className="text-sm md:text-lg font-semibold text-travliaq-deep-blue">
                       {option.label}
                     </span>
                   </div>
@@ -2309,7 +2308,7 @@ const Questionnaire = () => {
               );
             })}
           </div>
-          <div className="flex justify-center pt-4">
+          <div className="flex justify-center pt-2 md:pt-4">
             <Button
               variant="hero"
               size="lg"
@@ -2349,12 +2348,11 @@ const Questionnaire = () => {
     // Step 11: Type hébergement (max 2 + "Peu importe") - SEULEMENT si hébergement sélectionné
     if (helpWithAccommodation.includes('accommodation') && step === stepCounter) {
       return (
-        <div className="space-y-8 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+        <div className="space-y-3 md:space-y-8 animate-fade-up">
+          <h2 className="text-xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
             {t('questionnaire.accommodationType.title')}
           </h2>
-          <p className="text-center text-muted-foreground">{t('questionnaire.accommodationType.select1or2')}</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 max-w-2xl mx-auto">
             {[
               { label: t('questionnaire.accommodationType.dontMind'), icon: "🤷" },
               { label: t('questionnaire.accommodationType.hotel'), icon: "🏨" },
@@ -2374,7 +2372,7 @@ const Questionnaire = () => {
               return (
                 <Card
                   key={option.label}
-                  className={`p-6 cursor-pointer transition-all hover:scale-105 ${
+                  className={`p-3 md:p-6 cursor-pointer transition-all hover:scale-105 ${
                     isSelected 
                       ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
                       : isDisabled
@@ -2403,9 +2401,9 @@ const Questionnaire = () => {
                     }
                   }}
                 >
-                  <div className="flex items-center space-x-4">
-                    <span className="text-3xl">{option.icon}</span>
-                    <span className="text-lg font-semibold text-travliaq-deep-blue">
+                  <div className="flex items-center space-x-2 md:space-x-4">
+                    <span className="text-2xl md:text-3xl">{option.icon}</span>
+                    <span className="text-sm md:text-lg font-semibold text-travliaq-deep-blue">
                       {option.label}
                     </span>
                   </div>
@@ -2413,7 +2411,7 @@ const Questionnaire = () => {
               );
             })}
           </div>
-          <div className="flex justify-center pt-4">
+          <div className="flex justify-center pt-2 md:pt-4">
             <Button
               variant="hero"
               size="lg"
@@ -2432,12 +2430,11 @@ const Questionnaire = () => {
     // Step 11b: Détails hôtel (SI Hôtel est sélectionné ET hébergement sélectionné)
     if (helpWithAccommodation.includes('accommodation') && (answers.accommodationType || []).includes(t('questionnaire.accommodationType.hotel')) && step === stepCounter) {
       return (
-        <div className="space-y-8 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+        <div className="space-y-3 md:space-y-8 animate-fade-up">
+          <h2 className="text-xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
             {t('questionnaire.hotelPreferences.title')}
           </h2>
-          <p className="text-center text-muted-foreground">{t('questionnaire.hotelPreferences.selectInterested')}</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 max-w-2xl mx-auto">
             {[
               { label: t('questionnaire.hotelPreferences.dontMind'), icon: "🤷", autoNext: true },
               { label: t('questionnaire.hotelPreferences.breakfast'), icon: "🥐" },
@@ -2454,7 +2451,7 @@ const Questionnaire = () => {
               return (
                 <Card
                   key={option.label}
-                  className={`p-4 cursor-pointer transition-all hover:scale-105 ${
+                  className={`p-2 md:p-4 cursor-pointer transition-all hover:scale-105 ${
                     isSelected 
                       ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
                       : "hover:shadow-golden hover:border-travliaq-deep-blue"
@@ -2467,9 +2464,9 @@ const Questionnaire = () => {
                     }
                   }}
                 >
-                  <div className="flex items-center space-x-3">
-                    <span className="text-3xl">{option.icon}</span>
-                    <span className="text-base font-semibold text-travliaq-deep-blue">
+                  <div className="flex items-center space-x-2 md:space-x-3">
+                    <span className="text-2xl md:text-3xl">{option.icon}</span>
+                    <span className="text-xs md:text-base font-semibold text-travliaq-deep-blue">
                       {option.label}
                     </span>
                   </div>
@@ -2477,7 +2474,7 @@ const Questionnaire = () => {
               );
             })}
           </div>
-          <div className="flex justify-center pt-4">
+          <div className="flex justify-center pt-2 md:pt-4">
             <Button
               variant="hero"
               size="lg"
@@ -2495,11 +2492,11 @@ const Questionnaire = () => {
     // Step 12: Confort - SEULEMENT si hébergement sélectionné
     if ((answers.helpWith || []).includes(HELP_WITH.ACCOMMODATION) && step === stepCounter) {
       return (
-        <div className="space-y-8 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+        <div className="space-y-3 md:space-y-8 animate-fade-up">
+          <h2 className="text-xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
             {t('questionnaire.comfort.title')}
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 max-w-2xl mx-auto">
             {[
               { label: t('questionnaire.comfort.dontMind'), icon: "🤷", autoNext: true },
               { label: t('questionnaire.comfort.rating75'), icon: "⭐" },
@@ -2508,7 +2505,7 @@ const Questionnaire = () => {
             ].map((option) => (
               <Card
                 key={option.label}
-                className="p-6 cursor-pointer hover:shadow-golden hover:border-travliaq-deep-blue transition-all hover:scale-105"
+                className="p-3 md:p-6 cursor-pointer hover:shadow-golden hover:border-travliaq-deep-blue transition-all hover:scale-105"
                 onClick={() => {
                   handleChoice("comfort", option.label);
                   // Auto-advance si "peu importe" est cliqué
@@ -2517,8 +2514,8 @@ const Questionnaire = () => {
                   }
                 }}
               >
-                <div className="flex items-center space-x-4">
-                  <span className="text-3xl">{option.icon}</span>
+                <div className="flex items-center space-x-2 md:space-x-4">
+                  <span className="text-2xl md:text-3xl">{option.icon}</span>
                   <span className="text-lg font-semibold text-travliaq-deep-blue">
                     {option.label}
                   </span>
