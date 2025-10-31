@@ -803,9 +803,9 @@ const Questionnaire = () => {
     return true;
   };
 
-  const nextStep = () => {
-    // Validation avant de continuer
-    if (!canProceedToNextStep()) {
+  const nextStep = (skipValidation: boolean = false) => {
+    // Validation avant de continuer (sauf si on skip la validation)
+    if (!skipValidation && !canProceedToNextStep()) {
       toast({
         title: t('questionnaire.pleaseAnswer'),
         description: t('questionnaire.answerRequired'),
@@ -830,7 +830,8 @@ const Questionnaire = () => {
 
   const handleChoice = (field: keyof Answer, value: any) => {
     setAnswers({ ...answers, [field]: value });
-    setTimeout(nextStep, 300);
+    // Skip validation car on vient de définir la valeur
+    setTimeout(() => nextStep(true), 300);
   };
 
   const handleMultiChoice = (field: keyof Answer, value: string, maxLimit?: number, autoAdvanceWhenComplete?: number) => {
@@ -1225,10 +1226,6 @@ const Questionnaire = () => {
                 }`}
                 onClick={() => {
                   handleChoice("travelGroup", option.code);
-                  // Auto-advance pour Solo et Duo
-                  if (option.code === TRAVEL_GROUPS.SOLO || option.code === TRAVEL_GROUPS.DUO) {
-                    setTimeout(nextStep, 300);
-                  }
                 }}
               >
                 <div className="flex items-center space-x-4">
@@ -1338,7 +1335,7 @@ const Questionnaire = () => {
             <Button
               variant="hero"
               size="lg"
-              onClick={nextStep}
+              onClick={() => nextStep()}
               disabled={!answers.helpWith || answers.helpWith.length === 0}
               className="bg-travliaq-deep-blue"
             >
@@ -1448,7 +1445,7 @@ const Questionnaire = () => {
               <Button
                 variant="hero"
                 size="lg"
-                onClick={nextStep}
+                onClick={() => nextStep()}
                 disabled={!answers.destination || answers.destination.trim() === "" || !answers.departureLocation || answers.departureLocation.trim() === ""}
                 className="bg-travliaq-deep-blue"
               >
@@ -1514,7 +1511,7 @@ const Questionnaire = () => {
             <Button
               variant="hero"
               size="lg"
-              onClick={nextStep}
+              onClick={() => nextStep()}
               disabled={!answers.climatePreference || answers.climatePreference.length === 0}
               className="bg-travliaq-deep-blue"
             >
@@ -1593,7 +1590,7 @@ const Questionnaire = () => {
             <Button
               variant="hero"
               size="lg"
-              onClick={nextStep}
+              onClick={() => nextStep()}
               disabled={!answers.travelAffinities || answers.travelAffinities.length === 0}
               className="bg-travliaq-deep-blue"
             >
@@ -1703,7 +1700,7 @@ const Questionnaire = () => {
               <Button
                 variant="hero"
                 size="lg"
-                onClick={nextStep}
+                onClick={() => nextStep()}
                 disabled={!answers.departureLocation || answers.departureLocation.trim() === ''}
                 className="bg-travliaq-deep-blue"
               >
@@ -1825,7 +1822,7 @@ const Questionnaire = () => {
               <Button
                 variant="hero"
                 size="lg"
-                onClick={nextStep}
+                onClick={() => nextStep()}
                 disabled={!departureDate || !returnDate}
                 className="bg-travliaq-deep-blue"
               >
@@ -1958,7 +1955,7 @@ const Questionnaire = () => {
               <Button
                 variant="hero"
                 size="lg"
-                onClick={nextStep}
+                onClick={() => nextStep()}
                 disabled={!answers.approximateDepartureDate}
                 className="bg-travliaq-deep-blue"
               >
@@ -2031,7 +2028,7 @@ const Questionnaire = () => {
               <Button
                 variant="hero"
                 size="lg"
-                onClick={nextStep}
+                onClick={() => nextStep()}
                 disabled={!answers.exactNights || answers.exactNights < 15}
                 className="bg-travliaq-deep-blue"
               >
@@ -2146,7 +2143,7 @@ const Questionnaire = () => {
               <Button
                 variant="hero"
                 size="lg"
-                onClick={nextStep}
+                onClick={() => nextStep()}
                 disabled={!answers.budgetAmount || !answers.budgetCurrency}
                 className="bg-travliaq-deep-blue"
               >
@@ -2221,7 +2218,7 @@ const Questionnaire = () => {
             <Button
               variant="hero"
               size="lg"
-              onClick={nextStep}
+              onClick={() => nextStep()}
               disabled={!answers.styles || answers.styles.length === 0}
               className="bg-travliaq-deep-blue"
             >
@@ -2487,7 +2484,7 @@ const Questionnaire = () => {
             <Button
               variant="hero"
               size="lg"
-              onClick={nextStep}
+              onClick={() => nextStep()}
               disabled={!answers.accommodationType || answers.accommodationType.length === 0}
               className="bg-travliaq-deep-blue"
             >
@@ -2550,7 +2547,7 @@ const Questionnaire = () => {
             <Button
               variant="hero"
               size="lg"
-              onClick={nextStep}
+              onClick={() => nextStep()}
               className="bg-travliaq-deep-blue"
             >
               {t('questionnaire.continue')}
@@ -2580,10 +2577,6 @@ const Questionnaire = () => {
                 className="p-3 md:p-6 cursor-pointer hover:shadow-golden hover:border-travliaq-deep-blue transition-all hover:scale-105"
                 onClick={() => {
                   handleChoice("comfort", option.label);
-                  // Auto-advance si "peu importe" est cliqué
-                  if ((option as any).autoNext) {
-                    setTimeout(nextStep, 300);
-                  }
                 }}
               >
                 <div className="flex items-center space-x-2 md:space-x-4">
@@ -2689,7 +2682,7 @@ const Questionnaire = () => {
             <Button
               variant="hero"
               size="lg"
-              onClick={nextStep}
+              onClick={() => nextStep()}
               className="bg-travliaq-deep-blue"
             >
               {t('questionnaire.continue')}
@@ -2797,7 +2790,7 @@ const Questionnaire = () => {
             <Button
               variant="hero"
               size="lg"
-              onClick={nextStep}
+              onClick={() => nextStep()}
               className="bg-travliaq-deep-blue"
             >
               {t('questionnaire.continue')}
@@ -2834,14 +2827,14 @@ const Questionnaire = () => {
               <Button
                 variant="outline"
                 size="lg"
-                onClick={nextStep}
+                onClick={() => nextStep()}
               >
                 {t('questionnaire.additionalInfo.skip')}
               </Button>
               <Button
                 variant="hero"
                 size="lg"
-                onClick={nextStep}
+                onClick={() => nextStep()}
                 className="bg-travliaq-deep-blue"
               >
                 {t('questionnaire.continue')}
