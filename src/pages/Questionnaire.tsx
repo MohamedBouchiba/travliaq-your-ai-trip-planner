@@ -881,7 +881,7 @@ const Questionnaire = () => {
     
     // Auto-advance when all options are selected (if autoAdvanceWhenComplete is provided)
     if (autoAdvanceWhenComplete && updated.length === autoAdvanceWhenComplete) {
-      setTimeout(nextStep, 400);
+      setTimeout(() => nextStep(true), 400);
     }
   };
 
@@ -1524,7 +1524,7 @@ const Questionnaire = () => {
                     handleMultiChoice("climatePreference", option.label);
                     // Auto-advance si "peu importe" est cliqué
                     if ((option as any).autoNext) {
-                      setTimeout(nextStep, 300);
+                      setTimeout(() => nextStep(true), 300);
                     }
                   }}
                 >
@@ -1607,7 +1607,7 @@ const Questionnaire = () => {
                         ? (answers.travelAffinities || []).filter(a => a !== option.label)
                         : [...(answers.travelAffinities || []), option.label];
                       if (updated.length === 5 || (option as any).autoNext) {
-                        setTimeout(nextStep, 300);
+                        setTimeout(() => nextStep(true), 300);
                       }
                     }
                   }}
@@ -2102,10 +2102,10 @@ const Questionnaire = () => {
                 onClick={() => {
                   if (option.label === t('questionnaire.budget.precise')) {
                     setAnswers({ ...answers, budgetType: t('questionnaire.budget.precise') });
-                    setTimeout(nextStep, 300);
+                    setTimeout(() => nextStep(true), 300);
                   } else {
                     setAnswers({ ...answers, budgetPerPerson: option.label, budgetType: undefined });
-                    setTimeout(nextStep, 300);
+                    setTimeout(() => nextStep(true), 300);
                   }
                 }}
               >
@@ -2235,7 +2235,7 @@ const Questionnaire = () => {
                         ? (answers.styles || []).filter(s => s !== option.label)
                         : [...(answers.styles || []), option.label];
                       if (updated.length === 5) {
-                        setTimeout(nextStep, 300);
+                        setTimeout(() => nextStep(true), 300);
                       }
                     }
                   }}
@@ -2338,7 +2338,7 @@ const Questionnaire = () => {
                           
                           // Auto-advance if all travelers have selected luggage
                           if (Object.keys(newLuggage).length === getNumberOfTravelers()) {
-                            setTimeout(nextStep, 300);
+                            setTimeout(() => nextStep(true), 300);
                           }
                         }}
                       >
@@ -2399,7 +2399,7 @@ const Questionnaire = () => {
                     handleMultiChoice("mobility", option.label);
                     // Auto-advance si "peu importe" est cliqué
                     if (option.autoNext && !(answers.mobility || []).includes(option.label)) {
-                      setTimeout(() => nextStep(), 300);
+                      setTimeout(() => nextStep(true), 300);
                     }
                   }}
                 >
@@ -2488,7 +2488,7 @@ const Questionnaire = () => {
                     if (option.label === t('questionnaire.accommodationType.dontMind')) {
                       // "Peu importe" remplace toute autre sélection
                       setAnswers({ ...answers, accommodationType: [option.label] });
-                      setTimeout(nextStep, 300);
+                      setTimeout(() => nextStep(true), 300);
                     } else if (!isDisabled) {
                       // Si "Peu importe" est déjà sélectionné, le retirer d'abord
                       const filteredSelection = currentSelection.filter(item => item !== t('questionnaire.accommodationType.dontMind'));
@@ -2501,7 +2501,7 @@ const Questionnaire = () => {
                       
                       // Auto-advance if 2 types are selected
                       if (updated.length === 2) {
-                        setTimeout(nextStep, 300);
+                        setTimeout(() => nextStep(true), 300);
                       }
                     }
                   }}
@@ -2565,7 +2565,7 @@ const Questionnaire = () => {
                     handleMultiChoice("hotelPreferences", option.label);
                     // Auto-advance si "peu importe" est cliqué
                     if (option.autoNext && !(answers.hotelPreferences || []).includes(option.label)) {
-                      setTimeout(() => nextStep(), 300);
+                      setTimeout(() => nextStep(true), 300);
                     }
                   }}
                 >
@@ -2700,7 +2700,7 @@ const Questionnaire = () => {
                     handleMultiChoice("amenities", option.label);
                     // Auto-advance si "peu importe" est cliqué
                     if (option.autoNext && !(answers.amenities || []).includes(option.label)) {
-                      setTimeout(() => nextStep(), 300);
+                      setTimeout(() => nextStep(true), 300);
                     }
                   }}
                 >
@@ -2801,7 +2801,7 @@ const Questionnaire = () => {
                     if (option.label === t('questionnaire.constraints.dontMind')) {
                       // "Peu importe" remplace toute autre sélection
                       setAnswers({ ...answers, constraints: [option.label] });
-                      setTimeout(nextStep, 300);
+                      setTimeout(() => nextStep(true), 300);
                     } else {
                       // Si "Peu importe" est déjà sélectionné, le retirer d'abord
                       const filteredSelection = currentSelection.filter(item => item !== t('questionnaire.constraints.dontMind'));
