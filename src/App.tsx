@@ -11,6 +11,7 @@ import { usePageTracking } from "@/hooks/usePageTracking";
 const Index = lazy(() => import("./pages/Index"));
 const CGV = lazy(() => import("./pages/CGV"));
 const Questionnaire = lazy(() => import("./pages/Questionnaire"));
+const QuestionnaireV2 = lazy(() => import("./pages/QuestionnaireV2"));
 const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
 const AdminBlog = lazy(() => import("./pages/AdminBlog"));
@@ -30,9 +31,10 @@ const AppContent = () => {
   return (
     <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>}>
       <Routes>
-              <Route path="/" element={<Index />} />
+        <Route path="/" element={<Index />} />
               <Route path="/cgv" element={<CGV />} />
               <Route path="/questionnaire" element={<Questionnaire />} />
+              <Route path="/questionnaire-v2" element={<QuestionnaireV2 />} />
               <Route path="/blog" element={<Blog />} />
               <Route path="/blog/:slug" element={<BlogPost />} />
               <Route path="/admin/blog" element={<AdminBlog />} />
