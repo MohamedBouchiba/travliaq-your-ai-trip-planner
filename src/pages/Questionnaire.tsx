@@ -751,6 +751,15 @@ const Questionnaire = () => {
     stepCounter++;
     if (step === stepCounter) return !!answers.travelGroup;
 
+    // Step 1b: Nombre exact de voyageurs (si Famille ou Groupe 3-5)
+    const normalizedGroup = normalizeTravelGroup(answers.travelGroup);
+    if (normalizedGroup === TRAVEL_GROUPS.FAMILY || normalizedGroup === TRAVEL_GROUPS.GROUP35) {
+      stepCounter++;
+      if (step === stepCounter) {
+        return !!answers.numberOfTravelers && answers.numberOfTravelers > 0;
+      }
+    }
+
     // Step 2: Destination en tête ?
     stepCounter++;
     if (step === stepCounter) return !!answers.hasDestination;
@@ -1012,7 +1021,7 @@ const Questionnaire = () => {
         email: answers.email || "",
         langue: i18n.language === 'en' ? 'en' : 'fr', // Capture the current language
         groupe_voyage: answers.travelGroup || null,
-        nombre_voyageurs: answers.numberOfTravelers || null,
+        nombre_voyageurs: answers.numberOfTravelers || getNumberOfTravelers(),
         a_destination: answers.hasDestination || null,
         destination: answers.destination || null,
         lieu_depart: answers.departureLocation || null,
@@ -1280,9 +1289,57 @@ const Questionnaire = () => {
     }
     stepCounter++;
 
-    // Step 1b: Nombre exact de voyageurs avec détails (si Famille ou Groupe 3-5)
+    // Step 1b: Nombre exact de voyageurs avec détails
     const normalizedGroup = normalizeTravelGroup(answers.travelGroup);
-    if ((normalizedGroup === TRAVEL_GROUPS.FAMILY || normalizedGroup === TRAVEL_GROUPS.GROUP35) && step === stepCounter) {
+    
+    // Pour GROUPE 3-5: Proposer de choisir 3, 4 ou 5 personnes
+    if (normalizedGroup === TRAVEL_GROUPS.GROUP35 && step === stepCounter) {
+      return (
+        <div className="space-y-6 animate-fade-up">
+          <h2 className="text-2xl md:text-3xl font-bold text-center bg-gradient-to-r from-travliaq-deep-blue to-travliaq-turquoise bg-clip-text text-transparent">
+            {t('questionnaire.numberOfPeople')}
+          </h2>
+          <p className="text-center text-muted-foreground">
+            Combien de personnes voyagent ?
+          </p>
+          <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto">
+            {[3, 4, 5].map((count) => (
+              <Card
+                key={count}
+                className={`p-6 cursor-pointer transition-all duration-300 hover:scale-105 border-2 ${
+                  answers.numberOfTravelers === count
+                    ? 'border-travliaq-turquoise bg-gradient-to-br from-travliaq-turquoise/10 to-travliaq-golden-sand/10 shadow-xl' 
+                    : 'border-transparent hover:border-travliaq-turquoise/50 hover:shadow-lg'
+                }`}
+                onClick={() => {
+                  setAnswers({ 
+                    ...answers, 
+                    numberOfTravelers: count,
+                    travelers: Array(count).fill(null).map(() => ({ type: 'adult' as const }))
+                  });
+                  setTimeout(() => nextStep(true), 300);
+                }}
+              >
+                <div className="flex flex-col items-center space-y-3">
+                  <span className="text-5xl">
+                    {count === 3 ? "👨‍👩‍👧" : count === 4 ? "👨‍👩‍👧‍👦" : "👨‍👩‍👧‍👦"}
+                  </span>
+                  <span className="text-2xl font-bold text-travliaq-deep-blue">
+                    {count}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {count === 1 ? 'personne' : 'personnes'}
+                  </span>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    
+    // Pour FAMILLE: Utiliser TravelersStep pour gérer adultes et enfants
+    if (normalizedGroup === TRAVEL_GROUPS.FAMILY && step === stepCounter) {
       return (
         <TravelersStep
           travelers={answers.travelers || []}
