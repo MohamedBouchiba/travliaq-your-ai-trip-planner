@@ -1422,7 +1422,6 @@ const Questionnaire = () => {
           <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
             {t('questionnaire.howCanHelp.description')}
           </p>
-          <p className="text-center text-sm text-muted-foreground">{t('questionnaire.multipleSelectionPossible')}</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2 max-w-3xl mx-auto">
             {[
               { code: HELP_WITH.FLIGHTS, label: t('questionnaire.flights'), icon: "✈️", desc: t('questionnaire.flights.desc') },
@@ -1590,7 +1589,6 @@ const Questionnaire = () => {
           <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
             {t('questionnaire.climatePreference.description')}
           </p>
-          <p className="text-center text-muted-foreground">{t('questionnaire.multipleSelectionPossible')}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
             {[
               { label: t('questionnaire.climate.dontMind'), icon: "🤷", desc: t('questionnaire.climate.dontMind.desc'), autoNext: true },
@@ -1659,7 +1657,6 @@ const Questionnaire = () => {
           <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
             {t('questionnaire.affinities.description')}
           </p>
-          <p className="text-center text-muted-foreground">{t('questionnaire.affinities.selectUpTo5')}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
             {[
               { label: t('questionnaire.affinities.dontMind'), icon: "🤷", autoNext: true },
@@ -2219,7 +2216,6 @@ const Questionnaire = () => {
           <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
             {t('questionnaire.budget.description')}
           </p>
-          <p className="text-center text-sm text-muted-foreground">{t('questionnaire.budget.excluding')}</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-w-3xl mx-auto">
             {[
               { label: t('questionnaire.budget.dontKnow'), icon: "🤷" },
@@ -2268,7 +2264,6 @@ const Questionnaire = () => {
           <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
             {t('questionnaire.budget.totalBudget.description')}
           </p>
-          <p className="text-center text-muted-foreground">{t('questionnaire.budget.entireTrip')}</p>
           <div className="max-w-xl mx-auto space-y-4">
             <div>
               <label className="block text-sm font-medium mb-2">{t('questionnaire.budget.amount')}</label>
@@ -2342,7 +2337,6 @@ const Questionnaire = () => {
           <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
             {t('questionnaire.styles.description')}
           </p>
-          <p className="text-center text-sm text-muted-foreground">{t('questionnaire.styles.selectUpTo5')}</p>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-w-3xl mx-auto">
             {[
               { label: t('questionnaire.styles.nature'), icon: "🌲" },
@@ -2836,7 +2830,6 @@ const Questionnaire = () => {
           <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
             {t('questionnaire.amenities.description')}
           </p>
-          <p className="text-center text-sm md:text-base text-muted-foreground">{t('questionnaire.amenities.selectAll')}</p>
           <div className="grid grid-cols-2 md:grid-cols-2 gap-2 md:gap-4 max-w-2xl mx-auto">
             {[
               { label: t('questionnaire.amenities.dontMind'), icon: "🤷", autoNext: true },
@@ -2937,7 +2930,6 @@ const Questionnaire = () => {
           <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
             {t('questionnaire.constraints.description')}
           </p>
-          <p className="text-center text-sm md:text-base text-muted-foreground">{t('questionnaire.constraints.selectAllImportant')}</p>
           <div className="grid grid-cols-2 md:grid-cols-2 gap-2 md:gap-4 max-w-2xl mx-auto">
             {[
               { label: t('questionnaire.constraints.dontMind'), icon: "🤷" },
