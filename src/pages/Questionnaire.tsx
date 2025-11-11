@@ -2454,11 +2454,12 @@ const Questionnaire = () => {
                 <label className="block text-sm font-medium">
                   {t('questionnaire.luggage.traveler')} {index + 1} {index === 0 && answers.travelGroup === t('questionnaire.duo') ? "👤" : index === 1 && answers.travelGroup === t('questionnaire.duo') ? "👥" : "👤"}
                 </label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   {[
                     { label: t('questionnaire.luggage.personalItem'), icon: "👜", desc: t('questionnaire.luggage.personalItem.desc') },
                     { label: t('questionnaire.luggage.cabin'), icon: "🎒", desc: t('questionnaire.luggage.cabin.desc') },
-                    { label: t('questionnaire.luggage.cabinHold'), icon: "🧳", desc: t('questionnaire.luggage.cabinHold.desc') }
+                    { label: t('questionnaire.luggage.hold'), icon: "🧳", desc: t('questionnaire.luggage.hold.desc') },
+                    { label: t('questionnaire.luggage.cabinHold'), icon: "🛄", desc: t('questionnaire.luggage.cabinHold.desc') }
                   ].map((option) => {
                     const isSelected = answers.luggage?.[index] === option.label;
                     return (

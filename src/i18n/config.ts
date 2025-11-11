@@ -368,7 +368,7 @@ const resources = {
       // Luggage details
       "questionnaire.luggage.personalItem.desc": "Sous le siège",
       "questionnaire.luggage.cabin.desc": "Compartiment supérieur",
-      "questionnaire.luggage.hold.desc": "Max bagages",
+      "questionnaire.luggage.hold.desc": "Enregistré en soute",
       "questionnaire.luggage.cabinHold.desc": "Cabine + Soute",
       
       // Mobility options
@@ -672,8 +672,8 @@ const resources = {
       "questionnaire.luggage.travelers_plural": "voyageurs",
       "questionnaire.luggage.traveler": "Voyageur",
       "questionnaire.luggage.personalItem": "Objet personnel uniquement",
-      "questionnaire.luggage.cabin": "Bagage cabine",
-      "questionnaire.luggage.hold": "Bagage soute",
+      "questionnaire.luggage.cabin": "Bagage cabine uniquement",
+      "questionnaire.luggage.hold": "Bagage soute uniquement",
       "questionnaire.luggage.cabinHold": "Cabine + Soute",
       
       // Mobility
@@ -1227,9 +1227,9 @@ const resources = {
       
       // Luggage details
       "questionnaire.luggage.personalItem.desc": "Under the seat",
-      "questionnaire.luggage.cabin.desc": "Upper compartment",
-      "questionnaire.luggage.hold.desc": "Max baggage",
-      "questionnaire.luggage.cabinHold.desc": "Cabin + Hold",
+      "questionnaire.luggage.cabin.desc": "Overhead bin",
+      "questionnaire.luggage.hold.desc": "Checked luggage",
+      "questionnaire.luggage.cabinHold.desc": "Cabin + Checked",
       
       // Mobility options
       "questionnaire.mobility.dontMind": "Don't mind",
@@ -1534,9 +1534,9 @@ const resources = {
       "questionnaire.luggage.travelers_plural": "travelers",
       "questionnaire.luggage.traveler": "Traveler",
       "questionnaire.luggage.personalItem": "Personal item only",
-      "questionnaire.luggage.cabin": "Cabin baggage",
-      "questionnaire.luggage.hold": "Hold baggage",
-      "questionnaire.luggage.cabinHold": "Cabin + Hold",
+      "questionnaire.luggage.cabin": "Cabin baggage only",
+      "questionnaire.luggage.hold": "Checked baggage only",
+      "questionnaire.luggage.cabinHold": "Cabin + Checked",
       
       // Accommodation type
       "questionnaire.accommodationType.title": "Accommodation type? 🏨",
