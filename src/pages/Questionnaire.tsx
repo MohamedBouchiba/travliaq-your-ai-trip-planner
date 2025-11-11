@@ -1789,9 +1789,6 @@ const Questionnaire = () => {
           <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
             {t('questionnaire.whereFrom')}
           </h2>
-          <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
-            {t('questionnaire.whereFrom.description')}
-          </p>
           <div className="max-w-xl mx-auto space-y-3">
             <div>
               <div className="flex items-center justify-between mb-2">
