@@ -896,6 +896,30 @@ const Questionnaire = () => {
     }
   };
 
+  // Handler pour les choix multiples avec option "Peu importe" exclusive
+  const handleMultiChoiceWithDontMind = (field: keyof Answer, value: string, dontMindLabel: string, autoNext: boolean = false) => {
+    const current = (answers[field] as string[]) || [];
+    
+    // Si on clique sur "Peu importe"
+    if (value === dontMindLabel) {
+      // Remplacer toute la sélection par ["Peu importe"]
+      setAnswers({ ...answers, [field]: [dontMindLabel] });
+      if (autoNext) {
+        setTimeout(() => nextStep(true), 300);
+      }
+    } else {
+      // Si "Peu importe" est déjà sélectionné, le retirer
+      const filteredSelection = current.filter(item => item !== dontMindLabel);
+      
+      // Toggle la nouvelle option
+      const updated = filteredSelection.includes(value)
+        ? filteredSelection.filter(v => v !== value)
+        : [...filteredSelection, value];
+      
+      setAnswers({ ...answers, [field]: updated });
+    }
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent, action: () => void, condition: boolean = true) => {
     if (e.key === "Enter" && condition) {
       e.preventDefault();
@@ -1580,11 +1604,12 @@ const Questionnaire = () => {
                       : "hover:shadow-golden hover:border-travliaq-deep-blue"
                   }`}
                   onClick={() => {
-                    handleMultiChoice("climatePreference", option.label);
-                    // Auto-advance si "peu importe" est cliqué
-                    if ((option as any).autoNext) {
-                      setTimeout(() => nextStep(true), 300);
-                    }
+                    handleMultiChoiceWithDontMind(
+                      "climatePreference", 
+                      option.label, 
+                      t('questionnaire.climate.dontMind'),
+                      (option as any).autoNext
+                    );
                   }}
                 >
                   <div className="flex items-center space-x-4">
@@ -1659,14 +1684,25 @@ const Questionnaire = () => {
                       : "hover:shadow-golden hover:border-travliaq-deep-blue"
                   }`}
                   onClick={() => {
-                    if (!isDisabled) {
-                      handleMultiChoice("travelAffinities", option.label, 5);
-                      // Auto-advance si 5 affinités sont sélectionnées OU si "peu importe" est cliqué
-                      const updated = (answers.travelAffinities || []).includes(option.label)
-                        ? (answers.travelAffinities || []).filter(a => a !== option.label)
-                        : [...(answers.travelAffinities || []), option.label];
-                      if (updated.length === 5 || (option as any).autoNext) {
+                    if (!isDisabled || option.label === t('questionnaire.affinities.dontMind')) {
+                      // Logique spéciale pour "Peu importe"
+                      if (option.label === t('questionnaire.affinities.dontMind')) {
+                        setAnswers({ ...answers, travelAffinities: [option.label] });
                         setTimeout(() => nextStep(true), 300);
+                      } else {
+                        // Retirer "Peu importe" si présent
+                        const current = (answers.travelAffinities || []).filter(
+                          a => a !== t('questionnaire.affinities.dontMind')
+                        );
+                        const updated = current.includes(option.label)
+                          ? current.filter(a => a !== option.label)
+                          : current.length < 5 ? [...current, option.label] : current;
+                        
+                        setAnswers({ ...answers, travelAffinities: updated });
+                        
+                        if (updated.length === 5) {
+                          setTimeout(() => nextStep(true), 300);
+                        }
                       }
                     }
                   }}
@@ -2459,11 +2495,12 @@ const Questionnaire = () => {
                       : "hover:shadow-golden hover:border-travliaq-deep-blue"
                   }`}
                   onClick={() => {
-                    handleMultiChoice("mobility", option.label);
-                    // Auto-advance si "peu importe" est cliqué
-                    if (option.autoNext && !(answers.mobility || []).includes(option.label)) {
-                      setTimeout(() => nextStep(true), 300);
-                    }
+                    handleMultiChoiceWithDontMind(
+                      "mobility", 
+                      option.label, 
+                      t('questionnaire.mobility.dontMind'),
+                      option.autoNext
+                    );
                   }}
                 >
                   <div className="flex items-center space-x-2 md:space-x-3">
@@ -2625,11 +2662,12 @@ const Questionnaire = () => {
                       : "hover:shadow-golden hover:border-travliaq-deep-blue"
                   }`}
                   onClick={() => {
-                    handleMultiChoice("hotelPreferences", option.label);
-                    // Auto-advance si "peu importe" est cliqué
-                    if (option.autoNext && !(answers.hotelPreferences || []).includes(option.label)) {
-                      setTimeout(() => nextStep(true), 300);
-                    }
+                    handleMultiChoiceWithDontMind(
+                      "hotelPreferences", 
+                      option.label, 
+                      t('questionnaire.hotelPreferences.dontMind'),
+                      option.autoNext
+                    );
                   }}
                 >
                   <div className="flex items-center space-x-2 md:space-x-3">
@@ -2760,11 +2798,12 @@ const Questionnaire = () => {
                       : "hover:shadow-golden hover:border-travliaq-deep-blue"
                   }`}
                   onClick={() => {
-                    handleMultiChoice("amenities", option.label);
-                    // Auto-advance si "peu importe" est cliqué
-                    if (option.autoNext && !(answers.amenities || []).includes(option.label)) {
-                      setTimeout(() => nextStep(true), 300);
-                    }
+                    handleMultiChoiceWithDontMind(
+                      "amenities", 
+                      option.label, 
+                      t('questionnaire.amenities.dontMind'),
+                      option.autoNext
+                    );
                   }}
                 >
                   <div className="flex items-center space-x-2 md:space-x-3">
