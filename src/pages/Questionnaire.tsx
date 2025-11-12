@@ -3622,7 +3622,7 @@ const Questionnaire = () => {
     }
     stepCounter++;
 
-    // Step final-1: Review & confirm
+    // Step final: Review & confirm
     if (step === stepCounter) {
       return (
         <ReviewStep
@@ -3654,9 +3654,6 @@ const Questionnaire = () => {
         />
       );
     }
-    stepCounter++;
-
-    // Step final: Email (removed, now part of Review)
 
     return null;
   };
