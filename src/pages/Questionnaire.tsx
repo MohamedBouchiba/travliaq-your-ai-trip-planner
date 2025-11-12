@@ -3431,25 +3431,25 @@ const Questionnaire = () => {
           </p>
           <div className="grid grid-cols-2 md:grid-cols-2 gap-2 md:gap-4 max-w-2xl mx-auto">
             {[
-              { label: t('questionnaire.amenities.dontMind'), icon: "🤷", autoNext: true },
-              { label: t('questionnaire.amenities.reliableWifi'), icon: "📶" },
-              { label: t('questionnaire.amenities.airConditioning'), icon: "❄️" },
-              { label: t('questionnaire.amenities.kitchen'), icon: "🍳" },
-              { label: t('questionnaire.amenities.washingMachine'), icon: "🧺" },
-              { label: t('questionnaire.amenities.parking'), icon: "🅿️" },
-              { label: t('questionnaire.amenities.elevator'), icon: "🛗" },
-              { label: t('questionnaire.amenities.reception24'), icon: "🔔" },
-              { label: t('questionnaire.amenities.babyCrib'), icon: "👶" },
-              { label: t('questionnaire.amenities.familyRoom'), icon: "👨‍👩‍👧‍👦" },
-              { label: t('questionnaire.amenities.pool'), icon: "🏊" },
-              { label: t('questionnaire.amenities.gym'), icon: "💪" },
-              { label: t('questionnaire.amenities.spa'), icon: "🧖" },
-              { label: t('questionnaire.amenities.gardenTerrace'), icon: "🌳" }
+              { code: AMENITIES.DONT_MIND, label: t('questionnaire.amenities.dontMind'), icon: "🤷", autoNext: true },
+              { code: AMENITIES.RELIABLE_WIFI, label: t('questionnaire.amenities.reliableWifi'), icon: "📶" },
+              { code: AMENITIES.AIR_CONDITIONING, label: t('questionnaire.amenities.airConditioning'), icon: "❄️" },
+              { code: AMENITIES.KITCHEN, label: t('questionnaire.amenities.kitchen'), icon: "🍳" },
+              { code: AMENITIES.WASHING_MACHINE, label: t('questionnaire.amenities.washingMachine'), icon: "🧺" },
+              { code: AMENITIES.PARKING, label: t('questionnaire.amenities.parking'), icon: "🅿️" },
+              { code: AMENITIES.ELEVATOR, label: t('questionnaire.amenities.elevator'), icon: "🛗" },
+              { code: AMENITIES.RECEPTION_24, label: t('questionnaire.amenities.reception24'), icon: "🔔" },
+              { code: AMENITIES.BABY_CRIB, label: t('questionnaire.amenities.babyCrib'), icon: "👶" },
+              { code: AMENITIES.FAMILY_ROOM, label: t('questionnaire.amenities.familyRoom'), icon: "👨‍👩‍👧‍👦" },
+              { code: AMENITIES.POOL, label: t('questionnaire.amenities.pool'), icon: "🏊" },
+              { code: AMENITIES.GYM, label: t('questionnaire.amenities.gym'), icon: "💪" },
+              { code: AMENITIES.SPA, label: t('questionnaire.amenities.spa'), icon: "🧖" },
+              { code: AMENITIES.GARDEN_TERRACE, label: t('questionnaire.amenities.gardenTerrace'), icon: "🌳" }
             ].map((option) => {
-              const isSelected = (answers.amenities || []).includes(option.label);
+              const isSelected = (answers.amenities || []).includes(option.code);
               return (
                 <Card
-                  key={option.label}
+                  key={option.code}
                   className={`p-2 md:p-4 cursor-pointer transition-all hover:scale-105 ${
                     isSelected 
                       ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
@@ -3458,8 +3458,8 @@ const Questionnaire = () => {
                   onClick={() => {
                     handleMultiChoiceWithDontMind(
                       "amenities", 
-                      option.label, 
-                      t('questionnaire.amenities.dontMind'),
+                      option.code, 
+                      AMENITIES.DONT_MIND,
                       option.autoNext
                     );
                   }}
@@ -3538,45 +3538,45 @@ const Questionnaire = () => {
           </p>
           <div className="grid grid-cols-2 md:grid-cols-2 gap-2 md:gap-4 max-w-2xl mx-auto">
             {[
-              { label: t('questionnaire.constraints.dontMind'), icon: "🤷" },
-              { label: t('questionnaire.constraints.halal'), icon: "🥙" },
-              { label: t('questionnaire.constraints.kosher'), icon: "✡️" },
-              { label: t('questionnaire.constraints.vegetarian'), icon: "🥗" },
-              { label: t('questionnaire.constraints.vegan'), icon: "🌱" },
-              { label: t('questionnaire.constraints.glutenFree'), icon: "🌾" },
-              { label: t('questionnaire.constraints.noPork'), icon: "🚫🥓" },
-              { label: t('questionnaire.constraints.noAlcohol'), icon: "🚫🍷" },
-              { label: t('questionnaire.constraints.prayerPlaces'), icon: "🛐" },
-              { label: t('questionnaire.constraints.buddhistTraditions'), icon: "☸️" },
-              { label: t('questionnaire.constraints.accessibility'), icon: "♿" },
-              { label: t('questionnaire.constraints.safezones'), icon: "🛡️" },
-              { label: t('questionnaire.constraints.avoidCar'), icon: "🚫🚗" },
-              { label: t('questionnaire.constraints.localTraditions'), icon: "🕊️" },
-              { label: t('questionnaire.constraints.foodAllergies'), icon: "⚠️" }
+              { code: CONSTRAINTS.DONT_MIND, label: t('questionnaire.constraints.dontMind'), icon: "🤷" },
+              { code: CONSTRAINTS.HALAL, label: t('questionnaire.constraints.halal'), icon: "🥙" },
+              { code: CONSTRAINTS.KOSHER, label: t('questionnaire.constraints.kosher'), icon: "✡️" },
+              { code: CONSTRAINTS.VEGETARIAN, label: t('questionnaire.constraints.vegetarian'), icon: "🥗" },
+              { code: CONSTRAINTS.VEGAN, label: t('questionnaire.constraints.vegan'), icon: "🌱" },
+              { code: CONSTRAINTS.GLUTEN_FREE, label: t('questionnaire.constraints.glutenFree'), icon: "🌾" },
+              { code: CONSTRAINTS.NO_PORK, label: t('questionnaire.constraints.noPork'), icon: "🚫🥓" },
+              { code: CONSTRAINTS.NO_ALCOHOL, label: t('questionnaire.constraints.noAlcohol'), icon: "🚫🍷" },
+              { code: CONSTRAINTS.PRAYER_PLACES, label: t('questionnaire.constraints.prayerPlaces'), icon: "🛐" },
+              { code: CONSTRAINTS.BUDDHIST, label: t('questionnaire.constraints.buddhistTraditions'), icon: "☸️" },
+              { code: CONSTRAINTS.ACCESSIBILITY, label: t('questionnaire.constraints.accessibility'), icon: "♿" },
+              { code: CONSTRAINTS.SAFE_ZONES, label: t('questionnaire.constraints.safezones'), icon: "🛡️" },
+              { code: CONSTRAINTS.AVOID_CAR, label: t('questionnaire.constraints.avoidCar'), icon: "🚫🚗" },
+              { code: CONSTRAINTS.LOCAL_TRADITIONS, label: t('questionnaire.constraints.localTraditions'), icon: "🕊️" },
+              { code: CONSTRAINTS.FOOD_ALLERGIES, label: t('questionnaire.constraints.foodAllergies'), icon: "⚠️" }
             ].map((option) => {
               const currentSelection = answers.constraints || [];
-              const isSelected = currentSelection.includes(option.label);
-              const hasPeuImporte = currentSelection.includes(t('questionnaire.constraints.dontMind'));
+              const isSelected = currentSelection.includes(option.code);
+              const hasPeuImporte = currentSelection.includes(CONSTRAINTS.DONT_MIND);
               
               return (
                 <Card
-                  key={option.label}
+                  key={option.code}
                   className={`p-2 md:p-4 cursor-pointer transition-all hover:scale-105 ${
                     isSelected 
                       ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
                       : "hover:shadow-golden hover:border-travliaq-deep-blue"
                   }`}
                   onClick={() => {
-                    if (option.label === t('questionnaire.constraints.dontMind')) {
+                    if (option.code === CONSTRAINTS.DONT_MIND) {
                       // "Peu importe" remplace toute autre sélection
-                      setAnswers({ ...answers, constraints: [option.label] });
+                      setAnswers({ ...answers, constraints: [option.code] });
                       setTimeout(() => nextStep(true), 300);
                     } else {
                       // Si "Peu importe" est déjà sélectionné, le retirer d'abord
-                      const filteredSelection = currentSelection.filter(item => item !== t('questionnaire.constraints.dontMind'));
-                      const updated = filteredSelection.includes(option.label)
-                        ? filteredSelection.filter(v => v !== option.label)
-                        : [...filteredSelection, option.label];
+                      const filteredSelection = currentSelection.filter(item => item !== CONSTRAINTS.DONT_MIND);
+                      const updated = filteredSelection.includes(option.code)
+                        ? filteredSelection.filter(v => v !== option.code)
+                        : [...filteredSelection, option.code];
                       setAnswers({ ...answers, constraints: updated });
                     }
                   }}
