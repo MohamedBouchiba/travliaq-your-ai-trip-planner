@@ -622,6 +622,12 @@ const Questionnaire = () => {
               });
             }
           } catch (error) {
+            logger.error('Erreur de géolocalisation', {
+              category: LogCategory.QUESTIONNAIRE,
+              error: error instanceof Error ? error : new Error(String(error)),
+              metadata: { latitude, longitude }
+            });
+            
             if (import.meta.env.DEV) {
               console.error("Geocoding error:", error);
             }
@@ -635,6 +641,11 @@ const Questionnaire = () => {
           }
         },
         (error) => {
+          logger.warn('Géolocalisation refusée par l\'utilisateur', {
+            category: LogCategory.QUESTIONNAIRE,
+            metadata: { errorCode: error.code, errorMessage: error.message }
+          });
+          
           setIsLoadingLocation(false);
           toast({
             title: "Position refusée",
@@ -789,6 +800,27 @@ const Questionnaire = () => {
 
   const totalSteps = getTotalSteps();
   const progress = (step / totalSteps) * 100;
+
+  // Fonction pour obtenir le contexte détaillé de l'étape actuelle pour le logging
+  const getStepDebugContext = () => {
+    return {
+      step,
+      totalSteps: getTotalSteps(),
+      travelGroup: answers.travelGroup,
+      hasDestination: answers.hasDestination,
+      helpWith: answers.helpWith,
+      datesType: answers.datesType,
+      numberOfTravelers: answers.numberOfTravelers,
+      security: answers.security,
+      rhythm: answers.rhythm,
+      schedulePrefs: answers.schedulePrefs,
+      amenities: answers.amenities,
+      constraints: answers.constraints,
+      accommodationType: answers.accommodationType,
+      hotelPreferences: answers.hotelPreferences,
+      // Pas de données sensibles (email, noms, etc.)
+    };
+  };
 
   // Validation pour chaque étape avant de continuer
   const canProceedToNextStep = (): boolean => {
@@ -997,7 +1029,27 @@ const Questionnaire = () => {
     
     // Validation avant de continuer (sauf si on skip la validation)
     if (!skipValidation && !canProceedToNextStep()) {
-      questionnaireLogger.logValidationError(step, 'step_validation', 'Validation échouée pour passer à l\'étape suivante');
+      // CRITICAL: Logger comme ERREUR dans Sentry avec contexte complet
+      const debugContext = getStepDebugContext();
+      
+      logger.error('Validation questionnaire échouée - Utilisateur bloqué', {
+        category: LogCategory.VALIDATION,
+        error: new Error(`Validation failed at step ${step}/${totalSteps}`),
+        metadata: {
+          ...debugContext,
+          userAgent: navigator.userAgent,
+          viewport: `${window.innerWidth}x${window.innerHeight}`,
+          language: i18n.language,
+          timestamp: new Date().toISOString()
+        }
+      });
+      
+      // Log également avec le logger du questionnaire
+      questionnaireLogger.logValidationError(
+        step, 
+        'step_validation_blocked', 
+        `Utilisateur bloqué à l'étape ${step}/${totalSteps} - Validation impossible`
+      );
       
       toast({
         title: t('questionnaire.pleaseAnswer'),
@@ -1049,49 +1101,89 @@ const Questionnaire = () => {
   };
 
   const handleChoice = (field: keyof Answer, value: any) => {
-    questionnaireLogger.logAnswer(step, String(field), value);
-    
-    setAnswers({ ...answers, [field]: value });
-    // Skip validation car on vient de définir la valeur
-    setTimeout(() => nextStep(true), 300);
+    try {
+      questionnaireLogger.logAnswer(step, String(field), value);
+      
+      setAnswers({ ...answers, [field]: value });
+      // Skip validation car on vient de définir la valeur
+      setTimeout(() => nextStep(true), 300);
+    } catch (error) {
+      logger.error('Erreur lors du choix d\'une réponse', {
+        category: LogCategory.QUESTIONNAIRE,
+        error: error instanceof Error ? error : new Error(String(error)),
+        metadata: { field, step, value: typeof value }
+      });
+    }
   };
 
   const handleMultiChoice = (field: keyof Answer, value: string, maxLimit?: number, autoAdvanceWhenComplete?: number) => {
-    const current = (answers[field] as string[]) || [];
-    const updated = current.includes(value)
-      ? current.filter(v => v !== value)
-      : maxLimit && current.length >= maxLimit
-      ? current
-      : [...current, value];
-    setAnswers({ ...answers, [field]: updated });
-    
-    // Auto-advance when all options are selected (if autoAdvanceWhenComplete is provided)
-    if (autoAdvanceWhenComplete && updated.length === autoAdvanceWhenComplete) {
-      setTimeout(() => nextStep(true), 400);
+    try {
+      const current = (answers[field] as string[]) || [];
+      const updated = current.includes(value)
+        ? current.filter(v => v !== value)
+        : maxLimit && current.length >= maxLimit
+        ? current
+        : [...current, value];
+      
+      questionnaireLogger.logAnswer(step, String(field), updated);
+      setAnswers({ ...answers, [field]: updated });
+      
+      // Auto-advance when all options are selected (if autoAdvanceWhenComplete is provided)
+      if (autoAdvanceWhenComplete && updated.length === autoAdvanceWhenComplete) {
+        setTimeout(() => nextStep(true), 400);
+      }
+    } catch (error) {
+      logger.error('Erreur lors de la sélection multiple', {
+        category: LogCategory.QUESTIONNAIRE,
+        error: error instanceof Error ? error : new Error(String(error)),
+        metadata: { field, step, value, maxLimit, autoAdvanceWhenComplete }
+      });
+      
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue. Veuillez réessayer.",
+        variant: "destructive"
+      });
     }
   };
 
   // Handler pour les choix multiples avec option "Peu importe" exclusive
   const handleMultiChoiceWithDontMind = (field: keyof Answer, value: string, dontMindLabel: string, autoNext: boolean = false) => {
-    const current = (answers[field] as string[]) || [];
-    
-    // Si on clique sur "Peu importe"
-    if (value === dontMindLabel) {
-      // Remplacer toute la sélection par ["Peu importe"]
-      setAnswers({ ...answers, [field]: [dontMindLabel] });
-      if (autoNext) {
-        setTimeout(() => nextStep(true), 300);
+    try {
+      const current = (answers[field] as string[]) || [];
+      
+      // Si on clique sur "Peu importe"
+      if (value === dontMindLabel) {
+        // Remplacer toute la sélection par ["Peu importe"]
+        questionnaireLogger.logAnswer(step, String(field), [dontMindLabel]);
+        setAnswers({ ...answers, [field]: [dontMindLabel] });
+        if (autoNext) {
+          setTimeout(() => nextStep(true), 300);
+        }
+      } else {
+        // Si "Peu importe" est déjà sélectionné, le retirer
+        const filteredSelection = current.filter(item => item !== dontMindLabel);
+        
+        // Toggle la nouvelle option
+        const updated = filteredSelection.includes(value)
+          ? filteredSelection.filter(v => v !== value)
+          : [...filteredSelection, value];
+        
+        questionnaireLogger.logAnswer(step, String(field), updated);
+        setAnswers({ ...answers, [field]: updated });
       }
-    } else {
-      // Si "Peu importe" est déjà sélectionné, le retirer
-      const filteredSelection = current.filter(item => item !== dontMindLabel);
+    } catch (error) {
+      logger.error('Erreur lors de la sélection avec option "peu importe"', {
+        category: LogCategory.QUESTIONNAIRE,
+        error: error instanceof Error ? error : new Error(String(error)),
+        metadata: { field, step, value, dontMindLabel, autoNext }
+      });
       
-      // Toggle la nouvelle option
-      const updated = filteredSelection.includes(value)
-        ? filteredSelection.filter(v => v !== value)
-        : [...filteredSelection, value];
-      
-      setAnswers({ ...answers, [field]: updated });
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue. Veuillez réessayer.",
+        variant: "destructive"
+      });
     }
   };
 
