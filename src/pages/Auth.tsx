@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
 import Navigation from '@/components/Navigation';
+import { logger, LogCategory } from '@/utils/logger';
 
 const passwordSchema = z
   .string()
@@ -39,14 +40,29 @@ const Auth = () => {
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
+      
+      logger.info('Tentative de connexion avec Google', {
+        category: LogCategory.AUTH
+      });
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/`,
         },
       });
+      
       if (error) throw error;
+      
+      logger.info('Redirection vers Google OAuth', {
+        category: LogCategory.AUTH
+      });
     } catch (error: any) {
+      logger.error('Erreur lors de la connexion Google', {
+        category: LogCategory.AUTH,
+        error: error instanceof Error ? error : new Error(String(error))
+      });
+      
       toast.error(error.message || 'Erreur lors de la connexion avec Google');
     } finally {
       setLoading(false);
@@ -81,12 +97,19 @@ const Auth = () => {
     try {
       emailSchema.parse(email);
     } catch (error) {
+      logger.warn('Email invalide lors de la tentative d\'authentification', {
+        category: LogCategory.AUTH,
+        metadata: { isLogin }
+      });
       toast.error('Adresse email invalide');
       return;
     }
 
     // Validation mot de passe pour l'inscription
     if (!isLogin && !validatePassword(password)) {
+      logger.warn('Mot de passe invalide lors de l\'inscription', {
+        category: LogCategory.AUTH
+      });
       toast.error('Le mot de passe ne respecte pas les critères de sécurité');
       return;
     }
@@ -95,6 +118,10 @@ const Auth = () => {
       setLoading(true);
       
       if (isLogin) {
+        logger.info('Tentative de connexion par email', {
+          category: LogCategory.AUTH
+        });
+        
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim().toLowerCase(),
           password,
@@ -102,6 +129,12 @@ const Auth = () => {
         
         if (error) {
           console.error('Erreur de connexion:', error);
+          
+          logger.error('Échec de connexion', {
+            category: LogCategory.AUTH,
+            error,
+            metadata: { errorMessage: error.message }
+          });
           
           if (error.message.includes('Invalid login credentials')) {
             throw new Error('Email ou mot de passe incorrect. Vérifiez que vous avez bien confirmé votre email si vous venez de vous inscrire.');
@@ -113,12 +146,24 @@ const Auth = () => {
         }
         
         if (!data.session) {
+          logger.error('Session manquante après connexion', {
+            category: LogCategory.AUTH
+          });
           throw new Error('Erreur de session. Veuillez réessayer.');
         }
+        
+        logger.info('Connexion réussie par email', {
+          category: LogCategory.AUTH,
+          metadata: { userId: data.user?.id }
+        });
         
         toast.success('Connexion réussie');
         navigate('/');
       } else {
+        logger.info('Tentative d\'inscription par email', {
+          category: LogCategory.AUTH
+        });
+        
         const { data, error } = await supabase.auth.signUp({
           email: email.trim().toLowerCase(),
           password,
@@ -130,6 +175,12 @@ const Auth = () => {
         if (error) {
           console.error('Erreur d\'inscription:', error);
           
+          logger.error('Échec d\'inscription', {
+            category: LogCategory.AUTH,
+            error,
+            metadata: { errorMessage: error.message }
+          });
+          
           if (error.message.includes('already registered') || error.message.includes('User already registered')) {
             throw new Error('Cette adresse email est déjà utilisée. Si vous vous êtes inscrit avec Google, veuillez vous connecter avec Google.');
           }
@@ -138,15 +189,30 @@ const Auth = () => {
         
         // Vérifier si la confirmation email est requise
         if (data.user && !data.session) {
+          logger.info('Inscription réussie - Confirmation email requise', {
+            category: LogCategory.AUTH,
+            metadata: { userId: data.user.id }
+          });
+          
           toast.success('Inscription réussie ! Vérifiez votre email pour confirmer votre compte avant de vous connecter.', {
             duration: 6000,
           });
         } else if (data.session) {
+          logger.info('Inscription réussie avec connexion automatique', {
+            category: LogCategory.AUTH,
+            metadata: { userId: data.user?.id }
+          });
+          
           toast.success('Inscription réussie ! Connexion automatique...');
           navigate('/');
         }
       }
     } catch (error: any) {
+      logger.error(`Erreur lors de ${isLogin ? 'la connexion' : "l'inscription"}`, {
+        category: LogCategory.AUTH,
+        error: error instanceof Error ? error : new Error(String(error))
+      });
+      
       toast.error(error.message || `Erreur lors de ${isLogin ? 'la connexion' : "l'inscription"}`);
     } finally {
       setLoading(false);

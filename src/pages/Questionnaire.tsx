@@ -38,6 +38,7 @@ import GoogleLoginPopup from "@/components/GoogleLoginPopup";
 import Navigation from "@/components/Navigation";
 import { z } from "zod";
 import { TRAVEL_GROUPS, YES_NO, DATES_TYPE, HELP_WITH, normalizeTravelGroup, normalizeYesNo, normalizeDatesType, normalizeHelpWithArray } from "@/lib/questionnaireValues";
+import { logger, questionnaireLogger, LogCategory } from "@/utils/logger";
 
 // Constantes pour les préférences d'hôtel avec repas (pour validation robuste)
 const HOTEL_MEAL_PREFERENCES = {
@@ -399,6 +400,15 @@ const Questionnaire = () => {
   const [, forceUpdate] = useState({});
   const [isEditMode, setIsEditMode] = useState(false);
   const [returnToReviewStep, setReturnToReviewStep] = useState<number | null>(null);
+
+  // Log component mount
+  useEffect(() => {
+    questionnaireLogger.logStepChange(1, getTotalSteps(), 'Début du questionnaire');
+    logger.info('Questionnaire monté', {
+      category: LogCategory.QUESTIONNAIRE,
+      metadata: { userId: user?.id, language: i18n.language }
+    });
+  }, []);
   
   // Force re-render when language changes
   useEffect(() => {
@@ -983,8 +993,12 @@ const Questionnaire = () => {
   };
 
   const nextStep = (skipValidation: boolean = false) => {
+    const totalSteps = getTotalSteps();
+    
     // Validation avant de continuer (sauf si on skip la validation)
     if (!skipValidation && !canProceedToNextStep()) {
+      questionnaireLogger.logValidationError(step, 'step_validation', 'Validation échouée pour passer à l\'étape suivante');
+      
       toast({
         title: t('questionnaire.pleaseAnswer'),
         description: t('questionnaire.answerRequired'),
@@ -992,6 +1006,21 @@ const Questionnaire = () => {
       });
       return;
     }
+    
+    const nextStepNumber = isEditMode && returnToReviewStep !== null ? returnToReviewStep : step + 1;
+    
+    questionnaireLogger.logStepChange(nextStepNumber, totalSteps);
+    logger.debug('Navigation vers étape suivante', {
+      category: LogCategory.QUESTIONNAIRE,
+      step: nextStepNumber,
+      totalSteps,
+      metadata: { 
+        from: step, 
+        to: nextStepNumber,
+        skipValidation,
+        isEditMode 
+      }
+    });
     
     // Si on est en mode édition et qu'on veut retourner au récapitulatif
     if (isEditMode && returnToReviewStep !== null) {
@@ -1004,10 +1033,24 @@ const Questionnaire = () => {
   };
 
   const prevStep = () => {
-    if (step > 1) setStep(step - 1);
+    if (step > 1) {
+      const totalSteps = getTotalSteps();
+      questionnaireLogger.logStepChange(step - 1, totalSteps);
+      
+      logger.debug('Navigation vers étape précédente', {
+        category: LogCategory.QUESTIONNAIRE,
+        step: step - 1,
+        totalSteps,
+        metadata: { from: step, to: step - 1 }
+      });
+      
+      setStep(step - 1);
+    }
   };
 
   const handleChoice = (field: keyof Answer, value: any) => {
+    questionnaireLogger.logAnswer(step, String(field), value);
+    
     setAnswers({ ...answers, [field]: value });
     // Skip validation car on vient de définir la valeur
     setTimeout(() => nextStep(true), 300);
@@ -1111,13 +1154,23 @@ const Questionnaire = () => {
   };
 
   const handleSubmitQuestionnaire = async () => {
+    const startTime = Date.now();
     setIsSubmitting(true);
+    
+    logger.info('Début de soumission du questionnaire', {
+      category: LogCategory.SUBMISSION,
+      metadata: { userId: user?.id }
+    });
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
       // CRITICAL: Require authentication before submission
       if (!user) {
+        logger.warn('Tentative de soumission sans authentification', {
+          category: LogCategory.SUBMISSION
+        });
+        
         toast({
           title: t('questionnaire.connectionRequired'),
           description: t('questionnaire.mustBeConnected'),
@@ -1216,6 +1269,11 @@ const Questionnaire = () => {
 
       // Validate all inputs before submission
       const validatedData = questionnaireSchema.parse(responseData);
+      
+      logger.debug('Données validées avec succès', {
+        category: LogCategory.SUBMISSION,
+        metadata: { fieldsCount: Object.keys(validatedData).length }
+      });
 
       // Use secure edge function with rate limiting
       const { data, error } = await supabase.functions.invoke('submit-questionnaire', {
@@ -1225,6 +1283,9 @@ const Questionnaire = () => {
       if (error) throw error;
 
       setSubmittedResponseId(data.data.id);
+      
+      questionnaireLogger.logSubmission(true, data.data.id);
+      questionnaireLogger.logPerformance('Soumission questionnaire', Date.now() - startTime);
       
       // Enqueue answer_id to SQS with retry logic
       const enqueueWithRetry = async (answerId: string, maxRetries = 3) => {
@@ -1236,17 +1297,28 @@ const Questionnaire = () => {
             
             if (sqsError) throw sqsError;
             if (sqsData?.ok) {
-              console.log(`[${new Date().toISOString()}] Answer enqueued successfully: ${answerId}`);
+              logger.info('Réponse mise en file d\'attente', {
+                category: LogCategory.SUBMISSION,
+                metadata: { answerId, attempt }
+              });
               return true;
             }
             throw new Error('Enqueue failed');
           } catch (err) {
-            console.error(`[${new Date().toISOString()}] Enqueue attempt ${attempt}/${maxRetries} failed:`, err);
+            logger.warn(`Tentative d'enqueue ${attempt}/${maxRetries} échouée`, {
+              category: LogCategory.SUBMISSION,
+              metadata: { answerId, attempt, error: String(err) }
+            });
+            
             if (attempt < maxRetries) {
               // Exponential backoff: 1s, 2s, 4s
               await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000));
             } else {
-              console.error(`[${new Date().toISOString()}] Failed to enqueue after ${maxRetries} attempts`);
+              logger.error('Échec d\'enqueue après tous les essais', {
+                category: LogCategory.SUBMISSION,
+                error: err instanceof Error ? err : new Error(String(err)),
+                metadata: { answerId, maxRetries }
+              });
               return false;
             }
           }
@@ -1257,7 +1329,10 @@ const Questionnaire = () => {
       // Fire and forget - don't block user flow
       enqueueWithRetry(data.data.id).then(success => {
         if (success) {
-          console.log('Answer successfully queued for processing');
+          logger.info('Traitement asynchrone lancé', {
+            category: LogCategory.SUBMISSION,
+            metadata: { answerId: data.data.id }
+          });
         }
       });
       
@@ -1286,6 +1361,12 @@ const Questionnaire = () => {
       }
 
     } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      // Log error with full context
+      questionnaireLogger.logSubmission(false, undefined, error instanceof Error ? error : new Error(String(error)));
+      questionnaireLogger.logPerformance('Soumission questionnaire (échec)', duration);
+      
       // Only log detailed errors in development
       if (import.meta.env.DEV) {
         console.error("Questionnaire submission error:", error);
@@ -1294,6 +1375,11 @@ const Questionnaire = () => {
       // Check if it's a quota exceeded error
       if (error && typeof error === 'object' && 'message' in error && 
           typeof error.message === 'string' && error.message.includes('quota_exceeded')) {
+        logger.warn('Quota dépassé', {
+          category: LogCategory.SUBMISSION,
+          metadata: { userId: user?.id }
+        });
+        
         toast({
           title: t('questionnaire.quotaReached'),
           description: t('questionnaire.quotaExceeded'),
@@ -1309,6 +1395,10 @@ const Questionnaire = () => {
       // Check if authentication is required
       if (error && typeof error === 'object' && 'message' in error && 
           typeof error.message === 'string' && error.message.includes('authentication_required')) {
+        logger.warn('Authentification requise pour soumission', {
+          category: LogCategory.SUBMISSION
+        });
+        
         toast({
           title: t('questionnaire.connectionRequired'),
           description: t('questionnaire.mustBeConnected'),
@@ -1320,12 +1410,20 @@ const Questionnaire = () => {
       }
       
       if (error instanceof z.ZodError) {
+        questionnaireLogger.logValidationError(step, 'global', error.errors[0]?.message || 'Validation error');
+        
         toast({
           title: t('questionnaire.validationError'),
           description: error.errors[0]?.message || t('questionnaire.invalidData'),
           variant: "destructive"
         });
       } else {
+        logger.error('Erreur lors de la soumission', {
+          category: LogCategory.SUBMISSION,
+          error: error instanceof Error ? error : new Error(String(error)),
+          metadata: { duration }
+        });
+        
         toast({
           title: t('questionnaire.error'),
           description: t('questionnaire.submissionError'),
@@ -1338,6 +1436,15 @@ const Questionnaire = () => {
   };
 
   const handleResetQuestionnaire = () => {
+    logger.info('Réinitialisation du questionnaire', {
+      category: LogCategory.QUESTIONNAIRE,
+      metadata: { 
+        userId: user?.id,
+        previousStep: step,
+        hadAnswers: Object.keys(answers).length > 0
+      }
+    });
+    
     // Effacer toutes les réponses
     setAnswers({});
     

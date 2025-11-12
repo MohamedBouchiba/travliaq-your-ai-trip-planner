@@ -1,12 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-
-declare global {
-  interface Window {
-    gtag?: (command: string, ...args: any[]) => void;
-    dataLayer?: any[];
-  }
-}
+import { logger, LogCategory } from '@/utils/logger';
 
 export const usePageTracking = () => {
   const location = useLocation();
@@ -20,31 +14,15 @@ export const usePageTracking = () => {
       return;
     }
 
-    const pageLocation = window.location.origin + currentPath;
-    const pageReferrer = previousPath.current 
-      ? window.location.origin + previousPath.current 
-      : document.referrer;
-
-    // Envoyer l'événement page_view à GA4
-    if (window.gtag) {
-      window.gtag('event', 'page_view', {
-        page_location: pageLocation,
-        page_path: currentPath,
-        page_referrer: pageReferrer,
-        page_title: document.title
-      });
-    }
-
-    // Mettre à jour le dataLayer pour GTM
-    if (window.dataLayer) {
-      window.dataLayer.push({
-        event: 'page_view',
-        page_location: pageLocation,
-        page_path: currentPath,
-        page_referrer: pageReferrer,
-        page_title: document.title
-      });
-    }
+    // Logger la navigation
+    logger.info(`Navigation vers ${currentPath}`, {
+      category: LogCategory.NAVIGATION,
+      metadata: {
+        from: previousPath.current || 'direct',
+        to: currentPath,
+        pageTitle: document.title
+      }
+    });
 
     // Mettre à jour la référence du chemin précédent
     previousPath.current = currentPath;
