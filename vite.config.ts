@@ -4,6 +4,8 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import viteCompression from "vite-plugin-compression";
 
+/// <reference types="vitest" />
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
@@ -41,5 +43,11 @@ export default defineConfig(({ mode }) => ({
         }
       }
     }
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts',
+    css: true,
   },
 }));
