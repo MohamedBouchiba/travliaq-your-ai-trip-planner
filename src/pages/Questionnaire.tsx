@@ -2267,20 +2267,14 @@ const Questionnaire = () => {
               { code: AFFINITIES.VINEYARDS_WINE, label: t('questionnaire.affinities.vineyardsWine'), icon: "🍷" },
               { code: AFFINITIES.DESERTS_LUNAR, label: t('questionnaire.affinities.desertsLunar'), icon: "🏜️" },
               { code: AFFINITIES.ISLANDS_ARCHIPELAGOS, label: t('questionnaire.affinities.islandsArchipelagos'), icon: "🏝️" },
-              { code: AFFINITIES.YOGA_WELLNESS, label: t('questionnaire.affinities.yogaWellness'), icon: "🧘" },
               { code: AFFINITIES.PHOTOGRAPHY, label: t('questionnaire.affinities.photography'), icon: "📸" },
               { code: AFFINITIES.ART_MUSEUMS, label: t('questionnaire.affinities.artMuseums'), icon: "🎨" },
               { code: AFFINITIES.WATER_SPORTS, label: t('questionnaire.affinities.waterSports'), icon: "🏄" },
-              { code: AFFINITIES.CLIMBING, label: t('questionnaire.affinities.climbing'), icon: "🧗" },
               { code: AFFINITIES.CYCLING, label: t('questionnaire.affinities.cycling'), icon: "🚴" },
-              { code: AFFINITIES.BIRDWATCHING, label: t('questionnaire.affinities.birdwatching'), icon: "🦜" },
               { code: AFFINITIES.FISHING, label: t('questionnaire.affinities.fishing'), icon: "🎣" },
-              { code: AFFINITIES.GOLF, label: t('questionnaire.affinities.golf'), icon: "⛳" },
               { code: AFFINITIES.SPAS_THERMAL, label: t('questionnaire.affinities.spasThermal'), icon: "♨️" },
               { code: AFFINITIES.CRUISES, label: t('questionnaire.affinities.cruises'), icon: "🛳️" },
-              { code: AFFINITIES.LEGENDARY_TRAINS, label: t('questionnaire.affinities.legendaryTrains'), icon: "🚂" },
               { code: AFFINITIES.LOCAL_MARKETS, label: t('questionnaire.affinities.localMarkets'), icon: "🛒" },
-              { code: AFFINITIES.NIGHTLIFE, label: t('questionnaire.affinities.nightlife'), icon: "🌃" },
               { code: AFFINITIES.CONCERTS_SHOWS, label: t('questionnaire.affinities.concertsShows'), icon: "🎪" }
             ].map((option) => {
               const isSelected = (answers.travelAffinities || []).includes(option.code);
@@ -3245,11 +3239,14 @@ const Questionnaire = () => {
           <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
             {t('questionnaire.accommodationType.description')}
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 max-w-2xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3 max-w-4xl mx-auto">
             {[
               { code: ACCOMMODATION_TYPE.DONT_MIND, label: t('questionnaire.accommodationType.dontMind'), icon: "🤷" },
               { code: ACCOMMODATION_TYPE.HOTEL, label: t('questionnaire.accommodationType.hotel'), icon: "🏨" },
               { code: ACCOMMODATION_TYPE.APARTMENT, label: t('questionnaire.accommodationType.apartment'), icon: "🏠" },
+              { code: ACCOMMODATION_TYPE.VILLA, label: t('questionnaire.accommodationType.villa'), icon: "🏰" },
+              { code: ACCOMMODATION_TYPE.CHALET, label: t('questionnaire.accommodationType.chalet'), icon: "🏔️" },
+              { code: ACCOMMODATION_TYPE.CONDOMINIUM, label: t('questionnaire.accommodationType.condominium'), icon: "🏢" },
               { code: ACCOMMODATION_TYPE.HOSTEL, label: t('questionnaire.accommodationType.hostel'), icon: "🛏️" },
               { code: ACCOMMODATION_TYPE.GUESTHOUSE, label: t('questionnaire.accommodationType.guesthouse'), icon: "🏡" },
               { code: ACCOMMODATION_TYPE.LODGE, label: t('questionnaire.accommodationType.lodge'), icon: "🌿" },
@@ -3263,9 +3260,9 @@ const Questionnaire = () => {
               const isDisabled = !isSelected && currentSelection.length >= 2 && option.code !== ACCOMMODATION_TYPE.DONT_MIND && !hasPeuImporte;
               
               return (
-                <Card
+                 <Card
                   key={option.code}
-                  className={`p-3 md:p-6 cursor-pointer transition-all hover:scale-105 ${
+                  className={`p-2 md:p-3 cursor-pointer transition-all hover:scale-105 ${
                     isSelected 
                       ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
                       : isDisabled
@@ -3294,9 +3291,9 @@ const Questionnaire = () => {
                     }
                   }}
                 >
-                  <div className="flex items-center space-x-2 md:space-x-4">
+                  <div className="flex flex-col items-center justify-center space-y-1 text-center">
                     <span className="text-2xl md:text-3xl">{option.icon}</span>
-                    <span className="text-sm md:text-lg font-semibold text-travliaq-deep-blue">
+                    <span className="text-xs md:text-sm font-semibold text-travliaq-deep-blue leading-tight">
                       {option.label}
                     </span>
                   </div>
