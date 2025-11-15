@@ -856,48 +856,48 @@ const Questionnaire = () => {
     
     if (normalizedGroup === TRAVEL_GROUPS.FAMILY || normalizedGroup === TRAVEL_GROUPS.GROUP35) total++; // Step 1b: Nombre exact
     if (normalizedGroup === TRAVEL_GROUPS.FAMILY) total++; // Step 1c: Détails enfants
-    total++; // Step 2: Destination en tête
-    total++; // Step 2b: Comment Travliaq peut aider (vols/hébergement/activités)
+    total++; // Step 2: Comment Travliaq peut aider (vols/hébergement/activités)
+    total++; // Step 3: Destination en tête
     
     if (normalizedHasDestination === YES_NO.YES) {
-      total++; // Step 2c: Quelle destination
+      total++; // Step 3b: Quelle destination
     } else if (normalizedHasDestination === YES_NO.NO) {
-      total++; // Step 2d: Climat préféré
-      total++; // Step 2e: Affinités de voyage
-      total++; // Step 2f: Ambiance recherchée
-      total++; // Step 2g: Ville de départ (pour destination flexible)
+      total++; // Step 3c: Climat préféré
+      total++; // Step 3d: Affinités de voyage
+      total++; // Step 3e: Ambiance recherchée
+      total++; // Step 3f: Ville de départ (pour destination flexible)
     }
     
-    total++; // Step 3: Dates
+    total++; // Step 4: Dates
     
     if (normalizedDatesType === DATES_TYPE.FIXED) {
-      total++; // Step 3b: Dates précises
+      total++; // Step 4b: Dates précises
     } else if (normalizedDatesType === DATES_TYPE.FLEXIBLE) {
-      total++; // Step 3c: Flexibilité
-      // Step 3d: Question "Avez-vous une période approximative ?"
+      total++; // Step 4c: Flexibilité
+      // Step 4d: Question "Avez-vous une période approximative ?"
       total++; 
-      // Step 3e: Saisie date approximative (SEULEMENT si YES)
+      // Step 4e: Saisie date approximative (SEULEMENT si YES)
       const normalizedHasApproxDate = normalizeYesNo(answers.hasApproximateDepartureDate);
       if (normalizedHasApproxDate === YES_NO.YES) total++; 
-      total++; // Step 4: Durée
+      total++; // Step 5: Durée
       // Check for "Plus de 14 jours" in duration
       if (answers.duration && (
         answers.duration.includes('14') || 
         answers.duration.toLowerCase().includes('more') ||
         answers.duration.toLowerCase().includes('plus')
       )) {
-        total++; // Step 4b: Nombre exact
+        total++; // Step 5b: Nombre exact
       }
     }
     
-    total++; // Step 5: Budget
+    total++; // Step 6: Budget
     // Check for precise budget type or >1800€
     if (answers.budgetType && (
       answers.budgetType.toLowerCase().includes('précis') ||
       answers.budgetType.toLowerCase().includes('precise') ||
       answers.budgetType.includes('1800')
     )) {
-      total++; // Step 5b: Montant exact
+      total++; // Step 6b: Montant exact
     }
     
     const helpWith = answers.helpWith || [];
@@ -905,9 +905,9 @@ const Questionnaire = () => {
     const needsAccommodation = helpWith.includes(HELP_WITH.ACCOMMODATION);
     const needsActivities = helpWith.includes(HELP_WITH.ACTIVITIES);
     
-    // Step 6: Style (seulement si destination précise ET activités sélectionnées)
+    // Step 7: Style (seulement si destination précise ET activités sélectionnées)
     if (normalizedHasDestination === YES_NO.YES && needsActivities) {
-      total++; // Step 6: Style
+      total++; // Step 7: Style
     }
     
     // Step 8-9: Vols et bagages (seulement si vols sélectionnés)
@@ -1001,8 +1001,8 @@ const Questionnaire = () => {
     const stepNames: { [key: number]: string } = {
       1: 'Groupe de voyage',
       2: 'Nombre de personnes',
-      3: 'Destination en tête',
-      4: 'Comment aider',
+      3: 'Comment aider',
+      4: 'Destination en tête',
       5: 'Trajet/Climat',
       6: 'Type de dates',
       7: 'Budget',
@@ -1061,42 +1061,42 @@ const Questionnaire = () => {
       }
     }
 
-    // Step 2: Destination en tête ?
-    stepCounter++;
-    if (step === stepCounter) return !!answers.hasDestination;
-
-    // Step 2b: Comment aider (multi)
+    // Step 2: Comment aider (multi)
     stepCounter++;
     if (step === stepCounter) return !!answers.helpWith && answers.helpWith.length > 0;
+
+    // Step 3: Destination en tête ?
+    stepCounter++;
+    if (step === stepCounter) return !!answers.hasDestination;
 
     const hasDest = normalizeYesNo(answers.hasDestination);
 
     // Branches selon la destination
     if (hasDest === YES_NO.YES) {
-      // Step 2c: Trajet (ville départ + destination)
+      // Step 3b: Trajet (ville départ + destination)
       stepCounter++;
       if (step === stepCounter) {
         return !!answers.destination && !!answers.departureLocation;
       }
     } else if (hasDest === YES_NO.NO) {
-      // Step 2c: Climat (multi)
+      // Step 3c: Climat (multi)
       stepCounter++;
       if (step === stepCounter) return !!answers.climatePreference && answers.climatePreference.length > 0;
 
-      // Step 2d: Affinités (multi)
+      // Step 3d: Affinités (multi)
       stepCounter++;
       if (step === stepCounter) return !!answers.travelAffinities && answers.travelAffinities.length > 0;
 
-      // Step 2e: Ambiance
+      // Step 3e: Ambiance
       stepCounter++;
       if (step === stepCounter) return !!answers.travelAmbiance;
 
-      // Step 2g: Ville de départ
+      // Step 3f: Ville de départ
       stepCounter++;
       if (step === stepCounter) return !!answers.departureLocation;
     }
 
-    // Step 3: Type de dates
+    // Step 4: Type de dates
     stepCounter++;
     if (step === stepCounter) return !!answers.datesType;
 
@@ -1969,41 +1969,7 @@ const Questionnaire = () => {
     }
     if (normalizedGroup === TRAVEL_GROUPS.FAMILY || normalizedGroup === TRAVEL_GROUPS.GROUP35) stepCounter++;
 
-    // Step 2: Destination en tête ?
-    if (step === stepCounter) {
-      return (
-        <div className="space-y-8 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
-            {t('questionnaire.destinationInMind')}
-          </h2>
-          <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
-            {t('questionnaire.destinationInMind.description')}
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-            {[
-              { label: t('questionnaire.yes'), icon: "✅" },
-              { label: t('questionnaire.no'), icon: "🤔" }
-            ].map((option) => (
-              <Card
-                key={option.label}
-                className="p-6 cursor-pointer hover:shadow-golden hover:border-travliaq-deep-blue transition-all hover:scale-105"
-                onClick={() => handleChoice("hasDestination", option.label)}
-              >
-                <div className="flex items-center space-x-4">
-                  <span className="text-4xl">{option.icon}</span>
-                  <span className="text-lg font-semibold text-travliaq-deep-blue">
-                    {option.label}
-                  </span>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
-      );
-    }
-    stepCounter++;
-
-    // Step 2b: Comment Travliaq peut vous aider ?
+    // Step 2: Comment Travliaq peut vous aider ?
     if (step === stepCounter) {
       return (
         <div className="space-y-3 animate-fade-up">
@@ -2059,7 +2025,41 @@ const Questionnaire = () => {
     }
     stepCounter++;
 
-    // Step 2c: Destination précise (si Oui)
+    // Step 3: Destination en tête ?
+    if (step === stepCounter) {
+      return (
+        <div className="space-y-8 animate-fade-up">
+          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+            {t('questionnaire.destinationInMind')}
+          </h2>
+          <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
+            {t('questionnaire.destinationInMind.description')}
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+            {[
+              { label: t('questionnaire.yes'), icon: "✅" },
+              { label: t('questionnaire.no'), icon: "🤔" }
+            ].map((option) => (
+              <Card
+                key={option.label}
+                className="p-6 cursor-pointer hover:shadow-golden hover:border-travliaq-deep-blue transition-all hover:scale-105"
+                onClick={() => handleChoice("hasDestination", option.label)}
+              >
+                <div className="flex items-center space-x-4">
+                  <span className="text-4xl">{option.icon}</span>
+                  <span className="text-lg font-semibold text-travliaq-deep-blue">
+                    {option.label}
+                  </span>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    stepCounter++;
+
+    // Step 3b: Destination précise (si Oui)
     if (normalizeYesNo(answers.hasDestination) === YES_NO.YES && step === stepCounter) {
       return (
         <div className="space-y-4 animate-fade-up">
@@ -2170,7 +2170,7 @@ const Questionnaire = () => {
     }
     if (normalizeYesNo(answers.hasDestination) === YES_NO.YES) stepCounter++;
 
-    // Step 2c: Climat préféré (si Non - pas de destination en tête) - MULTI-CHOIX
+    // Step 3c: Climat préféré (si Non - pas de destination en tête) - MULTI-CHOIX
     if (normalizeYesNo(answers.hasDestination) === YES_NO.NO && step === stepCounter) {
       return (
         <div className="space-y-4 animate-fade-up">
@@ -2330,7 +2330,7 @@ const Questionnaire = () => {
     }
     if (normalizeYesNo(answers.hasDestination) === YES_NO.NO) stepCounter++;
 
-    // Step 2e: Ambiance recherchée (si Non)
+    // Step 3e: Ambiance recherchée (si Non)
     if (normalizeYesNo(answers.hasDestination) === YES_NO.NO && step === stepCounter) {
       return (
         <div className="space-y-3 md:space-y-8 animate-fade-up">
@@ -2380,7 +2380,7 @@ const Questionnaire = () => {
     }
     if (normalizeYesNo(answers.hasDestination) === YES_NO.NO) stepCounter++;
 
-    // Step 2g: Ville de départ (si destination flexible)
+    // Step 3f: Ville de départ (si destination flexible)
     if (normalizeYesNo(answers.hasDestination) === YES_NO.NO && step === stepCounter) {
       return (
         <div className="space-y-4 animate-fade-up">
