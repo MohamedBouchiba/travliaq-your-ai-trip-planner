@@ -548,12 +548,10 @@ const resources = {
       "questionnaire.affinities.photography": "Photographie",
       "questionnaire.affinities.artMuseums": "Art & musées",
       "questionnaire.affinities.waterSports": "Sports nautiques",
-      "questionnaire.affinities.cycling": "Vélo & cyclotourisme",
       "questionnaire.affinities.fishing": "Pêche",
       "questionnaire.affinities.spasThermal": "Spas & thermalisme",
       "questionnaire.affinities.cruises": "Croisières",
       "questionnaire.affinities.localMarkets": "Marchés locaux",
-      "questionnaire.affinities.concertsShows": "Concerts & spectacles",
 
       // Travel ambiance
       "questionnaire.ambiance.title": "Ambiance souhaitée ? 🎨",
@@ -1441,12 +1439,10 @@ const resources = {
       "questionnaire.affinities.photography": "Photography",
       "questionnaire.affinities.artMuseums": "Art & museums",
       "questionnaire.affinities.waterSports": "Water sports",
-      "questionnaire.affinities.cycling": "Cycling & bike tours",
       "questionnaire.affinities.fishing": "Fishing",
       "questionnaire.affinities.spasThermal": "Spas & thermal baths",
       "questionnaire.affinities.cruises": "Cruises",
       "questionnaire.affinities.localMarkets": "Local markets",
-      "questionnaire.affinities.concertsShows": "Concerts & shows",
 
       // Travel ambiance
       "questionnaire.ambiance.title": "Desired ambiance? 🎨",

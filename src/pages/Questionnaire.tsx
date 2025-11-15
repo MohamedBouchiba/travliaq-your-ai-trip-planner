@@ -2270,12 +2270,10 @@ const Questionnaire = () => {
               { code: AFFINITIES.PHOTOGRAPHY, label: t('questionnaire.affinities.photography'), icon: "📸" },
               { code: AFFINITIES.ART_MUSEUMS, label: t('questionnaire.affinities.artMuseums'), icon: "🎨" },
               { code: AFFINITIES.WATER_SPORTS, label: t('questionnaire.affinities.waterSports'), icon: "🏄" },
-              { code: AFFINITIES.CYCLING, label: t('questionnaire.affinities.cycling'), icon: "🚴" },
               { code: AFFINITIES.FISHING, label: t('questionnaire.affinities.fishing'), icon: "🎣" },
               { code: AFFINITIES.SPAS_THERMAL, label: t('questionnaire.affinities.spasThermal'), icon: "♨️" },
               { code: AFFINITIES.CRUISES, label: t('questionnaire.affinities.cruises'), icon: "🛳️" },
-              { code: AFFINITIES.LOCAL_MARKETS, label: t('questionnaire.affinities.localMarkets'), icon: "🛒" },
-              { code: AFFINITIES.CONCERTS_SHOWS, label: t('questionnaire.affinities.concertsShows'), icon: "🎪" }
+              { code: AFFINITIES.LOCAL_MARKETS, label: t('questionnaire.affinities.localMarkets'), icon: "🛒" }
             ].map((option) => {
               const isSelected = (answers.travelAffinities || []).includes(option.code);
               const isDisabled = !isSelected && (answers.travelAffinities || []).length >= 5;

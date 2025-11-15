@@ -62,12 +62,10 @@ export const AFFINITIES = {
   PHOTOGRAPHY: 'photography',
   ART_MUSEUMS: 'art_museums',
   WATER_SPORTS: 'water_sports',
-  CYCLING: 'cycling',
   FISHING: 'fishing',
   SPAS_THERMAL: 'spas_thermal',
   CRUISES: 'cruises',
   LOCAL_MARKETS: 'local_markets',
-  CONCERTS_SHOWS: 'concerts_shows',
   // Anciens codes gardés pour compatibilité
   BEACH: 'beach',
   MOUNTAIN: 'mountain',
