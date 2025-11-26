@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Loader2, Eye, EyeOff, Mail, Sparkles } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Mail, Sparkles, Send } from 'lucide-react';
 import { z } from 'zod';
 import Navigation from '@/components/Navigation';
 import { logger, LogCategory } from '@/utils/logger';
@@ -24,6 +24,9 @@ const Auth = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
+  const [showMagicLink, setShowMagicLink] = useState(false);
+  const [magicLinkEmail, setMagicLinkEmail] = useState('');
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
 
   // Dynamic password schema with translations
@@ -41,16 +44,16 @@ const Auth = () => {
     }
   }, [user, navigate]);
 
-  const handleGoogleLogin = async () => {
+  const handleOAuthLogin = async (provider: 'google' | 'facebook' | 'linkedin_oidc') => {
     try {
       setLoading(true);
       
-      logger.info('Tentative de connexion avec Google', {
+      logger.info(`Tentative de connexion avec ${provider}`, {
         category: LogCategory.AUTH
       });
       
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider,
         options: {
           redirectTo: `${window.location.origin}/`,
         },
@@ -58,16 +61,66 @@ const Auth = () => {
       
       if (error) throw error;
       
-      logger.info('Redirection vers Google OAuth', {
+      logger.info(`Redirection vers ${provider} OAuth`, {
         category: LogCategory.AUTH
       });
     } catch (error: any) {
-      logger.error('Erreur lors de la connexion Google', {
+      logger.error(`Erreur lors de la connexion ${provider}`, {
         category: LogCategory.AUTH,
         error: error instanceof Error ? error : new Error(String(error))
       });
       
-      toast.error(error.message || t('auth.googleError'));
+      toast.error(error.message || t('auth.oauthError'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMagicLinkSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!magicLinkEmail) {
+      toast.error(t('auth.fillAllFields'));
+      return;
+    }
+
+    // Validation email
+    try {
+      emailSchema.parse(magicLinkEmail);
+    } catch (error) {
+      toast.error(t('auth.invalidEmail'));
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      logger.info('Envoi de Magic Link', {
+        category: LogCategory.AUTH
+      });
+      
+      const { error } = await supabase.auth.signInWithOtp({
+        email: magicLinkEmail.trim().toLowerCase(),
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+        },
+      });
+      
+      if (error) throw error;
+      
+      logger.info('Magic Link envoyé avec succès', {
+        category: LogCategory.AUTH
+      });
+      
+      setMagicLinkSent(true);
+      toast.success(t('auth.magicLinkSent'));
+    } catch (error: any) {
+      logger.error('Erreur lors de l\'envoi du Magic Link', {
+        category: LogCategory.AUTH,
+        error: error instanceof Error ? error : new Error(String(error))
+      });
+      
+      toast.error(error.message || t('auth.magicLinkError'));
     } finally {
       setLoading(false);
     }
@@ -242,13 +295,13 @@ const Auth = () => {
               </p>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Google Sign-in - Primary option */}
               <Button
                 type="button"
                 size="lg"
                 className="w-full bg-white hover:bg-white/90 text-travliaq-deep-blue border-0 shadow-lg hover:shadow-xl transition-all duration-300 h-12"
-                onClick={handleGoogleLogin}
+                onClick={() => handleOAuthLogin('google')}
                 disabled={loading}
               >
                 {loading ? (
@@ -275,6 +328,134 @@ const Auth = () => {
                 )}
                 <span className="font-medium">{t('auth.continueWithGoogle')}</span>
               </Button>
+
+              {/* LinkedIn Sign-in */}
+              <Button
+                type="button"
+                size="lg"
+                className="w-full bg-[#0A66C2] hover:bg-[#004182] text-white border-0 shadow-md hover:shadow-lg transition-all duration-300 h-12"
+                onClick={() => handleOAuthLogin('linkedin_oidc')}
+                disabled={loading}
+              >
+                {loading ? (
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                ) : (
+                  <svg className="mr-3 h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                  </svg>
+                )}
+                <span className="font-medium">{t('auth.continueWithLinkedIn')}</span>
+              </Button>
+
+              {/* Facebook Sign-in */}
+              <Button
+                type="button"
+                size="lg"
+                className="w-full bg-[#1877F2] hover:bg-[#166FE5] text-white border-0 shadow-md hover:shadow-lg transition-all duration-300 h-12"
+                onClick={() => handleOAuthLogin('facebook')}
+                disabled={loading}
+              >
+                {loading ? (
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                ) : (
+                  <svg className="mr-3 h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                )}
+                <span className="font-medium">{t('auth.continueWithFacebook')}</span>
+              </Button>
+
+              {/* Magic Link toggle */}
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-white/20" />
+                </div>
+                <div className="relative flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMagicLink(!showMagicLink);
+                      setShowEmailForm(false);
+                      setMagicLinkSent(false);
+                    }}
+                    className="bg-travliaq-deep-blue px-4 py-1 text-white/70 hover:text-white text-sm transition-colors flex items-center gap-2"
+                  >
+                    <Send className="w-4 h-4" />
+                    {showMagicLink ? t('auth.hideMagicLink') : t('auth.useMagicLink')}
+                  </button>
+                </div>
+              </div>
+
+              {/* Magic Link form */}
+              {showMagicLink && (
+                <div className="space-y-3 animate-fade-in">
+                  <div className="bg-white/5 rounded-2xl p-6 space-y-4">
+                    <div className="flex items-center justify-center gap-2 pb-2">
+                      <div className="h-px bg-white/20 flex-1" />
+                      <span className="text-white/60 text-xs font-medium uppercase tracking-wide">
+                        {t('auth.magicLinkTitle')}
+                      </span>
+                      <div className="h-px bg-white/20 flex-1" />
+                    </div>
+
+                    {!magicLinkSent ? (
+                      <form onSubmit={handleMagicLinkSend} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="magic-email" className="text-white text-sm">
+                            {t('auth.email')}
+                          </Label>
+                          <Input
+                            id="magic-email"
+                            type="email"
+                            placeholder={t('auth.emailPlaceholder')}
+                            value={magicLinkEmail}
+                            onChange={(e) => setMagicLinkEmail(e.target.value)}
+                            className="bg-white/10 border-white/30 text-white placeholder:text-white/40 focus:border-travliaq-turquoise h-11"
+                            required
+                          />
+                        </div>
+
+                        <Button
+                          type="submit"
+                          size="lg"
+                          className="w-full bg-travliaq-turquoise hover:bg-travliaq-turquoise/90 text-white h-11 font-medium"
+                          disabled={loading}
+                        >
+                          {loading ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Send className="mr-2 h-4 w-4" />
+                          )}
+                          {t('auth.sendMagicLink')}
+                        </Button>
+                      </form>
+                    ) : (
+                      <div className="text-center space-y-3">
+                        <div className="inline-flex items-center justify-center w-12 h-12 bg-green-500/20 rounded-full mb-2">
+                          <Mail className="w-6 h-6 text-green-400" />
+                        </div>
+                        <p className="text-white text-sm">
+                          {t('auth.magicLinkSentMessage')}
+                        </p>
+                        <p className="text-white/60 text-xs">
+                          {magicLinkEmail}
+                        </p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setMagicLinkSent(false);
+                            setMagicLinkEmail('');
+                          }}
+                          className="text-travliaq-turquoise hover:text-travliaq-turquoise/80"
+                        >
+                          {t('auth.sendAnotherLink')}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Divider with email option toggle */}
               <div className="relative py-4">
