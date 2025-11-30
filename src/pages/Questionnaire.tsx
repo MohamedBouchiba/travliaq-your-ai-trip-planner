@@ -2026,10 +2026,10 @@ const Questionnaire = () => {
         <QuestionTransition step={step}>
           <div className="space-y-3">
             <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
-              {t('questionnaire.destination.hasDestination')}
+              {t('questionnaire.destinationInMind')}
             </h2>
             <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
-              {t('questionnaire.destination.hasDestination.description')}
+              {t('questionnaire.destinationInMind.description')}
             </p>
             <div className="grid grid-cols-2 gap-4 max-w-xl mx-auto">
               {[
@@ -2519,9 +2519,6 @@ const Questionnaire = () => {
           <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
             {t('questionnaire.dates.selectDates')}
           </h2>
-          <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
-            {t('questionnaire.dates.selectDates.description')}
-          </p>
           <div className="max-w-2xl mx-auto space-y-3">
             <div className="space-y-2">
               <label className="block text-sm font-medium text-travliaq-deep-blue text-center">
@@ -3992,31 +3989,29 @@ const Questionnaire = () => {
         </div>
       </div>
       
-      {/* Layout avec barre latérale sur desktop */}
-      <div className="flex flex-col md:flex-row min-h-screen">
-        {/* Enhanced Progress Bar with Milestones - Mobile: top, Desktop: sidebar */}
-        <div className="md:hidden fixed top-[52px] left-0 right-0 z-50 bg-white/95 backdrop-blur-sm">
-          <ProgressBar currentStep={step} totalSteps={totalSteps} progress={progress} answers={answers} />
-        </div>
-        
-        <div className="hidden md:block md:fixed md:left-0 md:top-[52px] md:bottom-0 md:w-64 md:border-r md:border-border/60 md:bg-white/95 md:backdrop-blur z-50">
-          <ProgressBar currentStep={step} totalSteps={totalSteps} progress={progress} answers={answers} />
+      {/* Layout centré avec progress bar en haut */}
+      <div className="flex flex-col min-h-screen">
+        {/* Progress bar compacte et centrée - visible sur mobile et desktop */}
+        <div className="fixed top-[52px] left-0 right-0 z-50 bg-white/95 backdrop-blur-sm py-1 border-b border-border/20">
+          <div className="max-w-4xl mx-auto px-4">
+            <ProgressBar currentStep={step} totalSteps={totalSteps} progress={progress} answers={answers} />
+          </div>
         </div>
 
         {/* Main content area - properly centered */}
-        <div className="flex-1 md:ml-64 flex justify-center items-start pt-24 md:pt-20 pb-8 px-4">
+        <div className="flex-1 flex justify-center items-start pt-28 md:pt-24 pb-8 px-4">
           <div className="w-full max-w-3xl space-y-4">
-            {/* Action buttons */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white/50 backdrop-blur-sm rounded-xl p-3 border border-border/30">
-              <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start">
+            {/* Action buttons - Optimisé pour mobile et desktop */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-white/50 backdrop-blur-sm rounded-xl p-2.5 border border-border/30">
+              <div className="flex items-center gap-1.5 flex-wrap justify-center sm:justify-start">
                 <AnimatedButton
                   variant="ghost"
                   size="sm"
                   onClick={step > 1 ? prevStep : undefined}
                   disabled={step === 1}
-                  className="text-travliaq-deep-blue hover:text-travliaq-turquoise hover:bg-travliaq-turquoise/10 transition-all"
+                  className="text-travliaq-deep-blue hover:text-travliaq-turquoise hover:bg-travliaq-turquoise/10 transition-all text-xs sm:text-sm px-2.5 sm:px-3 py-1.5"
                 >
-                  <ChevronLeft className="mr-1 h-4 w-4" />
+                  <ChevronLeft className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   {t('questionnaire.back')}
                 </AnimatedButton>
                 
@@ -4029,14 +4024,14 @@ const Questionnaire = () => {
                       setIsEditMode(false);
                       setReturnToReviewStep(null);
                     }}
-                    className="bg-travliaq-turquoise hover:bg-travliaq-turquoise/90 text-white transition-all"
+                    className="bg-travliaq-turquoise hover:bg-travliaq-turquoise/90 text-white transition-all text-xs sm:text-sm px-2.5 sm:px-3 py-1.5"
                   >
                     {t('questionnaire.backToReview')}
                   </AnimatedButton>
                 )}
               </div>
               
-              <div className="flex items-center gap-2 justify-center sm:justify-end">
+              <div className="flex items-center gap-1.5 justify-center sm:justify-end flex-wrap">
                 <AnimatedButton
                   variant="outline"
                   size="sm"
@@ -4058,19 +4053,20 @@ const Questionnaire = () => {
                       setTimeout(() => navigate('/'), 500);
                     }
                   }}
-                  className="text-travliaq-deep-blue border-travliaq-deep-blue hover:bg-travliaq-deep-blue hover:text-white transition-all"
+                  className="text-travliaq-deep-blue border-travliaq-deep-blue hover:bg-travliaq-deep-blue hover:text-white transition-all text-xs sm:text-sm px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
                 >
-                  {t('questionnaire.saveAndReturn')}
+                  <span className="hidden sm:inline">{t('questionnaire.saveAndReturn')}</span>
+                  <span className="sm:hidden">💾</span>
                 </AnimatedButton>
 
                 <AnimatedButton
                   variant="outline"
                   size="sm"
                   onClick={() => setShowResetDialog(true)}
-                  className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white transition-all"
+                  className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white transition-all text-xs sm:text-sm px-2.5 sm:px-3 py-1.5"
                 >
-                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-                  Repartir de zéro
+                  <Trash2 className="w-3.5 h-3.5 sm:mr-1.5" />
+                  <span className="hidden sm:inline">Repartir de zéro</span>
                 </AnimatedButton>
               </div>
             </div>
