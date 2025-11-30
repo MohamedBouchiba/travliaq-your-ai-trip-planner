@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
+import logoTravliaq from "@/assets/logo-travliaq.png";
 import { 
   MapPin, 
   Users, 
@@ -3842,18 +3843,38 @@ const Questionnaire = () => {
       <div className="absolute top-0 left-0 w-96 h-96 bg-travliaq-turquoise/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
       <div className="absolute bottom-0 right-0 w-96 h-96 bg-travliaq-golden-sand/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
       
-      {/* Navigation minimale */}
-      <Navigation variant="minimal" />
+      {/* Navigation minimale avec logo */}
+      <div className="fixed top-0 left-0 right-0 z-[60] bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2 transition-all duration-300 hover:opacity-80 group"
+            aria-label="Retour à l'accueil"
+          >
+            <img 
+              src={logoTravliaq} 
+              alt="Travliaq" 
+              className="h-8 w-auto transform group-hover:scale-105 transition-transform"
+            />
+          </button>
+          
+          {/* Step indicator on desktop */}
+          <div className="hidden sm:flex items-center gap-2 text-xs text-gray-600">
+            <span className="font-medium">{step}/{totalSteps}</span>
+            <span className="text-travliaq-deep-blue font-bold">{Math.round(progress)}%</span>
+          </div>
+        </div>
+      </div>
       
       {/* Enhanced Progress Bar with Milestones */}
-      <div className="fixed top-0 left-0 right-0 z-50">
-        <ProgressBar currentStep={step} totalSteps={totalSteps} progress={progress} />
+      <div className="fixed top-[52px] left-0 right-0 z-50">
+        <ProgressBar currentStep={step} totalSteps={totalSteps} progress={progress} answers={answers} />
       </div>
 
       {/* Header ultra-compact */}
-      <div className="pt-24 pb-4 px-4">
+      <div className="pt-32 pb-4 px-4">
         <div className="max-w-3xl mx-auto">
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex items-center justify-center">
             <h1 className="text-xl md:text-2xl font-montserrat font-bold bg-gradient-to-r from-travliaq-deep-blue via-travliaq-turquoise to-travliaq-deep-blue bg-clip-text text-transparent">
               {t('questionnaire.customTrip')}
             </h1>
