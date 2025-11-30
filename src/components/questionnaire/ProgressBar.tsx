@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Users, MapPin, Calendar, Wallet, Plane, Heart, Bed, CheckCircle2 } from "lucide-react";
+import { Users, MapPin, Calendar, Wallet, Plane, Heart, Bed, CheckCircle2, Compass } from "lucide-react";
 
 interface Milestone {
   key: string;
@@ -12,18 +12,18 @@ interface ProgressBarProps {
   currentStep: number;
   totalSteps: number;
   progress: number;
-  answers?: any; // Pour calculer dynamiquement les jalons
+  answers?: any;
 }
 
 export const ProgressBar = ({ currentStep, totalSteps, progress, answers = {} }: ProgressBarProps) => {
   const { t } = useTranslation();
 
-  // Calculer dynamiquement les jalons basés sur les réponses
+  // Calculer dynamiquement les phases (milestones) basées sur les réponses
   const calculateMilestones = (): Milestone[] => {
     const milestones: Milestone[] = [];
     let currentStepCount = 1;
 
-    // 1. PROFIL (Qui voyage, nombre de voyageurs, enfants)
+    // PHASE 1: PROFIL (toujours présente)
     const profileStart = currentStepCount;
     currentStepCount += 1; // Qui voyage
     if (answers.travelGroup === 'family' || answers.travelGroup === 'group35') {
@@ -39,7 +39,7 @@ export const ProgressBar = ({ currentStep, totalSteps, progress, answers = {} }:
       stepRange: [profileStart, currentStepCount - 1]
     });
 
-    // 2. SERVICES + DESTINATION
+    // PHASE 2: DESTINATION (toujours présente)
     const destinationStart = currentStepCount;
     currentStepCount += 1; // Services (aide avec quoi)
     currentStepCount += 1; // Destination en tête
@@ -56,19 +56,20 @@ export const ProgressBar = ({ currentStep, totalSteps, progress, answers = {} }:
       stepRange: [destinationStart, currentStepCount - 1]
     });
 
-    // 3. DATES (Type de dates, dates précises/flexibles, durée)
+    // PHASE 3: DATES (toujours présente)
     const datesStart = currentStepCount;
     currentStepCount += 1; // Type de dates
     if (answers.datesType?.toLowerCase?.().includes('fixed') || answers.datesType?.toLowerCase?.().includes('précises')) {
       currentStepCount += 1; // Dates précises
     } else if (answers.datesType?.toLowerCase?.().includes('flexible')) {
-      currentStepCount += 2; // Flexibilité + période approximative
+      currentStepCount += 1; // Flexibilité
+      currentStepCount += 1; // Période approximative
       if (answers.hasApproximateDepartureDate === 'yes' || answers.hasApproximateDepartureDate?.toLowerCase?.().includes('oui')) {
         currentStepCount += 1; // Date approximative
       }
       currentStepCount += 1; // Durée
       if (answers.duration?.includes('>14') || answers.duration?.toLowerCase?.().includes('more')) {
-        currentStepCount += 1; // Nombre exact de nuits
+        currentStepCount += 1; // Nombre exact de nuits (>14)
       }
     }
     milestones.push({
@@ -78,7 +79,7 @@ export const ProgressBar = ({ currentStep, totalSteps, progress, answers = {} }:
       stepRange: [datesStart, currentStepCount - 1]
     });
 
-    // 4. BUDGET
+    // PHASE 4: BUDGET (toujours présente)
     const budgetStart = currentStepCount;
     currentStepCount += 1; // Budget
     if (answers.budgetType?.toLowerCase?.().includes('précis') || 
@@ -98,7 +99,7 @@ export const ProgressBar = ({ currentStep, totalSteps, progress, answers = {} }:
     const needsAccommodation = helpWith.includes('accommodation') || helpWith.includes('hébergement');
     const needsActivities = helpWith.includes('activities') || helpWith.includes('activités');
 
-    // 5. VOLS (si sélectionné)
+    // PHASE 5: VOLS (conditionnelle - seulement si vols sélectionnés)
     if (needsFlights) {
       const flightsStart = currentStepCount;
       currentStepCount += 2; // Préférence vol + Bagages
@@ -110,40 +111,47 @@ export const ProgressBar = ({ currentStep, totalSteps, progress, answers = {} }:
       });
     }
 
-    // 6. PRÉFÉRENCES (Style, Mobilité, Sécurité, Rythme)
-    const preferencesStart = currentStepCount;
-    let hasPreferences = false;
-    
-    // Style (si destination précise ET activités)
-    if ((answers.hasDestination === 'yes' || answers.hasDestination?.toLowerCase?.().includes('oui')) && needsActivities) {
-      currentStepCount += 1;
-      hasPreferences = true;
-    }
-    
-    // Mobilité (si pas uniquement vols ET pas uniquement hébergement)
-    const onlyFlights = helpWith.length === 1 && needsFlights;
-    const onlyAccommodation = helpWith.length === 1 && needsAccommodation;
-    if (!onlyFlights && !onlyAccommodation) {
-      currentStepCount += 1;
-      hasPreferences = true;
-    }
-    
-    // Sécurité & Rythme (si activités sélectionnées)
+    // PHASE 6: ACTIVITÉS (conditionnelle - seulement si activités sélectionnées)
     if (needsActivities) {
+      const activitiesStart = currentStepCount;
+      
+      // Style (si destination précise ET activités)
+      if (answers.hasDestination === 'yes' || answers.hasDestination?.toLowerCase?.().includes('oui')) {
+        currentStepCount += 1; // Style
+      }
+      
+      // Mobilité (si pas uniquement vols ET pas uniquement hébergement)
+      const onlyFlights = helpWith.length === 1 && needsFlights;
+      const onlyAccommodation = helpWith.length === 1 && needsAccommodation;
+      if (!onlyFlights && !onlyAccommodation) {
+        currentStepCount += 1; // Mobilité
+      }
+      
       currentStepCount += 2; // Sécurité + Rythme
-      hasPreferences = true;
-    }
-
-    if (hasPreferences) {
+      
       milestones.push({
-        key: "preferences",
-        icon: Heart,
-        label: t("questionnaire.progress.preferences"),
-        stepRange: [preferencesStart, currentStepCount - 1]
+        key: "activities",
+        icon: Compass,
+        label: t("questionnaire.progress.activities"),
+        stepRange: [activitiesStart, currentStepCount - 1]
       });
+    } else {
+      // Mobilité peut exister sans activités (si pas uniquement vols ET pas uniquement hébergement)
+      const onlyFlights = helpWith.length === 1 && needsFlights;
+      const onlyAccommodation = helpWith.length === 1 && needsAccommodation;
+      if (!onlyFlights && !onlyAccommodation) {
+        const mobilityStart = currentStepCount;
+        currentStepCount += 1; // Mobilité seule
+        milestones.push({
+          key: "mobility",
+          icon: Compass,
+          label: t("questionnaire.progress.preferences"),
+          stepRange: [mobilityStart, currentStepCount - 1]
+        });
+      }
     }
 
-    // 7. HÉBERGEMENT (si sélectionné)
+    // PHASE 7: HÉBERGEMENT (conditionnelle - seulement si hébergement sélectionné)
     if (needsAccommodation) {
       const accommodationStart = currentStepCount;
       currentStepCount += 1; // Type hébergement
@@ -175,13 +183,13 @@ export const ProgressBar = ({ currentStep, totalSteps, progress, answers = {} }:
       });
     }
 
-    // 8. FINALISATION (Zone ouverte + Review)
+    // PHASE 8: FINALISATION (toujours présente)
     const finalizationStart = currentStepCount;
     milestones.push({
       key: "finalization",
       icon: CheckCircle2,
       label: t("questionnaire.progress.finalization"),
-      stepRange: [finalizationStart, 100] // Jusqu'à la fin
+      stepRange: [finalizationStart, 100]
     });
 
     return milestones;
@@ -215,170 +223,186 @@ export const ProgressBar = ({ currentStep, totalSteps, progress, answers = {} }:
   };
 
   return (
-    <div className="w-full bg-white/90 backdrop-blur-sm border-b border-gray-200 shadow-sm">
-      {/* Main Progress Bar */}
-      <div className="relative h-1.5 bg-gradient-to-r from-gray-100 to-gray-200">
+    <div className="w-full bg-gradient-to-br from-travliaq-deep-blue/5 via-white to-travliaq-turquoise/5 backdrop-blur-md border-b border-travliaq-turquoise/20 shadow-lg">
+      {/* Main Progress Bar - Futuristic Style */}
+      <div className="relative h-2 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 overflow-hidden">
+        {/* Background animated shimmer */}
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-travliaq-turquoise/10 to-transparent animate-shimmer" />
+        
+        {/* Progress fill */}
         <div 
-          className="h-full bg-gradient-to-r from-travliaq-deep-blue via-travliaq-turquoise to-travliaq-golden-sand transition-all duration-500 ease-out relative overflow-hidden shadow-lg"
+          className="h-full bg-gradient-to-r from-travliaq-turquoise via-travliaq-deep-blue to-travliaq-golden-sand transition-all duration-700 ease-out relative overflow-hidden shadow-[0_0_20px_rgba(0,180,216,0.6)]"
           style={{ width: `${progress}%` }}
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-white/40 via-transparent to-white/40 animate-pulse" />
         </div>
       </div>
 
-      {/* Milestones */}
-      <div className="max-w-7xl mx-auto px-4 py-2.5">
-        <div className="flex items-center justify-between relative">
-          {/* Mobile: Show only current milestone */}
-          <div className="md:hidden flex items-center gap-3 w-full justify-center">
-            {milestones.map((milestone, index) => {
-              if (index !== currentMilestoneIndex) return null;
-              
-              const Icon = milestone.icon;
-              const isCompleted = index < currentMilestoneIndex;
-              const isCurrent = index === currentMilestoneIndex;
-              const milestoneProgress = getMilestoneProgress(index);
+      {/* Milestones Container */}
+      <div className="max-w-7xl mx-auto px-3 py-3">
+        {/* Mobile: Show only current milestone */}
+        <div className="md:hidden flex items-center justify-center gap-3">
+          {milestones.map((milestone, index) => {
+            if (index !== currentMilestoneIndex) return null;
+            
+            const Icon = milestone.icon;
+            const isCompleted = index < currentMilestoneIndex;
+            const isCurrent = index === currentMilestoneIndex;
+            const milestoneProgress = getMilestoneProgress(index);
 
-              return (
-                <div
-                  key={milestone.key}
-                  className="flex items-center gap-2 animate-fade-in"
-                >
+            return (
+              <div
+                key={milestone.key}
+                className="flex items-center gap-3 animate-fade-in"
+              >
+                {/* Icon with futuristic glow */}
+                <div className="relative">
                   <div className={`
-                    relative flex items-center justify-center w-9 h-9 rounded-full border-2 transition-all duration-300
+                    relative flex items-center justify-center w-12 h-12 rounded-full transition-all duration-500
                     ${isCompleted 
-                      ? 'bg-travliaq-turquoise border-travliaq-turquoise text-white scale-110' 
+                      ? 'bg-gradient-to-br from-travliaq-turquoise to-travliaq-deep-blue text-white shadow-[0_0_20px_rgba(0,180,216,0.8)]' 
                       : isCurrent 
-                        ? 'bg-white border-travliaq-deep-blue text-travliaq-deep-blue scale-110' 
-                        : 'bg-gray-100 border-gray-300 text-gray-400'
+                        ? 'bg-gradient-to-br from-white to-gray-50 text-travliaq-deep-blue shadow-[0_0_25px_rgba(0,180,216,0.5)]' 
+                        : 'bg-gray-100 text-gray-400'
                     }
                   `}>
-                    <Icon className="w-4 h-4" />
+                    <Icon className="w-5 h-5" />
                     
-                    {/* Progress ring for current milestone */}
+                    {/* Circular progress ring */}
                     {isCurrent && (
-                      <svg className="absolute -inset-1 w-11 h-11 -rotate-90">
+                      <svg className="absolute -inset-1.5 w-15 h-15 -rotate-90">
                         <circle
-                          cx="22"
-                          cy="22"
-                          r="20"
+                          cx="30"
+                          cy="30"
+                          r="28"
                           stroke="currentColor"
-                          strokeWidth="2"
+                          strokeWidth="3"
                           fill="none"
                           className="text-gray-200"
                         />
                         <circle
-                          cx="22"
-                          cy="22"
-                          r="20"
+                          cx="30"
+                          cy="30"
+                          r="28"
                           stroke="currentColor"
-                          strokeWidth="2"
+                          strokeWidth="3"
                           fill="none"
-                          strokeDasharray={`${2 * Math.PI * 20}`}
-                          strokeDashoffset={`${2 * Math.PI * 20 * (1 - milestoneProgress / 100)}`}
-                          className="text-travliaq-turquoise transition-all duration-500"
+                          strokeDasharray={`${2 * Math.PI * 28}`}
+                          strokeDashoffset={`${2 * Math.PI * 28 * (1 - milestoneProgress / 100)}`}
+                          className="text-travliaq-turquoise transition-all duration-500 drop-shadow-[0_0_8px_rgba(0,180,216,0.8)]"
                           strokeLinecap="round"
                         />
                       </svg>
                     )}
                   </div>
-                  
-                  <div className="flex flex-col">
-                    <span className={`text-xs font-semibold ${
-                      isCurrent ? 'text-travliaq-deep-blue' : 'text-gray-600'
-                    }`}>
-                      {milestone.label}
-                    </span>
-                    <span className="text-[10px] text-gray-500">
-                      {currentStep}/{totalSteps} • {Math.round(progress)}%
-                    </span>
-                  </div>
                 </div>
-              );
-            })}
-          </div>
+                
+                {/* Label */}
+                <div className="flex flex-col">
+                  <span className={`text-sm font-bold ${
+                    isCurrent ? 'text-travliaq-deep-blue' : 'text-gray-700'
+                  }`}>
+                    {milestone.label}
+                  </span>
+                  <span className="text-xs text-gray-500 font-medium">
+                    {currentStep}/{totalSteps} • {Math.round(progress)}%
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
-          {/* Desktop: Show all milestones */}
-          <div className="hidden md:flex items-center justify-between w-full gap-1">
-            {milestones.map((milestone, index) => {
-              const Icon = milestone.icon;
-              const isCompleted = index < currentMilestoneIndex;
-              const isCurrent = index === currentMilestoneIndex;
-              const milestoneProgress = getMilestoneProgress(index);
-              const isLast = index === milestones.length - 1;
+        {/* Desktop: Show all milestones with futuristic design */}
+        <div className="hidden md:flex items-center justify-between w-full">
+          {milestones.map((milestone, index) => {
+            const Icon = milestone.icon;
+            const isCompleted = index < currentMilestoneIndex;
+            const isCurrent = index === currentMilestoneIndex;
+            const milestoneProgress = getMilestoneProgress(index);
+            const isLast = index === milestones.length - 1;
 
-              return (
-                <div key={milestone.key} className="flex items-center flex-1 min-w-0">
-                  <div className="flex flex-col items-center gap-0.5 group flex-shrink-0">
+            return (
+              <div key={milestone.key} className="flex items-center flex-1">
+                {/* Milestone node */}
+                <div className="flex flex-col items-center gap-2 group relative">
+                  {/* Icon container with glow effect */}
+                  <div className="relative">
                     <div className={`
-                      relative flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all duration-300
+                      relative flex items-center justify-center w-10 h-10 rounded-full transition-all duration-500
                       ${isCompleted 
-                        ? 'bg-travliaq-turquoise border-travliaq-turquoise text-white scale-110 shadow-md' 
+                        ? 'bg-gradient-to-br from-travliaq-turquoise to-travliaq-deep-blue text-white shadow-[0_0_20px_rgba(0,180,216,0.8)] scale-110' 
                         : isCurrent 
-                          ? 'bg-white border-travliaq-deep-blue text-travliaq-deep-blue scale-110 shadow-md' 
-                          : 'bg-gray-100 border-gray-300 text-gray-400'
+                          ? 'bg-gradient-to-br from-white to-gray-50 text-travliaq-deep-blue shadow-[0_0_25px_rgba(0,180,216,0.5)] scale-110' 
+                          : 'bg-gray-100 text-gray-400 scale-100'
                       }
                     `}>
-                      <Icon className="w-3.5 h-3.5" />
+                      <Icon className="w-4 h-4" />
                       
-                      {/* Progress ring for current milestone */}
+                      {/* Animated progress ring for current */}
                       {isCurrent && (
-                        <svg className="absolute -inset-1 w-10 h-10 -rotate-90">
+                        <svg className="absolute -inset-1.5 w-13 h-13 -rotate-90">
                           <circle
-                            cx="20"
-                            cy="20"
-                            r="18"
+                            cx="26"
+                            cy="26"
+                            r="24"
                             stroke="currentColor"
-                            strokeWidth="2"
+                            strokeWidth="2.5"
                             fill="none"
                             className="text-gray-200"
                           />
                           <circle
-                            cx="20"
-                            cy="20"
-                            r="18"
+                            cx="26"
+                            cy="26"
+                            r="24"
                             stroke="currentColor"
-                            strokeWidth="2"
+                            strokeWidth="2.5"
                             fill="none"
-                            strokeDasharray={`${2 * Math.PI * 18}`}
-                            strokeDashoffset={`${2 * Math.PI * 18 * (1 - milestoneProgress / 100)}`}
-                            className="text-travliaq-turquoise transition-all duration-500"
+                            strokeDasharray={`${2 * Math.PI * 24}`}
+                            strokeDashoffset={`${2 * Math.PI * 24 * (1 - milestoneProgress / 100)}`}
+                            className="text-travliaq-turquoise transition-all duration-500 drop-shadow-[0_0_8px_rgba(0,180,216,0.8)]"
                             strokeLinecap="round"
                           />
                         </svg>
                       )}
                     </div>
                     
-                    <span className={`text-[10px] font-medium text-center transition-all duration-300 max-w-[70px] leading-tight truncate ${
-                      isCompleted 
-                        ? 'text-travliaq-turquoise' 
-                        : isCurrent 
-                          ? 'text-travliaq-deep-blue font-semibold' 
-                          : 'text-gray-500'
-                    }`}>
-                      {milestone.label}
-                    </span>
+                    {/* Pulsing dot for current */}
+                    {isCurrent && (
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-travliaq-golden-sand rounded-full animate-ping" />
+                    )}
                   </div>
-
-                  {/* Connector line */}
-                  {!isLast && (
-                    <div className="flex-1 h-0.5 mx-1 bg-gray-200 relative overflow-hidden min-w-[20px]">
-                      <div 
-                        className={`h-full transition-all duration-500 ${
-                          isCompleted 
-                            ? 'bg-gradient-to-r from-travliaq-turquoise to-travliaq-turquoise w-full' 
-                            : isCurrent && milestoneProgress > 80
-                              ? 'bg-gradient-to-r from-travliaq-turquoise to-transparent'
-                              : 'w-0'
-                        }`}
-                        style={isCurrent && milestoneProgress > 80 ? { width: `${(milestoneProgress - 80) * 5}%` } : {}}
-                      />
-                    </div>
-                  )}
+                  
+                  {/* Label below icon */}
+                  <span className={`text-[11px] font-bold text-center transition-all duration-300 max-w-[80px] leading-tight ${
+                    isCompleted 
+                      ? 'text-travliaq-turquoise' 
+                      : isCurrent 
+                        ? 'text-travliaq-deep-blue' 
+                        : 'text-gray-500'
+                  }`}>
+                    {milestone.label}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Connector line between milestones */}
+                {!isLast && (
+                  <div className="flex-1 h-1 mx-2 bg-gradient-to-r from-gray-200 to-gray-100 relative overflow-hidden rounded-full">
+                    <div 
+                      className={`h-full transition-all duration-700 rounded-full ${
+                        isCompleted 
+                          ? 'bg-gradient-to-r from-travliaq-turquoise to-travliaq-deep-blue w-full shadow-[0_0_10px_rgba(0,180,216,0.6)]' 
+                          : isCurrent && milestoneProgress > 80
+                            ? 'bg-gradient-to-r from-travliaq-turquoise to-transparent shadow-[0_0_10px_rgba(0,180,216,0.4)]'
+                            : 'w-0'
+                      }`}
+                      style={isCurrent && milestoneProgress > 80 ? { width: `${(milestoneProgress - 80) * 5}%` } : {}}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
