@@ -206,19 +206,21 @@ export const ProgressBar = ({ currentStep, totalSteps, progress, answers = {} }:
   };
 
   return (
-    <div className="w-full bg-white/95 backdrop-blur border-b border-border/60 shadow-sm">
-      {/* Main Progress Bar - ultra fine */}
-      <div className="relative h-1 bg-gradient-to-r from-muted via-muted to-muted overflow-hidden">
-        <div
-          className="h-full bg-gradient-to-r from-travliaq-turquoise via-travliaq-deep-blue to-travliaq-golden-sand transition-all duration-500 ease-out"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
+    <>
+      {/* Mobile: horizontal layout at top */}
+      <div className="md:hidden w-full bg-white/95 backdrop-blur border-b border-border/60 shadow-sm">
+        {/* Main Progress Bar - ultra fine */}
+        <div className="relative h-1 bg-gradient-to-r from-muted via-muted to-muted overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-travliaq-turquoise via-travliaq-deep-blue to-travliaq-golden-sand transition-all duration-500 ease-out"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
 
-      {/* Milestones Container */}
-      <div className="max-w-7xl mx-auto px-3 py-2">
+        {/* Milestones Container */}
+        <div className="max-w-7xl mx-auto px-3 py-2">
         {/* Mobile: only current milestone, very compact */}
-        <div className="md:hidden flex items-center justify-center gap-2">
+        <div className="flex items-center justify-center gap-2">
           {milestones.map((milestone, index) => {
             if (index !== currentMilestoneIndex) return null;
 
@@ -256,9 +258,27 @@ export const ProgressBar = ({ currentStep, totalSteps, progress, answers = {} }:
             );
           })}
         </div>
+        </div>
+      </div>
 
-        {/* Desktop: all milestones, slim line, no overlap */}
-        <div className="hidden md:flex items-center justify-between w-full">
+      {/* Desktop: vertical sidebar layout */}
+      <div className="hidden md:flex md:flex-col md:h-full md:py-6 md:px-4">
+        {/* Progress indicator at top */}
+        <div className="mb-6 text-center">
+          <div className="text-2xl font-bold text-travliaq-deep-blue mb-1">{Math.round(progress)}%</div>
+          <div className="text-xs text-muted-foreground">{currentStep} / {totalSteps}</div>
+        </div>
+
+        {/* Vertical Progress Bar */}
+        <div className="relative w-1 h-32 mx-auto mb-6 bg-gradient-to-b from-muted via-muted to-muted overflow-hidden rounded-full">
+          <div
+            className="w-full bg-gradient-to-b from-travliaq-turquoise via-travliaq-deep-blue to-travliaq-golden-sand transition-all duration-500 ease-out"
+            style={{ height: `${progress}%` }}
+          />
+        </div>
+
+        {/* Vertical Milestones */}
+        <div className="flex flex-col gap-4 flex-1">
           {milestones.map((milestone, index) => {
             const Icon = milestone.icon;
             const isCompleted = index < currentMilestoneIndex;
@@ -266,26 +286,26 @@ export const ProgressBar = ({ currentStep, totalSteps, progress, answers = {} }:
             const isLast = index === milestones.length - 1;
 
             return (
-              <div key={milestone.key} className="flex items-center flex-1 min-w-0">
+              <div key={milestone.key} className="flex flex-col items-center gap-2">
                 {/* Node */}
-                <div className="flex flex-col items-center gap-1">
+                <div className="flex items-center gap-3 w-full">
                   <div
-                    className={`flex items-center justify-center w-9 h-9 rounded-full text-sm transition-all duration-300
+                    className={`flex items-center justify-center w-10 h-10 rounded-full text-sm transition-all duration-300 flex-shrink-0
                       ${isCompleted
                         ? "bg-travliaq-turquoise text-white shadow-[0_0_12px_rgba(0,180,216,0.6)] scale-105"
                         : isCurrent
-                          ? "bg-white text-travliaq-deep-blue border border-travliaq-turquoise shadow-sm scale-105"
+                          ? "bg-white text-travliaq-deep-blue border-2 border-travliaq-turquoise shadow-sm scale-105"
                           : "bg-muted text-muted-foreground scale-100"}
                     `}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon className="w-5 h-5" />
                   </div>
                   <span
-                    className={`text-[11px] font-medium text-center leading-tight max-w-[80px] truncate ${
+                    className={`text-sm font-medium leading-tight flex-1 ${
                       isCompleted
                         ? "text-travliaq-turquoise"
                         : isCurrent
-                          ? "text-travliaq-deep-blue"
+                          ? "text-travliaq-deep-blue font-semibold"
                           : "text-muted-foreground"
                     }`}
                   >
@@ -293,16 +313,16 @@ export const ProgressBar = ({ currentStep, totalSteps, progress, answers = {} }:
                   </span>
                 </div>
 
-                {/* Connector */}
+                {/* Vertical Connector */}
                 {!isLast && (
-                  <div className="flex-1 h-px mx-2 bg-muted relative overflow-hidden rounded-full">
+                  <div className="w-px h-8 ml-5 bg-muted relative overflow-hidden rounded-full">
                     <div
-                      className={`h-full transition-all duration-500 rounded-full ${
+                      className={`w-full transition-all duration-500 rounded-full ${
                         isCompleted
-                          ? "bg-gradient-to-r from-travliaq-turquoise to-travliaq-deep-blue w-full"
+                          ? "bg-gradient-to-b from-travliaq-turquoise to-travliaq-deep-blue h-full"
                           : isCurrent
-                            ? "bg-gradient-to-r from-travliaq-turquoise to-transparent w-1/3"
-                            : "w-0"
+                            ? "bg-gradient-to-b from-travliaq-turquoise to-transparent h-1/3"
+                            : "h-0"
                       }`}
                     />
                   </div>
@@ -312,6 +332,6 @@ export const ProgressBar = ({ currentStep, totalSteps, progress, answers = {} }:
           })}
         </div>
       </div>
-    </div>
+    </>
   );
 };

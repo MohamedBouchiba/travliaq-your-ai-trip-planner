@@ -3966,13 +3966,19 @@ const Questionnaire = () => {
         </div>
       </div>
       
-      {/* Enhanced Progress Bar with Milestones */}
-      <div className="fixed top-[52px] left-0 right-0 z-50">
-        <ProgressBar currentStep={step} totalSteps={totalSteps} progress={progress} answers={answers} />
-      </div>
+      {/* Layout avec barre latérale sur desktop */}
+      <div className="flex flex-col md:flex-row md:min-h-screen">
+        {/* Enhanced Progress Bar with Milestones - Mobile: top, Desktop: sidebar */}
+        <div className="md:hidden fixed top-[52px] left-0 right-0 z-50">
+          <ProgressBar currentStep={step} totalSteps={totalSteps} progress={progress} answers={answers} />
+        </div>
+        
+        <div className="hidden md:block md:fixed md:left-0 md:top-[52px] md:bottom-0 md:w-64 md:border-r md:border-border/60 md:bg-white/95 md:backdrop-blur z-50">
+          <ProgressBar currentStep={step} totalSteps={totalSteps} progress={progress} answers={answers} />
+        </div>
 
-      {/* Content compact */}
-      <div className="max-w-3xl mx-auto px-4 pt-20 pb-2 relative z-10">
+        {/* Content compact */}
+        <div className="w-full md:ml-64 max-w-3xl md:mx-auto px-4 pt-20 md:pt-4 pb-2 relative z-10">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 flex-wrap">
             {step > 1 && (
@@ -4084,7 +4090,8 @@ const Questionnaire = () => {
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
+       </AlertDialog>
+      </div>
     </div>
   );
 };
