@@ -65,6 +65,7 @@ import { RhythmStep } from "@/components/questionnaire/RhythmStep";
 import { TravelersStep } from "@/components/questionnaire/TravelersStep";
 import { CitySearch } from "@/components/questionnaire/CitySearch";
 import { ReviewStep } from "@/components/questionnaire/ReviewStep";
+import { ProgressBar } from "@/components/questionnaire/ProgressBar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -3843,31 +3844,18 @@ const Questionnaire = () => {
       {/* Navigation minimale */}
       <Navigation variant="minimal" />
       
-      {/* Progress Bar améliorée */}
-      <div className="fixed top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-gray-100 to-gray-200 z-50 shadow-md">
-        <div 
-          className="h-full bg-gradient-to-r from-travliaq-deep-blue via-travliaq-turquoise to-travliaq-golden-sand transition-all duration-500 ease-out relative overflow-hidden shadow-lg"
-          style={{ width: `${progress}%` }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
-        </div>
+      {/* Enhanced Progress Bar with Milestones */}
+      <div className="fixed top-0 left-0 right-0 z-50">
+        <ProgressBar currentStep={step} totalSteps={totalSteps} progress={progress} />
       </div>
 
       {/* Header ultra-compact */}
-      <div className="pt-20 pb-4 px-4">
+      <div className="pt-24 pb-4 px-4">
         <div className="max-w-3xl mx-auto">
           <div className="flex items-center justify-center gap-4">
             <h1 className="text-xl md:text-2xl font-montserrat font-bold bg-gradient-to-r from-travliaq-deep-blue via-travliaq-turquoise to-travliaq-deep-blue bg-clip-text text-transparent">
               {t('questionnaire.customTrip')}
             </h1>
-            <div className="flex items-center gap-2 bg-gradient-to-r from-travliaq-turquoise/20 to-travliaq-golden-sand/20 px-4 py-2 rounded-full border border-travliaq-turquoise/30 shadow-sm">
-              <span className="text-xs text-travliaq-deep-blue/70 font-medium">
-                {step}/{totalSteps}
-              </span>
-              <span className="text-xs font-bold text-travliaq-deep-blue">
-                {Math.round(progress)}%
-              </span>
-            </div>
           </div>
         </div>
       </div>

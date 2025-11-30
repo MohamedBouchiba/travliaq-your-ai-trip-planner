@@ -421,6 +421,15 @@ const resources = {
       "questionnaire.pleaseAnswer": "Réponse requise",
       "questionnaire.answerRequired": "Veuillez répondre à cette question avant de continuer",
 
+      // Progress milestones
+      "questionnaire.progress.profile": "Profil",
+      "questionnaire.progress.destination": "Destination",
+      "questionnaire.progress.dates": "Dates",
+      "questionnaire.progress.budget": "Budget",
+      "questionnaire.progress.preferences": "Préférences",
+      "questionnaire.progress.accommodation": "Hébergement",
+      "questionnaire.progress.finalization": "Finalisation",
+
       // Help with descriptions
       "questionnaire.flights.desc": "Billets d'avion",
       "questionnaire.accommodation.desc": "Hôtels & logements",
@@ -1368,6 +1377,15 @@ const resources = {
 
       "questionnaire.pleaseAnswer": "Answer required",
       "questionnaire.answerRequired": "Please answer this question before continuing",
+
+      // Progress milestones
+      "questionnaire.progress.profile": "Profile",
+      "questionnaire.progress.destination": "Destination",
+      "questionnaire.progress.dates": "Dates",
+      "questionnaire.progress.budget": "Budget",
+      "questionnaire.progress.preferences": "Preferences",
+      "questionnaire.progress.accommodation": "Accommodation",
+      "questionnaire.progress.finalization": "Finalization",
 
       // Help with descriptions
       "questionnaire.flights.desc": "Flight tickets",
