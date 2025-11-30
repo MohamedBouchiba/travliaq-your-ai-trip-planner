@@ -3993,9 +3993,9 @@ const Questionnaire = () => {
       </div>
       
       {/* Layout avec barre latérale sur desktop */}
-      <div className="flex flex-col md:flex-row md:min-h-screen">
+      <div className="flex flex-col md:flex-row min-h-screen">
         {/* Enhanced Progress Bar with Milestones - Mobile: top, Desktop: sidebar */}
-        <div className="md:hidden fixed top-[52px] left-0 right-0 z-50">
+        <div className="md:hidden fixed top-[52px] left-0 right-0 z-50 bg-white/95 backdrop-blur-sm">
           <ProgressBar currentStep={step} totalSteps={totalSteps} progress={progress} answers={answers} />
         </div>
         
@@ -4003,79 +4003,84 @@ const Questionnaire = () => {
           <ProgressBar currentStep={step} totalSteps={totalSteps} progress={progress} answers={answers} />
         </div>
 
-        {/* Content compact */}
-        <div className="w-full md:ml-64 max-w-3xl md:mx-auto px-4 pt-20 md:pt-4 pb-2 relative z-10">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            {step > 1 && (
-              <AnimatedButton
-                variant="ghost"
-                size="sm"
-                onClick={prevStep}
-                className="text-travliaq-deep-blue hover:text-travliaq-turquoise hover:bg-travliaq-turquoise/10 transition-all"
-              >
-                <ChevronLeft className="mr-1 h-4 w-4" />
-                {t('questionnaire.back')}
-              </AnimatedButton>
-            )}
-            
-            {isEditMode && returnToReviewStep !== null && (
-              <AnimatedButton
-                variant="default"
-                size="sm"
-                onClick={() => {
-                  setStep(returnToReviewStep);
-                  setIsEditMode(false);
-                  setReturnToReviewStep(null);
-                }}
-                className="bg-travliaq-turquoise hover:bg-travliaq-turquoise/90 text-white transition-all"
-              >
-                {t('questionnaire.backToReview')}
-              </AnimatedButton>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
-            <AnimatedButton
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (user) {
-                  const draftKey = `travliaq:qv2:${user.id}`;
-                  const draft = {
-                    version: 2,
-                    timestamp: Date.now(),
-                    step,
-                    answers
-                  };
-                  localStorage.setItem(draftKey, JSON.stringify(draft));
-                  toast({
-                    title: t('questionnaire.draftSaved'),
-                    description: t('questionnaire.draftSavedDesc'),
-                    duration: 3000
-                  });
-                  setTimeout(() => navigate('/'), 500);
-                }
-              }}
-              className="text-travliaq-deep-blue border-travliaq-deep-blue hover:bg-travliaq-deep-blue hover:text-white transition-all flex-1 sm:flex-none whitespace-nowrap"
-            >
-              {t('questionnaire.saveAndReturn')}
-            </AnimatedButton>
+        {/* Main content area - properly centered */}
+        <div className="flex-1 md:ml-64 flex justify-center items-start pt-24 md:pt-20 pb-8 px-4">
+          <div className="w-full max-w-3xl space-y-4">
+            {/* Action buttons */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white/50 backdrop-blur-sm rounded-xl p-3 border border-border/30">
+              <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start">
+                {step > 1 && (
+                  <AnimatedButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={prevStep}
+                    className="text-travliaq-deep-blue hover:text-travliaq-turquoise hover:bg-travliaq-turquoise/10 transition-all"
+                  >
+                    <ChevronLeft className="mr-1 h-4 w-4" />
+                    {t('questionnaire.back')}
+                  </AnimatedButton>
+                )}
+                
+                {isEditMode && returnToReviewStep !== null && (
+                  <AnimatedButton
+                    variant="default"
+                    size="sm"
+                    onClick={() => {
+                      setStep(returnToReviewStep);
+                      setIsEditMode(false);
+                      setReturnToReviewStep(null);
+                    }}
+                    className="bg-travliaq-turquoise hover:bg-travliaq-turquoise/90 text-white transition-all"
+                  >
+                    {t('questionnaire.backToReview')}
+                  </AnimatedButton>
+                )}
+              </div>
+              
+              <div className="flex items-center gap-2 justify-center sm:justify-end">
+                <AnimatedButton
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (user) {
+                      const draftKey = `travliaq:qv2:${user.id}`;
+                      const draft = {
+                        version: 2,
+                        timestamp: Date.now(),
+                        step,
+                        answers
+                      };
+                      localStorage.setItem(draftKey, JSON.stringify(draft));
+                      toast({
+                        title: t('questionnaire.draftSaved'),
+                        description: t('questionnaire.draftSavedDesc'),
+                        duration: 3000
+                      });
+                      setTimeout(() => navigate('/'), 500);
+                    }
+                  }}
+                  className="text-travliaq-deep-blue border-travliaq-deep-blue hover:bg-travliaq-deep-blue hover:text-white transition-all"
+                >
+                  {t('questionnaire.saveAndReturn')}
+                </AnimatedButton>
 
-            <AnimatedButton
-              variant="outline"
-              size="sm"
-              onClick={() => setShowResetDialog(true)}
-              className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white transition-all duration-300 h-9 px-3 text-sm flex-1 sm:flex-none whitespace-nowrap"
-            >
-              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-              Repartir de zéro
-            </AnimatedButton>
-          </div>
-        </div>
+                <AnimatedButton
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowResetDialog(true)}
+                  className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white transition-all"
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                  Repartir de zéro
+                </AnimatedButton>
+              </div>
+            </div>
 
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-travliaq-turquoise/20 p-6 md:p-8 transition-all hover:shadow-[0_20px_60px_-15px_rgba(56,189,248,0.3)]">
-          {renderStep()}
+            {/* Questionnaire card */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-travliaq-turquoise/20 p-6 md:p-8 transition-all hover:shadow-[0_20px_60px_-15px_rgba(56,189,248,0.3)]">
+              {renderStep()}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -4117,7 +4122,6 @@ const Questionnaire = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
        </AlertDialog>
-      </div>
     </div>
   );
 };
