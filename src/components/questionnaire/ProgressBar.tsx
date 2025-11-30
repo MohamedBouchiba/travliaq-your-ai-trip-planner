@@ -206,132 +206,56 @@ export const ProgressBar = ({ currentStep, totalSteps, progress, answers = {} }:
   };
 
   return (
-    <>
-      {/* Mobile: horizontal layout at top */}
-      <div className="md:hidden w-full bg-white/95 backdrop-blur border-b border-border/60 shadow-sm">
-        {/* Main Progress Bar - ultra fine */}
-        <div className="relative h-1 bg-gradient-to-r from-muted via-muted to-muted overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-travliaq-turquoise via-travliaq-deep-blue to-travliaq-golden-sand transition-all duration-500 ease-out"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-
-        {/* Milestones Container */}
-        <div className="max-w-7xl mx-auto px-3 py-2">
-        {/* Mobile: only current milestone, very compact */}
-        <div className="flex items-center justify-center gap-2">
-          {milestones.map((milestone, index) => {
-            if (index !== currentMilestoneIndex) return null;
-
-            const Icon = milestone.icon;
-            const isCompleted = index < currentMilestoneIndex;
-            const isCurrent = index === currentMilestoneIndex;
-
-            return (
-              <div key={milestone.key} className="flex items-center gap-2">
-                <div
-                  className={`flex items-center justify-center w-8 h-8 rounded-full text-xs transition-all duration-300
-                    ${isCompleted
-                      ? "bg-travliaq-turquoise text-white shadow-[0_0_10px_rgba(0,180,216,0.6)]"
-                      : isCurrent
-                        ? "bg-white text-travliaq-deep-blue border border-travliaq-turquoise shadow-sm"
-                        : "bg-muted text-muted-foreground"}
-                  `}
-                >
-                  <Icon className="w-4 h-4" />
-                </div>
-
-                <div className="flex flex-col">
-                  <span
-                    className={`text-xs font-semibold leading-tight ${
-                      isCurrent ? "text-travliaq-deep-blue" : "text-muted-foreground"
-                    }`}
-                  >
-                    {milestone.label}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {currentStep}/{totalSteps} • {Math.round(progress)}%
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        </div>
+    <div className="w-full">
+      {/* Main Progress Bar - ultra fine et minimaliste */}
+      <div className="relative h-0.5 bg-gradient-to-r from-gray-200 via-gray-200 to-gray-200 overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-travliaq-turquoise via-travliaq-deep-blue to-travliaq-golden-sand transition-all duration-500 ease-out"
+          style={{ width: `${progress}%` }}
+        />
       </div>
 
-      {/* Desktop: vertical sidebar layout */}
-      <div className="hidden md:flex md:flex-col md:h-full md:py-6 md:px-4">
-        {/* Progress indicator at top */}
-        <div className="mb-6 text-center">
-          <div className="text-2xl font-bold text-travliaq-deep-blue mb-1">{Math.round(progress)}%</div>
-          <div className="text-xs text-muted-foreground">{currentStep} / {totalSteps}</div>
-        </div>
+      {/* Compact milestone indicator */}
+      <div className="flex items-center justify-center gap-1.5 py-1.5 px-2">
+        {milestones.map((milestone, index) => {
+          const Icon = milestone.icon;
+          const isCompleted = index < currentMilestoneIndex;
+          const isCurrent = index === currentMilestoneIndex;
 
-        {/* Vertical Progress Bar */}
-        <div className="relative w-1 h-32 mx-auto mb-6 bg-gradient-to-b from-muted via-muted to-muted overflow-hidden rounded-full">
-          <div
-            className="w-full bg-gradient-to-b from-travliaq-turquoise via-travliaq-deep-blue to-travliaq-golden-sand transition-all duration-500 ease-out"
-            style={{ height: `${progress}%` }}
-          />
-        </div>
-
-        {/* Vertical Milestones */}
-        <div className="flex flex-col gap-4 flex-1">
-          {milestones.map((milestone, index) => {
-            const Icon = milestone.icon;
-            const isCompleted = index < currentMilestoneIndex;
-            const isCurrent = index === currentMilestoneIndex;
-            const isLast = index === milestones.length - 1;
-
-            return (
-              <div key={milestone.key} className="flex flex-col items-center gap-2">
-                {/* Node */}
-                <div className="flex items-center gap-3 w-full">
+          return (
+            <div
+              key={milestone.key}
+              className={`flex items-center gap-1 transition-all duration-300 ${
+                isCurrent ? "scale-110" : "scale-100 opacity-40"
+              }`}
+            >
+              {isCurrent && (
+                <>
                   <div
-                    className={`flex items-center justify-center w-10 h-10 rounded-full text-sm transition-all duration-300 flex-shrink-0
+                    className={`flex items-center justify-center w-5 h-5 rounded-full text-xs transition-all duration-300
                       ${isCompleted
-                        ? "bg-travliaq-turquoise text-white shadow-[0_0_12px_rgba(0,180,216,0.6)] scale-105"
-                        : isCurrent
-                          ? "bg-white text-travliaq-deep-blue border-2 border-travliaq-turquoise shadow-sm scale-105"
-                          : "bg-muted text-muted-foreground scale-100"}
+                        ? "bg-travliaq-turquoise text-white"
+                        : "bg-white text-travliaq-deep-blue border border-travliaq-turquoise"}
                     `}
                   >
-                    <Icon className="w-5 h-5" />
+                    <Icon className="w-3 h-3" />
                   </div>
-                  <span
-                    className={`text-sm font-medium leading-tight flex-1 ${
-                      isCompleted
-                        ? "text-travliaq-turquoise"
-                        : isCurrent
-                          ? "text-travliaq-deep-blue font-semibold"
-                          : "text-muted-foreground"
-                    }`}
-                  >
-                    {milestone.label}
+                  <span className="text-[10px] font-medium text-travliaq-deep-blue whitespace-nowrap">
+                    {milestone.label} • {currentStep}/{totalSteps}
                   </span>
-                </div>
-
-                {/* Vertical Connector */}
-                {!isLast && (
-                  <div className="w-px h-8 ml-5 bg-muted relative overflow-hidden rounded-full">
-                    <div
-                      className={`w-full transition-all duration-500 rounded-full ${
-                        isCompleted
-                          ? "bg-gradient-to-b from-travliaq-turquoise to-travliaq-deep-blue h-full"
-                          : isCurrent
-                            ? "bg-gradient-to-b from-travliaq-turquoise to-transparent h-1/3"
-                            : "h-0"
-                      }`}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                </>
+              )}
+              {!isCurrent && (
+                <div
+                  className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                    isCompleted ? "bg-travliaq-turquoise" : "bg-gray-300"
+                  }`}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
-    </>
+    </div>
   );
 };
