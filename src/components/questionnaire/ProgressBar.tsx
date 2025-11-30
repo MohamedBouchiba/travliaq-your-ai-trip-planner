@@ -223,88 +223,49 @@ export const ProgressBar = ({ currentStep, totalSteps, progress, answers = {} }:
   };
 
   return (
-    <div className="w-full bg-gradient-to-br from-travliaq-deep-blue/5 via-white to-travliaq-turquoise/5 backdrop-blur-md border-b border-travliaq-turquoise/20 shadow-lg">
-      {/* Main Progress Bar - Futuristic Style */}
-      <div className="relative h-2 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 overflow-hidden">
-        {/* Background animated shimmer */}
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-travliaq-turquoise/10 to-transparent animate-shimmer" />
-        
-        {/* Progress fill */}
-        <div 
-          className="h-full bg-gradient-to-r from-travliaq-turquoise via-travliaq-deep-blue to-travliaq-golden-sand transition-all duration-700 ease-out relative overflow-hidden shadow-[0_0_20px_rgba(0,180,216,0.6)]"
+    <div className="w-full bg-white/95 backdrop-blur border-b border-border/60 shadow-sm">
+      {/* Main Progress Bar - ultra fine */}
+      <div className="relative h-1 bg-gradient-to-r from-muted via-muted to-muted overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-travliaq-turquoise via-travliaq-deep-blue to-travliaq-golden-sand transition-all duration-500 ease-out"
           style={{ width: `${progress}%` }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-white/40 via-transparent to-white/40 animate-pulse" />
-        </div>
+        />
       </div>
 
       {/* Milestones Container */}
-      <div className="max-w-7xl mx-auto px-3 py-3">
-        {/* Mobile: Show only current milestone */}
-        <div className="md:hidden flex items-center justify-center gap-3">
+      <div className="max-w-7xl mx-auto px-3 py-2">
+        {/* Mobile: only current milestone, very compact */}
+        <div className="md:hidden flex items-center justify-center gap-2">
           {milestones.map((milestone, index) => {
             if (index !== currentMilestoneIndex) return null;
-            
+
             const Icon = milestone.icon;
             const isCompleted = index < currentMilestoneIndex;
             const isCurrent = index === currentMilestoneIndex;
-            const milestoneProgress = getMilestoneProgress(index);
 
             return (
-              <div
-                key={milestone.key}
-                className="flex items-center gap-3 animate-fade-in"
-              >
-                {/* Icon with futuristic glow */}
-                <div className="relative">
-                  <div className={`
-                    relative flex items-center justify-center w-12 h-12 rounded-full transition-all duration-500
-                    ${isCompleted 
-                      ? 'bg-gradient-to-br from-travliaq-turquoise to-travliaq-deep-blue text-white shadow-[0_0_20px_rgba(0,180,216,0.8)]' 
-                      : isCurrent 
-                        ? 'bg-gradient-to-br from-white to-gray-50 text-travliaq-deep-blue shadow-[0_0_25px_rgba(0,180,216,0.5)]' 
-                        : 'bg-gray-100 text-gray-400'
-                    }
-                  `}>
-                    <Icon className="w-5 h-5" />
-                    
-                    {/* Circular progress ring */}
-                    {isCurrent && (
-                      <svg className="absolute -inset-1.5 w-15 h-15 -rotate-90">
-                        <circle
-                          cx="30"
-                          cy="30"
-                          r="28"
-                          stroke="currentColor"
-                          strokeWidth="3"
-                          fill="none"
-                          className="text-gray-200"
-                        />
-                        <circle
-                          cx="30"
-                          cy="30"
-                          r="28"
-                          stroke="currentColor"
-                          strokeWidth="3"
-                          fill="none"
-                          strokeDasharray={`${2 * Math.PI * 28}`}
-                          strokeDashoffset={`${2 * Math.PI * 28 * (1 - milestoneProgress / 100)}`}
-                          className="text-travliaq-turquoise transition-all duration-500 drop-shadow-[0_0_8px_rgba(0,180,216,0.8)]"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                    )}
-                  </div>
+              <div key={milestone.key} className="flex items-center gap-2">
+                <div
+                  className={`flex items-center justify-center w-8 h-8 rounded-full text-xs transition-all duration-300
+                    ${isCompleted
+                      ? "bg-travliaq-turquoise text-white shadow-[0_0_10px_rgba(0,180,216,0.6)]"
+                      : isCurrent
+                        ? "bg-white text-travliaq-deep-blue border border-travliaq-turquoise shadow-sm"
+                        : "bg-muted text-muted-foreground"}
+                  `}
+                >
+                  <Icon className="w-4 h-4" />
                 </div>
-                
-                {/* Label */}
+
                 <div className="flex flex-col">
-                  <span className={`text-sm font-bold ${
-                    isCurrent ? 'text-travliaq-deep-blue' : 'text-gray-700'
-                  }`}>
+                  <span
+                    className={`text-xs font-semibold leading-tight ${
+                      isCurrent ? "text-travliaq-deep-blue" : "text-muted-foreground"
+                    }`}
+                  >
                     {milestone.label}
                   </span>
-                  <span className="text-xs text-gray-500 font-medium">
+                  <span className="text-[10px] text-muted-foreground">
                     {currentStep}/{totalSteps} • {Math.round(progress)}%
                   </span>
                 </div>
@@ -313,90 +274,53 @@ export const ProgressBar = ({ currentStep, totalSteps, progress, answers = {} }:
           })}
         </div>
 
-        {/* Desktop: Show all milestones with futuristic design */}
+        {/* Desktop: all milestones, slim line, no overlap */}
         <div className="hidden md:flex items-center justify-between w-full">
           {milestones.map((milestone, index) => {
             const Icon = milestone.icon;
             const isCompleted = index < currentMilestoneIndex;
             const isCurrent = index === currentMilestoneIndex;
-            const milestoneProgress = getMilestoneProgress(index);
             const isLast = index === milestones.length - 1;
 
             return (
-              <div key={milestone.key} className="flex items-center flex-1">
-                {/* Milestone node */}
-                <div className="flex flex-col items-center gap-2 group relative">
-                  {/* Icon container with glow effect */}
-                  <div className="relative">
-                    <div className={`
-                      relative flex items-center justify-center w-10 h-10 rounded-full transition-all duration-500
-                      ${isCompleted 
-                        ? 'bg-gradient-to-br from-travliaq-turquoise to-travliaq-deep-blue text-white shadow-[0_0_20px_rgba(0,180,216,0.8)] scale-110' 
-                        : isCurrent 
-                          ? 'bg-gradient-to-br from-white to-gray-50 text-travliaq-deep-blue shadow-[0_0_25px_rgba(0,180,216,0.5)] scale-110' 
-                          : 'bg-gray-100 text-gray-400 scale-100'
-                      }
-                    `}>
-                      <Icon className="w-4 h-4" />
-                      
-                      {/* Animated progress ring for current */}
-                      {isCurrent && (
-                        <svg className="absolute -inset-1.5 w-13 h-13 -rotate-90">
-                          <circle
-                            cx="26"
-                            cy="26"
-                            r="24"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            fill="none"
-                            className="text-gray-200"
-                          />
-                          <circle
-                            cx="26"
-                            cy="26"
-                            r="24"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            fill="none"
-                            strokeDasharray={`${2 * Math.PI * 24}`}
-                            strokeDashoffset={`${2 * Math.PI * 24 * (1 - milestoneProgress / 100)}`}
-                            className="text-travliaq-turquoise transition-all duration-500 drop-shadow-[0_0_8px_rgba(0,180,216,0.8)]"
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                      )}
-                    </div>
-                    
-                    {/* Pulsing dot for current */}
-                    {isCurrent && (
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-travliaq-golden-sand rounded-full animate-ping" />
-                    )}
+              <div key={milestone.key} className="flex items-center flex-1 min-w-0">
+                {/* Node */}
+                <div className="flex flex-col items-center gap-1">
+                  <div
+                    className={`flex items-center justify-center w-9 h-9 rounded-full text-sm transition-all duration-300
+                      ${isCompleted
+                        ? "bg-travliaq-turquoise text-white shadow-[0_0_12px_rgba(0,180,216,0.6)] scale-105"
+                        : isCurrent
+                          ? "bg-white text-travliaq-deep-blue border border-travliaq-turquoise shadow-sm scale-105"
+                          : "bg-muted text-muted-foreground scale-100"}
+                    `}
+                  >
+                    <Icon className="w-4 h-4" />
                   </div>
-                  
-                  {/* Label below icon */}
-                  <span className={`text-[11px] font-bold text-center transition-all duration-300 max-w-[80px] leading-tight ${
-                    isCompleted 
-                      ? 'text-travliaq-turquoise' 
-                      : isCurrent 
-                        ? 'text-travliaq-deep-blue' 
-                        : 'text-gray-500'
-                  }`}>
+                  <span
+                    className={`text-[11px] font-medium text-center leading-tight max-w-[80px] truncate ${
+                      isCompleted
+                        ? "text-travliaq-turquoise"
+                        : isCurrent
+                          ? "text-travliaq-deep-blue"
+                          : "text-muted-foreground"
+                    }`}
+                  >
                     {milestone.label}
                   </span>
                 </div>
 
-                {/* Connector line between milestones */}
+                {/* Connector */}
                 {!isLast && (
-                  <div className="flex-1 h-1 mx-2 bg-gradient-to-r from-gray-200 to-gray-100 relative overflow-hidden rounded-full">
-                    <div 
-                      className={`h-full transition-all duration-700 rounded-full ${
-                        isCompleted 
-                          ? 'bg-gradient-to-r from-travliaq-turquoise to-travliaq-deep-blue w-full shadow-[0_0_10px_rgba(0,180,216,0.6)]' 
-                          : isCurrent && milestoneProgress > 80
-                            ? 'bg-gradient-to-r from-travliaq-turquoise to-transparent shadow-[0_0_10px_rgba(0,180,216,0.4)]'
-                            : 'w-0'
+                  <div className="flex-1 h-px mx-2 bg-muted relative overflow-hidden rounded-full">
+                    <div
+                      className={`h-full transition-all duration-500 rounded-full ${
+                        isCompleted
+                          ? "bg-gradient-to-r from-travliaq-turquoise to-travliaq-deep-blue w-full"
+                          : isCurrent
+                            ? "bg-gradient-to-r from-travliaq-turquoise to-transparent w-1/3"
+                            : "w-0"
                       }`}
-                      style={isCurrent && milestoneProgress > 80 ? { width: `${(milestoneProgress - 80) * 5}%` } : {}}
                     />
                   </div>
                 )}
