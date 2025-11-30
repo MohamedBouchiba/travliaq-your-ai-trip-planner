@@ -3971,19 +3971,8 @@ const Questionnaire = () => {
         <ProgressBar currentStep={step} totalSteps={totalSteps} progress={progress} answers={answers} />
       </div>
 
-      {/* Header ultra-compact */}
-      <div className="pt-32 pb-4 px-4">
-        <div className="max-w-3xl mx-auto">
-          <div className="flex items-center justify-center">
-            <h1 className="text-xl md:text-2xl font-montserrat font-bold bg-gradient-to-r from-travliaq-deep-blue via-travliaq-turquoise to-travliaq-deep-blue bg-clip-text text-transparent">
-              {t('questionnaire.customTrip')}
-            </h1>
-          </div>
-        </div>
-      </div>
-
       {/* Content compact */}
-      <div className="max-w-3xl mx-auto px-4 py-2 relative z-10">
+      <div className="max-w-3xl mx-auto px-4 pt-20 pb-2 relative z-10">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 flex-wrap">
             {step > 1 && (
