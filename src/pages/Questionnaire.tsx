@@ -66,6 +66,9 @@ import { TravelersStep } from "@/components/questionnaire/TravelersStep";
 import { CitySearch } from "@/components/questionnaire/CitySearch";
 import { ReviewStep } from "@/components/questionnaire/ReviewStep";
 import { ProgressBar } from "@/components/questionnaire/ProgressBar";
+import { QuestionTransition } from "@/components/questionnaire/QuestionTransition";
+import { AnimatedCard } from "@/components/questionnaire/AnimatedCard";
+import { AnimatedButton } from "@/components/questionnaire/AnimatedButton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1871,38 +1874,36 @@ const Questionnaire = () => {
     // Step 1: Qui voyage
     if (step === stepCounter) {
       return (
-        <div className="space-y-6 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center bg-gradient-to-r from-travliaq-deep-blue to-travliaq-turquoise bg-clip-text text-transparent">
-            {t('questionnaire.whoTraveling')}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-            {[
-              { code: TRAVEL_GROUPS.SOLO, label: t('questionnaire.solo'), icon: "🧳" },
-              { code: TRAVEL_GROUPS.DUO, label: t('questionnaire.duo'), icon: "👥" },
-              { code: TRAVEL_GROUPS.GROUP35, label: t('questionnaire.group35'), icon: "👨‍👩‍👧" },
-              { code: TRAVEL_GROUPS.FAMILY, label: t('questionnaire.family'), icon: "👨‍👩‍👧‍👦" }
-            ].map((option) => (
-              <Card
-                key={option.code}
-                className={`p-6 cursor-pointer transition-all duration-300 hover:scale-105 border-2 ${
-                  normalizeTravelGroup(answers.travelGroup) === option.code
-                    ? 'border-travliaq-turquoise bg-gradient-to-br from-travliaq-turquoise/10 to-travliaq-golden-sand/10 shadow-xl' 
-                    : 'border-transparent hover:border-travliaq-turquoise/50 hover:shadow-lg'
-                }`}
-                onClick={() => {
-                  handleChoice("travelGroup", option.code);
-                }}
-              >
-                <div className="flex items-center space-x-4">
-                  <span className="text-5xl">{option.icon}</span>
-                  <span className="text-lg font-semibold text-travliaq-deep-blue">
-                    {option.label}
-                  </span>
-                </div>
-              </Card>
-            ))}
+        <QuestionTransition step={step}>
+          <div className="space-y-6">
+            <h2 className="text-2xl md:text-3xl font-bold text-center bg-gradient-to-r from-travliaq-deep-blue to-travliaq-turquoise bg-clip-text text-transparent animate-fade-in">
+              {t('questionnaire.whoTraveling')}
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+              {[
+                { code: TRAVEL_GROUPS.SOLO, label: t('questionnaire.solo'), icon: "🧳" },
+                { code: TRAVEL_GROUPS.DUO, label: t('questionnaire.duo'), icon: "👥" },
+                { code: TRAVEL_GROUPS.GROUP35, label: t('questionnaire.group35'), icon: "👨‍👩‍👧" },
+                { code: TRAVEL_GROUPS.FAMILY, label: t('questionnaire.family'), icon: "👨‍👩‍👧‍👦" }
+              ].map((option, index) => (
+                <AnimatedCard
+                  key={option.code}
+                  isSelected={normalizeTravelGroup(answers.travelGroup) === option.code}
+                  onClick={() => handleChoice("travelGroup", option.code)}
+                  className="p-6"
+                  delay={index * 100}
+                >
+                  <div className="flex items-center space-x-4">
+                    <span className="text-5xl transform group-hover:scale-110 transition-transform duration-300">{option.icon}</span>
+                    <span className="text-lg font-semibold text-travliaq-deep-blue">
+                      {option.label}
+                    </span>
+                  </div>
+                </AnimatedCard>
+              ))}
+            </div>
           </div>
-        </div>
+        </QuestionTransition>
       );
     }
     stepCounter++;
@@ -1913,43 +1914,43 @@ const Questionnaire = () => {
     // Pour GROUPE 3-5: Proposer de choisir 3, 4 ou 5 personnes
     if (normalizedGroup === TRAVEL_GROUPS.GROUP35 && step === stepCounter) {
       return (
-        <div className="space-y-6 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center bg-gradient-to-r from-travliaq-deep-blue to-travliaq-turquoise bg-clip-text text-transparent">
-            {t('questionnaire.numberOfPeople')}
-          </h2>
-          <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto">
-            {[3, 4, 5].map((count) => (
-              <Card
-                key={count}
-                className={`p-6 cursor-pointer transition-all duration-300 hover:scale-105 border-2 ${
-                  answers.numberOfTravelers === count
-                    ? 'border-travliaq-turquoise bg-gradient-to-br from-travliaq-turquoise/10 to-travliaq-golden-sand/10 shadow-xl' 
-                    : 'border-transparent hover:border-travliaq-turquoise/50 hover:shadow-lg'
-                }`}
-                onClick={() => {
-                  setAnswers({ 
-                    ...answers, 
-                    numberOfTravelers: count,
-                    travelers: Array(count).fill(null).map(() => ({ type: 'adult' as const }))
-                  });
-                  setTimeout(() => nextStep(true), 300);
-                }}
-              >
-                <div className="flex flex-col items-center space-y-3">
-                  <span className="text-5xl">
-                    {count === 3 ? "👨‍👩‍👧" : count === 4 ? "👨‍👩‍👧‍👦" : "👨‍👩‍👧‍👦"}
-                  </span>
-                  <span className="text-2xl font-bold text-travliaq-deep-blue">
-                    {count}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {count === 1 ? 'personne' : 'personnes'}
-                  </span>
-                </div>
-              </Card>
-            ))}
+        <QuestionTransition step={step}>
+          <div className="space-y-6">
+            <h2 className="text-2xl md:text-3xl font-bold text-center bg-gradient-to-r from-travliaq-deep-blue to-travliaq-turquoise bg-clip-text text-transparent animate-fade-in">
+              {t('questionnaire.numberOfPeople')}
+            </h2>
+            <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto">
+              {[3, 4, 5].map((count, index) => (
+                <AnimatedCard
+                  key={count}
+                  isSelected={answers.numberOfTravelers === count}
+                  onClick={() => {
+                    setAnswers({ 
+                      ...answers, 
+                      numberOfTravelers: count,
+                      travelers: Array(count).fill(null).map(() => ({ type: 'adult' as const }))
+                    });
+                    setTimeout(() => nextStep(true), 300);
+                  }}
+                  className="p-6"
+                  delay={index * 100}
+                >
+                  <div className="flex flex-col items-center space-y-3">
+                    <span className="text-5xl transform group-hover:scale-110 group-hover:animate-bounce-subtle transition-transform duration-300">
+                      {count === 3 ? "👨‍👩‍👧" : count === 4 ? "👨‍👩‍👧‍👦" : "👨‍👩‍👧‍👦"}
+                    </span>
+                    <span className="text-2xl font-bold text-travliaq-deep-blue">
+                      {count}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {count === 1 ? 'personne' : 'personnes'}
+                    </span>
+                  </div>
+                </AnimatedCard>
+              ))}
+            </div>
           </div>
-        </div>
+        </QuestionTransition>
       );
     }
     
@@ -3865,7 +3866,7 @@ const Questionnaire = () => {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 flex-wrap">
             {step > 1 && (
-              <Button
+              <AnimatedButton
                 variant="ghost"
                 size="sm"
                 onClick={prevStep}
@@ -3873,11 +3874,11 @@ const Questionnaire = () => {
               >
                 <ChevronLeft className="mr-1 h-4 w-4" />
                 {t('questionnaire.back')}
-              </Button>
+              </AnimatedButton>
             )}
             
             {isEditMode && returnToReviewStep !== null && (
-              <Button
+              <AnimatedButton
                 variant="default"
                 size="sm"
                 onClick={() => {
@@ -3888,12 +3889,12 @@ const Questionnaire = () => {
                 className="bg-travliaq-turquoise hover:bg-travliaq-turquoise/90 text-white transition-all"
               >
                 {t('questionnaire.backToReview')}
-              </Button>
+              </AnimatedButton>
             )}
           </div>
           
           <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
-            <Button
+            <AnimatedButton
               variant="outline"
               size="sm"
               onClick={() => {
@@ -3917,17 +3918,17 @@ const Questionnaire = () => {
               className="text-travliaq-deep-blue border-travliaq-deep-blue hover:bg-travliaq-deep-blue hover:text-white transition-all flex-1 sm:flex-none whitespace-nowrap"
             >
               {t('questionnaire.saveAndReturn')}
-            </Button>
+            </AnimatedButton>
 
-            <Button
+            <AnimatedButton
               variant="outline"
               size="sm"
               onClick={() => setShowResetDialog(true)}
-              className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-red-500/50 h-9 px-3 text-sm flex-1 sm:flex-none whitespace-nowrap"
+              className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white transition-all duration-300 h-9 px-3 text-sm flex-1 sm:flex-none whitespace-nowrap"
             >
               <Trash2 className="w-3.5 h-3.5 mr-1.5" />
               Repartir de zéro
-            </Button>
+            </AnimatedButton>
           </div>
         </div>
 
