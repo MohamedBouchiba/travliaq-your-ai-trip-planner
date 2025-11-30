@@ -1965,55 +1965,57 @@ const Questionnaire = () => {
     // Step 2: Comment Travliaq peut vous aider ?
     if (step === stepCounter) {
       return (
-        <div className="space-y-3 animate-fade-up">
-          <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
-            {t('questionnaire.howCanHelp')}
-          </h2>
-          <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
-            {t('questionnaire.howCanHelp.description')}
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 max-w-3xl mx-auto">
-            {[
-              { code: HELP_WITH.FLIGHTS, label: t('questionnaire.flights'), icon: "✈️", desc: t('questionnaire.flights.desc') },
-              { code: HELP_WITH.ACCOMMODATION, label: t('questionnaire.accommodation'), icon: "🏨", desc: t('questionnaire.accommodation.desc') },
-              { code: HELP_WITH.ACTIVITIES, label: t('questionnaire.activities'), icon: "🎯", desc: t('questionnaire.activities.desc') }
-            ].map((option) => {
-              const isSelected = (answers.helpWith || []).includes(option.code);
-              return (
-                <Card
-                  key={option.code}
-                   className={`p-4 cursor-pointer transition-all hover:scale-105 ${
-                    isSelected 
-                      ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
-                      : "hover:shadow-golden hover:border-travliaq-deep-blue"
-                  }`}
-                  onClick={() => handleMultiChoice("helpWith", option.code, undefined, 3)}
-                >
-                  <div className="flex flex-col items-center space-y-1.5">
-                    <span className="text-3xl">{option.icon}</span>
-                    <span className="text-base font-semibold text-travliaq-deep-blue text-center">
-                      {option.label}
-                    </span>
-                    <span className="text-xs text-muted-foreground text-center">
-                      {option.desc}
-                    </span>
-                  </div>
-                </Card>
-              );
-            })}
+        <QuestionTransition step={step}>
+          <div className="space-y-3">
+            <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
+              {t('questionnaire.howCanHelp')}
+            </h2>
+            <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
+              {t('questionnaire.howCanHelp.description')}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 max-w-3xl mx-auto">
+              {[
+                { code: HELP_WITH.FLIGHTS, label: t('questionnaire.flights'), icon: "✈️", desc: t('questionnaire.flights.desc') },
+                { code: HELP_WITH.ACCOMMODATION, label: t('questionnaire.accommodation'), icon: "🏨", desc: t('questionnaire.accommodation.desc') },
+                { code: HELP_WITH.ACTIVITIES, label: t('questionnaire.activities'), icon: "🎯", desc: t('questionnaire.activities.desc') }
+              ].map((option) => {
+                const isSelected = (answers.helpWith || []).includes(option.code);
+                return (
+                  <Card
+                    key={option.code}
+                     className={`p-4 cursor-pointer transition-all hover:scale-105 ${
+                      isSelected 
+                        ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
+                        : "hover:shadow-golden hover:border-travliaq-deep-blue"
+                    }`}
+                    onClick={() => handleMultiChoice("helpWith", option.code, undefined, 3)}
+                  >
+                    <div className="flex flex-col items-center space-y-1.5">
+                      <span className="text-3xl">{option.icon}</span>
+                      <span className="text-base font-semibold text-travliaq-deep-blue text-center">
+                        {option.label}
+                      </span>
+                      <span className="text-xs text-muted-foreground text-center">
+                        {option.desc}
+                      </span>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+            <div className="flex justify-center pt-2">
+              <Button
+                variant="hero"
+                size="lg"
+                onClick={() => nextStep()}
+                disabled={!answers.helpWith || answers.helpWith.length === 0}
+                className="bg-travliaq-deep-blue"
+              >
+                {t('questionnaire.continue')}
+              </Button>
+            </div>
           </div>
-          <div className="flex justify-center pt-2">
-            <Button
-              variant="hero"
-              size="lg"
-              onClick={() => nextStep()}
-              disabled={!answers.helpWith || answers.helpWith.length === 0}
-              className="bg-travliaq-deep-blue"
-            >
-              {t('questionnaire.continue')}
-            </Button>
-          </div>
-        </div>
+        </QuestionTransition>
       );
     }
     stepCounter++;
@@ -2021,33 +2023,45 @@ const Questionnaire = () => {
     // Step 3: Destination en tête ?
     if (step === stepCounter) {
       return (
-        <div className="space-y-8 animate-fade-up">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
-            {t('questionnaire.destinationInMind')}
-          </h2>
-          <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
-            {t('questionnaire.destinationInMind.description')}
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-            {[
-              { label: t('questionnaire.yes'), icon: "✅" },
-              { label: t('questionnaire.no'), icon: "🤔" }
-            ].map((option) => (
-              <Card
-                key={option.label}
-                className="p-6 cursor-pointer hover:shadow-golden hover:border-travliaq-deep-blue transition-all hover:scale-105"
-                onClick={() => handleChoice("hasDestination", option.label)}
-              >
-                <div className="flex items-center space-x-4">
-                  <span className="text-4xl">{option.icon}</span>
-                  <span className="text-lg font-semibold text-travliaq-deep-blue">
-                    {option.label}
-                  </span>
-                </div>
-              </Card>
-            ))}
+        <QuestionTransition step={step}>
+          <div className="space-y-3">
+            <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
+              {t('questionnaire.destination.hasDestination')}
+            </h2>
+            <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
+              {t('questionnaire.destination.hasDestination.description')}
+            </p>
+            <div className="grid grid-cols-2 gap-4 max-w-xl mx-auto">
+              {[
+                { code: YES_NO.YES, label: t('questionnaire.yes'), icon: "✅" },
+                { code: YES_NO.NO, label: t('questionnaire.no'), icon: "🌍" }
+              ].map((option) => {
+                const isSelected = normalizeYesNo(answers.hasDestination) === option.code;
+                return (
+                  <Card
+                    key={option.code}
+                    className={`p-6 cursor-pointer transition-all hover:scale-105 ${
+                      isSelected 
+                        ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
+                        : "hover:shadow-golden hover:border-travliaq-deep-blue"
+                    }`}
+                    onClick={() => {
+                      setAnswers({ ...answers, hasDestination: option.code });
+                      setTimeout(() => nextStep(true), 300);
+                    }}
+                  >
+                    <div className="flex flex-col items-center space-y-2">
+                      <span className="text-4xl">{option.icon}</span>
+                      <span className="text-lg font-semibold text-travliaq-deep-blue">
+                        {option.label}
+                      </span>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        </QuestionTransition>
       );
     }
     stepCounter++;
@@ -2166,67 +2180,69 @@ const Questionnaire = () => {
     // Step 3c: Climat préféré (si Non - pas de destination en tête) - MULTI-CHOIX
     if (normalizeYesNo(answers.hasDestination) === YES_NO.NO && step === stepCounter) {
       return (
-        <div className="space-y-4 animate-fade-up">
-          <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
-            {t('questionnaire.climatePreference')}
-          </h2>
-          <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
-            {t('questionnaire.climatePreference.description')}
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
-            {[
-              { code: CLIMATE.DONT_MIND, label: t('questionnaire.climate.dontMind'), icon: "🤷", desc: t('questionnaire.climate.dontMind.desc'), autoNext: true },
-              { code: CLIMATE.HOT_SUNNY, label: t('questionnaire.climate.hotSunny'), icon: "☀️", desc: t('questionnaire.climate.hotSunny.desc') },
-              { code: CLIMATE.MILD_SWEET, label: t('questionnaire.climate.mildSweet'), icon: "🌤️", desc: t('questionnaire.climate.mildSweet.desc') },
-              { code: CLIMATE.COLD_SNOWY, label: t('questionnaire.climate.coldSnowy'), icon: "❄️", desc: t('questionnaire.climate.coldSnowy.desc') },
-              { code: CLIMATE.TROPICAL_HUMID, label: t('questionnaire.climate.tropicalHumid'), icon: "🌴", desc: t('questionnaire.climate.tropicalHumid.desc') },
-              { code: CLIMATE.MOUNTAIN_ALTITUDE, label: t('questionnaire.climate.mountainAltitude'), icon: "⛰️", desc: t('questionnaire.climate.mountainAltitude.desc') }
-            ].map((option) => {
-              const isSelected = (answers.climatePreference || []).includes(option.code);
-              return (
-                <Card
-                  key={option.label}
-                  className={`p-6 cursor-pointer transition-all hover:scale-105 ${
-                    isSelected 
-                      ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
-                      : "hover:shadow-golden hover:border-travliaq-deep-blue"
-                  }`}
-                  onClick={() => {
-                    handleMultiChoiceWithDontMind(
-                      "climatePreference", 
-                      option.code, 
-                      CLIMATE.DONT_MIND,
-                      (option as any).autoNext
-                    );
-                  }}
-                >
-                  <div className="flex items-center space-x-4">
-                    <span className="text-4xl">{option.icon}</span>
-                    <div className="flex flex-col">
-                      <span className="text-lg font-semibold text-travliaq-deep-blue">
-                        {option.label}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {option.desc}
-                      </span>
+        <QuestionTransition step={step}>
+          <div className="space-y-4">
+            <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
+              {t('questionnaire.climatePreference')}
+            </h2>
+            <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
+              {t('questionnaire.climatePreference.description')}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
+              {[
+                { code: CLIMATE.DONT_MIND, label: t('questionnaire.climate.dontMind'), icon: "🤷", desc: t('questionnaire.climate.dontMind.desc'), autoNext: true },
+                { code: CLIMATE.HOT_SUNNY, label: t('questionnaire.climate.hotSunny'), icon: "☀️", desc: t('questionnaire.climate.hotSunny.desc') },
+                { code: CLIMATE.MILD_SWEET, label: t('questionnaire.climate.mildSweet'), icon: "🌤️", desc: t('questionnaire.climate.mildSweet.desc') },
+                { code: CLIMATE.COLD_SNOWY, label: t('questionnaire.climate.coldSnowy'), icon: "❄️", desc: t('questionnaire.climate.coldSnowy.desc') },
+                { code: CLIMATE.TROPICAL_HUMID, label: t('questionnaire.climate.tropicalHumid'), icon: "🌴", desc: t('questionnaire.climate.tropicalHumid.desc') },
+                { code: CLIMATE.MOUNTAIN_ALTITUDE, label: t('questionnaire.climate.mountainAltitude'), icon: "⛰️", desc: t('questionnaire.climate.mountainAltitude.desc') }
+              ].map((option) => {
+                const isSelected = (answers.climatePreference || []).includes(option.code);
+                return (
+                  <Card
+                    key={option.label}
+                    className={`p-6 cursor-pointer transition-all hover:scale-105 ${
+                      isSelected 
+                        ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
+                        : "hover:shadow-golden hover:border-travliaq-deep-blue"
+                    }`}
+                    onClick={() => {
+                      handleMultiChoiceWithDontMind(
+                        "climatePreference", 
+                        option.code, 
+                        CLIMATE.DONT_MIND,
+                        (option as any).autoNext
+                      );
+                    }}
+                  >
+                    <div className="flex items-center space-x-4">
+                      <span className="text-4xl">{option.icon}</span>
+                      <div className="flex flex-col">
+                        <span className="text-lg font-semibold text-travliaq-deep-blue">
+                          {option.label}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {option.desc}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              );
-            })}
+                  </Card>
+                );
+              })}
+            </div>
+            <div className="flex justify-center pt-4">
+              <Button
+                variant="hero"
+                size="lg"
+                onClick={() => nextStep()}
+                disabled={!answers.climatePreference || answers.climatePreference.length === 0}
+                className="bg-travliaq-deep-blue"
+              >
+                {t('questionnaire.continue')}
+              </Button>
+            </div>
           </div>
-          <div className="flex justify-center pt-4">
-            <Button
-              variant="hero"
-              size="lg"
-              onClick={() => nextStep()}
-              disabled={!answers.climatePreference || answers.climatePreference.length === 0}
-              className="bg-travliaq-deep-blue"
-            >
-              {t('questionnaire.continue')}
-            </Button>
-          </div>
-        </div>
+        </QuestionTransition>
       );
     }
     if (normalizeYesNo(answers.hasDestination) === YES_NO.NO) stepCounter++;
@@ -2731,81 +2747,132 @@ const Questionnaire = () => {
       // Étape transparente: Préciser 8, 9 ou 10 nuits (si 8-10 sélectionné)
       if (answers.duration === t('questionnaire.duration.8to10')) {
         return (
-          <div className="space-y-3 md:space-y-8 animate-fade-up">
-            <h2 className="text-xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
-              {t('questionnaire.duration.specify8to10')}
-            </h2>
-            <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
-              {t('questionnaire.duration.specify8to10.description')}
-            </p>
-            <div className="grid grid-cols-3 gap-2 md:gap-4 max-w-2xl mx-auto">
-              {[
-                { nights: 8, label: t('questionnaire.duration.8nights'), icon: "🛏️" },
-                { nights: 9, label: t('questionnaire.duration.9nights'), icon: "🛏️" },
-                { nights: 10, label: t('questionnaire.duration.10nights'), icon: "🛏️" }
-              ].map((option) => {
-                const isSelected = answers.exactNights === option.nights;
-                return (
-                  <Card
-                    key={option.nights}
-                    className={`p-3 md:p-6 cursor-pointer transition-all hover:scale-105 ${
-                      isSelected 
-                        ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
-                        : "hover:shadow-golden hover:border-travliaq-deep-blue"
-                    }`}
-                    onClick={() => {
-                      setAnswers({ ...answers, exactNights: option.nights });
-                      setTimeout(() => nextStep(true), 300);
-                    }}
-                  >
-                    <div className="flex flex-col items-center space-y-1 md:space-y-2">
-                      <span className="text-2xl md:text-3xl">{option.icon}</span>
-                      <span className="text-center font-semibold text-travliaq-deep-blue text-sm md:text-base">
-                        {option.label}
-                      </span>
-                    </div>
-                  </Card>
-                );
-              })}
+          <QuestionTransition step={step}>
+            <div className="space-y-3 md:space-y-8">
+              <h2 className="text-xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+                {t('questionnaire.duration.specify8to10')}
+              </h2>
+              <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
+                {t('questionnaire.duration.specify8to10.description')}
+              </p>
+              <div className="grid grid-cols-3 gap-2 md:gap-4 max-w-2xl mx-auto">
+                {[
+                  { nights: 8, label: t('questionnaire.duration.8nights'), icon: "🛏️" },
+                  { nights: 9, label: t('questionnaire.duration.9nights'), icon: "🛏️" },
+                  { nights: 10, label: t('questionnaire.duration.10nights'), icon: "🛏️" }
+                ].map((option) => {
+                  const isSelected = answers.exactNights === option.nights;
+                  return (
+                    <Card
+                      key={option.nights}
+                      className={`p-3 md:p-6 cursor-pointer transition-all hover:scale-105 ${
+                        isSelected 
+                          ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
+                          : "hover:shadow-golden hover:border-travliaq-deep-blue"
+                      }`}
+                      onClick={() => {
+                        setAnswers({ ...answers, exactNights: option.nights });
+                        setTimeout(() => nextStep(true), 300);
+                      }}
+                    >
+                      <div className="flex flex-col items-center space-y-1 md:space-y-2">
+                        <span className="text-2xl md:text-3xl">{option.icon}</span>
+                        <span className="text-center font-semibold text-travliaq-deep-blue text-sm md:text-base">
+                          {option.label}
+                        </span>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          </QuestionTransition>
         );
       }
       
       // Étape transparente: Préciser 11, 12, 13 ou 14 nuits (si 11-14 sélectionné)
       if (answers.duration === t('questionnaire.duration.11to14')) {
         return (
-          <div className="space-y-3 md:space-y-8 animate-fade-up">
+          <QuestionTransition step={step}>
+            <div className="space-y-3 md:space-y-8">
+              <h2 className="text-xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+                {t('questionnaire.duration.specify11to14')}
+              </h2>
+              <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
+                {t('questionnaire.duration.specify11to14.description')}
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 max-w-3xl mx-auto">
+                {[
+                  { nights: 11, label: t('questionnaire.duration.11nights'), icon: "🛏️" },
+                  { nights: 12, label: t('questionnaire.duration.12nights'), icon: "🛏️" },
+                  { nights: 13, label: t('questionnaire.duration.13nights'), icon: "🛏️" },
+                  { nights: 14, label: t('questionnaire.duration.14nights'), icon: "🛏️" }
+                ].map((option) => {
+                  const isSelected = answers.exactNights === option.nights;
+                  return (
+                    <Card
+                      key={option.nights}
+                      className={`p-3 md:p-6 cursor-pointer transition-all hover:scale-105 ${
+                        isSelected 
+                          ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
+                          : "hover:shadow-golden hover:border-travliaq-deep-blue"
+                      }`}
+                      onClick={() => {
+                        setAnswers({ ...answers, exactNights: option.nights });
+                        setTimeout(() => nextStep(true), 300);
+                      }}
+                    >
+                      <div className="flex flex-col items-center space-y-1 md:space-y-2">
+                        <span className="text-2xl md:text-3xl">{option.icon}</span>
+                        <span className="text-center font-semibold text-travliaq-deep-blue text-sm md:text-base">
+                          {option.label}
+                        </span>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          </QuestionTransition>
+        );
+      }
+      
+      // Affichage principal de l'étape Durée
+      return (
+        <QuestionTransition step={step}>
+          <div className="space-y-3 md:space-y-8">
             <h2 className="text-xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
-              {t('questionnaire.duration.specify11to14')}
+              {t('questionnaire.duration.title')}
             </h2>
             <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
-              {t('questionnaire.duration.specify11to14.description')}
+              {t('questionnaire.duration.description')}
             </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 max-w-3xl mx-auto">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4 max-w-3xl mx-auto">
               {[
-                { nights: 11, label: t('questionnaire.duration.11nights'), icon: "🛏️" },
-                { nights: 12, label: t('questionnaire.duration.12nights'), icon: "🛏️" },
-                { nights: 13, label: t('questionnaire.duration.13nights'), icon: "🛏️" },
-                { nights: 14, label: t('questionnaire.duration.14nights'), icon: "🛏️" }
+                { label: t('questionnaire.duration.2nights'), icon: "🌙" },
+                { label: t('questionnaire.duration.3nights'), icon: "🌙🌙" },
+                { label: t('questionnaire.duration.4nights'), icon: "🌃" },
+                { label: t('questionnaire.duration.5nights'), icon: "🌃" },
+                { label: t('questionnaire.duration.6nights'), icon: "🌆" },
+                { label: t('questionnaire.duration.7nights'), icon: "🌆" },
+                { label: t('questionnaire.duration.8to10'), icon: "🌇" },
+                { label: t('questionnaire.duration.11to14'), icon: "🌇" },
+                { label: t('questionnaire.duration.more14'), icon: "🌉" }
               ].map((option) => {
-                const isSelected = answers.exactNights === option.nights;
+                const isSelected = answers.duration === option.label;
                 return (
                   <Card
-                    key={option.nights}
-                    className={`p-3 md:p-6 cursor-pointer transition-all hover:scale-105 ${
+                    key={option.label}
+                    className={`p-2 md:p-4 cursor-pointer transition-all hover:scale-105 ${
                       isSelected 
                         ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
                         : "hover:shadow-golden hover:border-travliaq-deep-blue"
                     }`}
-                    onClick={() => {
-                      setAnswers({ ...answers, exactNights: option.nights });
-                      setTimeout(() => nextStep(true), 300);
-                    }}
+                    onClick={() => handleChoice("duration", option.label)}
                   >
                     <div className="flex flex-col items-center space-y-1 md:space-y-2">
-                      <span className="text-2xl md:text-3xl">{option.icon}</span>
-                      <span className="text-center font-semibold text-travliaq-deep-blue text-sm md:text-base">
+                      <span className="text-xl md:text-2xl">{option.icon}</span>
+                      <span className="text-center font-semibold text-travliaq-deep-blue text-xs md:text-sm">
                         {option.label}
                       </span>
                     </div>
@@ -2814,52 +2881,7 @@ const Questionnaire = () => {
               })}
             </div>
           </div>
-        );
-      }
-      
-      // Affichage principal de l'étape Durée
-      return (
-        <div className="space-y-3 md:space-y-8 animate-fade-up">
-          <h2 className="text-xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
-            {t('questionnaire.duration.title')}
-          </h2>
-          <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
-            {t('questionnaire.duration.description')}
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4 max-w-3xl mx-auto">
-            {[
-              { label: t('questionnaire.duration.2nights'), icon: "🌙" },
-              { label: t('questionnaire.duration.3nights'), icon: "🌙🌙" },
-              { label: t('questionnaire.duration.4nights'), icon: "🌃" },
-              { label: t('questionnaire.duration.5nights'), icon: "🌃" },
-              { label: t('questionnaire.duration.6nights'), icon: "🌆" },
-              { label: t('questionnaire.duration.7nights'), icon: "🌆" },
-              { label: t('questionnaire.duration.8to10'), icon: "🌇" },
-              { label: t('questionnaire.duration.11to14'), icon: "🌇" },
-              { label: t('questionnaire.duration.more14'), icon: "🌉" }
-            ].map((option) => {
-              const isSelected = answers.duration === option.label;
-              return (
-                <Card
-                  key={option.label}
-                  className={`p-2 md:p-4 cursor-pointer transition-all hover:scale-105 ${
-                    isSelected 
-                      ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
-                      : "hover:shadow-golden hover:border-travliaq-deep-blue"
-                  }`}
-                  onClick={() => handleChoice("duration", option.label)}
-                >
-                  <div className="flex flex-col items-center space-y-1 md:space-y-2">
-                    <span className="text-xl md:text-2xl">{option.icon}</span>
-                    <span className="text-center font-semibold text-travliaq-deep-blue text-xs md:text-sm">
-                      {option.label}
-                    </span>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
+        </QuestionTransition>
       );
     }
     if (normalizeDatesType(answers.datesType) === DATES_TYPE.FLEXIBLE) stepCounter++;
@@ -2909,54 +2931,56 @@ const Questionnaire = () => {
     // Step 5: Budget
     if (step === stepCounter) {
       return (
-        <div className="space-y-3 animate-fade-up">
-          <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
-            {t('questionnaire.budget.title')}
-          </h2>
-          <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
-            {t('questionnaire.budget.description')}
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-w-3xl mx-auto">
-            {[
-              { label: t('questionnaire.budget.dontKnow'), icon: "🤷" },
-              { label: t('questionnaire.budget.precise'), icon: "🎯" },
-              { label: t('questionnaire.budget.less300'), icon: "💵" },
-              { label: t('questionnaire.budget.300to600'), icon: "💶" },
-              { label: t('questionnaire.budget.600to900'), icon: "💷" },
-              { label: t('questionnaire.budget.900to1200'), icon: "💴" },
-              { label: t('questionnaire.budget.1200to1800'), icon: "💸" },
-              { label: t('questionnaire.budget.more1800'), icon: "💎" }
-            ].map((option) => {
-              const isSelected = answers.budgetPerPerson === option.label || answers.budgetType === option.label;
-              return (
-                <Card
-                  key={option.label}
-                  className={`p-3 cursor-pointer transition-all hover:scale-105 ${
-                    isSelected 
-                      ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
-                      : "hover:shadow-golden hover:border-travliaq-deep-blue"
-                  }`}
-                  onClick={() => {
-                    if (option.label === t('questionnaire.budget.precise') || option.label === t('questionnaire.budget.more1800')) {
-                      setAnswers({ ...answers, budgetType: option.label });
-                      setTimeout(() => nextStep(true), 300);
-                    } else {
-                      setAnswers({ ...answers, budgetPerPerson: option.label, budgetType: undefined });
-                      setTimeout(() => nextStep(true), 300);
-                    }
-                  }}
-                >
-                  <div className="flex flex-col items-center space-y-1">
-                    <span className="text-2xl">{option.icon}</span>
-                    <span className="text-xs md:text-sm font-semibold text-travliaq-deep-blue text-center">
-                      {option.label}
-                    </span>
-                  </div>
-                </Card>
-              );
-            })}
+        <QuestionTransition step={step}>
+          <div className="space-y-3">
+            <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
+              {t('questionnaire.budget.title')}
+            </h2>
+            <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
+              {t('questionnaire.budget.description')}
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-w-3xl mx-auto">
+              {[
+                { label: t('questionnaire.budget.dontKnow'), icon: "🤷" },
+                { label: t('questionnaire.budget.precise'), icon: "🎯" },
+                { label: t('questionnaire.budget.less300'), icon: "💵" },
+                { label: t('questionnaire.budget.300to600'), icon: "💶" },
+                { label: t('questionnaire.budget.600to900'), icon: "💷" },
+                { label: t('questionnaire.budget.900to1200'), icon: "💴" },
+                { label: t('questionnaire.budget.1200to1800'), icon: "💸" },
+                { label: t('questionnaire.budget.more1800'), icon: "💎" }
+              ].map((option) => {
+                const isSelected = answers.budgetPerPerson === option.label || answers.budgetType === option.label;
+                return (
+                  <Card
+                    key={option.label}
+                    className={`p-3 cursor-pointer transition-all hover:scale-105 ${
+                      isSelected 
+                        ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
+                        : "hover:shadow-golden hover:border-travliaq-deep-blue"
+                    }`}
+                    onClick={() => {
+                      if (option.label === t('questionnaire.budget.precise') || option.label === t('questionnaire.budget.more1800')) {
+                        setAnswers({ ...answers, budgetType: option.label });
+                        setTimeout(() => nextStep(true), 300);
+                      } else {
+                        setAnswers({ ...answers, budgetPerPerson: option.label, budgetType: undefined });
+                        setTimeout(() => nextStep(true), 300);
+                      }
+                    }}
+                  >
+                    <div className="flex flex-col items-center space-y-1">
+                      <span className="text-2xl">{option.icon}</span>
+                      <span className="text-xs md:text-sm font-semibold text-travliaq-deep-blue text-center">
+                        {option.label}
+                      </span>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        </QuestionTransition>
       );
     }
     stepCounter++;
@@ -3854,47 +3878,49 @@ const Questionnaire = () => {
     // Step 18: Zone ouverte - SANS LIMITE DE CARACTÈRES
     if (step === stepCounter) {
       return (
-        <div className="space-y-4 animate-fade-up">
-          <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
-            {t('questionnaire.additionalInfo.title')}
-          </h2>
-          <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
-            {t('questionnaire.additionalInfo.descriptionExtended')}
-          </p>
-          <p className="text-center text-muted-foreground">
-            {t('questionnaire.additionalInfo.description')}
-          </p>
-          <div className="max-w-xl mx-auto space-y-4">
-            <Textarea
-              placeholder={t('questionnaire.additionalInfo.placeholder')}
-              className="min-h-[150px] text-base"
-              value={answers.additionalInfo || ""}
-              onChange={(e) => setAnswers({ ...answers, additionalInfo: e.target.value })}
-            />
-            {answers.additionalInfo && (
-              <div className="text-sm text-muted-foreground text-center">
-                {answers.additionalInfo.length} {t('questionnaire.additionalInfo.characters')}
+        <QuestionTransition step={step}>
+          <div className="space-y-4">
+            <h2 className="text-xl md:text-2xl font-bold text-center text-travliaq-deep-blue">
+              {t('questionnaire.additionalInfo.title')}
+            </h2>
+            <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
+              {t('questionnaire.additionalInfo.descriptionExtended')}
+            </p>
+            <p className="text-center text-muted-foreground">
+              {t('questionnaire.additionalInfo.description')}
+            </p>
+            <div className="max-w-xl mx-auto space-y-4">
+              <Textarea
+                placeholder={t('questionnaire.additionalInfo.placeholder')}
+                className="min-h-[150px] text-base"
+                value={answers.additionalInfo || ""}
+                onChange={(e) => setAnswers({ ...answers, additionalInfo: e.target.value })}
+              />
+              {answers.additionalInfo && (
+                <div className="text-sm text-muted-foreground text-center">
+                  {answers.additionalInfo.length} {t('questionnaire.additionalInfo.characters')}
+                </div>
+              )}
+              <div className="flex justify-center gap-4">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => nextStep()}
+                >
+                  {t('questionnaire.additionalInfo.skip')}
+                </Button>
+                <Button
+                  variant="hero"
+                  size="lg"
+                  onClick={() => nextStep()}
+                  className="bg-travliaq-deep-blue"
+                >
+                  {t('questionnaire.continue')}
+                </Button>
               </div>
-            )}
-            <div className="flex justify-center gap-4">
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => nextStep()}
-              >
-                {t('questionnaire.additionalInfo.skip')}
-              </Button>
-              <Button
-                variant="hero"
-                size="lg"
-                onClick={() => nextStep()}
-                className="bg-travliaq-deep-blue"
-              >
-                {t('questionnaire.continue')}
-              </Button>
             </div>
           </div>
-        </div>
+        </QuestionTransition>
       );
     }
     stepCounter++;
