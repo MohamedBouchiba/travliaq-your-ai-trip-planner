@@ -880,21 +880,15 @@ const Questionnaire = () => {
       const normalizedHasApproxDate = normalizeYesNo(answers.hasApproximateDepartureDate);
       if (normalizedHasApproxDate === YES_NO.YES) total++; 
       total++; // Step 5: Durée
-      // Check for "8-10", "11-14" or "Plus de 14 jours" in duration
-      if (answers.duration) {
-        const dur = answers.duration.toLowerCase();
-        // Check for 8-10 nights
-        if (dur.includes('8') && dur.includes('10')) {
-          total++; // Step 5b: Préciser 8, 9 ou 10
-        }
-        // Check for 11-14 nights
-        else if (dur.includes('11') && dur.includes('14')) {
-          total++; // Step 5b: Préciser 11, 12, 13 ou 14
-        }
-        // Check for >14 nights
-        else if (dur.includes('14') && (dur.includes('>') || dur.includes('more') || dur.includes('plus'))) {
-          total++; // Step 5b: Nombre exact (>14)
-        }
+      // Check for ">14 nuits" only - 8-10 and 11-14 are transparent sub-steps
+      if (answers.duration && (
+        answers.duration.includes('14') && (
+          answers.duration.includes('>') || 
+          answers.duration.toLowerCase().includes('more') ||
+          answers.duration.toLowerCase().includes('plus')
+        )
+      )) {
+        total++; // Step 5b: Nombre exact (>14)
       }
     }
     
@@ -1137,24 +1131,6 @@ const Questionnaire = () => {
     if (normalizeDatesType(answers.datesType) === DATES_TYPE.FLEXIBLE) {
       stepCounter++;
       if (step === stepCounter) return !!answers.duration;
-
-      // Si 8-10 nuits, exiger le nombre exact (8, 9 ou 10)
-      if (answers.duration === t('questionnaire.duration.8to10')) {
-        stepCounter++;
-        if (step === stepCounter) {
-          return !!answers.exactNights && 
-                 (answers.exactNights === 8 || answers.exactNights === 9 || answers.exactNights === 10);
-        }
-      }
-
-      // Si 11-14 nuits, exiger le nombre exact (11, 12, 13 ou 14)
-      if (answers.duration === t('questionnaire.duration.11to14')) {
-        stepCounter++;
-        if (step === stepCounter) {
-          return !!answers.exactNights && 
-                 (answers.exactNights >= 11 && answers.exactNights <= 14);
-        }
-      }
 
       // Si >14 nuits, exiger le nombre exact
       if (answers.duration === t('questionnaire.duration.more14')) {
@@ -2806,7 +2782,7 @@ const Questionnaire = () => {
     }
     if (normalizeDatesType(answers.datesType) === DATES_TYPE.FLEXIBLE) stepCounter++;
 
-    // Step 4b: Préciser 8, 9 ou 10 nuits (si 8-10 sélectionné)
+    // Étape transparente: Préciser 8, 9 ou 10 nuits (si 8-10 sélectionné)
     if (
       normalizeDatesType(answers.datesType) === DATES_TYPE.FLEXIBLE &&
       answers.duration === t('questionnaire.duration.8to10') &&
@@ -2826,7 +2802,7 @@ const Questionnaire = () => {
               { nights: 9, label: t('questionnaire.duration.9nights'), icon: "🛏️" },
               { nights: 10, label: t('questionnaire.duration.10nights'), icon: "🛏️" }
             ].map((option) => {
-              const isSelected = answers.exactNights === option.nights;
+              const isSelected = answers.duration === option.label;
               return (
                 <Card
                   key={option.nights}
@@ -2836,7 +2812,7 @@ const Questionnaire = () => {
                       : "hover:shadow-golden hover:border-travliaq-deep-blue"
                   }`}
                   onClick={() => {
-                    setAnswers({ ...answers, exactNights: option.nights });
+                    setAnswers({ ...answers, duration: option.label, exactNights: option.nights });
                     setTimeout(() => nextStep(true), 300);
                   }}
                 >
@@ -2853,9 +2829,8 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if (normalizeDatesType(answers.datesType) === DATES_TYPE.FLEXIBLE && answers.duration === t('questionnaire.duration.8to10')) stepCounter++;
 
-    // Step 4c: Préciser 11, 12, 13 ou 14 nuits (si 11-14 sélectionné)
+    // Étape transparente: Préciser 11, 12, 13 ou 14 nuits (si 11-14 sélectionné)
     if (
       normalizeDatesType(answers.datesType) === DATES_TYPE.FLEXIBLE &&
       answers.duration === t('questionnaire.duration.11to14') &&
@@ -2876,7 +2851,7 @@ const Questionnaire = () => {
               { nights: 13, label: t('questionnaire.duration.13nights'), icon: "🛏️" },
               { nights: 14, label: t('questionnaire.duration.14nights'), icon: "🛏️" }
             ].map((option) => {
-              const isSelected = answers.exactNights === option.nights;
+              const isSelected = answers.duration === option.label;
               return (
                 <Card
                   key={option.nights}
@@ -2886,7 +2861,7 @@ const Questionnaire = () => {
                       : "hover:shadow-golden hover:border-travliaq-deep-blue"
                   }`}
                   onClick={() => {
-                    setAnswers({ ...answers, exactNights: option.nights });
+                    setAnswers({ ...answers, duration: option.label, exactNights: option.nights });
                     setTimeout(() => nextStep(true), 300);
                   }}
                 >
@@ -2903,9 +2878,8 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if (normalizeDatesType(answers.datesType) === DATES_TYPE.FLEXIBLE && answers.duration === t('questionnaire.duration.11to14')) stepCounter++;
 
-    // Step 4d: Nombre exact de nuits (uniquement si dates FLEXIBLES et >14 nuits)
+    // Step 4b: Nombre exact de nuits (uniquement si dates FLEXIBLES et >14 nuits)
     if (
       normalizeDatesType(answers.datesType) === DATES_TYPE.FLEXIBLE &&
       answers.duration === t('questionnaire.duration.more14') &&
