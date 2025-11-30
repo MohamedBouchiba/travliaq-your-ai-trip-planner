@@ -912,52 +912,39 @@ const Questionnaire = () => {
     const needsAccommodation = helpWith.includes(HELP_WITH.ACCOMMODATION);
     const needsActivities = helpWith.includes(HELP_WITH.ACTIVITIES);
     
-    // Step 7: Style (seulement si destination précise ET activités sélectionnées)
-    if (normalizedHasDestination === YES_NO.YES && needsActivities) {
-      total++; // Step 7: Style
-    }
-    
-    // Step 8-9: Vols et bagages (seulement si vols sélectionnés)
+    // FLIGHTS PHASE: Vols et bagages (seulement si vols sélectionnés)
     if (needsFlights) {
-      total++; // Step 8: Vols
-      total++; // Step 9: Bagages
+      total++; // Vols
+      total++; // Bagages
     }
     
-    // Step 10: Mobilité - SEULEMENT si pas uniquement vols ET pas uniquement hébergement
-    const onlyFlights = helpWith.length === 1 && helpWith.includes(HELP_WITH.FLIGHTS);
-    const onlyAccommodation = helpWith.length === 1 && helpWith.includes(HELP_WITH.ACCOMMODATION);
-    if (!onlyFlights && !onlyAccommodation) {
-      total++; // Step 10: Mobilité
+    // ACTIVITIES PHASE: Style, Mobilité, Sécurité, Rythme (seulement si activités sélectionnées)
+    if (normalizedHasDestination === YES_NO.YES && needsActivities) {
+      total++; // Style
+    }
+    if (needsActivities) {
+      total++; // Mobilité
+      total++; // Sécurité
+      total++; // Rythme
     }
     
-    // Step 11-14: Hébergement (seulement si hébergement sélectionné)
+    // ACCOMMODATION PHASE: Type hébergement, préférences hôtel, confort, quartier, équipements (seulement si hébergement sélectionné)
     if (needsAccommodation) {
-      total++; // Step 11: Type hébergement
+      total++; // Type hébergement
       // Check for hotel in accommodation type
       if (answers.accommodationType && Array.isArray(answers.accommodationType)) {
         const hasHotel = answers.accommodationType.some((type: string) => 
           type.toLowerCase().includes('hôtel') || 
           type.toLowerCase().includes('hotel')
         );
-        if (hasHotel) total++; // Step 11b: Préférences hôtel
+        if (hasHotel) total++; // Préférences hôtel
       }
-      total++; // Step 12: Confort
-      total++; // Step 13: Quartier
-      total++; // Step 14: Équipements
+      total++; // Confort
+      total++; // Quartier
+      total++; // Équipements
     }
     
-    // Step 15: Sécurité & Phobies (seulement si activités sélectionnées, PAS si uniquement hébergement)
-    const needsSecurityStep = needsActivities;
-    if (needsSecurityStep) {
-      total++; // Step 15: Sécurité
-    }
-    
-    // Step 16: Horloge biologique (seulement si activités sélectionnées)
-    if (needsActivities) {
-      total++; // Step 16: Horloge biologique
-    }
-    
-    // Step 17: Contraintes alimentaires - SEULEMENT si hébergement + hôtel + prestation avec repas
+    // Contraintes alimentaires - SEULEMENT si hébergement + hôtel + prestation avec repas
     const hasHotelWithMeals = needsAccommodation && 
       answers.accommodationType?.some((type: string) => 
         type.toLowerCase().includes('hôtel') || type.toLowerCase().includes('hotel')
@@ -1161,19 +1148,14 @@ const Questionnaire = () => {
     const needsActivities = helpWith.includes(HELP_WITH.ACTIVITIES);
     const hasDestForValidation = normalizeYesNo(answers.hasDestination);
 
-    // Step 6: Style (seulement si destination précise ET activités)
-    if (hasDestForValidation === YES_NO.YES && needsActivities) {
-      stepCounter++;
-      if (step === stepCounter) return !!answers.styles && answers.styles.length > 0;
-    }
-
-    // Step 8: Préférence de vol (si vols sélectionnés)
+    // FLIGHTS PHASE
+    // Préférence de vol (si vols sélectionnés)
     if (needsFlights) {
       stepCounter++;
       if (step === stepCounter) return !!answers.flightPreference;
     }
 
-    // Step 9: Bagages (si vols sélectionnés)
+    // Bagages (si vols sélectionnés)
     if (needsFlights) {
       stepCounter++;
       if (step === stepCounter) {
@@ -1182,15 +1164,33 @@ const Questionnaire = () => {
       }
     }
 
-    // Step 10: Mobilité (si pas uniquement vols ET pas uniquement hébergement)
-    const onlyFlights = helpWith.length === 1 && helpWith.includes(HELP_WITH.FLIGHTS);
-    const onlyAccommodation = helpWith.length === 1 && helpWith.includes(HELP_WITH.ACCOMMODATION);
-    if (!onlyFlights && !onlyAccommodation) {
+    // ACTIVITIES PHASE
+    // Style (seulement si destination précise ET activités)
+    if (hasDestForValidation === YES_NO.YES && needsActivities) {
+      stepCounter++;
+      if (step === stepCounter) return !!answers.styles && answers.styles.length > 0;
+    }
+
+    // Mobilité (si activités)
+    if (needsActivities) {
       stepCounter++;
       if (step === stepCounter) return !!answers.mobility && answers.mobility.length > 0;
     }
 
-    // Step 11: Type d'hébergement (si hébergement sélectionné)
+    // Sécurité (si activités)
+    if (needsActivities) {
+      stepCounter++;
+      if (step === stepCounter) return !!answers.security && answers.security.length > 0;
+    }
+
+    // Rythme (si activités)
+    if (needsActivities) {
+      stepCounter++;
+      if (step === stepCounter) return !!answers.rhythm;
+    }
+
+    // ACCOMMODATION PHASE
+    // Type d'hébergement (si hébergement sélectionné)
     if (needsAccommodation) {
       stepCounter++;
       if (step === stepCounter) return !!answers.accommodationType && answers.accommodationType.length > 0;
@@ -1220,18 +1220,6 @@ const Questionnaire = () => {
     if (needsAccommodation) {
       stepCounter++;
       if (step === stepCounter) return !!answers.amenities && answers.amenities.length > 0;
-    }
-
-    // Step 15: Sécurité (seulement si activités)
-    if (needsActivities) {
-      stepCounter++;
-      if (step === stepCounter) return !!answers.security && answers.security.length > 0;
-    }
-
-    // Step 16: Horloge biologique (seulement si activités)
-    if (needsActivities) {
-      stepCounter++;
-      if (step === stepCounter) return !!answers.rhythm;
     }
 
     // Step 17: Contraintes (si hébergement + hôtel + repas)
@@ -2737,7 +2725,7 @@ const Questionnaire = () => {
     }
     if (normalizeYesNo(answers.hasApproximateDepartureDate) === YES_NO.YES) stepCounter++;
 
-    // Step 4: Durée (only if flexible dates)
+    // Step 5: Durée (only if flexible dates)
     if (normalizeDatesType(answers.datesType) === DATES_TYPE.FLEXIBLE && step === stepCounter) {
       // Afficher les étapes transparentes DANS LA MÊME étape si nécessaire
       // Étape transparente: Préciser 8, 9 ou 10 nuits (si 8-10 sélectionné)
@@ -2756,7 +2744,7 @@ const Questionnaire = () => {
                 { nights: 9, label: t('questionnaire.duration.9nights'), icon: "🛏️" },
                 { nights: 10, label: t('questionnaire.duration.10nights'), icon: "🛏️" }
               ].map((option) => {
-                const isSelected = answers.duration === option.label;
+                const isSelected = answers.exactNights === option.nights;
                 return (
                   <Card
                     key={option.nights}
@@ -2766,7 +2754,7 @@ const Questionnaire = () => {
                         : "hover:shadow-golden hover:border-travliaq-deep-blue"
                     }`}
                     onClick={() => {
-                      setAnswers({ ...answers, duration: option.label, exactNights: option.nights });
+                      setAnswers({ ...answers, exactNights: option.nights });
                       setTimeout(() => nextStep(true), 300);
                     }}
                   >
@@ -2801,7 +2789,7 @@ const Questionnaire = () => {
                 { nights: 13, label: t('questionnaire.duration.13nights'), icon: "🛏️" },
                 { nights: 14, label: t('questionnaire.duration.14nights'), icon: "🛏️" }
               ].map((option) => {
-                const isSelected = answers.duration === option.label;
+                const isSelected = answers.exactNights === option.nights;
                 return (
                   <Card
                     key={option.nights}
@@ -2811,7 +2799,7 @@ const Questionnaire = () => {
                         : "hover:shadow-golden hover:border-travliaq-deep-blue"
                     }`}
                     onClick={() => {
-                      setAnswers({ ...answers, duration: option.label, exactNights: option.nights });
+                      setAnswers({ ...answers, exactNights: option.nights });
                       setTimeout(() => nextStep(true), 300);
                     }}
                   >
@@ -3044,7 +3032,120 @@ const Questionnaire = () => {
     }
     if (answers.budgetType === t('questionnaire.budget.precise') || answers.budgetType === t('questionnaire.budget.more1800')) stepCounter++;
 
-    // Step 6: Style (max 5 au lieu de 3) - SEULEMENT si destination précise ET activités sélectionnées
+    // ========== FLIGHTS PHASE ==========
+    
+    // Step 6: Vols - SEULEMENT si vols sélectionnés
+    if (helpWithFlights.includes(HELP_WITH.FLIGHTS) && step === stepCounter) {
+      return (
+        <div className="space-y-8 animate-fade-up">
+          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+            {t('questionnaire.flights.title')}
+          </h2>
+          <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
+            {t('questionnaire.flights.description')}
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
+            {[
+              { code: FLIGHT_PREF.DIRECT, label: t('questionnaire.flights.directOnly'), icon: "✈️" },
+              { code: FLIGHT_PREF.ONE_STOP, label: t('questionnaire.flights.max1Stop'), icon: "🛫" },
+              { code: FLIGHT_PREF.CHEAPEST, label: t('questionnaire.flights.dontMind'), icon: "💰" }
+            ].map((option) => {
+              const isSelected = normalizeFlightPref(answers.flightPreference) === option.code;
+              return (
+                <Card
+                  key={option.code}
+                  className={`p-6 cursor-pointer transition-all hover:scale-105 ${
+                    isSelected 
+                      ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
+                      : "hover:shadow-golden hover:border-travliaq-deep-blue"
+                  }`}
+                  onClick={() => handleChoice("flightPreference", option.code)}
+                >
+                  <div className="flex flex-col items-center space-y-2">
+                    <span className="text-4xl">{option.icon}</span>
+                    <span className="text-center font-semibold text-travliaq-deep-blue">
+                      {option.label}
+                    </span>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+    if (helpWithFlights.includes(HELP_WITH.FLIGHTS)) stepCounter++;
+
+    // Step 7: Bagages par voyageur - SEULEMENT si vols sélectionnés
+    if (helpWithFlights.includes(HELP_WITH.FLIGHTS) && step === stepCounter) {
+      return (
+        <div className="space-y-8 animate-fade-up">
+          <h2 className="text-2xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
+            {t('questionnaire.luggage.title')}
+          </h2>
+          <p className="text-sm text-muted-foreground text-center max-w-xl mx-auto">
+            {t('questionnaire.luggage.description')}
+          </p>
+          <p className="text-center text-muted-foreground">
+            {getNumberOfTravelers()} {getNumberOfTravelers() > 1 ? t('questionnaire.luggage.travelers_plural') : t('questionnaire.luggage.travelers')}
+          </p>
+          <div className="max-w-2xl mx-auto space-y-4">
+            {Array.from({ length: getNumberOfTravelers() }).map((_, index) => (
+              <div key={index} className="space-y-2">
+                <label className="block text-sm font-medium">
+                  {t('questionnaire.luggage.traveler')} {index + 1} {index === 0 && normalizeTravelGroup(answers.travelGroup) === TRAVEL_GROUPS.DUO ? "👤" : index === 1 && normalizeTravelGroup(answers.travelGroup) === TRAVEL_GROUPS.DUO ? "👥" : "👤"}
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { code: LUGGAGE.PERSONAL_ITEM, label: t('questionnaire.luggage.personalItem'), icon: "👜", desc: t('questionnaire.luggage.personalItem.desc') },
+                    { code: LUGGAGE.CABIN, label: t('questionnaire.luggage.cabin'), icon: "🎒", desc: t('questionnaire.luggage.cabin.desc') },
+                    { code: LUGGAGE.HOLD, label: t('questionnaire.luggage.hold'), icon: "🧳", desc: t('questionnaire.luggage.hold.desc') },
+                    { code: LUGGAGE.CABIN_HOLD, label: t('questionnaire.luggage.cabinHold'), icon: "🛄", desc: t('questionnaire.luggage.cabinHold.desc') }
+                  ].map((option) => {
+                    const isSelected = normalizeLuggage(answers.luggage?.[index]) === option.code;
+                    return (
+                      <Card
+                        key={option.code}
+                        className={`p-4 cursor-pointer transition-all hover:scale-105 ${
+                          isSelected 
+                            ? "border-[3px] border-travliaq-turquoise bg-travliaq-turquoise/15 shadow-golden scale-105" 
+                            : "hover:shadow-golden hover:border-travliaq-deep-blue"
+                        }`}
+                        onClick={() => {
+                          const newLuggage = { ...(answers.luggage || {}) };
+                          newLuggage[index] = option.code;
+                          setAnswers({ ...answers, luggage: newLuggage });
+                          
+                          // Auto-advance if all travelers have selected luggage
+                          if (Object.keys(newLuggage).length === getNumberOfTravelers()) {
+                            setTimeout(() => nextStep(true), 300);
+                          }
+                        }}
+                      >
+                        <div className="flex flex-col items-center space-y-1 text-center">
+                          <span className="text-2xl">{option.icon}</span>
+                          <span className="text-sm font-semibold text-travliaq-deep-blue">
+                            {option.label}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {option.desc}
+                          </span>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    if (helpWithFlights.includes(HELP_WITH.FLIGHTS)) stepCounter++;
+    
+    // ========== ACTIVITIES PHASE ==========
+    
+    // Step 8: Style (max 5) - SEULEMENT si destination précise ET activités sélectionnées
     const helpWithForStyle = answers.helpWith || [];
     const hasActivitiesForStyle = helpWithForStyle.includes(HELP_WITH.ACTIVITIES);
     if (normalizeYesNo(answers.hasDestination) === YES_NO.YES && hasActivitiesForStyle && step === stepCounter) {
@@ -3231,11 +3332,10 @@ const Questionnaire = () => {
     }
     if (helpWithFlights.includes(HELP_WITH.FLIGHTS)) stepCounter++;
 
-    // Step 10: Mobilité (multi-choix + exhaustif) - SEULEMENT si pas uniquement vols ET pas uniquement hébergement
+    // Step 10: Mobilité - SEULEMENT si activités sélectionnées
     const helpWithMobility = answers.helpWith || [];
-    const onlyFlightsMobility = helpWithMobility.length === 1 && helpWithMobility.includes(HELP_WITH.FLIGHTS);
-    const onlyAccommodationMobility = helpWithMobility.length === 1 && helpWithMobility.includes(HELP_WITH.ACCOMMODATION);
-    if (!onlyFlightsMobility && !onlyAccommodationMobility && step === stepCounter) {
+    const needsActivitiesForMobility = helpWithMobility.includes(HELP_WITH.ACTIVITIES);
+    if (needsActivitiesForMobility && step === stepCounter) {
       return (
         <div className="space-y-3 md:space-y-8 animate-fade-up">
           <h2 className="text-xl md:text-3xl font-bold text-center text-travliaq-deep-blue">
@@ -3318,12 +3418,45 @@ const Questionnaire = () => {
         </div>
       );
     }
-    if (!onlyFlightsMobility && !onlyAccommodationMobility) stepCounter++;
+    if (needsActivitiesForMobility) stepCounter++;
+
+    // ========== ACTIVITIES PHASE (continued) ==========
+    
+    // Step 11: Sécurité & Phobies - SEULEMENT si activités sélectionnées
+    const helpWithForSecurity = answers.helpWith || [];
+    const needsActivitiesForSecurity = helpWithForSecurity.includes(HELP_WITH.ACTIVITIES);
+    const needsSecurityStepRender = needsActivitiesForSecurity;
+    if (needsSecurityStepRender && step === stepCounter) {
+      return (
+        <SecurityStep
+          security={answers.security || []}
+          onUpdate={(security) => setAnswers({ ...answers, security })}
+          onNext={() => nextStep(true)}
+        />
+      );
+    }
+    if (needsSecurityStepRender) stepCounter++;
+
+    // Step 12: Rythme & horaires - SEULEMENT si activités sélectionnées
+    if (needsActivitiesForSecurity && step === stepCounter) {
+      return (
+        <RhythmStep
+          rhythm={answers.rhythm || ""}
+          schedulePrefs={answers.schedulePrefs || []}
+          onUpdateRhythm={(rhythm) => setAnswers({ ...answers, rhythm })}
+          onUpdateSchedulePrefs={(schedulePrefs) => setAnswers({ ...answers, schedulePrefs })}
+          onNext={() => nextStep(true)}
+        />
+      );
+    }
+    if (needsActivitiesForSecurity) stepCounter++;
+    
+    // ========== ACCOMMODATION PHASE ==========
 
     // Déclarer helpWithAccommodation ici pour qu'elle soit disponible pour tous les steps suivants
     // (déjà déclaré en haut de renderStep)
 
-    // Step 11: Type hébergement (max 2 + "Peu importe") - SEULEMENT si hébergement sélectionné
+    // Step 13: Type hébergement (max 2 + "Peu importe") - SEULEMENT si hébergement sélectionné
     if (helpWithAccommodation.includes(HELP_WITH.ACCOMMODATION) && step === stepCounter) {
       return (
         <div className="space-y-3 md:space-y-8 animate-fade-up">
@@ -3628,34 +3761,7 @@ const Questionnaire = () => {
     }
     if ((answers.helpWith || []).includes(HELP_WITH.ACCOMMODATION)) stepCounter++;
 
-    // Step 15: Sécurité & Phobies (seulement si activités sélectionnées, PAS si uniquement hébergement)
-    const helpWithForSecurity = answers.helpWith || [];
-    const needsActivitiesForSecurity = helpWithForSecurity.includes(HELP_WITH.ACTIVITIES);
-    const needsSecurityStepRender = needsActivitiesForSecurity;
-    if (needsSecurityStepRender && step === stepCounter) {
-      return (
-        <SecurityStep
-          security={answers.security || []}
-          onUpdate={(security) => setAnswers({ ...answers, security })}
-          onNext={() => nextStep(true)}
-        />
-      );
-    }
-    if (needsSecurityStepRender) stepCounter++;
-
-    // Step 16: Rythme & horaires (seulement si activités sélectionnées)
-    if (needsActivitiesForSecurity && step === stepCounter) {
-      return (
-        <RhythmStep
-          rhythm={answers.rhythm || ""}
-          schedulePrefs={answers.schedulePrefs || []}
-          onUpdateRhythm={(rhythm) => setAnswers({ ...answers, rhythm })}
-          onUpdateSchedulePrefs={(schedulePrefs) => setAnswers({ ...answers, schedulePrefs })}
-          onNext={() => nextStep(true)}
-        />
-      );
-    }
-    if (needsActivitiesForSecurity) stepCounter++;
+    // REMOVED: Sécurité and Rythme moved to Activities phase (before Accommodation)
 
     // Step 17: Contraintes alimentaires - SEULEMENT si hébergement + hôtel + prestation avec repas
     const helpWithForConstraints = answers.helpWith || [];

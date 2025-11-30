@@ -120,13 +120,10 @@ export const ProgressBar = ({ currentStep, totalSteps, progress, answers = {} }:
         currentStepCount += 1; // Style
       }
       
-      // Mobilité (si pas uniquement vols ET pas uniquement hébergement)
-      const onlyFlights = helpWith.length === 1 && needsFlights;
-      const onlyAccommodation = helpWith.length === 1 && needsAccommodation;
-      if (!onlyFlights && !onlyAccommodation) {
-        currentStepCount += 1; // Mobilité
-      }
+      // Mobilité (si activités)
+      currentStepCount += 1; // Mobilité
       
+      // Sécurité + Rythme
       currentStepCount += 2; // Sécurité + Rythme
       
       milestones.push({
@@ -135,20 +132,6 @@ export const ProgressBar = ({ currentStep, totalSteps, progress, answers = {} }:
         label: t("questionnaire.progress.activities"),
         stepRange: [activitiesStart, currentStepCount - 1]
       });
-    } else {
-      // Mobilité peut exister sans activités (si pas uniquement vols ET pas uniquement hébergement)
-      const onlyFlights = helpWith.length === 1 && needsFlights;
-      const onlyAccommodation = helpWith.length === 1 && needsAccommodation;
-      if (!onlyFlights && !onlyAccommodation) {
-        const mobilityStart = currentStepCount;
-        currentStepCount += 1; // Mobilité seule
-        milestones.push({
-          key: "mobility",
-          icon: Compass,
-          label: t("questionnaire.progress.preferences"),
-          stepRange: [mobilityStart, currentStepCount - 1]
-        });
-      }
     }
 
     // PHASE 7: HÉBERGEMENT (conditionnelle - seulement si hébergement sélectionné)
