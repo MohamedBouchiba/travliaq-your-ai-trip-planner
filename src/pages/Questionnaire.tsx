@@ -1073,6 +1073,11 @@ const Questionnaire = () => {
       // Step 3b: Trajet (ville départ + destination)
       stepCounter++;
       if (step === stepCounter) {
+        // Les villes de départ et d'arrivée ne peuvent pas être identiques
+        if (answers.destination && answers.departureLocation && 
+            answers.destination.toLowerCase().trim() === answers.departureLocation.toLowerCase().trim()) {
+          return false;
+        }
         return !!answers.destination && !!answers.departureLocation;
       }
     } else if (hasDest === YES_NO.NO) {
@@ -1256,8 +1261,14 @@ const Questionnaire = () => {
       let errorMessage = `Utilisateur bloqué à l'étape ${step}/${totalSteps}`;
       let userMessage = t('questionnaire.answerRequired');
       
-      // Messages d'erreur spécifiques pour l'étape "Nombre de personnes"
+      // Messages d'erreur spécifiques selon l'étape
       const normalizedGroup = normalizeTravelGroup(answers.travelGroup);
+      
+      // Vérifier si c'est l'erreur des villes identiques
+      if (answers.destination && answers.departureLocation && 
+          answers.destination.toLowerCase().trim() === answers.departureLocation.toLowerCase().trim()) {
+        userMessage = t('questionnaire.citiesMustBeDifferent');
+      }
       if ((normalizedGroup === TRAVEL_GROUPS.FAMILY || normalizedGroup === TRAVEL_GROUPS.GROUP35) && step === 2) {
         if (normalizedGroup === TRAVEL_GROUPS.FAMILY && answers.travelers) {
           const adults = answers.travelers.filter(t => t.type === 'adult').length;
@@ -2165,12 +2176,27 @@ const Questionnaire = () => {
               />
             </div>
 
+            {/* Message d'erreur si les villes sont identiques */}
+            {answers.destination && answers.departureLocation && 
+             answers.destination.toLowerCase().trim() === answers.departureLocation.toLowerCase().trim() && (
+              <div className="flex items-center justify-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-lg">
+                <AlertTriangle className="h-4 w-4" />
+                <span>{t('questionnaire.citiesMustBeDifferent')}</span>
+              </div>
+            )}
+            
             <div className="flex justify-center">
               <Button
                 variant="hero"
                 size="lg"
                 onClick={() => nextStep()}
-                disabled={!answers.destination || answers.destination.trim() === "" || !answers.departureLocation || answers.departureLocation.trim() === ""}
+                disabled={
+                  !answers.destination || 
+                  answers.destination.trim() === "" || 
+                  !answers.departureLocation || 
+                  answers.departureLocation.trim() === "" ||
+                  answers.destination.toLowerCase().trim() === answers.departureLocation.toLowerCase().trim()
+                }
                 className="bg-travliaq-deep-blue"
               >
                 {t('questionnaire.continue')}

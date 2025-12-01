@@ -548,6 +548,7 @@ const resources = {
       "questionnaire.destinationTooltip":
         "Tu peux saisir n'importe quelle ville, même si elle n'apparaît pas dans la liste. L'IA comprendra ta destination si tu l'orthographies correctement.",
       "questionnaire.destinationCity": "Ville de destination...",
+      "questionnaire.citiesMustBeDifferent": "Les villes de départ et de destination doivent être différentes",
       "questionnaire.climatePreference": "Climat préféré ? 🌡️",
       "questionnaire.climatePreference.description": "Choix multiples possibles",
       "questionnaire.customTrip": "TON VOYAGE SUR MESURE",
@@ -1510,6 +1511,7 @@ const resources = {
       "questionnaire.destinationTooltip":
         "You can enter any city, even if it doesn't appear in the list. The AI will understand your destination if you spell it correctly.",
       "questionnaire.destinationCity": "Destination city...",
+      "questionnaire.citiesMustBeDifferent": "Departure and destination cities must be different",
       "questionnaire.climatePreference": "Preferred climate? 🌡️",
       "questionnaire.climatePreference.description": "Multiple choices possible",
       "questionnaire.customTrip": "YOUR CUSTOM TRIP",
