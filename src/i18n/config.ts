@@ -12,6 +12,12 @@ const resources = {
       "nav.admin": "Admin",
       "nav.login": "Se connecter",
       "nav.logout": "Déconnexion",
+      "nav.comparison": "Comparaison",
+      "nav.howItWorks": "Comment ça marche",
+      "nav.examples": "Exemples",
+      "nav.whyUs": "Pourquoi nous",
+      "nav.faq": "FAQ",
+      "nav.questionnaire": "Questionnaire",
 
       // Hero Section
       "hero.title": "Ton voyage,",
@@ -35,6 +41,7 @@ const resources = {
 
       // Steps details
       "step1.title": "Vos envies",
+      "step1.description": "Partage-nous tes envies de voyage pour un itinéraire 100% personnalisé.",
       "step1.dest": "Indique ta destination :",
       "step1.dest.desc":
         "que ce soit Lisbonne, Tokyo ou juste l'aéroport de départ, pour que Travliaq trouve les meilleures options.",
@@ -44,6 +51,7 @@ const resources = {
       "step1.budget.desc": "solo, sac à dos, confort ou premium, on adapte chaque étape à ton rythme et à tes envies.",
 
       "step2.title": "Recherche intelligente",
+      "step2.description": "Notre IA analyse des milliers d'options pour trouver les meilleures combinaisons.",
       "step2.scan": "On scanne les meilleures options :",
       "step2.scan.desc": "vols, hébergements et activités, via des sources fiables et mises à jour en temps réel.",
       "step2.cross": "On croise prix, météo et logistique :",
@@ -52,6 +60,7 @@ const resources = {
       "step2.filter.desc": "solo, backpacker, confort ou premium, chaque résultat est ajusté à tes priorités.",
 
       "step3.title": "Itinéraire optimisé",
+      "step3.description": "Reçois un programme détaillé jour par jour, parfaitement adapté à tes préférences.",
       "step3.program": "Programme jour par jour :",
       "step3.program.desc":
         "activités, visites, pauses et repas organisés dans un ordre logique, pour profiter sans te presser.",
@@ -61,6 +70,7 @@ const resources = {
       "step3.tips.desc": "spots photo, restaurants cachés, transports malins... comme si un ami sur place te guidait.",
 
       "step4.title": "Voyage prêt à réserver",
+      "step4.description": "Tout est prêt ! Il ne te reste plus qu'à réserver en quelques clics.",
       "step4.email": "Itinéraire complet envoyé par e-mail :",
       "step4.email.desc": "prêt à être consulté en ligne ou hors connexion.",
       "step4.links": "Liens directs pour réserver :",
@@ -90,6 +100,63 @@ const resources = {
       // CTA
       "cta.start": "Commencer mon voyage",
       "cta.create": "Crée ton itinéraire",
+
+      // Comparison Section
+      "comparison.title": "Avant / Après Travliaq",
+      "comparison.subtitle": "Découvre comment Travliaq transforme ta façon de planifier tes voyages",
+      "comparison.before.badge": "Sans Travliaq",
+      "comparison.before.title": "Planification traditionnelle",
+      "comparison.before.point1": "Des heures passées à comparer des centaines d'onglets",
+      "comparison.before.point2": "Risque de surpayer vols et hébergements",
+      "comparison.before.point3": "Itinéraire improvisé et stressant",
+      "comparison.before.point4": "Aucune garantie de cohérence ou d'optimisation",
+      "comparison.after.badge": "Avec Travliaq",
+      "comparison.after.title": "Planification intelligente",
+      "comparison.after.point1": "Quelques clics pour un itinéraire complet",
+      "comparison.after.point2": "Meilleurs prix garantis par l'IA",
+      "comparison.after.point3": "Programme optimisé jour par jour",
+      "comparison.after.point4": "Support 7j/7 et modifications illimitées",
+
+      // Examples Section
+      "examples.title": "Découvre nos voyages",
+      "examples.subtitle": "Des exemples concrets d'itinéraires créés par Travliaq",
+      "examples.tokyo.title": "Tokyo & Kyoto",
+      "examples.tokyo.description": "Culture, gastronomie et temples traditionnels au cœur du Japon.",
+      "examples.tokyo.duration": "10 jours",
+      "examples.tokyo.travelers": "2 voyageurs",
+      "examples.algeria.title": "Sidi Bel Abbès",
+      "examples.algeria.description": "Découverte authentique de l'Algérie et de son patrimoine.",
+      "examples.algeria.duration": "7 jours",
+      "examples.algeria.travelers": "1 voyageur",
+      "examples.custom.title": "Ton voyage sur mesure",
+      "examples.custom.description": "Crée l'itinéraire parfait selon tes envies et ton budget.",
+      "examples.custom.anywhere": "Partout dans le monde",
+      "examples.viewTrip": "Voir le voyage",
+      "examples.createYours": "Créer mon voyage",
+
+      // Video Section
+      "video.title": "Découvre Travliaq en vidéo",
+      "video.subtitle": "Vois comment nous simplifions la planification de tes voyages",
+      "video.coming": "Vidéo de démonstration",
+      "video.demo": "Bientôt disponible",
+
+      // FAQ Section
+      "faq.title": "Questions fréquentes",
+      "faq.subtitle": "Tout ce que tu dois savoir sur Travliaq",
+      "faq.q1": "Comment fonctionne Travliaq ?",
+      "faq.a1": "Travliaq utilise l'intelligence artificielle pour analyser tes préférences de voyage (destination, budget, dates, style) et compare en temps réel des milliers d'options de vols, d'hébergements et d'activités. En moins de 24h, tu reçois un itinéraire optimisé jour par jour avec tous les liens de réservation.",
+      "faq.q2": "Combien coûte le service ?",
+      "faq.a2": "L'utilisation de Travliaq est actuellement gratuite. Tu payes uniquement tes réservations (vols, hôtels, activités) directement auprès des prestataires.",
+      "faq.q3": "Puis-je modifier mon itinéraire après réception ?",
+      "faq.a3": "Absolument ! Ton itinéraire est 100% modulable. Tu peux ajuster les dates, changer une activité, modifier un hébergement ou même relancer une recherche complète à tout moment.",
+      "faq.q4": "Quelles destinations sont disponibles ?",
+      "faq.a4": "Travliaq couvre le monde entier ! Que tu rêves de Tokyo, New York, Marrakech ou d'un road trip en Patagonie, notre IA trouve les meilleures options pour n'importe quelle destination.",
+      "faq.q5": "Les prix sont-ils vraiment les meilleurs ?",
+      "faq.a5": "Oui ! Notre IA compare en temps réel des centaines de sources (compagnies aériennes, plateformes de réservation, hôtels) pour te garantir les meilleurs tarifs. Et si tu trouves moins cher ailleurs, on ajuste ton itinéraire.",
+      "faq.q6": "Combien de temps faut-il pour recevoir mon itinéraire ?",
+      "faq.a6": "En général, tu reçois ta première proposition dans les 24 heures suivant la soumission de ton questionnaire. Pour les demandes urgentes, nous pouvons accélérer le processus.",
+      "faq.more": "Tu as d'autres questions ?",
+      "faq.contact": "Contacte-nous",
 
       // Toast
       "toast.login": "Connectez-vous avec Google pour sauvegarder vos préférences",
@@ -937,6 +1004,12 @@ const resources = {
       "nav.admin": "Admin",
       "nav.login": "Login",
       "nav.logout": "Logout",
+      "nav.comparison": "Comparison",
+      "nav.howItWorks": "How it works",
+      "nav.examples": "Examples",
+      "nav.whyUs": "Why us",
+      "nav.faq": "FAQ",
+      "nav.questionnaire": "Questionnaire",
 
       // Hero Section
       "hero.title": "Your trip,",
@@ -960,6 +1033,7 @@ const resources = {
 
       // Steps details
       "step1.title": "Your wishes",
+      "step1.description": "Share your travel wishes for a 100% personalized itinerary.",
       "step1.dest": "Tell us your destination:",
       "step1.dest.desc":
         "whether it's Lisbon, Tokyo or just your departure airport, so Travliaq can find the best options.",
@@ -969,6 +1043,7 @@ const resources = {
       "step1.budget.desc": "solo, backpacking, comfort or premium, we adapt each step to your pace and wishes.",
 
       "step2.title": "Smart search",
+      "step2.description": "Our AI analyzes thousands of options to find the best combinations.",
       "step2.scan": "We scan the best options:",
       "step2.scan.desc": "flights, accommodations and activities, from reliable sources updated in real time.",
       "step2.cross": "We cross-reference prices, weather and logistics:",
@@ -977,6 +1052,7 @@ const resources = {
       "step2.filter.desc": "solo, backpacker, comfort or premium, each result is adjusted to your priorities.",
 
       "step3.title": "Optimized itinerary",
+      "step3.description": "Receive a detailed day-by-day program, perfectly tailored to your preferences.",
       "step3.program": "Day-by-day program:",
       "step3.program.desc":
         "activities, visits, breaks and meals organized in a logical order, to enjoy without rushing.",
@@ -986,6 +1062,7 @@ const resources = {
       "step3.tips.desc": "photo spots, hidden restaurants, smart transport... as if a friend on site was guiding you.",
 
       "step4.title": "Trip ready to book",
+      "step4.description": "Everything is ready! You just need to book in a few clicks.",
       "step4.email": "Complete itinerary sent by email:",
       "step4.email.desc": "ready to be consulted online or offline.",
       "step4.links": "Direct booking links:",
@@ -1015,6 +1092,63 @@ const resources = {
       // CTA
       "cta.start": "Start my journey",
       "cta.create": "Create your itinerary",
+
+      // Comparison Section
+      "comparison.title": "Before / After Travliaq",
+      "comparison.subtitle": "Discover how Travliaq transforms the way you plan your trips",
+      "comparison.before.badge": "Without Travliaq",
+      "comparison.before.title": "Traditional planning",
+      "comparison.before.point1": "Hours spent comparing hundreds of tabs",
+      "comparison.before.point2": "Risk of overpaying for flights and accommodations",
+      "comparison.before.point3": "Improvised and stressful itinerary",
+      "comparison.before.point4": "No guarantee of consistency or optimization",
+      "comparison.after.badge": "With Travliaq",
+      "comparison.after.title": "Smart planning",
+      "comparison.after.point1": "A few clicks for a complete itinerary",
+      "comparison.after.point2": "Best prices guaranteed by AI",
+      "comparison.after.point3": "Day-by-day optimized program",
+      "comparison.after.point4": "24/7 support and unlimited modifications",
+
+      // Examples Section
+      "examples.title": "Discover our trips",
+      "examples.subtitle": "Concrete examples of itineraries created by Travliaq",
+      "examples.tokyo.title": "Tokyo & Kyoto",
+      "examples.tokyo.description": "Culture, gastronomy and traditional temples in the heart of Japan.",
+      "examples.tokyo.duration": "10 days",
+      "examples.tokyo.travelers": "2 travelers",
+      "examples.algeria.title": "Sidi Bel Abbès",
+      "examples.algeria.description": "Authentic discovery of Algeria and its heritage.",
+      "examples.algeria.duration": "7 days",
+      "examples.algeria.travelers": "1 traveler",
+      "examples.custom.title": "Your custom trip",
+      "examples.custom.description": "Create the perfect itinerary according to your wishes and budget.",
+      "examples.custom.anywhere": "Anywhere in the world",
+      "examples.viewTrip": "View trip",
+      "examples.createYours": "Create my trip",
+
+      // Video Section
+      "video.title": "Discover Travliaq in video",
+      "video.subtitle": "See how we simplify your travel planning",
+      "video.coming": "Demo video",
+      "video.demo": "Coming soon",
+
+      // FAQ Section
+      "faq.title": "Frequently asked questions",
+      "faq.subtitle": "Everything you need to know about Travliaq",
+      "faq.q1": "How does Travliaq work?",
+      "faq.a1": "Travliaq uses artificial intelligence to analyze your travel preferences (destination, budget, dates, style) and compares thousands of flight, accommodation and activity options in real time. In less than 24 hours, you receive an optimized day-by-day itinerary with all booking links.",
+      "faq.q2": "How much does the service cost?",
+      "faq.a2": "Using Travliaq is currently free. You only pay for your bookings (flights, hotels, activities) directly with the providers.",
+      "faq.q3": "Can I modify my itinerary after receiving it?",
+      "faq.a3": "Absolutely! Your itinerary is 100% customizable. You can adjust dates, change an activity, modify accommodation or even restart a complete search at any time.",
+      "faq.q4": "Which destinations are available?",
+      "faq.a4": "Travliaq covers the whole world! Whether you dream of Tokyo, New York, Marrakech or a road trip in Patagonia, our AI finds the best options for any destination.",
+      "faq.q5": "Are the prices really the best?",
+      "faq.a5": "Yes! Our AI compares hundreds of sources in real time (airlines, booking platforms, hotels) to guarantee you the best rates. And if you find cheaper elsewhere, we adjust your itinerary.",
+      "faq.q6": "How long does it take to receive my itinerary?",
+      "faq.a6": "Generally, you receive your first proposal within 24 hours of submitting your questionnaire. For urgent requests, we can speed up the process.",
+      "faq.more": "Have more questions?",
+      "faq.contact": "Contact us",
 
       // Toast
       "toast.login": "Sign in with Google to save your preferences",

@@ -9,6 +9,7 @@ import { usePageTracking } from "@/hooks/usePageTracking";
 
 const SentryTest = lazy(() => import("./pages/SentryTest"));
 const Index = lazy(() => import("./pages/Index"));
+const IndexV2 = lazy(() => import("./pages/IndexV2"));
 const CGV = lazy(() => import("./pages/CGV"));
 const Questionnaire = lazy(() => import("./pages/Questionnaire"));
 const QuestionnaireV2 = lazy(() => import("./pages/QuestionnaireV2"));
@@ -32,6 +33,7 @@ const AppContent = () => {
     <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>}>
       <Routes>
         <Route path="/" element={<Index />} />
+              <Route path="/v2" element={<IndexV2 />} />
               <Route path="/cgv" element={<CGV />} />
               <Route path="/questionnaire" element={<Questionnaire />} />
               <Route path="/questionnaire-v2" element={<QuestionnaireV2 />} />
