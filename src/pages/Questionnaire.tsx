@@ -1364,8 +1364,15 @@ const Questionnaire = () => {
       questionnaireLogger.logAnswer(step, String(field), value);
       
       setAnswers({ ...answers, [field]: value });
-      // Skip validation car on vient de définir la valeur
-      setTimeout(() => nextStep(true), 300);
+      
+      // Ne PAS auto-avancer si c'est une durée 8-10 ou 11-14 (sous-étape requise)
+      const is8to10 = field === 'duration' && value === t('questionnaire.duration.8to10');
+      const is11to14 = field === 'duration' && value === t('questionnaire.duration.11to14');
+      
+      if (!is8to10 && !is11to14) {
+        // Skip validation car on vient de définir la valeur
+        setTimeout(() => nextStep(true), 300);
+      }
     } catch (error) {
       logger.error('Erreur lors du choix d\'une réponse', {
         category: LogCategory.QUESTIONNAIRE,
@@ -1605,7 +1612,8 @@ const Questionnaire = () => {
         flexibilite: answers.flexibility || null,
         a_date_depart_approximative: answers.hasApproximateDepartureDate || null,
         date_depart_approximative: answers.approximateDepartureDate || null,
-        duree: normalizeDuration(answers.duration) || "",
+        // Si exactNights est défini (8-10 ou 11-14), utiliser cette valeur exacte pour duree
+        duree: answers.exactNights ? `${answers.exactNights}nights` : (normalizeDuration(answers.duration) || ""),
         nuits_exactes: answers.exactNights || null,
         budget_par_personne: answers.budgetPerPerson || null,
         type_budget: answers.budgetType || null,
