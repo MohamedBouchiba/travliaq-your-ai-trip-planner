@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useTripData } from "@/hooks/useTripData";
@@ -26,9 +26,9 @@ import {
   Info,
   Scale,
   Building2,
-  Umbrella
+  Umbrella,
+  Ban
 } from "lucide-react";
-import logo from "@/assets/logo-travliaq.png";
 
 const TripDetails = () => {
   const { code } = useParams();
@@ -42,9 +42,7 @@ const TripDetails = () => {
 
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
-  // Calculate trip details
   const regularSteps = steps.filter(s => !s.is_summary);
-  const uniqueCities = new Set(regularSteps.map(s => s.title.split(' ')[0])).size;
 
   if (loading) {
     return (
@@ -71,58 +69,87 @@ const TripDetails = () => {
     navigate(`/recommendations/${encodeURIComponent(tripCode || '')}`);
   };
 
-  // Dynamic included/excluded based on trip data
+  // Dynamic included/excluded items
   const includedItems = [
-    trip.flight_from && trip.flight_to && { icon: Plane, text: isEnglish ? `Round-trip flights ${trip.flight_from} ↔ ${trip.flight_to}` : `Vols aller-retour ${trip.flight_from} ↔ ${trip.flight_to}` },
-    trip.hotel_name && { icon: Hotel, text: isEnglish ? `Accommodation: ${trip.hotel_name}` : `Hébergement : ${trip.hotel_name}` },
-    regularSteps.length > 0 && { icon: MapPin, text: isEnglish ? `${regularSteps.length} planned activities` : `${regularSteps.length} activités planifiées` },
-    { icon: FileText, text: isEnglish ? 'Complete personalized itinerary' : 'Itinéraire personnalisé complet' },
-    { icon: Phone, text: isEnglish ? '7/7 customer support' : 'Assistance client 7j/7' },
+    trip.flight_from && trip.flight_to && { 
+      icon: Plane, 
+      textFr: `Vols aller-retour ${trip.flight_from} ↔ ${trip.flight_to}`,
+      textEn: `Round-trip flights ${trip.flight_from} ↔ ${trip.flight_to}`
+    },
+    trip.hotel_name && { 
+      icon: Hotel, 
+      textFr: `Hébergement : ${trip.hotel_name}`,
+      textEn: `Accommodation: ${trip.hotel_name}`
+    },
+    regularSteps.length > 0 && { 
+      icon: MapPin, 
+      textFr: `${regularSteps.length} activités planifiées`,
+      textEn: `${regularSteps.length} planned activities`
+    },
+    { 
+      icon: FileText, 
+      textFr: 'Itinéraire personnalisé complet',
+      textEn: 'Complete personalized itinerary'
+    },
+    { 
+      icon: Phone, 
+      textFr: 'Assistance client 7j/7',
+      textEn: '24/7 customer support'
+    },
   ].filter(Boolean);
 
   const excludedItems = [
-    { icon: Umbrella, text: isEnglish ? 'Travel insurance (recommended)' : 'Assurance voyage (recommandée)' },
-    { icon: CreditCard, text: isEnglish ? 'Personal expenses and tips' : 'Dépenses personnelles et pourboires' },
-    { icon: MapPin, text: isEnglish ? 'Optional excursions not mentioned' : 'Excursions optionnelles non mentionnées' },
+    { 
+      icon: Umbrella, 
+      textFr: 'Assurance voyage (recommandée)',
+      textEn: 'Travel insurance (recommended)'
+    },
+    { 
+      icon: CreditCard, 
+      textFr: 'Dépenses personnelles et pourboires',
+      textEn: 'Personal expenses and tips'
+    },
+    { 
+      icon: MapPin, 
+      textFr: 'Excursions optionnelles non mentionnées',
+      textEn: 'Optional excursions not mentioned'
+    },
   ];
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
+      <Navigation theme="light" />
       
-      <div className="container max-w-4xl mx-auto px-4 py-8 pt-24">
+      <div className="container max-w-4xl mx-auto px-4 py-6 pt-20 md:py-8 md:pt-24">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6 md:mb-8">
           <Button
             variant="ghost"
             onClick={handleBackToTrip}
-            className="mb-4 -ml-2"
+            className="mb-4 -ml-2 text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             {t('tripDetails.backToTrip')}
           </Button>
           
-          <div className="flex items-center gap-4 mb-4">
-            <img src={logo} alt="Travliaq" className="h-10" />
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-                {isEnglish ? (trip.destination_en || trip.destination) : trip.destination}
-              </h1>
-              <p className="text-muted-foreground">
-                {trip.total_days} {isEnglish ? 'days' : 'jours'} • {trip.travelers || 2} {isEnglish ? 'travelers' : 'voyageurs'}
-              </p>
-            </div>
+          <div className="mb-4">
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-1">
+              {isEnglish ? (trip.destination_en || trip.destination) : trip.destination}
+            </h1>
+            <p className="text-muted-foreground text-sm md:text-base">
+              {trip.total_days} {t('tripDetails.days')} • {trip.travelers || 2} {t('tripDetails.travelers')}
+            </p>
           </div>
 
-          <Badge variant="outline" className="text-primary border-primary">
+          <Badge className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/20">
             {t('tripDetails.preBookingInfo')}
           </Badge>
         </div>
 
         {/* Trip Summary Card */}
-        <Card className="mb-6 border-primary/20 bg-primary/5">
+        <Card className="mb-6 border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
+            <CardTitle className="flex items-center gap-2 text-lg text-foreground">
               <Info className="h-5 w-5 text-primary" />
               {t('tripDetails.tripSummary')}
             </CardTitle>
@@ -130,31 +157,31 @@ const TripDetails = () => {
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <Calendar className="h-4 w-4 text-primary" />
                 <div>
-                  <p className="text-muted-foreground">{isEnglish ? 'Duration' : 'Durée'}</p>
-                  <p className="font-medium">{trip.total_days} {isEnglish ? 'days' : 'jours'}</p>
+                  <p className="text-muted-foreground text-xs">{t('tripDetails.duration')}</p>
+                  <p className="font-medium text-foreground">{trip.total_days} {t('tripDetails.days')}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-muted-foreground" />
+                <Users className="h-4 w-4 text-primary" />
                 <div>
-                  <p className="text-muted-foreground">{isEnglish ? 'Travelers' : 'Voyageurs'}</p>
-                  <p className="font-medium">{trip.travelers || 2}</p>
+                  <p className="text-muted-foreground text-xs">{t('tripDetails.travelersLabel')}</p>
+                  <p className="font-medium text-foreground">{trip.travelers || 2}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <MapPin className="h-4 w-4 text-primary" />
                 <div>
-                  <p className="text-muted-foreground">{isEnglish ? 'Activities' : 'Activités'}</p>
-                  <p className="font-medium">{regularSteps.length}</p>
+                  <p className="text-muted-foreground text-xs">{t('tripDetails.activities')}</p>
+                  <p className="font-medium text-foreground">{regularSteps.length}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4 text-muted-foreground" />
+                <CreditCard className="h-4 w-4 text-primary" />
                 <div>
-                  <p className="text-muted-foreground">{isEnglish ? 'Total Price' : 'Prix total'}</p>
-                  <p className="font-medium text-primary">{trip.total_price || trip.total_budget || '—'}</p>
+                  <p className="text-muted-foreground text-xs">{t('tripDetails.totalPrice')}</p>
+                  <p className="font-semibold text-primary">{trip.total_price || trip.total_budget || '—'}</p>
                 </div>
               </div>
             </div>
@@ -162,10 +189,10 @@ const TripDetails = () => {
         </Card>
 
         {/* Included / Excluded */}
-        <div className="grid md:grid-cols-2 gap-6 mb-6">
-          <Card>
+        <div className="grid md:grid-cols-2 gap-4 md:gap-6 mb-6">
+          <Card className="border-green-500/20">
             <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg text-green-600">
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg text-green-600 dark:text-green-400">
                 <CheckCircle2 className="h-5 w-5" />
                 {t('tripDetails.included')}
               </CardTitle>
@@ -173,16 +200,16 @@ const TripDetails = () => {
             <CardContent className="space-y-3">
               {includedItems.map((item: any, idx) => (
                 <div key={idx} className="flex items-start gap-3 text-sm">
-                  <item.icon className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                  <span>{item.text}</span>
+                  <item.icon className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
+                  <span className="text-foreground">{isEnglish ? item.textEn : item.textFr}</span>
                 </div>
               ))}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-orange-500/20">
             <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg text-orange-500">
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg text-orange-500 dark:text-orange-400">
                 <XCircle className="h-5 w-5" />
                 {t('tripDetails.excluded')}
               </CardTitle>
@@ -190,8 +217,8 @@ const TripDetails = () => {
             <CardContent className="space-y-3">
               {excludedItems.map((item, idx) => (
                 <div key={idx} className="flex items-start gap-3 text-sm">
-                  <item.icon className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
-                  <span>{item.text}</span>
+                  <item.icon className="h-4 w-4 text-orange-500 dark:text-orange-400 mt-0.5 shrink-0" />
+                  <span className="text-foreground">{isEnglish ? item.textEn : item.textFr}</span>
                 </div>
               ))}
             </CardContent>
@@ -201,7 +228,7 @@ const TripDetails = () => {
         {/* Legal Information */}
         <Card className="mb-6">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
+            <CardTitle className="flex items-center gap-2 text-base md:text-lg text-foreground">
               <Scale className="h-5 w-5 text-primary" />
               {t('tripDetails.responsibilities')}
             </CardTitle>
@@ -216,7 +243,7 @@ const TripDetails = () => {
             </div>
             <Separator />
             <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              <AlertTriangle className="h-5 w-5 text-accent shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium text-foreground">{t('tripDetails.globalResponsibility')}</p>
                 <p>{t('tripDetails.globalResponsibilityDesc')}</p>
@@ -225,49 +252,41 @@ const TripDetails = () => {
           </CardContent>
         </Card>
 
-        {/* Cancellation Policy */}
-        <Card className="mb-6">
+        {/* Cancellation Policy - No Refunds */}
+        <Card className="mb-6 border-destructive/20">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <FileText className="h-5 w-5 text-primary" />
+            <CardTitle className="flex items-center gap-2 text-base md:text-lg text-foreground">
+              <Ban className="h-5 w-5 text-destructive" />
               {t('tripDetails.cancellation')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <div className="grid gap-2">
-              <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
-                <span>{t('tripDetails.cancel30days')}</span>
-                <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
-                  {isEnglish ? '100% refund' : 'Remboursement 100%'}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg">
-                <span>{t('tripDetails.cancel15days')}</span>
-                <Badge variant="outline" className="bg-yellow-100 text-yellow-700 border-yellow-300">
-                  {isEnglish ? '50% refund' : 'Remboursement 50%'}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-950/30 rounded-lg">
-                <span>{t('tripDetails.cancel7days')}</span>
-                <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300">
-                  {isEnglish ? 'No refund' : 'Non remboursable'}
-                </Badge>
+            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-foreground mb-1">{t('tripDetails.noRefundPolicy')}</p>
+                  <p className="text-muted-foreground">{t('tripDetails.noRefundDesc')}</p>
+                </div>
               </div>
             </div>
+            <p className="text-xs text-muted-foreground italic">
+              {t('tripDetails.insuranceRecommendation')}
+            </p>
           </CardContent>
         </Card>
 
         {/* Guarantees */}
         <Card className="mb-6 border-primary/20">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
+            <CardTitle className="flex items-center gap-2 text-base md:text-lg text-foreground">
               <Shield className="h-5 w-5 text-primary" />
               {t('tripDetails.guarantees')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <div className="flex items-start gap-3">
-              <Shield className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+              <Shield className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium text-foreground">{t('tripDetails.insolvencyGuarantee')}</p>
                 <p className="text-muted-foreground">{t('tripDetails.insolvencyGuaranteeDesc')}</p>
@@ -275,7 +294,7 @@ const TripDetails = () => {
             </div>
             <Separator />
             <div className="flex items-start gap-3">
-              <Shield className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+              <Shield className="h-5 w-5 text-primary shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium text-foreground">{t('tripDetails.rcProInsurance')}</p>
                 <p className="text-muted-foreground">{t('tripDetails.rcProInsuranceDesc')}</p>
@@ -285,18 +304,18 @@ const TripDetails = () => {
         </Card>
 
         {/* Acceptance Checkbox */}
-        <Card className="mb-8 border-2 border-primary/30">
+        <Card className="mb-6 md:mb-8 border-2 border-primary/30 bg-primary/5">
           <CardContent className="pt-6">
             <div className="flex items-start gap-4">
               <Checkbox
                 id="terms"
                 checked={acceptedTerms}
                 onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
-                className="mt-1"
+                className="mt-1 border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
               />
-              <label htmlFor="terms" className="text-sm cursor-pointer leading-relaxed">
+              <label htmlFor="terms" className="text-sm cursor-pointer leading-relaxed text-foreground">
                 {t('tripDetails.acceptTerms')}{' '}
-                <a href="/cgv" target="_blank" className="text-primary underline hover:no-underline">
+                <a href="/cgv" target="_blank" className="text-primary underline hover:no-underline font-medium">
                   {t('tripDetails.termsLink')}
                 </a>
                 {' '}{t('tripDetails.acceptTerms2')}
@@ -306,11 +325,11 @@ const TripDetails = () => {
         </Card>
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-between">
+        <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-between">
           <Button
             variant="outline"
             onClick={handleBackToTrip}
-            className="gap-2"
+            className="gap-2 border-muted-foreground/30 hover:border-primary hover:text-primary"
           >
             <ArrowLeft className="h-4 w-4" />
             {t('tripDetails.backToTrip')}
@@ -319,7 +338,7 @@ const TripDetails = () => {
           <Button
             onClick={handleProceedToBooking}
             disabled={!acceptedTerms}
-            className="gap-2 bg-primary hover:bg-primary/90"
+            className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
             size="lg"
           >
             {t('tripDetails.proceedToBooking')}
@@ -328,7 +347,7 @@ const TripDetails = () => {
         </div>
 
         {/* Footer Note */}
-        <p className="text-center text-xs text-muted-foreground mt-8">
+        <p className="text-center text-xs text-muted-foreground mt-6 md:mt-8">
           {t('tripDetails.footerNote')}
         </p>
       </div>
