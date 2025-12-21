@@ -10,7 +10,7 @@ interface PlannerCardProps {
 
 const PlannerCard = ({ pin, onClose, onAddToTrip }: PlannerCardProps) => {
   return (
-    <div className="pointer-events-auto absolute top-20 right-6 w-80 bg-card rounded-2xl shadow-deep overflow-hidden animate-scale-up z-30">
+    <div className="pointer-events-auto absolute top-20 left-1/2 -translate-x-1/2 w-80 bg-card rounded-2xl shadow-deep overflow-hidden animate-scale-up z-30 border border-border">
       {/* Image */}
       {pin.image ? (
         <div className="relative h-40 overflow-hidden">

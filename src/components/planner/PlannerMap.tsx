@@ -58,7 +58,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId }: Plan
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    mapboxgl.accessToken = "pk.eyJ1IjoidHJhdmxpYXEiLCJhIjoiY200YzE5bGl4MHZ4ZjJrcTFwdXZmY3FxZCJ9.2v4VJXr3_g0cxEsNDFCOGA";
+    mapboxgl.accessToken = "pk.eyJ1IjoibW9oYW1lZGJvdWNoaWJhIiwiYSI6ImNtZ2t3dHZ0MzAyaDAya3NldXJ1dTkxdTAifQ.vYCeVngdG4_B0Zpms0dQNA";
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
@@ -202,7 +202,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId }: Plan
   }, [center, zoom]);
 
   return (
-    <div ref={mapContainer} className="absolute inset-0" />
+    <div ref={mapContainer} className="absolute inset-0 w-full h-full" style={{ minHeight: "100%" }} />
   );
 };
 

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import PlannerMap from "@/components/planner/PlannerMap";
 import PlannerPanel from "@/components/planner/PlannerPanel";
@@ -22,20 +22,10 @@ export interface MapPin {
 }
 
 const TravelPlanner = () => {
-  const [activeTab, setActiveTab] = useState<TabType>("flights");
+  const [activeTab, setActiveTab] = useState<TabType>("activities");
   const [selectedPin, setSelectedPin] = useState<MapPin | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>([2.3522, 48.8566]); // Paris
-  const [mapZoom, setMapZoom] = useState(5);
-
-  const pageTitle = useMemo(() => {
-    const byTab: Record<TabType, string> = {
-      flights: "Flights",
-      activities: "Activities",
-      stays: "Stays",
-      preferences: "Preferences",
-    };
-    return `Travel Co-Pilot | ${byTab[activeTab]}`;
-  }, [activeTab]);
+  const [mapZoom, setMapZoom] = useState(12);
 
   const handleTabChange = useCallback((tab: TabType) => {
     setActiveTab(tab);
@@ -51,7 +41,6 @@ const TravelPlanner = () => {
   }, []);
 
   const handleAddToTrip = useCallback((pin: MapPin) => {
-    // TODO: Add to trip logic
     console.log("Added to trip:", pin);
     setSelectedPin(null);
   }, []);
@@ -59,15 +48,15 @@ const TravelPlanner = () => {
   return (
     <>
       <Helmet>
-        <title>{pageTitle}</title>
+        <title>Planificateur | Travliaq</title>
         <meta
           name="description"
-          content="Workspace de planification: chat + carte interactive + onglets. Comparez vols, activités et hébergements et construisez votre voyage." 
+          content="Planifiez votre voyage avec notre assistant intelligent. Comparez vols, activités et hébergements sur une carte interactive."
         />
         <link rel="canonical" href="/planner" />
       </Helmet>
 
-      <div className="h-[100svh] w-full grid grid-cols-[360px_1fr] overflow-hidden bg-background">
+      <div className="h-[100svh] w-full grid grid-cols-[420px_1fr] overflow-hidden bg-background">
         {/* Left: Chat */}
         <PlannerChat
           onAction={(action) => {
@@ -95,10 +84,10 @@ const TravelPlanner = () => {
             selectedPinId={selectedPin?.id}
           />
 
-          {/* Overlay tabs + actions */}
+          {/* Overlay tabs */}
           <PlannerTopBar activeTab={activeTab} onTabChange={handleTabChange} />
 
-          {/* Overlay right panel (contextual) */}
+          {/* Overlay panel (positioned to avoid tabs) */}
           <PlannerPanel
             activeTab={activeTab}
             layout="overlay"
@@ -119,4 +108,3 @@ const TravelPlanner = () => {
 };
 
 export default TravelPlanner;
-
