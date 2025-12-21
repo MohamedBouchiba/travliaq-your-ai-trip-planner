@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Plus, X, ArrowLeftRight, MapPin } from "lucide-react";
+import { Plus, X, ArrowLeftRight, MapPin, PlaneTakeoff, PlaneLanding } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -63,10 +63,10 @@ function CityInput({ value, onChange, placeholder, icon }: CityInputProps) {
       <PopoverTrigger asChild>
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
           {icon === "from" && (
-            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
+            <PlaneTakeoff className="h-3 w-3 text-muted-foreground shrink-0" />
           )}
           {icon === "to" && (
-            <MapPin className="h-3 w-3 text-primary shrink-0" />
+            <PlaneLanding className="h-3 w-3 text-primary shrink-0" />
           )}
           <input
             ref={inputRef}

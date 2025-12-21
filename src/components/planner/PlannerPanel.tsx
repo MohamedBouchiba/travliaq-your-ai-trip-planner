@@ -49,7 +49,7 @@ const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVis
             )}
           </div>
         )}
-        <div className="p-4">
+        <div className="flex-1 overflow-y-auto themed-scroll p-4 max-h-[calc(100vh-8rem)]">
           {activeTab === "flights" && <FlightsPanel onMapMove={onMapMove} />}
           {activeTab === "activities" && <ActivitiesPanel />}
           {activeTab === "stays" && <StaysPanel />}
@@ -160,13 +160,22 @@ const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoo
   const totalAdults = passengers.filter(p => p.type === "adult").length;
   const totalChildren = passengers.filter(p => p.type === "child").length;
 
+  // Reset legs when trip type changes
+  const handleTripTypeChange = (newType: "roundtrip" | "oneway" | "multi") => {
+    setTripType(newType);
+    // Reset to single leg when switching from multi to other types
+    if (newType !== "multi" && legs.length > 1) {
+      setLegs([{ id: crypto.randomUUID(), from: legs[0]?.from || "", to: legs[0]?.to || "", date: legs[0]?.date, returnDate: legs[0]?.returnDate }]);
+    }
+  };
+
   return (
     <div className="space-y-5">
       {/* Trip Type Toggle - Centered */}
       <div className="flex justify-center">
         <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-muted/40 border border-border/30">
           <button
-            onClick={() => setTripType("roundtrip")}
+            onClick={() => handleTripTypeChange("roundtrip")}
             className={cn(
               "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
               tripType === "roundtrip"
@@ -177,7 +186,7 @@ const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoo
             Aller-retour
           </button>
           <button
-            onClick={() => setTripType("oneway")}
+            onClick={() => handleTripTypeChange("oneway")}
             className={cn(
               "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
               tripType === "oneway"
@@ -188,7 +197,7 @@ const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoo
             Aller simple
           </button>
           <button
-            onClick={() => setTripType("multi")}
+            onClick={() => handleTripTypeChange("multi")}
             className={cn(
               "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
               tripType === "multi"
@@ -293,87 +302,66 @@ const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoo
           </div>
         </div>
 
-        {/* Baggage Section */}
-        <div className="p-3 rounded-xl bg-muted/20 border border-border/30 space-y-3">
-          <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Bagages (par passager)</span>
-          
-          {/* Personal Item */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-base">🎒</span>
-              <div>
-                <div className="text-xs font-medium text-foreground">Objet personnel</div>
-                <div className="text-[10px] text-muted-foreground">Petit sac, limité à 1</div>
+        {/* Baggage Section - Simplified */}
+        <div className="flex gap-3">
+          <div className="flex-1 p-2.5 rounded-xl bg-muted/20 border border-border/30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">🧳</span>
+                <span className="text-xs text-foreground">Cabine</span>
               </div>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-muted-foreground bg-muted/40 px-2 py-1 rounded">1</span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    const firstPass = passengers[0];
+                    if (firstPass && firstPass.cabinBags > 0) {
+                      setPassengers(passengers.map(p => ({ ...p, cabinBags: Math.max(0, p.cabinBags - 1) })));
+                    }
+                  }}
+                  className="w-5 h-5 rounded-md bg-muted/40 hover:bg-muted/60 text-foreground flex items-center justify-center text-xs"
+                >
+                  −
+                </button>
+                <span className="text-xs w-4 text-center">{passengers[0]?.cabinBags || 0}</span>
+                <button
+                  onClick={() => {
+                    setPassengers(passengers.map(p => ({ ...p, cabinBags: Math.min(2, p.cabinBags + 1) })));
+                  }}
+                  className="w-5 h-5 rounded-md bg-muted/40 hover:bg-muted/60 text-foreground flex items-center justify-center text-xs"
+                >
+                  +
+                </button>
+              </div>
             </div>
           </div>
-
-          {/* Cabin Bag */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-base">🧳</span>
-              <div>
-                <div className="text-xs font-medium text-foreground">Bagage cabine</div>
-                <div className="text-[10px] text-muted-foreground">Max 10kg, 55x40x20cm</div>
+          <div className="flex-1 p-2.5 rounded-xl bg-muted/20 border border-border/30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">🛄</span>
+                <span className="text-xs text-foreground">Soute</span>
               </div>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => {
-                  const firstPass = passengers[0];
-                  if (firstPass && firstPass.cabinBags > 0) {
-                    setPassengers(passengers.map(p => ({ ...p, cabinBags: Math.max(0, p.cabinBags - 1) })));
-                  }
-                }}
-                className="w-6 h-6 rounded-lg bg-muted/40 hover:bg-muted/60 text-foreground flex items-center justify-center text-sm"
-              >
-                −
-              </button>
-              <span className="text-xs w-6 text-center">{passengers[0]?.cabinBags || 0}</span>
-              <button
-                onClick={() => {
-                  setPassengers(passengers.map(p => ({ ...p, cabinBags: Math.min(2, p.cabinBags + 1) })));
-                }}
-                className="w-6 h-6 rounded-lg bg-muted/40 hover:bg-muted/60 text-foreground flex items-center justify-center text-sm"
-              >
-                +
-              </button>
-            </div>
-          </div>
-
-          {/* Checked Bag */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-base">🛄</span>
-              <div>
-                <div className="text-xs font-medium text-foreground">Bagage en soute</div>
-                <div className="text-[10px] text-muted-foreground">Max 23kg chacun</div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    const firstPass = passengers[0];
+                    if (firstPass && firstPass.checkedBags > 0) {
+                      setPassengers(passengers.map(p => ({ ...p, checkedBags: Math.max(0, p.checkedBags - 1) })));
+                    }
+                  }}
+                  className="w-5 h-5 rounded-md bg-muted/40 hover:bg-muted/60 text-foreground flex items-center justify-center text-xs"
+                >
+                  −
+                </button>
+                <span className="text-xs w-4 text-center">{passengers[0]?.checkedBags || 0}</span>
+                <button
+                  onClick={() => {
+                    setPassengers(passengers.map(p => ({ ...p, checkedBags: p.checkedBags + 1 })));
+                  }}
+                  className="w-5 h-5 rounded-md bg-muted/40 hover:bg-muted/60 text-foreground flex items-center justify-center text-xs"
+                >
+                  +
+                </button>
               </div>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => {
-                  const firstPass = passengers[0];
-                  if (firstPass && firstPass.checkedBags > 0) {
-                    setPassengers(passengers.map(p => ({ ...p, checkedBags: Math.max(0, p.checkedBags - 1) })));
-                  }
-                }}
-                className="w-6 h-6 rounded-lg bg-muted/40 hover:bg-muted/60 text-foreground flex items-center justify-center text-sm"
-              >
-                −
-              </button>
-              <span className="text-xs w-6 text-center">{passengers[0]?.checkedBags || 0}</span>
-              <button
-                onClick={() => {
-                  setPassengers(passengers.map(p => ({ ...p, checkedBags: p.checkedBags + 1 })));
-                }}
-                className="w-6 h-6 rounded-lg bg-muted/40 hover:bg-muted/60 text-foreground flex items-center justify-center text-sm"
-              >
-                +
-              </button>
             </div>
           </div>
         </div>
