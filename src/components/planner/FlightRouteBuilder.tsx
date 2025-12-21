@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, X, CalendarDays, ChevronDown } from "lucide-react";
+import { Plus, X, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -30,8 +30,7 @@ export default function FlightRouteBuilder({
   onStopsChange,
   maxStops = 2,
 }: FlightRouteBuilderProps) {
-  const [showDepartureCalendar, setShowDepartureCalendar] = useState(false);
-  const [showArrivalCalendar, setShowArrivalCalendar] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
   const [activeStopCalendar, setActiveStopCalendar] = useState<string | null>(null);
 
   const addStop = () => {
@@ -52,79 +51,94 @@ export default function FlightRouteBuilder({
     );
   };
 
-  return (
-    <div className="space-y-3">
-      {/* Departure */}
-      <div className="space-y-1.5">
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={departure.city}
-            onChange={(e) => onDepartureChange({ ...departure, city: e.target.value })}
-            placeholder="Ville de départ"
-            className="flex-1 px-2.5 py-2 rounded-lg border border-border/40 bg-muted/20 text-xs placeholder:text-muted-foreground focus:border-primary focus:bg-primary/5 focus:outline-none transition-all"
-          />
-          <button
-            onClick={() => {
-              setShowDepartureCalendar(!showDepartureCalendar);
-              setShowArrivalCalendar(false);
-              setActiveStopCalendar(null);
-            }}
-            className={cn(
-              "flex items-center gap-1.5 px-2.5 py-2 rounded-lg border text-xs transition-all shrink-0",
-              showDepartureCalendar
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border/40 bg-muted/20 hover:bg-muted/40"
-            )}
-          >
-            <CalendarDays className="h-3.5 w-3.5" />
-            <span className={departure.date ? "text-foreground font-medium" : "text-muted-foreground"}>
-              {departure.date ? format(departure.date, "d MMM", { locale: fr }) : "Aller"}
-            </span>
-            <ChevronDown className={cn("h-3 w-3 transition-transform", showDepartureCalendar && "rotate-180")} />
-          </button>
-        </div>
-        {showDepartureCalendar && (
-          <div className="p-2 rounded-lg border border-border/40 bg-card">
-            <PlannerCalendar
-              dateRange={{ from: departure.date, to: departure.date }}
-              onDateRangeChange={(range) => {
-                if (range.from) {
-                  onDepartureChange({ ...departure, date: range.from });
-                  setShowDepartureCalendar(false);
-                }
-              }}
-            />
-          </div>
-        )}
-      </div>
+  const handleDateRangeChange = (range: { from?: Date; to?: Date }) => {
+    if (range.from) {
+      onDepartureChange({ ...departure, date: range.from });
+    }
+    if (range.to) {
+      onArrivalChange({ ...arrival, date: range.to });
+      setShowCalendar(false);
+    }
+  };
 
-      {/* Intermediate stops */}
+  return (
+    <div className="space-y-2">
+      {/* Departure */}
+      <input
+        type="text"
+        value={departure.city}
+        onChange={(e) => onDepartureChange({ ...departure, city: e.target.value })}
+        placeholder="Départ"
+        className="w-full px-2.5 py-2 rounded-lg border border-border/40 bg-muted/20 text-xs placeholder:text-muted-foreground focus:border-primary focus:bg-primary/5 focus:outline-none transition-all"
+      />
+
+      {/* Arrival */}
+      <input
+        type="text"
+        value={arrival.city}
+        onChange={(e) => onArrivalChange({ ...arrival, city: e.target.value })}
+        placeholder="Arrivée"
+        className="w-full px-2.5 py-2 rounded-lg border border-border/40 bg-muted/20 text-xs placeholder:text-muted-foreground focus:border-primary focus:bg-primary/5 focus:outline-none transition-all"
+      />
+
+      {/* Date range selector */}
+      <button
+        onClick={() => {
+          setShowCalendar(!showCalendar);
+          setActiveStopCalendar(null);
+        }}
+        className={cn(
+          "w-full flex items-center justify-between px-2.5 py-2 rounded-lg border text-xs transition-all",
+          showCalendar
+            ? "border-primary bg-primary/10"
+            : "border-border/40 bg-muted/20 hover:bg-muted/40"
+        )}
+      >
+        <div className="flex items-center gap-1.5">
+          <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className={departure.date ? "text-foreground" : "text-muted-foreground"}>
+            {departure.date ? format(departure.date, "d MMM", { locale: fr }) : "Aller"}
+          </span>
+        </div>
+        <span className="text-muted-foreground">→</span>
+        <span className={arrival.date ? "text-foreground" : "text-muted-foreground"}>
+          {arrival.date ? format(arrival.date, "d MMM", { locale: fr }) : "Retour"}
+        </span>
+      </button>
+
+      {showCalendar && (
+        <div className="p-2 rounded-lg border border-border/40 bg-card">
+          <PlannerCalendar
+            dateRange={{ from: departure.date, to: arrival.date }}
+            onDateRangeChange={handleDateRangeChange}
+          />
+        </div>
+      )}
+
+      {/* Additional stops */}
       {stops.map((stop) => (
         <div key={stop.id} className="space-y-1.5">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <input
               type="text"
               value={stop.city}
               onChange={(e) => updateStop(stop.id, { city: e.target.value })}
-              placeholder="Destination intermédiaire"
+              placeholder="Destination"
               className="flex-1 px-2.5 py-2 rounded-lg border border-border/40 bg-muted/20 text-xs placeholder:text-muted-foreground focus:border-primary focus:bg-primary/5 focus:outline-none transition-all"
             />
             <button
               onClick={() => {
                 setActiveStopCalendar(activeStopCalendar === stop.id ? null : stop.id);
-                setShowDepartureCalendar(false);
-                setShowArrivalCalendar(false);
+                setShowCalendar(false);
               }}
               className={cn(
-                "flex items-center gap-1.5 px-2.5 py-2 rounded-lg border text-xs transition-all shrink-0",
+                "px-2.5 py-2 rounded-lg border text-xs transition-all shrink-0",
                 activeStopCalendar === stop.id
-                  ? "border-primary bg-primary/10 text-primary"
+                  ? "border-primary bg-primary/10"
                   : "border-border/40 bg-muted/20 hover:bg-muted/40"
               )}
             >
-              <CalendarDays className="h-3.5 w-3.5" />
-              <span className={stop.date ? "text-foreground font-medium" : "text-muted-foreground"}>
+              <span className={stop.date ? "text-foreground" : "text-muted-foreground"}>
                 {stop.date ? format(stop.date, "d MMM", { locale: fr }) : "Date"}
               </span>
             </button>
@@ -151,61 +165,16 @@ export default function FlightRouteBuilder({
         </div>
       ))}
 
-      {/* Add stop button */}
+      {/* Add stop - subtle plus button */}
       {stops.length < maxStops && (
         <button
           onClick={addStop}
-          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary transition-colors"
+          className="h-6 w-6 rounded-full border border-dashed border-border/50 flex items-center justify-center text-muted-foreground/60 hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all mx-auto"
+          title="Ajouter une destination"
         >
           <Plus className="h-3 w-3" />
-          <span>Ajouter une destination</span>
         </button>
       )}
-
-      {/* Arrival */}
-      <div className="space-y-1.5">
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={arrival.city}
-            onChange={(e) => onArrivalChange({ ...arrival, city: e.target.value })}
-            placeholder="Ville d'arrivée"
-            className="flex-1 px-2.5 py-2 rounded-lg border border-border/40 bg-muted/20 text-xs placeholder:text-muted-foreground focus:border-primary focus:bg-primary/5 focus:outline-none transition-all"
-          />
-          <button
-            onClick={() => {
-              setShowArrivalCalendar(!showArrivalCalendar);
-              setShowDepartureCalendar(false);
-              setActiveStopCalendar(null);
-            }}
-            className={cn(
-              "flex items-center gap-1.5 px-2.5 py-2 rounded-lg border text-xs transition-all shrink-0",
-              showArrivalCalendar
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border/40 bg-muted/20 hover:bg-muted/40"
-            )}
-          >
-            <CalendarDays className="h-3.5 w-3.5" />
-            <span className={arrival.date ? "text-foreground font-medium" : "text-muted-foreground"}>
-              {arrival.date ? format(arrival.date, "d MMM", { locale: fr }) : "Retour"}
-            </span>
-            <ChevronDown className={cn("h-3 w-3 transition-transform", showArrivalCalendar && "rotate-180")} />
-          </button>
-        </div>
-        {showArrivalCalendar && (
-          <div className="p-2 rounded-lg border border-border/40 bg-card">
-            <PlannerCalendar
-              dateRange={{ from: arrival.date, to: arrival.date }}
-              onDateRangeChange={(range) => {
-                if (range.from) {
-                  onArrivalChange({ ...arrival, date: range.from });
-                  setShowArrivalCalendar(false);
-                }
-              }}
-            />
-          </div>
-        )}
-      </div>
     </div>
   );
 }
