@@ -22,7 +22,7 @@ interface FlightRouteBuilderProps {
   legs: FlightLeg[];
   onLegsChange: (legs: FlightLeg[]) => void;
   maxLegs?: number;
-  tripType?: "roundtrip" | "oneway";
+  tripType?: "roundtrip" | "oneway" | "multi";
 }
 
 interface CityInputProps {
@@ -228,7 +228,15 @@ export default function FlightRouteBuilder({
 
           {/* Calendar for this leg */}
           {activeLegCalendar === leg.id && (
-            <div className="p-3 rounded-xl border border-border/40 bg-card">
+            <div className="p-3 rounded-xl border border-border/40 bg-card relative">
+              {/* Close button */}
+              <button
+                onClick={() => setActiveLegCalendar(null)}
+                className="absolute top-2 right-2 p-1.5 rounded-full hover:bg-muted/50 transition-colors z-10"
+                aria-label="Fermer le calendrier"
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
               <PlannerCalendar
                 dateRange={{ from: leg.date, to: leg.date }}
                 onDateRangeChange={(range) => handleDateSelect(leg.id, range)}
@@ -238,15 +246,17 @@ export default function FlightRouteBuilder({
         </div>
       ))}
 
-      {/* Add flight button - hidden for one-way trips */}
-      {tripType === "roundtrip" && legs.length < maxLegs && (
-        <button
-          onClick={addLeg}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-        >
-          <Plus className="h-3 w-3" />
-          Ajouter un vol
-        </button>
+      {/* Add flight button - only for multi-destinations */}
+      {tripType === "multi" && legs.length < maxLegs && (
+        <div className="flex justify-center">
+          <button
+            onClick={addLeg}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Ajouter une destination
+          </button>
+        </div>
       )}
     </div>
   );
