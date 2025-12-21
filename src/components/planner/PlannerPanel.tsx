@@ -96,8 +96,8 @@ const ChipButton = ({
 // Flights Panel
 const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoom: number) => void }) => {
   const [legs, setLegs] = useState<FlightLeg[]>([
-    { id: "departure", from: "", to: "", date: undefined },
-    { id: "return", from: "", to: "", date: undefined },
+    { id: "departure", city: "", date: undefined },
+    { id: "arrival", city: "", date: undefined },
   ]);
   const [passengers, setPassengers] = useState(2);
   const [travelClass, setTravelClass] = useState<"economy" | "business" | "first">("economy");
