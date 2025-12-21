@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeSanitize from "rehype-sanitize";
 import { useEffect } from "react";
 
 type MarkdownContentProps = {
@@ -45,7 +46,7 @@ export const MarkdownContent = ({ content }: MarkdownContentProps) => {
       prose-th:bg-muted prose-th:p-3 prose-th:text-left prose-th:font-semibold
       prose-td:border prose-td:border-border prose-td:p-3
     ">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
         {content}
       </ReactMarkdown>
     </div>
