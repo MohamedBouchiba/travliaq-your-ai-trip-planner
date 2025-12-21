@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, User, Bot } from "lucide-react";
+import { Send, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import logo from "@/assets/logo-travliaq.png";
 
 export type ChatQuickAction =
   | { type: "tab"; tab: "flights" | "activities" | "stays" | "preferences" }
@@ -157,16 +158,16 @@ export default function PlannerChat({ onAction }: PlannerChatProps) {
               {/* Avatar */}
               <div
                 className={cn(
-                  "h-8 w-8 rounded-full flex items-center justify-center shrink-0",
+                  "h-8 w-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden",
                   m.role === "user"
                     ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-secondary-foreground"
+                    : "bg-white"
                 )}
               >
                 {m.role === "user" ? (
                   <User className="h-4 w-4" />
                 ) : (
-                  <Bot className="h-4 w-4" />
+                  <img src={logo} alt="Travliaq" className="h-6 w-6 object-contain" />
                 )}
               </div>
 
