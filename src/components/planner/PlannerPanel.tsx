@@ -140,18 +140,26 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange }: {
   // Notify parent of route changes when legs change
   const handleLegsChange = (newLegs: FlightLeg[]) => {
     setLegs(newLegs);
-    if (onFlightRoutesChange) {
-      const routes: FlightRoutePoint[] = [];
-      newLegs.forEach((leg) => {
-        if (leg.from) routes.push({ city: leg.from });
-        if (leg.to) routes.push({ city: leg.to });
-      });
-      // Remove duplicates
-      const uniqueRoutes = routes.filter((route, index, self) =>
-        index === self.findIndex((r) => r.city === route.city)
-      );
-      onFlightRoutesChange(uniqueRoutes);
-    }
+
+    if (!onFlightRoutesChange) return;
+
+    // Keep order and duplicates where it matters (multi-destination), but avoid consecutive duplicates
+    const sequence: FlightRoutePoint[] = [];
+
+    newLegs.forEach((leg, idx) => {
+      const from = leg.from?.trim();
+      const to = leg.to?.trim();
+
+      if (idx === 0 && from) sequence.push({ city: from });
+      if (to) sequence.push({ city: to });
+    });
+
+    const cleaned = sequence.filter((p, idx, arr) => {
+      const prev = arr[idx - 1];
+      return !prev || prev.city !== p.city;
+    });
+
+    onFlightRoutesChange(cleaned);
   };
 
   const addPassenger = () => {

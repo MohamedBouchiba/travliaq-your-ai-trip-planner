@@ -5,11 +5,18 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import PlannerCalendar from "./PlannerCalendar";
 import { useCitySearch, City } from "@/hooks/useCitySearch";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+function getMockRoutePrice(from?: string, to?: string): number | null {
+  const a = from?.trim();
+  const b = to?.trim();
+  if (!a || !b) return null;
+  const seed = `${a.toLowerCase()}__${b.toLowerCase()}`;
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  // 60€ -> 620€
+  return 60 + (hash % 560);
+}
 
 export interface FlightLeg {
   id: string;
@@ -40,7 +47,7 @@ function CityInput({ value, onChange, placeholder, icon }: CityInputProps) {
   const justSelectedRef = useRef(false);
   const { data: cities = [], isLoading } = useCitySearch(search, isOpen);
 
-  // Only sync search with value when value changes externally (not from our own selection)
+  // Keep input text in sync with external value (except right after a selection)
   useEffect(() => {
     if (!justSelectedRef.current) {
       setSearch(value);
@@ -54,29 +61,29 @@ function CityInput({ value, onChange, placeholder, icon }: CityInputProps) {
     setSearch(newValue);
     onChange(newValue);
     setIsOpen(false);
+    inputRef.current?.blur();
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setSearch(newValue);
+    onChange(newValue);
     if (!isOpen && newValue.length >= 2) {
       setIsOpen(true);
     }
   };
 
   const handleFocus = () => {
-    // Clear input on focus to allow easy retyping
     setSearch("");
     setIsOpen(true);
   };
 
   const handleBlur = () => {
-    // If nothing was selected and search is empty, restore original value
-    setTimeout(() => {
-      if (search === "" && value) {
-        setSearch(value);
-      }
-    }, 250);
+    // If blur comes from clicking a suggestion, do nothing (prevents overwriting the selection)
+    if (justSelectedRef.current) return;
+    if (search.trim() === "" && value) {
+      setSearch(value);
+    }
   };
 
   return (
@@ -119,6 +126,7 @@ function CityInput({ value, onChange, placeholder, icon }: CityInputProps) {
             {cities.slice(0, 8).map((city) => (
               <button
                 key={city.id}
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleSelect(city)}
                 className="w-full px-3 py-2 text-left hover:bg-muted/50 transition-colors flex items-center gap-2"
               >
@@ -216,13 +224,23 @@ export default function FlightRouteBuilder({
               icon="from"
             />
 
-            {/* Swap button */}
-            <button
-              onClick={() => swapCities(leg.id)}
-              className="p-1.5 rounded-full border border-border/40 hover:bg-muted/40 transition-colors shrink-0"
-            >
-              <ArrowLeftRight className="h-3 w-3 text-muted-foreground" />
-            </button>
+            {/* Link + price + swap */}
+            <div className="shrink-0">
+              <button
+                onClick={() => swapCities(leg.id)}
+                className="relative px-2 py-1 rounded-xl border border-border/40 hover:bg-muted/40 transition-colors"
+                aria-label="Inverser départ et destination"
+              >
+                <div className="flex items-center gap-1.5">
+                  <div className="h-px w-6 bg-border" />
+                  <span className="text-[10px] font-medium text-muted-foreground tabular-nums">
+                    {getMockRoutePrice(leg.from, leg.to) ? `${getMockRoutePrice(leg.from, leg.to)}€` : "—"}
+                  </span>
+                  <div className="h-px w-6 bg-border" />
+                  <ArrowLeftRight className="h-3 w-3 text-muted-foreground" />
+                </div>
+              </button>
+            </div>
 
             {/* To city */}
             <CityInput

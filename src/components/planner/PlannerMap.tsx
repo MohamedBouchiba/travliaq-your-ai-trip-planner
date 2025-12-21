@@ -9,7 +9,7 @@ import type { FlightRoutePoint } from "./PlannerPanel";
 const mockFlightPins: MapPin[] = [
   { id: "cdg", type: "flights", lat: 49.0097, lng: 2.5479, title: "Paris CDG", subtitle: "Aéroport", price: 0 },
   { id: "jfk", type: "flights", lat: 40.6413, lng: -73.7781, title: "New York JFK", subtitle: "Aéroport", price: 450 },
-  { id: "lhr", type: "flights", lat: 51.4700, lng: -0.4543, title: "Londres Heathrow", subtitle: "Aéroport", price: 120 },
+  { id: "lhr", type: "flights", lat: 51.47, lng: -0.4543, title: "Londres Heathrow", subtitle: "Aéroport", price: 120 },
   { id: "bcn", type: "flights", lat: 41.2974, lng: 2.0833, title: "Barcelone", subtitle: "Aéroport", price: 85 },
   { id: "fco", type: "flights", lat: 41.8003, lng: 12.2389, title: "Rome Fiumicino", subtitle: "Aéroport", price: 95 },
 ];
@@ -25,8 +25,18 @@ const mockStayPins: MapPin[] = [
   { id: "hotel1", type: "stays", lat: 48.8698, lng: 2.3075, title: "Le Meurice", subtitle: "5 étoiles", price: 850, rating: 4.9 },
   { id: "hotel2", type: "stays", lat: 48.8652, lng: 2.3218, title: "Hôtel Costes", subtitle: "5 étoiles", price: 520, rating: 4.7 },
   { id: "hotel3", type: "stays", lat: 48.8566, lng: 2.3522, title: "Hôtel de Ville B&B", subtitle: "3 étoiles", price: 120, rating: 4.3 },
-  { id: "hotel4", type: "stays", lat: 48.8738, lng: 2.2950, title: "Renaissance Arc", subtitle: "4 étoiles", price: 280, rating: 4.5 },
+  { id: "hotel4", type: "stays", lat: 48.8738, lng: 2.295, title: "Renaissance Arc", subtitle: "4 étoiles", price: 280, rating: 4.5 },
 ];
+
+function getMockRoutePrice(from?: string, to?: string): number | null {
+  const a = from?.trim();
+  const b = to?.trim();
+  if (!a || !b) return null;
+  const seed = `${a.toLowerCase()}__${b.toLowerCase()}`;
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  return 60 + (hash % 560);
+}
 
 // City coordinates mapping (common cities)
 const cityCoordinates: Record<string, { lat: number; lng: number }> = {
@@ -256,8 +266,14 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     routeMarkersRef.current = [];
 
     // Remove previous dynamic routes
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 20; i++) {
       const sourceId = `dynamic-route-${i}`;
+      const labelId = `dynamic-route-label-${i}`;
+
+      if (map.current.getLayer(labelId)) {
+        map.current.removeLayer(labelId);
+      }
+
       if (map.current.getSource(sourceId)) {
         if (map.current.getLayer(sourceId)) {
           map.current.removeLayer(sourceId);
@@ -306,17 +322,21 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       routeMarkersRef.current.push(marker);
     });
 
-    // Draw lines between consecutive points
+    // Draw lines + price labels between consecutive points
     for (let i = 0; i < routePoints.length - 1; i++) {
       const from = routePoints[i];
       const to = routePoints[i + 1];
       const sourceId = `dynamic-route-${i}`;
+      const labelId = `dynamic-route-label-${i}`;
+      const price = getMockRoutePrice(from.city, to.city);
 
       map.current.addSource(sourceId, {
         type: "geojson",
         data: {
           type: "Feature",
-          properties: {},
+          properties: {
+            priceText: price ? `${price}€` : "",
+          },
           geometry: {
             type: "LineString",
             coordinates: [
@@ -342,6 +362,27 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
           "line-opacity": 0.8,
         },
       });
+
+      if (price) {
+        map.current.addLayer({
+          id: labelId,
+          type: "symbol",
+          source: sourceId,
+          layout: {
+            "symbol-placement": "line-center",
+            "text-field": ["get", "priceText"],
+            "text-size": 12,
+            "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
+            "text-padding": 2,
+            "text-allow-overlap": true,
+          },
+          paint: {
+            "text-color": "hsl(var(--foreground))",
+            "text-halo-color": "hsl(var(--background))",
+            "text-halo-width": 2,
+          },
+        });
+      }
     }
 
     // Fit map to show all points if we have at least 2
