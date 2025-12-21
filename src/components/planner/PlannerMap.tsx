@@ -118,15 +118,15 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId }: Plan
         user-select: none;
       `;
 
-      // Add price or icon based on type
+      // Add price or icon based on type (using textContent for XSS prevention)
       if (pin.price !== undefined && pin.price > 0) {
-        el.innerHTML = `${pin.price}€`;
+        el.textContent = `${pin.price}€`;
       } else if (activeTab === "flights") {
-        el.innerHTML = "✈️";
+        el.textContent = "✈️";
       } else if (activeTab === "activities") {
-        el.innerHTML = "📍";
+        el.textContent = "📍";
       } else {
-        el.innerHTML = "🏨";
+        el.textContent = "🏨";
       }
 
       el.addEventListener("mouseenter", () => {
