@@ -164,6 +164,24 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     };
   }, []);
 
+  // Resize map when container size changes (panel resize)
+  useEffect(() => {
+    if (!mapContainer.current || !map.current) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      // Use requestAnimationFrame to debounce resize calls
+      requestAnimationFrame(() => {
+        map.current?.resize();
+      });
+    });
+
+    resizeObserver.observe(mapContainer.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [mapLoaded]);
+
   // Update markers when tab changes
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
