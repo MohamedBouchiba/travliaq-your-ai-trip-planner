@@ -1,178 +1,153 @@
 import { useState } from "react";
-import { Plus, X, CalendarDays } from "lucide-react";
+import { Plus, X, CalendarDays, ArrowLeftRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import PlannerCalendar from "./PlannerCalendar";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 export interface FlightLeg {
   id: string;
-  city: string;
+  from: string;
+  to: string;
   date?: Date;
 }
 
 interface FlightRouteBuilderProps {
-  departure: { city: string; date?: Date };
-  arrival: { city: string; date?: Date };
-  stops: FlightLeg[];
-  onDepartureChange: (data: { city: string; date?: Date }) => void;
-  onArrivalChange: (data: { city: string; date?: Date }) => void;
-  onStopsChange: (stops: FlightLeg[]) => void;
-  maxStops?: number;
+  legs: FlightLeg[];
+  onLegsChange: (legs: FlightLeg[]) => void;
+  maxLegs?: number;
 }
 
 export default function FlightRouteBuilder({
-  departure,
-  arrival,
-  stops,
-  onDepartureChange,
-  onArrivalChange,
-  onStopsChange,
-  maxStops = 2,
+  legs,
+  onLegsChange,
+  maxLegs = 4,
 }: FlightRouteBuilderProps) {
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [activeStopCalendar, setActiveStopCalendar] = useState<string | null>(null);
-
-  const addStop = () => {
-    if (stops.length >= maxStops) return;
-    onStopsChange([
-      ...stops,
-      { id: crypto.randomUUID(), city: "", date: undefined },
-    ]);
-  };
-
-  const removeStop = (id: string) => {
-    onStopsChange(stops.filter((s) => s.id !== id));
-  };
-
-  const updateStop = (id: string, updates: Partial<FlightLeg>) => {
-    onStopsChange(
-      stops.map((s) => (s.id === id ? { ...s, ...updates } : s))
+  const updateLeg = (id: string, updates: Partial<FlightLeg>) => {
+    onLegsChange(
+      legs.map((leg) => (leg.id === id ? { ...leg, ...updates } : leg))
     );
   };
 
-  const handleDateRangeChange = (range: { from?: Date; to?: Date }) => {
-    if (range.from) {
-      onDepartureChange({ ...departure, date: range.from });
-    }
-    if (range.to) {
-      onArrivalChange({ ...arrival, date: range.to });
-      setShowCalendar(false);
-    }
+  const swapCities = (id: string) => {
+    onLegsChange(
+      legs.map((leg) =>
+        leg.id === id ? { ...leg, from: leg.to, to: leg.from } : leg
+      )
+    );
+  };
+
+  const addLeg = () => {
+    if (legs.length >= maxLegs) return;
+    const lastLeg = legs[legs.length - 1];
+    onLegsChange([
+      ...legs,
+      {
+        id: crypto.randomUUID(),
+        from: lastLeg?.to || "",
+        to: "",
+        date: undefined,
+      },
+    ]);
+  };
+
+  const removeLeg = (id: string) => {
+    if (legs.length <= 1) return;
+    onLegsChange(legs.filter((leg) => leg.id !== id));
   };
 
   return (
     <div className="space-y-2">
-      {/* Departure */}
-      <input
-        type="text"
-        value={departure.city}
-        onChange={(e) => onDepartureChange({ ...departure, city: e.target.value })}
-        placeholder="Départ"
-        className="w-full px-2.5 py-2 rounded-lg border border-border/40 bg-muted/20 text-xs placeholder:text-muted-foreground focus:border-primary focus:bg-primary/5 focus:outline-none transition-all"
-      />
-
-      {/* Arrival */}
-      <input
-        type="text"
-        value={arrival.city}
-        onChange={(e) => onArrivalChange({ ...arrival, city: e.target.value })}
-        placeholder="Arrivée"
-        className="w-full px-2.5 py-2 rounded-lg border border-border/40 bg-muted/20 text-xs placeholder:text-muted-foreground focus:border-primary focus:bg-primary/5 focus:outline-none transition-all"
-      />
-
-      {/* Date range selector */}
-      <button
-        onClick={() => {
-          setShowCalendar(!showCalendar);
-          setActiveStopCalendar(null);
-        }}
-        className={cn(
-          "w-full flex items-center justify-between px-2.5 py-2 rounded-lg border text-xs transition-all",
-          showCalendar
-            ? "border-primary bg-primary/10"
-            : "border-border/40 bg-muted/20 hover:bg-muted/40"
-        )}
-      >
-        <div className="flex items-center gap-1.5">
-          <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className={departure.date ? "text-foreground" : "text-muted-foreground"}>
-            {departure.date ? format(departure.date, "d MMM", { locale: fr }) : "Aller"}
-          </span>
-        </div>
-        <span className="text-muted-foreground">→</span>
-        <span className={arrival.date ? "text-foreground" : "text-muted-foreground"}>
-          {arrival.date ? format(arrival.date, "d MMM", { locale: fr }) : "Retour"}
-        </span>
-      </button>
-
-      {showCalendar && (
-        <div className="p-2 rounded-lg border border-border/40 bg-card">
-          <PlannerCalendar
-            dateRange={{ from: departure.date, to: arrival.date }}
-            onDateRangeChange={handleDateRangeChange}
-          />
-        </div>
-      )}
-
-      {/* Additional stops */}
-      {stops.map((stop) => (
-        <div key={stop.id} className="space-y-1.5">
-          <div className="flex items-center gap-1.5">
+      {legs.map((leg, index) => (
+        <div
+          key={leg.id}
+          className="flex items-center gap-1.5 p-2 rounded-lg border border-border/40 bg-muted/20"
+        >
+          {/* From city */}
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
             <input
               type="text"
-              value={stop.city}
-              onChange={(e) => updateStop(stop.id, { city: e.target.value })}
-              placeholder="Destination"
-              className="flex-1 px-2.5 py-2 rounded-lg border border-border/40 bg-muted/20 text-xs placeholder:text-muted-foreground focus:border-primary focus:bg-primary/5 focus:outline-none transition-all"
+              value={leg.from}
+              onChange={(e) => updateLeg(leg.id, { from: e.target.value })}
+              placeholder={index === 0 ? "D'où partez-vous ?" : "Départ"}
+              className="flex-1 min-w-0 bg-transparent text-xs placeholder:text-muted-foreground focus:outline-none"
             />
-            <button
-              onClick={() => {
-                setActiveStopCalendar(activeStopCalendar === stop.id ? null : stop.id);
-                setShowCalendar(false);
-              }}
-              className={cn(
-                "px-2.5 py-2 rounded-lg border text-xs transition-all shrink-0",
-                activeStopCalendar === stop.id
-                  ? "border-primary bg-primary/10"
-                  : "border-border/40 bg-muted/20 hover:bg-muted/40"
-              )}
-            >
-              <span className={stop.date ? "text-foreground" : "text-muted-foreground"}>
-                {stop.date ? format(stop.date, "d MMM", { locale: fr }) : "Date"}
-              </span>
-            </button>
-            <button
-              onClick={() => removeStop(stop.id)}
-              className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
           </div>
-          {activeStopCalendar === stop.id && (
-            <div className="p-2 rounded-lg border border-border/40 bg-card">
-              <PlannerCalendar
-                dateRange={{ from: stop.date, to: stop.date }}
-                onDateRangeChange={(range) => {
-                  if (range.from) {
-                    updateStop(stop.id, { date: range.from });
-                    setActiveStopCalendar(null);
-                  }
-                }}
+
+          {/* Swap button */}
+          <button
+            onClick={() => swapCities(leg.id)}
+            className="p-1 rounded-full border border-border/40 hover:bg-muted/40 transition-colors shrink-0"
+          >
+            <ArrowLeftRight className="h-3 w-3 text-muted-foreground" />
+          </button>
+
+          {/* To city */}
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary/60 shrink-0" />
+            <input
+              type="text"
+              value={leg.to}
+              onChange={(e) => updateLeg(leg.id, { to: e.target.value })}
+              placeholder="Où allez-vous ?"
+              className="flex-1 min-w-0 bg-transparent text-xs placeholder:text-muted-foreground focus:outline-none"
+            />
+          </div>
+
+          {/* Date picker */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                className={cn(
+                  "flex items-center gap-1.5 px-2 py-1 rounded border border-border/40 hover:bg-muted/40 transition-colors shrink-0 text-xs",
+                  leg.date ? "text-foreground" : "text-muted-foreground"
+                )}
+              >
+                <CalendarDays className="h-3 w-3" />
+                <span className="whitespace-nowrap">
+                  {leg.date
+                    ? format(leg.date, "EEE d MMM", { locale: fr })
+                    : "Date"}
+                </span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={leg.date}
+                onSelect={(date) => updateLeg(leg.id, { date: date || undefined })}
+                locale={fr}
+                className="p-3 pointer-events-auto"
               />
-            </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* Remove button */}
+          {legs.length > 1 && (
+            <button
+              onClick={() => removeLeg(leg.id)}
+              className="p-1 hover:text-destructive transition-colors shrink-0"
+            >
+              <X className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+            </button>
           )}
         </div>
       ))}
 
-      {/* Add stop - subtle plus button */}
-      {stops.length < maxStops && (
+      {/* Add flight button */}
+      {legs.length < maxLegs && (
         <button
-          onClick={addStop}
-          className="h-6 w-6 rounded-full border border-dashed border-border/50 flex items-center justify-center text-muted-foreground/60 hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all mx-auto"
-          title="Ajouter une destination"
+          onClick={addLeg}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
         >
           <Plus className="h-3 w-3" />
+          Ajouter un vol
         </button>
       )}
     </div>
