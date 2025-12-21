@@ -107,7 +107,16 @@ function getCityCoords(cityName: string): { lat: number; lng: number } | null {
 function cssHsl(varName: string, fallbackHsl = "222.2 47.4% 11.2%") {
   // shadcn tokens are stored as: "H S% L%" (no hsl())
   const raw = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-  const hsl = raw || fallbackHsl;
+  const hsl = (raw || fallbackHsl).trim();
+
+  // Mapbox's color parser is stricter than browsers: it doesn't accept the space-separated hsl() form.
+  // Convert "193 100% 42%" -> "hsl(193, 100%, 42%)"
+  const parts = hsl.split(/\s+/).filter(Boolean);
+  if (parts.length >= 3) {
+    const [h, s, l] = parts;
+    return `hsl(${h}, ${s}, ${l})`;
+  }
+
   return `hsl(${hsl})`;
 }
 
@@ -266,10 +275,10 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     // Remove previous dynamic routes
     for (let i = 0; i < 20; i++) {
       const sourceId = `dynamic-route-${i}`;
-      const labelId = `dynamic-route-label-${i}`;
+      const arrowId = `dynamic-route-arrow-${i}`;
 
-      if (map.current.getLayer(labelId)) {
-        map.current.removeLayer(labelId);
+      if (map.current.getLayer(arrowId)) {
+        map.current.removeLayer(arrowId);
       }
 
       if (map.current.getSource(sourceId)) {
@@ -356,6 +365,26 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
           "line-width": 3,
           "line-dasharray": [2, 2],
           "line-opacity": 0.85,
+        },
+      });
+
+      // Direction arrows along the line
+      map.current.addLayer({
+        id: `dynamic-route-arrow-${i}`,
+        type: "symbol",
+        source: sourceId,
+        layout: {
+          "symbol-placement": "line",
+          "symbol-spacing": 90,
+          "text-field": "➜",
+          "text-size": 16,
+          "text-keep-upright": false,
+          "text-rotation-alignment": "map",
+        },
+        paint: {
+          "text-color": routeColor,
+          "text-halo-color": "rgba(0,0,0,0.35)",
+          "text-halo-width": 1,
         },
       });
     }
