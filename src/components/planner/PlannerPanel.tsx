@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calendar, Users, Armchair, Filter, Clock, Sun, Moon, DollarSign, Sliders } from "lucide-react";
+import { Calendar, Users, Armchair, Filter, Clock, Sun, Moon, DollarSign, Sliders, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TabType } from "@/pages/TravelPlanner";
 import { Slider } from "@/components/ui/slider";
@@ -10,23 +10,51 @@ interface PlannerPanelProps {
   activeTab: TabType;
   onMapMove: (center: [number, number], zoom: number) => void;
   layout?: "sidebar" | "overlay";
+  onClose?: () => void;
+  isVisible?: boolean;
 }
 
-const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar" }: PlannerPanelProps) => {
+const tabLabels: Record<TabType, string> = {
+  flights: "Vols",
+  activities: "Activités",
+  stays: "Hébergements",
+  preferences: "Préférences",
+};
+
+const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVisible = true }: PlannerPanelProps) => {
+  if (!isVisible && layout === "overlay") return null;
+
   const wrapperClass =
     layout === "overlay"
-      ? "pointer-events-none absolute top-20 left-8 bottom-4 w-[340px] rounded-2xl border border-primary/20 bg-card/95 backdrop-blur-xl shadow-deep overflow-hidden z-10"
+      ? "pointer-events-none absolute top-16 left-4 bottom-4 w-[320px] z-10"
       : "w-80 lg:w-96 border-l border-border bg-card overflow-y-auto themed-scroll shrink-0";
 
-  const innerClass = layout === "overlay" ? "pointer-events-auto h-full overflow-y-auto themed-scroll p-5" : "p-5";
+  const innerClass = layout === "overlay" ? "pointer-events-auto h-full overflow-y-auto themed-scroll" : "";
 
   return (
     <aside className={wrapperClass} aria-label="Panneau de filtres">
-      <div className={innerClass}>
-        {activeTab === "flights" && <FlightsPanel onMapMove={onMapMove} />}
-        {activeTab === "activities" && <ActivitiesPanel />}
-        {activeTab === "stays" && <StaysPanel />}
-        {activeTab === "preferences" && <PreferencesPanel />}
+      <div className={cn(innerClass, layout === "overlay" && "rounded-2xl bg-card/95 backdrop-blur-xl border border-border/50 shadow-lg overflow-hidden")}>
+        {/* Header with close button */}
+        {layout === "overlay" && (
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-muted/30">
+            <h2 className="font-medium text-foreground text-sm">{tabLabels[activeTab]}</h2>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                aria-label="Fermer le panneau"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        )}
+        <div className="p-4">
+          {activeTab === "flights" && <FlightsPanel onMapMove={onMapMove} />}
+          {activeTab === "activities" && <ActivitiesPanel />}
+          {activeTab === "stays" && <StaysPanel />}
+          {activeTab === "preferences" && <PreferencesPanel />}
+        </div>
       </div>
     </aside>
   );

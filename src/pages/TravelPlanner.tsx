@@ -26,10 +26,12 @@ const TravelPlanner = () => {
   const [selectedPin, setSelectedPin] = useState<MapPin | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>([2.3522, 48.8566]); // Paris
   const [mapZoom, setMapZoom] = useState(12);
+  const [isPanelVisible, setIsPanelVisible] = useState(true);
 
   const handleTabChange = useCallback((tab: TabType) => {
     setActiveTab(tab);
     setSelectedPin(null);
+    setIsPanelVisible(true); // Réouvre le panneau quand on change d'onglet
   }, []);
 
   const handlePinClick = useCallback((pin: MapPin) => {
@@ -91,6 +93,8 @@ const TravelPlanner = () => {
           <PlannerPanel
             activeTab={activeTab}
             layout="overlay"
+            isVisible={isPanelVisible}
+            onClose={() => setIsPanelVisible(false)}
             onMapMove={(center, zoom) => {
               setMapCenter(center);
               setMapZoom(zoom);
