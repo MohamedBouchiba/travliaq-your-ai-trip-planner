@@ -95,10 +95,9 @@ const ChipButton = ({
 
 // Flights Panel
 const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoom: number) => void }) => {
-  const [legs, setLegs] = useState<FlightLeg[]>([
-    { id: "departure", city: "", date: undefined },
-    { id: "arrival", city: "", date: undefined },
-  ]);
+  const [departure, setDeparture] = useState<{ city: string; date?: Date }>({ city: "" });
+  const [arrival, setArrival] = useState<{ city: string; date?: Date }>({ city: "" });
+  const [stops, setStops] = useState<FlightLeg[]>([]);
   const [passengers, setPassengers] = useState(2);
   const [travelClass, setTravelClass] = useState<"economy" | "business" | "first">("economy");
   const [directOnly, setDirectOnly] = useState(false);
@@ -110,9 +109,13 @@ const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoo
       <div>
         <SectionHeader icon={Plane} title="Itinéraire" />
         <FlightRouteBuilder
-          legs={legs}
-          onLegsChange={setLegs}
-          maxLegs={4}
+          departure={departure}
+          arrival={arrival}
+          stops={stops}
+          onDepartureChange={setDeparture}
+          onArrivalChange={setArrival}
+          onStopsChange={setStops}
+          maxStops={2}
         />
       </div>
 
