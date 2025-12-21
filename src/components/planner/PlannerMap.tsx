@@ -224,14 +224,17 @@ interface PlannerMapProps {
   onPinClick: (pin: MapPin) => void;
   selectedPinId?: string;
   flightRoutes?: FlightRoutePoint[];
+  animateToUserLocation?: boolean;
+  onAnimationComplete?: () => void;
 }
 
-const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flightRoutes = [] }: PlannerMapProps) => {
+const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flightRoutes = [], animateToUserLocation = false, onAnimationComplete }: PlannerMapProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const routeMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const hasAnimatedRef = useRef(false);
 
   // Get pins based on active tab
   const getPinsForTab = useCallback((tab: TabType): MapPin[] => {
@@ -277,6 +280,52 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       map.current = null;
     };
   }, []);
+
+  // Animate to user location on initial load
+  useEffect(() => {
+    if (!map.current || !mapLoaded || hasAnimatedRef.current || !animateToUserLocation) return;
+
+    hasAnimatedRef.current = true;
+
+    // Wait a moment for the globe to be visible, then animate to user location
+    const timer = setTimeout(() => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            map.current?.flyTo({
+              center: [position.coords.longitude, position.coords.latitude],
+              zoom: 10,
+              duration: 3000,
+              essential: true,
+            });
+            setTimeout(() => onAnimationComplete?.(), 3000);
+          },
+          () => {
+            // Fallback to Paris if geolocation fails
+            map.current?.flyTo({
+              center: [2.3522, 48.8566],
+              zoom: 10,
+              duration: 3000,
+              essential: true,
+            });
+            setTimeout(() => onAnimationComplete?.(), 3000);
+          },
+          { timeout: 5000 }
+        );
+      } else {
+        // Fallback to Paris
+        map.current?.flyTo({
+          center: [2.3522, 48.8566],
+          zoom: 10,
+          duration: 3000,
+          essential: true,
+        });
+        setTimeout(() => onAnimationComplete?.(), 3000);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [mapLoaded, animateToUserLocation, onAnimationComplete]);
 
   // Resize map when container size changes (panel resize)
   useEffect(() => {

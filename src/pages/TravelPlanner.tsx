@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import PlannerMap from "@/components/planner/PlannerMap";
@@ -23,12 +23,13 @@ export interface MapPin {
 }
 
 const TravelPlanner = () => {
-  const [activeTab, setActiveTab] = useState<TabType>("activities");
+  const [activeTab, setActiveTab] = useState<TabType>("flights");
   const [selectedPin, setSelectedPin] = useState<MapPin | null>(null);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([2.3522, 48.8566]); // Paris
-  const [mapZoom, setMapZoom] = useState(12);
-  const [isPanelVisible, setIsPanelVisible] = useState(true);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([0, 20]); // Globe view
+  const [mapZoom, setMapZoom] = useState(1.5); // Zoom out to see globe
+  const [isPanelVisible, setIsPanelVisible] = useState(false); // No panel at start
   const [flightRoutes, setFlightRoutes] = useState<FlightRoutePoint[]>([]);
+  const [initialAnimationDone, setInitialAnimationDone] = useState(false);
 
   const handleTabChange = useCallback((tab: TabType) => {
     setActiveTab(tab);
@@ -94,6 +95,8 @@ const TravelPlanner = () => {
                 onPinClick={handlePinClick}
                 selectedPinId={selectedPin?.id}
                 flightRoutes={flightRoutes}
+                animateToUserLocation={!initialAnimationDone}
+                onAnimationComplete={() => setInitialAnimationDone(true)}
               />
 
               {/* Overlay tabs */}

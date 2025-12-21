@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.sentry-tunnel]
 verify_jwt = false
+
+[functions.planner-chat]
+verify_jwt = false

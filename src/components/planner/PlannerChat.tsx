@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/logo-travliaq.png";
 
 export type ChatQuickAction =
@@ -17,6 +18,76 @@ interface ChatMessage {
 
 interface PlannerChatProps {
   onAction: (action: ChatQuickAction) => void;
+}
+
+// City coordinates for map actions
+const cityCoordinates: Record<string, [number, number]> = {
+  "paris": [2.3522, 48.8566],
+  "new york": [-74.0060, 40.7128],
+  "nyc": [-74.0060, 40.7128],
+  "barcelone": [2.1734, 41.3851],
+  "barcelona": [2.1734, 41.3851],
+  "rome": [12.4964, 41.9028],
+  "tokyo": [139.6503, 35.6762],
+  "londres": [-0.1278, 51.5074],
+  "london": [-0.1278, 51.5074],
+  "berlin": [13.4050, 52.5200],
+  "amsterdam": [4.9041, 52.3676],
+  "lisbonne": [-9.1393, 38.7223],
+  "lisbon": [-9.1393, 38.7223],
+  "bruxelles": [4.3517, 50.8503],
+  "brussels": [4.3517, 50.8503],
+  "madrid": [-3.7038, 40.4168],
+  "vienne": [16.3738, 48.2082],
+  "vienna": [16.3738, 48.2082],
+  "prague": [14.4378, 50.0755],
+  "budapest": [19.0402, 47.4979],
+  "dubai": [55.2708, 25.2048],
+  "singapour": [103.8198, 1.3521],
+  "singapore": [103.8198, 1.3521],
+  "sydney": [151.2093, -33.8688],
+  "bangkok": [100.5018, 13.7563],
+  "marrakech": [-7.9811, 31.6295],
+  "le caire": [31.2357, 30.0444],
+  "cairo": [31.2357, 30.0444],
+};
+
+function getCityCoords(cityName: string): [number, number] | null {
+  const normalized = cityName.toLowerCase().trim();
+  return cityCoordinates[normalized] || null;
+}
+
+function parseAction(content: string): { cleanContent: string; action: ChatQuickAction | null } {
+  const actionMatch = content.match(/<action>(.*?)<\/action>/s);
+  let cleanContent = content.replace(/<action>.*?<\/action>/gs, "").trim();
+  
+  if (!actionMatch) return { cleanContent, action: null };
+
+  try {
+    const actionData = JSON.parse(actionMatch[1]);
+    
+    if (actionData.type === "zoom" && actionData.city) {
+      const coords = getCityCoords(actionData.city);
+      if (coords) {
+        return { cleanContent, action: { type: "zoom", center: coords, zoom: 12 } };
+      }
+    }
+    
+    if (actionData.type === "tab" && actionData.tab) {
+      return { cleanContent, action: { type: "tab", tab: actionData.tab } };
+    }
+    
+    if (actionData.type === "tabAndZoom" && actionData.tab && actionData.city) {
+      const coords = getCityCoords(actionData.city);
+      if (coords) {
+        return { cleanContent, action: { type: "tabAndZoom", tab: actionData.tab, center: coords, zoom: 12 } };
+      }
+    }
+  } catch (e) {
+    console.error("Failed to parse action:", e);
+  }
+
+  return { cleanContent, action: null };
 }
 
 export default function PlannerChat({ onAction }: PlannerChatProps) {
@@ -39,82 +110,16 @@ export default function PlannerChat({ onAction }: PlannerChatProps) {
     scrollToBottom();
   }, [messages]);
 
-  const generateResponse = (userText: string): string => {
-    const text = userText.toLowerCase();
-
-    // City responses
-    if (text.includes("paris")) {
-      onAction({ type: "zoom", center: [2.3522, 48.8566], zoom: 12 });
-      return "Paris est une excellente destination ! J'ai centré la carte sur la ville. Vous pouvez explorer les vols, les activités comme la Tour Eiffel ou le Louvre, et les hébergements. Que souhaitez-vous voir en premier ?";
-    }
-    if (text.includes("new york") || text.includes("nyc")) {
-      onAction({ type: "zoom", center: [-73.9855, 40.758], zoom: 12 });
-      return "New York, la ville qui ne dort jamais ! La carte est maintenant centrée sur Manhattan. Voulez-vous que je vous montre les vols disponibles ou les activités incontournables ?";
-    }
-    if (text.includes("barcelone") || text.includes("barcelona")) {
-      onAction({ type: "zoom", center: [2.1734, 41.3851], zoom: 12 });
-      return "Barcelone est magnifique ! Entre la Sagrada Familia, les plages et la gastronomie, vous allez adorer. Je vous montre les options ?";
-    }
-    if (text.includes("rome") || text.includes("roma")) {
-      onAction({ type: "zoom", center: [12.4964, 41.9028], zoom: 12 });
-      return "Rome, la ville éternelle ! Le Colisée, le Vatican, la cuisine italienne... Que voulez-vous explorer en premier ?";
-    }
-    if (text.includes("tokyo") || text.includes("japon")) {
-      onAction({ type: "zoom", center: [139.6917, 35.6895], zoom: 11 });
-      return "Tokyo est une destination fascinante ! Entre tradition et modernité, vous allez vivre une expérience unique. Voulez-vous voir les vols ou les activités ?";
-    }
-    if (text.includes("londres") || text.includes("london")) {
-      onAction({ type: "zoom", center: [-0.1276, 51.5074], zoom: 12 });
-      return "Londres vous attend ! Big Ben, Buckingham Palace, les musées gratuits... Par quoi voulez-vous commencer ?";
-    }
-
-    // Tab triggers
-    if (text.includes("vol") || text.includes("avion") || text.includes("flight")) {
-      onAction({ type: "tab", tab: "flights" });
-      return "Je vous affiche les options de vols. Vous pouvez filtrer par date, classe et nombre de passagers dans le panneau à gauche.";
-    }
-    if (text.includes("activité") || text.includes("visite") || text.includes("faire") || text.includes("voir")) {
-      onAction({ type: "tab", tab: "activities" });
-      return "Voici les activités disponibles. Vous pouvez filtrer par type (culture, plein air, gastronomie...) et par budget.";
-    }
-    if (text.includes("hôtel") || text.includes("hotel") || text.includes("dormir") || text.includes("hébergement") || text.includes("logement")) {
-      onAction({ type: "tab", tab: "stays" });
-      return "Je vous montre les hébergements. Filtrez par prix, note et équipements selon vos préférences.";
-    }
-    if (text.includes("préférence") || text.includes("profil") || text.includes("style")) {
-      onAction({ type: "tab", tab: "preferences" });
-      return "Configurons vos préférences de voyage. Cela m'aidera à vous proposer des recommandations personnalisées.";
-    }
-
-    // Budget questions
-    if (text.includes("budget") || text.includes("prix") || text.includes("coût") || text.includes("cher")) {
-      return "Le budget dépend de votre destination et de vos choix. Dites-moi où vous voulez aller et je vous donnerai une estimation. Vous pouvez aussi ajuster les filtres de prix dans chaque onglet.";
-    }
-
-    // Duration questions
-    if (text.includes("combien de temps") || text.includes("durée") || text.includes("jours")) {
-      return "La durée idéale dépend de la destination. Pour une capitale européenne, 3-4 jours suffisent. Pour un voyage plus lointain comme le Japon, comptez au moins une semaine. Quelle destination avez-vous en tête ?";
-    }
-
-    // Weather questions
-    if (text.includes("météo") || text.includes("climat") || text.includes("quand partir") || text.includes("saison")) {
-      return "Je peux vous conseiller sur la meilleure période. Quelle destination vous intéresse ?";
-    }
-
-    // Default response
-    return "Je comprends ! Pour vous aider au mieux, dites-moi quelle ville ou quel pays vous intéresse. Je peux aussi vous montrer les vols, activités ou hébergements si vous le souhaitez.";
-  };
-
-  const send = () => {
+  const send = async () => {
     if (!input.trim() || isLoading) return;
 
+    const userText = input.trim();
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
-      text: input.trim(),
+      text: userText,
     };
 
-    const userText = input.trim();
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
@@ -126,25 +131,58 @@ export default function PlannerChat({ onAction }: PlannerChatProps) {
       { id: typingId, role: "assistant", text: "", isTyping: true },
     ]);
 
-    // Simulate AI response delay
-    setTimeout(() => {
-      const response = generateResponse(userText);
+    try {
+      // Build conversation history for API
+      const apiMessages = messages
+        .filter((m) => !m.isTyping && m.id !== "welcome")
+        .map((m) => ({ role: m.role, content: m.text }));
+      apiMessages.push({ role: "user", content: userText });
+
+      const { data, error } = await supabase.functions.invoke("planner-chat", {
+        body: { messages: apiMessages },
+      });
+
+      if (error) {
+        console.error("Chat API error:", error);
+        throw new Error(error.message);
+      }
+
+      const rawContent = data?.content || "Désolé, je n'ai pas pu répondre.";
+      const { cleanContent, action } = parseAction(rawContent);
+
+      // Trigger map/tab action if present
+      if (action) {
+        onAction(action);
+      }
+
       setMessages((prev) =>
         prev
           .filter((m) => m.id !== typingId)
           .concat({
             id: `bot-${Date.now()}`,
             role: "assistant",
-            text: response,
+            text: cleanContent,
           })
       );
+    } catch (err) {
+      console.error("Failed to get chat response:", err);
+      setMessages((prev) =>
+        prev
+          .filter((m) => m.id !== typingId)
+          .concat({
+            id: `error-${Date.now()}`,
+            role: "assistant",
+            text: "Désolé, une erreur s'est produite. Veuillez réessayer.",
+          })
+      );
+    } finally {
       setIsLoading(false);
-    }, 800);
+    }
   };
 
   return (
     <aside className="h-full w-full bg-background flex flex-col">
-      {/* Messages area - ChatGPT style */}
+      {/* Messages area */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto py-6 px-4 space-y-6">
           {messages.map((m) => (
@@ -203,7 +241,7 @@ export default function PlannerChat({ onAction }: PlannerChatProps) {
         </div>
       </div>
 
-      {/* Input area - ChatGPT style */}
+      {/* Input area */}
       <div className="border-t border-border bg-background p-4">
         <div className="max-w-3xl mx-auto">
           <div className="relative flex items-end gap-2 rounded-2xl border border-border bg-muted/30 p-2 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20">
