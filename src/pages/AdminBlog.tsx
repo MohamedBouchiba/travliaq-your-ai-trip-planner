@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeSanitize from "rehype-sanitize";
 
 type BlogPost = {
   id: string;
@@ -393,7 +394,7 @@ const AdminBlog = () => {
                 </TabsContent>
                 <TabsContent value="preview">
                   <div className="min-h-[400px] p-6 border rounded-md bg-background prose prose-lg max-w-none prose-headings:text-travliaq-deep-blue prose-a:text-travliaq-turquoise prose-strong:text-travliaq-deep-blue">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
                       {currentPost.content || "*Aucun contenu à prévisualiser*"}
                     </ReactMarkdown>
                   </div>
