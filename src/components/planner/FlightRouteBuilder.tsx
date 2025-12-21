@@ -36,48 +36,47 @@ interface CityInputProps {
 function CityInput({ value, onChange, placeholder, icon }: CityInputProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState(value);
-  const [previousValue, setPreviousValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
+  const justSelectedRef = useRef(false);
   const { data: cities = [], isLoading } = useCitySearch(search, isOpen);
 
+  // Only sync search with value when value changes externally (not from our own selection)
   useEffect(() => {
-    setSearch(value);
-    setPreviousValue(value);
+    if (!justSelectedRef.current) {
+      setSearch(value);
+    }
+    justSelectedRef.current = false;
   }, [value]);
 
   const handleSelect = (city: City) => {
     const newValue = `${city.name}, ${city.country}`;
-    onChange(newValue);
+    justSelectedRef.current = true;
     setSearch(newValue);
-    setPreviousValue(newValue);
+    onChange(newValue);
     setIsOpen(false);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setSearch(newValue);
-    onChange(newValue);
     if (!isOpen && newValue.length >= 2) {
       setIsOpen(true);
     }
   };
 
   const handleFocus = () => {
-    // Clear input on focus if there's a value, to allow easy retyping
-    if (value) {
-      setSearch("");
-      setIsOpen(true);
-    }
+    // Clear input on focus to allow easy retyping
+    setSearch("");
+    setIsOpen(true);
   };
 
   const handleBlur = () => {
-    // Restore previous value if user didn't type anything
+    // If nothing was selected and search is empty, restore original value
     setTimeout(() => {
-      if (search === "" && previousValue) {
-        setSearch(previousValue);
-        onChange(previousValue);
+      if (search === "" && value) {
+        setSearch(value);
       }
-    }, 200);
+    }, 250);
   };
 
   return (
