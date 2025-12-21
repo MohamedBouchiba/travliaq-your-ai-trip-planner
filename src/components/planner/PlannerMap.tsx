@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import "@/styles/mapbox-overrides.css";
 import type { TabType, MapPin } from "@/pages/TravelPlanner";
 
 // Mock data for pins
@@ -65,8 +66,14 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId }: Plan
       style: "mapbox://styles/mapbox/outdoors-v12",
       center: [center[0], center[1]],
       zoom: zoom,
+      attributionControl: false,
     });
 
+    // Compact attribution control
+    map.current.addControl(
+      new mapboxgl.AttributionControl({ compact: true, customAttribution: "" }),
+      "bottom-right"
+    );
     map.current.addControl(new mapboxgl.NavigationControl(), "bottom-right");
 
     map.current.on("load", () => {

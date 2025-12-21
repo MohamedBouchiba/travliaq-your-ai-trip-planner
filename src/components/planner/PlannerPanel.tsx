@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import type { TabType } from "@/pages/TravelPlanner";
 import { Slider } from "@/components/ui/slider";
 import PlannerCalendar from "./PlannerCalendar";
+import FlightRouteBuilder, { FlightLeg } from "./FlightRouteBuilder";
 
 interface PlannerPanelProps {
   activeTab: TabType;
@@ -94,7 +95,10 @@ const ChipButton = ({
 
 // Flights Panel
 const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoom: number) => void }) => {
-  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
+  const [legs, setLegs] = useState<FlightLeg[]>([
+    { id: "departure", from: "", to: "", date: undefined },
+    { id: "return", from: "", to: "", date: undefined },
+  ]);
   const [passengers, setPassengers] = useState(2);
   const [travelClass, setTravelClass] = useState<"economy" | "business" | "first">("economy");
   const [directOnly, setDirectOnly] = useState(false);
@@ -102,12 +106,13 @@ const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoo
 
   return (
     <div className="space-y-5">
-      {/* Calendar */}
+      {/* Route Builder */}
       <div>
-        <SectionHeader icon={CalendarIcon} title="Dates du voyage" />
-        <PlannerCalendar
-          dateRange={dateRange}
-          onDateRangeChange={setDateRange}
+        <SectionHeader icon={Plane} title="Itinéraire" />
+        <FlightRouteBuilder
+          legs={legs}
+          onLegsChange={setLegs}
+          maxLegs={4}
         />
       </div>
 
