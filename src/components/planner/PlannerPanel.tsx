@@ -97,7 +97,9 @@ const ChipButton = ({
 interface Passenger {
   id: string;
   type: "adult" | "child";
-  baggage: "personal" | "cabin" | "checked";
+  personalItems: number;
+  cabinBags: number;
+  checkedBags: number;
 }
 
 // Flight options
@@ -105,29 +107,32 @@ interface FlightOptions {
   directOnly: boolean;
   flexibleDates: boolean;
   includeNearbyAirports: boolean;
-  preferredAirline: boolean;
+  morningFlights: boolean;
+  afternoonFlights: boolean;
+  noEveningFlights: boolean;
 }
 
 // Flights Panel
 const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoom: number) => void }) => {
   const [tripType, setTripType] = useState<"roundtrip" | "oneway" | "multi">("roundtrip");
   const [legs, setLegs] = useState<FlightLeg[]>([
-    { id: crypto.randomUUID(), from: "", to: "", date: undefined },
+    { id: crypto.randomUUID(), from: "", to: "", date: undefined, returnDate: undefined },
   ]);
   const [passengers, setPassengers] = useState<Passenger[]>([
-    { id: crypto.randomUUID(), type: "adult", baggage: "cabin" },
+    { id: crypto.randomUUID(), type: "adult", personalItems: 1, cabinBags: 1, checkedBags: 0 },
   ]);
   const [travelClass, setTravelClass] = useState<"economy" | "business" | "first">("economy");
-  const [departureTime, setDepartureTime] = useState<"morning" | "afternoon" | "evening" | null>(null);
   const [options, setOptions] = useState<FlightOptions>({
     directOnly: false,
     flexibleDates: false,
     includeNearbyAirports: false,
-    preferredAirline: false,
+    morningFlights: false,
+    afternoonFlights: false,
+    noEveningFlights: false,
   });
 
   const addPassenger = () => {
-    setPassengers([...passengers, { id: crypto.randomUUID(), type: "adult", baggage: "cabin" }]);
+    setPassengers([...passengers, { id: crypto.randomUUID(), type: "adult", personalItems: 1, cabinBags: 1, checkedBags: 0 }]);
   };
 
   const removePassenger = (id: string) => {
@@ -147,15 +152,13 @@ const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoo
   // Determine max legs based on trip type
   const getMaxLegs = () => {
     if (tripType === "oneway") return 1;
-    if (tripType === "roundtrip") return 2;
+    if (tripType === "roundtrip") return 1; // Only 1 leg for roundtrip (dates handle both ways)
     return 5; // multi-destinations
   };
 
-  const baggageOptions = [
-    { id: "personal", label: "🎒", title: "Personnel" },
-    { id: "cabin", label: "🧳", title: "Cabine" },
-    { id: "checked", label: "🛄", title: "Soute" },
-  ];
+  // Count totals for display
+  const totalAdults = passengers.filter(p => p.type === "adult").length;
+  const totalChildren = passengers.filter(p => p.type === "child").length;
 
   return (
     <div className="space-y-5">
@@ -207,81 +210,172 @@ const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoo
       />
 
       {/* Passengers Section */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-foreground">Passagers</span>
-          <button
-            onClick={addPassenger}
-            className="text-xs text-primary hover:text-primary/80 font-medium transition-colors"
-          >
-            + Ajouter
-          </button>
-        </div>
+      <div className="space-y-3">
+        <span className="text-xs font-medium text-foreground">Passagers</span>
         
-        <div className="space-y-2">
-          {passengers.map((passenger, index) => (
-            <div 
-              key={passenger.id} 
-              className="flex items-center gap-2 p-2 rounded-xl bg-muted/20 border border-border/30"
+        {/* Adults & Children dropdowns */}
+        <div className="flex gap-3">
+          <div className="flex-1">
+            <label className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1 block">Adultes</label>
+            <select
+              value={totalAdults}
+              onChange={(e) => {
+                const newCount = parseInt(e.target.value);
+                const currentAdults = passengers.filter(p => p.type === "adult");
+                if (newCount > currentAdults.length) {
+                  // Add adults
+                  const toAdd = newCount - currentAdults.length;
+                  const newPassengers = [...passengers];
+                  for (let i = 0; i < toAdd; i++) {
+                    newPassengers.push({ id: crypto.randomUUID(), type: "adult", personalItems: 1, cabinBags: 1, checkedBags: 0 });
+                  }
+                  setPassengers(newPassengers);
+                } else {
+                  // Remove adults from the end
+                  const toRemove = currentAdults.length - newCount;
+                  let removed = 0;
+                  const newPassengers = passengers.filter(p => {
+                    if (p.type === "adult" && removed < toRemove) {
+                      removed++;
+                      return false;
+                    }
+                    return true;
+                  });
+                  // Ensure at least 1 passenger
+                  if (newPassengers.length === 0) {
+                    newPassengers.push({ id: crypto.randomUUID(), type: "adult", personalItems: 1, cabinBags: 1, checkedBags: 0 });
+                  }
+                  setPassengers(newPassengers);
+                }
+              }}
+              className="w-full px-3 py-2 rounded-xl text-xs bg-muted/30 border border-border/30 text-foreground focus:outline-none focus:border-primary/50"
             >
-              <span className="text-xs text-muted-foreground min-w-[18px]">{index + 1}.</span>
-              
-              {/* Type toggle buttons */}
-              <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-muted/40">
-                <button
-                  onClick={() => updatePassenger(passenger.id, { type: "adult" })}
-                  className={cn(
-                    "px-2 py-1 rounded text-[10px] font-medium transition-all",
-                    passenger.type === "adult" 
-                      ? "bg-background text-foreground shadow-sm" 
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  Adulte
-                </button>
-                <button
-                  onClick={() => updatePassenger(passenger.id, { type: "child" })}
-                  className={cn(
-                    "px-2 py-1 rounded text-[10px] font-medium transition-all",
-                    passenger.type === "child" 
-                      ? "bg-background text-foreground shadow-sm" 
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  Enfant
-                </button>
-              </div>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
+                <option key={n} value={n}>{n} adulte{n > 1 ? 's' : ''}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1">
+            <label className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1 block">Enfants</label>
+            <select
+              value={totalChildren}
+              onChange={(e) => {
+                const newCount = parseInt(e.target.value);
+                const currentChildren = passengers.filter(p => p.type === "child");
+                if (newCount > currentChildren.length) {
+                  // Add children
+                  const toAdd = newCount - currentChildren.length;
+                  const newPassengers = [...passengers];
+                  for (let i = 0; i < toAdd; i++) {
+                    newPassengers.push({ id: crypto.randomUUID(), type: "child", personalItems: 1, cabinBags: 0, checkedBags: 0 });
+                  }
+                  setPassengers(newPassengers);
+                } else {
+                  // Remove children from the end
+                  const toRemove = currentChildren.length - newCount;
+                  let removed = 0;
+                  const newPassengers = passengers.filter(p => {
+                    if (p.type === "child" && removed < toRemove) {
+                      removed++;
+                      return false;
+                    }
+                    return true;
+                  });
+                  setPassengers(newPassengers);
+                }
+              }}
+              className="w-full px-3 py-2 rounded-xl text-xs bg-muted/30 border border-border/30 text-foreground focus:outline-none focus:border-primary/50"
+            >
+              {[0, 1, 2, 3, 4, 5, 6].map(n => (
+                <option key={n} value={n}>{n} enfant{n > 1 ? 's' : ''}</option>
+              ))}
+            </select>
+          </div>
+        </div>
 
-              {/* Baggage buttons with emojis */}
-              <div className="flex items-center gap-1 flex-1">
-                {baggageOptions.map((bag) => (
-                  <button
-                    key={bag.id}
-                    onClick={() => updatePassenger(passenger.id, { baggage: bag.id as Passenger["baggage"] })}
-                    title={bag.title}
-                    className={cn(
-                      "flex-1 py-1 rounded-lg text-sm transition-all text-center",
-                      passenger.baggage === bag.id
-                        ? "bg-primary/15 border border-primary/40"
-                        : "bg-muted/30 border border-border/30 hover:bg-muted/50"
-                    )}
-                  >
-                    {bag.label}
-                  </button>
-                ))}
+        {/* Baggage Section */}
+        <div className="p-3 rounded-xl bg-muted/20 border border-border/30 space-y-3">
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Bagages (par passager)</span>
+          
+          {/* Personal Item */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-base">🎒</span>
+              <div>
+                <div className="text-xs font-medium text-foreground">Objet personnel</div>
+                <div className="text-[10px] text-muted-foreground">Petit sac, limité à 1</div>
               </div>
-
-              {/* Remove button */}
-              {passengers.length > 1 && (
-                <button
-                  onClick={() => removePassenger(passenger.id)}
-                  className="p-1 text-muted-foreground hover:text-destructive transition-colors"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
             </div>
-          ))}
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground bg-muted/40 px-2 py-1 rounded">1</span>
+            </div>
+          </div>
+
+          {/* Cabin Bag */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-base">🧳</span>
+              <div>
+                <div className="text-xs font-medium text-foreground">Bagage cabine</div>
+                <div className="text-[10px] text-muted-foreground">Max 10kg, 55x40x20cm</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => {
+                  const firstPass = passengers[0];
+                  if (firstPass && firstPass.cabinBags > 0) {
+                    setPassengers(passengers.map(p => ({ ...p, cabinBags: Math.max(0, p.cabinBags - 1) })));
+                  }
+                }}
+                className="w-6 h-6 rounded-lg bg-muted/40 hover:bg-muted/60 text-foreground flex items-center justify-center text-sm"
+              >
+                −
+              </button>
+              <span className="text-xs w-6 text-center">{passengers[0]?.cabinBags || 0}</span>
+              <button
+                onClick={() => {
+                  setPassengers(passengers.map(p => ({ ...p, cabinBags: Math.min(2, p.cabinBags + 1) })));
+                }}
+                className="w-6 h-6 rounded-lg bg-muted/40 hover:bg-muted/60 text-foreground flex items-center justify-center text-sm"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          {/* Checked Bag */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-base">🛄</span>
+              <div>
+                <div className="text-xs font-medium text-foreground">Bagage en soute</div>
+                <div className="text-[10px] text-muted-foreground">Max 23kg chacun</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => {
+                  const firstPass = passengers[0];
+                  if (firstPass && firstPass.checkedBags > 0) {
+                    setPassengers(passengers.map(p => ({ ...p, checkedBags: Math.max(0, p.checkedBags - 1) })));
+                  }
+                }}
+                className="w-6 h-6 rounded-lg bg-muted/40 hover:bg-muted/60 text-foreground flex items-center justify-center text-sm"
+              >
+                −
+              </button>
+              <span className="text-xs w-6 text-center">{passengers[0]?.checkedBags || 0}</span>
+              <button
+                onClick={() => {
+                  setPassengers(passengers.map(p => ({ ...p, checkedBags: p.checkedBags + 1 })));
+                }}
+                className="w-6 h-6 rounded-lg bg-muted/40 hover:bg-muted/60 text-foreground flex items-center justify-center text-sm"
+              >
+                +
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -310,32 +404,6 @@ const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoo
         </div>
       </div>
 
-      {/* Departure Time */}
-      <div className="space-y-2">
-        <span className="text-xs font-medium text-foreground">Horaire de départ préféré</span>
-        <div className="flex gap-2">
-          {[
-            { id: "morning", label: "Matin", time: "6h - 12h" },
-            { id: "afternoon", label: "Après-midi", time: "12h - 18h" },
-            { id: "evening", label: "Soir", time: "18h - 00h" },
-          ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setDepartureTime(departureTime === t.id ? null : t.id as typeof departureTime)}
-              className={cn(
-                "flex-1 px-2 py-2 rounded-xl text-center transition-all",
-                departureTime === t.id
-                  ? "bg-primary/10 text-primary border border-primary/30"
-                  : "bg-muted/30 text-muted-foreground border border-border/30 hover:bg-muted/50 hover:text-foreground"
-              )}
-            >
-              <div className="text-xs font-medium">{t.label}</div>
-              <div className="text-[10px] opacity-70">{t.time}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Options Section */}
       <div className="space-y-2">
         <span className="text-xs font-medium text-foreground">Options</span>
@@ -344,7 +412,9 @@ const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoo
             { key: "directOnly" as const, label: "Vols directs", icon: "✈️" },
             { key: "flexibleDates" as const, label: "Dates flexibles", icon: "📅" },
             { key: "includeNearbyAirports" as const, label: "Aéroports proches", icon: "📍" },
-            { key: "preferredAirline" as const, label: "Compagnie préférée", icon: "⭐" },
+            { key: "morningFlights" as const, label: "Vols matin", icon: "🌅" },
+            { key: "afternoonFlights" as const, label: "Vols après-midi", icon: "☀️" },
+            { key: "noEveningFlights" as const, label: "Pas de vol le soir", icon: "🌙" },
           ].map((opt) => (
             <button
               key={opt.key}

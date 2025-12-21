@@ -16,6 +16,7 @@ export interface FlightLeg {
   from: string;
   to: string;
   date?: Date;
+  returnDate?: Date;
 }
 
 interface FlightRouteBuilderProps {
@@ -162,9 +163,18 @@ export default function FlightRouteBuilder({
   };
 
   const handleDateSelect = (legId: string, range: { from?: Date; to?: Date }) => {
-    if (range.from) {
-      updateLeg(legId, { date: range.from });
-      setActiveLegCalendar(null);
+    if (tripType === "roundtrip") {
+      // For round-trip, store both dates
+      updateLeg(legId, { date: range.from, returnDate: range.to });
+      // Only close calendar if we have both dates or user explicitly closes
+      if (range.from && range.to) {
+        setActiveLegCalendar(null);
+      }
+    } else {
+      if (range.from) {
+        updateLeg(legId, { date: range.from });
+        setActiveLegCalendar(null);
+      }
     }
   };
 
@@ -199,23 +209,44 @@ export default function FlightRouteBuilder({
               icon="to"
             />
 
-            {/* Date picker trigger */}
-            <button
-              onClick={() => setActiveLegCalendar(activeLegCalendar === leg.id ? null : leg.id)}
-              className={cn(
-                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors shrink-0 text-xs",
-                activeLegCalendar === leg.id
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border/40 hover:bg-muted/40",
-                leg.date ? "text-foreground" : "text-muted-foreground"
-              )}
-            >
-              <span className="whitespace-nowrap">
-                {leg.date
-                  ? format(leg.date, "EEE d MMM", { locale: fr })
-                  : "Date"}
-              </span>
-            </button>
+            {/* Date picker trigger(s) */}
+            {tripType === "roundtrip" ? (
+              <button
+                onClick={() => setActiveLegCalendar(activeLegCalendar === leg.id ? null : leg.id)}
+                className={cn(
+                  "flex items-center gap-1 px-2 py-1.5 rounded-lg border transition-colors shrink-0 text-xs",
+                  activeLegCalendar === leg.id
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border/40 hover:bg-muted/40",
+                  leg.date || leg.returnDate ? "text-foreground" : "text-muted-foreground"
+                )}
+              >
+                <span className="whitespace-nowrap">
+                  {leg.date ? format(leg.date, "d MMM", { locale: fr }) : "Aller"}
+                </span>
+                <span className="text-muted-foreground">→</span>
+                <span className="whitespace-nowrap">
+                  {leg.returnDate ? format(leg.returnDate, "d MMM", { locale: fr }) : "Retour"}
+                </span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setActiveLegCalendar(activeLegCalendar === leg.id ? null : leg.id)}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors shrink-0 text-xs",
+                  activeLegCalendar === leg.id
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border/40 hover:bg-muted/40",
+                  leg.date ? "text-foreground" : "text-muted-foreground"
+                )}
+              >
+                <span className="whitespace-nowrap">
+                  {leg.date
+                    ? format(leg.date, "EEE d MMM", { locale: fr })
+                    : "Date"}
+                </span>
+              </button>
+            )}
 
             {/* Remove button */}
             {legs.length > 1 && (
@@ -240,7 +271,9 @@ export default function FlightRouteBuilder({
                 <X className="h-4 w-4 text-muted-foreground" />
               </button>
               <PlannerCalendar
-                dateRange={{ from: leg.date, to: leg.date }}
+                dateRange={tripType === "roundtrip" 
+                  ? { from: leg.date, to: leg.returnDate } 
+                  : { from: leg.date, to: leg.date }}
                 onDateRangeChange={(range) => handleDateSelect(leg.id, range)}
               />
             </div>
