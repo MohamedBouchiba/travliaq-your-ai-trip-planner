@@ -231,15 +231,15 @@ const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoo
           {passengers.map((passenger, index) => (
             <div 
               key={passenger.id}
-              className="flex items-center gap-2 p-2 rounded-xl bg-muted/20 border border-border/30"
+              className="flex items-center gap-1.5 p-1.5 rounded-xl bg-muted/20 border border-border/30"
             >
               {/* Type selector */}
-              <div className="flex items-center gap-1.5 min-w-0">
+              <div className="flex items-center gap-1 shrink-0">
                 <span className="text-xs">{passenger.type === "adult" ? "👤" : "👶"}</span>
                 <select
                   value={passenger.type}
                   onChange={(e) => updatePassenger(passenger.id, { type: e.target.value as "adult" | "child" })}
-                  className="text-[10px] bg-transparent border-none text-foreground focus:outline-none cursor-pointer w-14"
+                  className="text-[10px] bg-transparent border-none text-foreground focus:outline-none cursor-pointer w-12"
                 >
                   <option value="adult">Adulte</option>
                   <option value="child">Enfant</option>
@@ -247,36 +247,38 @@ const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoo
               </div>
 
               {/* Cabin bags */}
-              <div className="flex items-center gap-1 px-1.5 py-1 rounded-md bg-muted/30">
+              <div className="flex items-center gap-0.5 px-1 py-0.5 rounded-md bg-muted/30">
                 <span className="text-[10px]">🧳</span>
+                <span className="text-[9px] text-muted-foreground">Cabine</span>
                 <button
                   onClick={() => updatePassenger(passenger.id, { cabinBags: Math.max(0, passenger.cabinBags - 1) })}
-                  className="w-4 h-4 rounded bg-muted/50 hover:bg-muted text-foreground flex items-center justify-center text-[10px]"
+                  className="w-3.5 h-3.5 rounded bg-muted/50 hover:bg-muted text-foreground flex items-center justify-center text-[9px] ml-0.5"
                 >
                   −
                 </button>
-                <span className="text-[10px] w-3 text-center">{passenger.cabinBags}</span>
+                <span className="text-[10px] w-2.5 text-center">{passenger.cabinBags}</span>
                 <button
                   onClick={() => updatePassenger(passenger.id, { cabinBags: Math.min(2, passenger.cabinBags + 1) })}
-                  className="w-4 h-4 rounded bg-muted/50 hover:bg-muted text-foreground flex items-center justify-center text-[10px]"
+                  className="w-3.5 h-3.5 rounded bg-muted/50 hover:bg-muted text-foreground flex items-center justify-center text-[9px]"
                 >
                   +
                 </button>
               </div>
 
               {/* Checked bags */}
-              <div className="flex items-center gap-1 px-1.5 py-1 rounded-md bg-muted/30">
+              <div className="flex items-center gap-0.5 px-1 py-0.5 rounded-md bg-muted/30">
                 <span className="text-[10px]">🛄</span>
+                <span className="text-[9px] text-muted-foreground">Soute</span>
                 <button
                   onClick={() => updatePassenger(passenger.id, { checkedBags: Math.max(0, passenger.checkedBags - 1) })}
-                  className="w-4 h-4 rounded bg-muted/50 hover:bg-muted text-foreground flex items-center justify-center text-[10px]"
+                  className="w-3.5 h-3.5 rounded bg-muted/50 hover:bg-muted text-foreground flex items-center justify-center text-[9px] ml-0.5"
                 >
                   −
                 </button>
-                <span className="text-[10px] w-3 text-center">{passenger.checkedBags}</span>
+                <span className="text-[10px] w-2.5 text-center">{passenger.checkedBags}</span>
                 <button
                   onClick={() => updatePassenger(passenger.id, { checkedBags: passenger.checkedBags + 1 })}
-                  className="w-4 h-4 rounded bg-muted/50 hover:bg-muted text-foreground flex items-center justify-center text-[10px]"
+                  className="w-3.5 h-3.5 rounded bg-muted/50 hover:bg-muted text-foreground flex items-center justify-center text-[9px]"
                 >
                   +
                 </button>
