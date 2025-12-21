@@ -9,12 +9,20 @@ import { Label } from "@/components/ui/label";
 interface PlannerPanelProps {
   activeTab: TabType;
   onMapMove: (center: [number, number], zoom: number) => void;
+  layout?: "sidebar" | "overlay";
 }
 
-const PlannerPanel = ({ activeTab, onMapMove }: PlannerPanelProps) => {
+const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar" }: PlannerPanelProps) => {
+  const wrapperClass =
+    layout === "overlay"
+      ? "pointer-events-none absolute top-16 left-3 bottom-3 w-[340px] rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-deep overflow-hidden z-10"
+      : "w-80 lg:w-96 border-l border-border bg-card overflow-y-auto themed-scroll shrink-0";
+
+  const innerClass = layout === "overlay" ? "pointer-events-auto h-full overflow-y-auto themed-scroll p-4" : "p-4";
+
   return (
-    <aside className="w-80 lg:w-96 border-l border-border bg-card overflow-y-auto themed-scroll shrink-0">
-      <div className="p-4">
+    <aside className={wrapperClass} aria-label="Panneau de filtres">
+      <div className={innerClass}>
         {activeTab === "flights" && <FlightsPanel onMapMove={onMapMove} />}
         {activeTab === "activities" && <ActivitiesPanel />}
         {activeTab === "stays" && <StaysPanel />}

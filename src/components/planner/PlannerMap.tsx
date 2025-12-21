@@ -96,18 +96,19 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId }: Plan
       el.style.cssText = `
         width: 40px;
         height: 40px;
-        border-radius: 50%;
-        background: ${pin.id === selectedPinId ? "hsl(193, 100%, 42%)" : "white"};
-        border: 3px solid ${pin.id === selectedPinId ? "hsl(193, 100%, 32%)" : "hsl(193, 100%, 42%)"};
+        border-radius: 9999px;
+        background: ${pin.id === selectedPinId ? "hsl(var(--primary))" : "hsl(var(--card))"};
+        border: 3px solid ${pin.id === selectedPinId ? "hsl(var(--primary) / 0.9)" : "hsl(var(--primary))"};
         display: flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        transition: all 0.2s ease;
+        box-shadow: 0 10px 25px -10px hsl(var(--foreground) / 0.25);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
         font-size: 12px;
-        font-weight: 600;
-        color: ${pin.id === selectedPinId ? "white" : "hsl(214, 51%, 11%)"};
+        font-weight: 700;
+        color: ${pin.id === selectedPinId ? "hsl(var(--primary-foreground))" : "hsl(var(--foreground))"};
+        user-select: none;
       `;
 
       // Add price or icon based on type

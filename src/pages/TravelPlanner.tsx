@@ -1,9 +1,10 @@
-import { useState, useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import PlannerMap from "@/components/planner/PlannerMap";
-import PlannerTabs from "@/components/planner/PlannerTabs";
 import PlannerPanel from "@/components/planner/PlannerPanel";
 import PlannerCard from "@/components/planner/PlannerCard";
+import PlannerChat from "@/components/planner/PlannerChat";
+import PlannerTopBar from "@/components/planner/PlannerTopBar";
 
 export type TabType = "flights" | "activities" | "stays" | "preferences";
 
@@ -25,6 +26,16 @@ const TravelPlanner = () => {
   const [selectedPin, setSelectedPin] = useState<MapPin | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>([2.3522, 48.8566]); // Paris
   const [mapZoom, setMapZoom] = useState(5);
+
+  const pageTitle = useMemo(() => {
+    const byTab: Record<TabType, string> = {
+      flights: "Flights",
+      activities: "Activities",
+      stays: "Stays",
+      preferences: "Preferences",
+    };
+    return `Travel Co-Pilot | ${byTab[activeTab]}`;
+  }, [activeTab]);
 
   const handleTabChange = useCallback((tab: TabType) => {
     setActiveTab(tab);
@@ -48,48 +59,64 @@ const TravelPlanner = () => {
   return (
     <>
       <Helmet>
-        <title>Planificateur de Voyage | Travliaq</title>
-        <meta name="description" content="Planifiez votre voyage avec notre interface interactive. Trouvez des vols, hébergements et activités sur une carte interactive." />
+        <title>{pageTitle}</title>
+        <meta
+          name="description"
+          content="Workspace de planification: chat + carte interactive + onglets. Comparez vols, activités et hébergements et construisez votre voyage." 
+        />
+        <link rel="canonical" href="/planner" />
       </Helmet>
 
-      <div className="h-screen w-full flex flex-col overflow-hidden bg-background">
-        {/* Top Navigation Bar with Tabs */}
-        <PlannerTabs activeTab={activeTab} onTabChange={handleTabChange} />
+      <div className="h-[100svh] w-full grid grid-cols-[360px_1fr] overflow-hidden bg-background">
+        {/* Left: Chat */}
+        <PlannerChat
+          onAction={(action) => {
+            if (action.type === "tab") setActiveTab(action.tab);
+            if (action.type === "zoom") {
+              setMapCenter(action.center);
+              setMapZoom(action.zoom);
+            }
+            if (action.type === "tabAndZoom") {
+              setActiveTab(action.tab);
+              setMapCenter(action.center);
+              setMapZoom(action.zoom);
+            }
+            setSelectedPin(null);
+          }}
+        />
 
-        {/* Main Content: Map + Side Panel */}
-        <div className="flex-1 flex overflow-hidden relative">
-          {/* Interactive Map */}
-          <div className="flex-1 relative">
-            <PlannerMap
-              activeTab={activeTab}
-              center={mapCenter}
-              zoom={mapZoom}
-              onPinClick={handlePinClick}
-              selectedPinId={selectedPin?.id}
-            />
+        {/* Right: Map workspace */}
+        <main className="relative overflow-hidden">
+          <PlannerMap
+            activeTab={activeTab}
+            center={mapCenter}
+            zoom={mapZoom}
+            onPinClick={handlePinClick}
+            selectedPinId={selectedPin?.id}
+          />
 
-            {/* Floating Card on Map */}
-            {selectedPin && (
-              <PlannerCard
-                pin={selectedPin}
-                onClose={handleCloseCard}
-                onAddToTrip={handleAddToTrip}
-              />
-            )}
-          </div>
+          {/* Overlay tabs + actions */}
+          <PlannerTopBar activeTab={activeTab} onTabChange={handleTabChange} />
 
-          {/* Right Side Panel */}
+          {/* Overlay right panel (contextual) */}
           <PlannerPanel
             activeTab={activeTab}
+            layout="overlay"
             onMapMove={(center, zoom) => {
               setMapCenter(center);
               setMapZoom(zoom);
             }}
           />
-        </div>
+
+          {/* Floating card on map */}
+          {selectedPin && (
+            <PlannerCard pin={selectedPin} onClose={handleCloseCard} onAddToTrip={handleAddToTrip} />
+          )}
+        </main>
       </div>
     </>
   );
 };
 
 export default TravelPlanner;
+
