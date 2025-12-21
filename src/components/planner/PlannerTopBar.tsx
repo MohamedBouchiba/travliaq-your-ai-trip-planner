@@ -16,30 +16,27 @@ const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
 
 export default function PlannerTopBar({ activeTab, onTabChange }: PlannerTopBarProps) {
   return (
-    <div className="pointer-events-none absolute top-4 left-8 z-20">
-      {/* Tabs - positioned left with travel/AI aesthetic */}
-      <div className="pointer-events-auto inline-flex items-center gap-1 rounded-2xl bg-secondary/90 backdrop-blur-xl shadow-deep px-2 py-2 border border-primary/20">
-        {tabs.map((t) => {
-          const Icon = t.icon;
-          const isActive = activeTab === t.id;
+    <div className="pointer-events-none absolute top-4 left-6 z-20 flex items-center gap-2">
+      {tabs.map((t) => {
+        const Icon = t.icon;
+        const isActive = activeTab === t.id;
 
-          return (
-            <button
-              key={t.id}
-              onClick={() => onTabChange(t.id)}
-              className={cn(
-                "h-10 px-5 rounded-xl text-sm font-medium flex items-center gap-2.5 transition-all duration-300",
-                isActive
-                  ? "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-glow"
-                  : "text-secondary-foreground/80 hover:text-secondary-foreground hover:bg-secondary-foreground/10"
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              <span className="hidden md:inline">{t.label}</span>
-            </button>
-          );
-        })}
-      </div>
+        return (
+          <button
+            key={t.id}
+            onClick={() => onTabChange(t.id)}
+            className={cn(
+              "pointer-events-auto h-10 px-4 rounded-full text-sm font-medium flex items-center gap-2 transition-all duration-300 backdrop-blur-md border",
+              isActive
+                ? "bg-primary/90 text-primary-foreground border-primary/50 shadow-lg"
+                : "bg-background/60 text-foreground/80 border-border/50 hover:bg-background/80 hover:text-foreground"
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            <span className="hidden md:inline">{t.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
