@@ -93,104 +93,201 @@ const ChipButton = ({
   </button>
 );
 
+// Passenger type
+interface Passenger {
+  id: string;
+  type: "adult" | "child";
+  baggage: "personal" | "cabin" | "checked";
+}
+
 // Flights Panel
 const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoom: number) => void }) => {
+  const [tripType, setTripType] = useState<"roundtrip" | "oneway">("roundtrip");
   const [legs, setLegs] = useState<FlightLeg[]>([
     { id: crypto.randomUUID(), from: "", to: "", date: undefined },
   ]);
-  const [passengers, setPassengers] = useState(2);
+  const [passengers, setPassengers] = useState<Passenger[]>([
+    { id: crypto.randomUUID(), type: "adult", baggage: "cabin" },
+  ]);
   const [travelClass, setTravelClass] = useState<"economy" | "business" | "first">("economy");
   const [directOnly, setDirectOnly] = useState(false);
   const [departureTime, setDepartureTime] = useState<"morning" | "afternoon" | "evening" | null>(null);
 
+  const addPassenger = () => {
+    setPassengers([...passengers, { id: crypto.randomUUID(), type: "adult", baggage: "cabin" }]);
+  };
+
+  const removePassenger = (id: string) => {
+    if (passengers.length > 1) {
+      setPassengers(passengers.filter(p => p.id !== id));
+    }
+  };
+
+  const updatePassenger = (id: string, updates: Partial<Passenger>) => {
+    setPassengers(passengers.map(p => p.id === id ? { ...p, ...updates } : p));
+  };
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
+      {/* Trip Type Toggle */}
+      <div className="flex items-center gap-1 p-1 rounded-full bg-muted/30 w-fit">
+        <button
+          onClick={() => setTripType("roundtrip")}
+          className={cn(
+            "px-3 py-1 rounded-full text-[11px] font-medium transition-all",
+            tripType === "roundtrip"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          Aller-retour
+        </button>
+        <button
+          onClick={() => setTripType("oneway")}
+          className={cn(
+            "px-3 py-1 rounded-full text-[11px] font-medium transition-all",
+            tripType === "oneway"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          Aller simple
+        </button>
+      </div>
+
       {/* Route Builder */}
       <div>
-        <SectionHeader icon={Plane} title="Itinéraire" />
         <FlightRouteBuilder
           legs={legs}
           onLegsChange={setLegs}
-          maxLegs={4}
+          maxLegs={tripType === "oneway" ? 1 : 4}
+          tripType={tripType}
         />
       </div>
 
-      {/* Passengers */}
-      <div>
-        <SectionHeader icon={Users} title="Voyageurs" />
-        <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/30">
-          <span className="text-sm text-foreground">Passagers</span>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setPassengers(Math.max(1, passengers - 1))}
-              className="h-7 w-7 rounded-full bg-muted hover:bg-muted/80 flex items-center justify-center text-foreground transition-colors"
-            >
-              −
-            </button>
-            <span className="text-sm font-semibold w-4 text-center">{passengers}</span>
-            <button
-              onClick={() => setPassengers(passengers + 1)}
-              className="h-7 w-7 rounded-full bg-primary/10 hover:bg-primary/20 text-primary flex items-center justify-center transition-colors"
-            >
-              +
-            </button>
-          </div>
+      {/* Passengers - Compact */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Passagers</span>
+          <button
+            onClick={addPassenger}
+            className="text-[10px] text-primary hover:text-primary/80 font-medium"
+          >
+            + Ajouter
+          </button>
         </div>
-      </div>
+        <div className="space-y-1">
+          {passengers.map((passenger, index) => (
+            <div key={passenger.id} className="flex items-center gap-1.5 py-1.5 px-2 rounded-lg bg-muted/20 border border-border/20">
+              <span className="text-[10px] text-muted-foreground w-4">{index + 1}.</span>
+              
+              {/* Type toggle */}
+              <div className="flex items-center gap-0.5 p-0.5 rounded bg-muted/40">
+                <button
+                  onClick={() => updatePassenger(passenger.id, { type: "adult" })}
+                  className={cn(
+                    "px-1.5 py-0.5 rounded text-[9px] font-medium transition-all",
+                    passenger.type === "adult" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+                  )}
+                >
+                  Adulte
+                </button>
+                <button
+                  onClick={() => updatePassenger(passenger.id, { type: "child" })}
+                  className={cn(
+                    "px-1.5 py-0.5 rounded text-[9px] font-medium transition-all",
+                    passenger.type === "child" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+                  )}
+                >
+                  Enfant
+                </button>
+              </div>
 
-      {/* Class */}
-      <div>
-        <SectionHeader icon={Plane} title="Classe" />
-        <div className="flex gap-1.5">
-          {[
-            { id: "economy", label: "Économique" },
-            { id: "business", label: "Affaires" },
-            { id: "first", label: "Première" },
-          ].map((c) => (
-            <ChipButton
-              key={c.id}
-              selected={travelClass === c.id}
-              onClick={() => setTravelClass(c.id as typeof travelClass)}
-            >
-              {c.label}
-            </ChipButton>
+              {/* Baggage select */}
+              <select
+                value={passenger.baggage}
+                onChange={(e) => updatePassenger(passenger.id, { baggage: e.target.value as Passenger["baggage"] })}
+                className="flex-1 bg-transparent text-[9px] text-foreground focus:outline-none cursor-pointer"
+              >
+                <option value="personal">🎒 Personnel</option>
+                <option value="cabin">🧳 Cabine</option>
+                <option value="checked">🛄 Soute</option>
+              </select>
+
+              {/* Remove */}
+              {passengers.length > 1 && (
+                <button
+                  onClick={() => removePassenger(passenger.id)}
+                  className="text-muted-foreground hover:text-destructive p-0.5"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              )}
+            </div>
           ))}
         </div>
       </div>
 
-      {/* Filters */}
-      <div>
-        <SectionHeader icon={Clock} title="Horaires" />
-        <div className="space-y-2">
-          <div className="flex gap-1.5 flex-wrap">
-            {[
-              { id: "morning", label: "Matin", time: "6h-12h" },
-              { id: "afternoon", label: "Après-midi", time: "12h-18h" },
-              { id: "evening", label: "Soir", time: "18h-00h" },
-            ].map((t) => (
-              <ChipButton
-                key={t.id}
-                selected={departureTime === t.id}
-                onClick={() => setDepartureTime(departureTime === t.id ? null : t.id as typeof departureTime)}
-              >
-                {t.label}
-              </ChipButton>
-            ))}
-          </div>
-          <button
-            onClick={() => setDirectOnly(!directOnly)}
-            className={cn(
-              "w-full p-2.5 rounded-xl text-xs font-medium transition-all flex items-center justify-center gap-2",
-              directOnly
-                ? "bg-primary/10 text-primary border border-primary/30"
-                : "bg-muted/30 text-muted-foreground border border-border/30 hover:bg-muted/50"
-            )}
-          >
-            <Plane className="h-3.5 w-3.5" />
-            Vols directs uniquement
-          </button>
+      {/* Class + Time on one line */}
+      <div className="flex items-center gap-2">
+        {/* Class compact */}
+        <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-muted/30 border border-border/20">
+          {[
+            { id: "economy", label: "Éco" },
+            { id: "business", label: "Aff." },
+            { id: "first", label: "1ère" },
+          ].map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setTravelClass(c.id as typeof travelClass)}
+              className={cn(
+                "px-2 py-1 rounded text-[9px] font-medium transition-all",
+                travelClass === c.id
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Time compact */}
+        <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-muted/30 border border-border/20 flex-1">
+          {[
+            { id: "morning", label: "🌅" },
+            { id: "afternoon", label: "☀️" },
+            { id: "evening", label: "🌙" },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setDepartureTime(departureTime === t.id ? null : t.id as typeof departureTime)}
+              className={cn(
+                "flex-1 px-2 py-1 rounded text-[10px] transition-all",
+                departureTime === t.id
+                  ? "bg-primary/20 text-primary"
+                  : "text-muted-foreground hover:bg-muted/40"
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
       </div>
+
+      {/* Direct flights toggle */}
+      <button
+        onClick={() => setDirectOnly(!directOnly)}
+        className={cn(
+          "w-full py-1.5 rounded-lg text-[10px] font-medium transition-all flex items-center justify-center gap-1.5",
+          directOnly
+            ? "bg-primary/10 text-primary border border-primary/30"
+            : "bg-muted/20 text-muted-foreground border border-border/20 hover:bg-muted/40"
+        )}
+      >
+        <Plane className="h-3 w-3" />
+        Vols directs uniquement
+      </button>
     </div>
   );
 };

@@ -22,6 +22,7 @@ interface FlightRouteBuilderProps {
   legs: FlightLeg[];
   onLegsChange: (legs: FlightLeg[]) => void;
   maxLegs?: number;
+  tripType?: "roundtrip" | "oneway";
 }
 
 interface CityInputProps {
@@ -120,6 +121,7 @@ export default function FlightRouteBuilder({
   legs,
   onLegsChange,
   maxLegs = 4,
+  tripType = "roundtrip",
 }: FlightRouteBuilderProps) {
   const [activeLegCalendar, setActiveLegCalendar] = useState<string | null>(null);
 
@@ -236,8 +238,8 @@ export default function FlightRouteBuilder({
         </div>
       ))}
 
-      {/* Add flight button */}
-      {legs.length < maxLegs && (
+      {/* Add flight button - hidden for one-way trips */}
+      {tripType === "roundtrip" && legs.length < maxLegs && (
         <button
           onClick={addLeg}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
