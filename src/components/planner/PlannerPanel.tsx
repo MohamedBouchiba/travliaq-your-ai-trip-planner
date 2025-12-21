@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calendar as CalendarIcon, Users, Plane, MapPin, Building2, Star, Clock, Wifi, Car, Coffee, Wind, X, Heart, Utensils, TreePine, Palette, Waves, Dumbbell, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TabType } from "@/pages/TravelPlanner";
@@ -136,6 +136,32 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange }: {
     includeNearbyAirports: false,
     noEveningFlights: false,
   });
+
+  // Detect user's city from IP on mount
+  useEffect(() => {
+    const detectUserCity = async () => {
+      try {
+        const response = await fetch("https://ipapi.co/json/");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.city && data.country_name) {
+            const userCity = `${data.city}, ${data.country_name}`;
+            setLegs((prev) => {
+              if (prev.length > 0 && !prev[0].from) {
+                return prev.map((leg, idx) =>
+                  idx === 0 ? { ...leg, from: userCity } : leg
+                );
+              }
+              return prev;
+            });
+          }
+        }
+      } catch {
+        // Silently fail - user can enter city manually
+      }
+    };
+    detectUserCity();
+  }, []);
 
   // Notify parent of route changes when legs change
   const handleLegsChange = (newLegs: FlightLeg[]) => {

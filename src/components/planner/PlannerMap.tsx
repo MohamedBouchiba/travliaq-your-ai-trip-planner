@@ -28,15 +28,6 @@ const mockStayPins: MapPin[] = [
   { id: "hotel4", type: "stays", lat: 48.8738, lng: 2.295, title: "Renaissance Arc", subtitle: "4 étoiles", price: 280, rating: 4.5 },
 ];
 
-function getMockRoutePrice(from?: string, to?: string): number | null {
-  const a = from?.trim();
-  const b = to?.trim();
-  if (!a || !b) return null;
-  const seed = `${a.toLowerCase()}__${b.toLowerCase()}`;
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  return 60 + (hash % 560);
-}
 
 // City coordinates mapping (common cities)
 const cityCoordinates: Record<string, { lat: number; lng: number }> = {
@@ -322,21 +313,17 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       routeMarkersRef.current.push(marker);
     });
 
-    // Draw lines + price labels between consecutive points
+    // Draw lines between consecutive points (no price labels)
     for (let i = 0; i < routePoints.length - 1; i++) {
       const from = routePoints[i];
       const to = routePoints[i + 1];
       const sourceId = `dynamic-route-${i}`;
-      const labelId = `dynamic-route-label-${i}`;
-      const price = getMockRoutePrice(from.city, to.city);
 
       map.current.addSource(sourceId, {
         type: "geojson",
         data: {
           type: "Feature",
-          properties: {
-            priceText: price ? `${price}€` : "",
-          },
+          properties: {},
           geometry: {
             type: "LineString",
             coordinates: [
@@ -362,27 +349,6 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
           "line-opacity": 0.8,
         },
       });
-
-      if (price) {
-        map.current.addLayer({
-          id: labelId,
-          type: "symbol",
-          source: sourceId,
-          layout: {
-            "symbol-placement": "line-center",
-            "text-field": ["get", "priceText"],
-            "text-size": 12,
-            "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
-            "text-padding": 2,
-            "text-allow-overlap": true,
-          },
-          paint: {
-            "text-color": "hsl(var(--foreground))",
-            "text-halo-color": "hsl(var(--background))",
-            "text-halo-width": 2,
-          },
-        });
-      }
     }
 
     // Fit map to show all points if we have at least 2
