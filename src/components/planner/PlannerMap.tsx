@@ -292,19 +292,21 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
+            // Offset center to the right to account for panel overlay (add ~5 degrees longitude)
+            const offsetLng = position.coords.longitude + 8;
             map.current?.flyTo({
-              center: [position.coords.longitude, position.coords.latitude],
-              zoom: 10,
+              center: [offsetLng, position.coords.latitude],
+              zoom: 4, // Continental scale
               duration: 3000,
               essential: true,
             });
             setTimeout(() => onAnimationComplete?.(), 3000);
           },
           () => {
-            // Fallback to Paris if geolocation fails
+            // Fallback to Europe centered with offset
             map.current?.flyTo({
-              center: [2.3522, 48.8566],
-              zoom: 10,
+              center: [12, 48], // Offset to right of center Europe
+              zoom: 4,
               duration: 3000,
               essential: true,
             });
@@ -313,10 +315,10 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
           { timeout: 5000 }
         );
       } else {
-        // Fallback to Paris
+        // Fallback to Europe
         map.current?.flyTo({
-          center: [2.3522, 48.8566],
-          zoom: 10,
+          center: [12, 48],
+          zoom: 4,
           duration: 3000,
           essential: true,
         });

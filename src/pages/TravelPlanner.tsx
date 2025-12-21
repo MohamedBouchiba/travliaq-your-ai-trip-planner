@@ -32,10 +32,15 @@ const TravelPlanner = () => {
   const [initialAnimationDone, setInitialAnimationDone] = useState(false);
 
   const handleTabChange = useCallback((tab: TabType) => {
-    setActiveTab(tab);
-    setSelectedPin(null);
-    setIsPanelVisible(true);
-  }, []);
+    // Toggle: if clicking on the same tab and panel is visible, close it
+    if (tab === activeTab && isPanelVisible) {
+      setIsPanelVisible(false);
+    } else {
+      setActiveTab(tab);
+      setSelectedPin(null);
+      setIsPanelVisible(true);
+    }
+  }, [activeTab, isPanelVisible]);
 
   const handlePinClick = useCallback((pin: MapPin) => {
     setSelectedPin(pin);
