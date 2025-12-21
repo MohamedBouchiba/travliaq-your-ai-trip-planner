@@ -94,7 +94,7 @@ const ChipButton = ({
 
 // Flights Panel
 const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoom: number) => void }) => {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [passengers, setPassengers] = useState(2);
   const [travelClass, setTravelClass] = useState<"economy" | "business" | "first">("economy");
   const [directOnly, setDirectOnly] = useState(false);
@@ -104,10 +104,10 @@ const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoo
     <div className="space-y-5">
       {/* Calendar */}
       <div>
-        <SectionHeader icon={CalendarIcon} title="Date de départ" />
+        <SectionHeader icon={CalendarIcon} title="Dates du voyage" />
         <PlannerCalendar
-          selectedDate={selectedDate}
-          onSelectDate={(date) => setSelectedDate(date)}
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
         />
       </div>
 
