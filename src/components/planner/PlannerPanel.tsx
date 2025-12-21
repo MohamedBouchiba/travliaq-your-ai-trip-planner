@@ -3,8 +3,7 @@ import { Calendar as CalendarIcon, Users, Plane, MapPin, Building2, Star, Clock,
 import { cn } from "@/lib/utils";
 import type { TabType } from "@/pages/TravelPlanner";
 import { Slider } from "@/components/ui/slider";
-import { Calendar } from "@/components/ui/calendar";
-import { fr } from "date-fns/locale";
+import PlannerCalendar from "./PlannerCalendar";
 
 interface PlannerPanelProps {
   activeTab: TabType;
@@ -106,37 +105,10 @@ const FlightsPanel = ({ onMapMove }: { onMapMove: (center: [number, number], zoo
       {/* Calendar */}
       <div>
         <SectionHeader icon={CalendarIcon} title="Date de départ" />
-        <div className="rounded-xl border border-border/50 bg-muted/20 overflow-hidden">
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={setSelectedDate}
-            locale={fr}
-            className="w-full pointer-events-auto"
-            classNames={{
-              months: "flex flex-col",
-              month: "space-y-2",
-              caption: "flex justify-center pt-1 relative items-center px-8",
-              caption_label: "text-xs font-medium",
-              nav: "space-x-1 flex items-center",
-              nav_button: "h-6 w-6 bg-transparent p-0 opacity-50 hover:opacity-100 rounded-md hover:bg-muted",
-              nav_button_previous: "absolute left-1",
-              nav_button_next: "absolute right-1",
-              table: "w-full border-collapse",
-              head_row: "flex justify-around",
-              head_cell: "text-muted-foreground rounded-md w-8 font-normal text-[10px] uppercase",
-              row: "flex w-full mt-1 justify-around",
-              cell: "h-7 w-7 text-center text-xs p-0 relative",
-              day: "h-7 w-7 p-0 font-normal rounded-md hover:bg-primary/10 transition-colors",
-              day_range_end: "day-range-end",
-              day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
-              day_today: "bg-accent text-accent-foreground",
-              day_outside: "opacity-30",
-              day_disabled: "opacity-30",
-              day_hidden: "invisible",
-            }}
-          />
-        </div>
+        <PlannerCalendar
+          selectedDate={selectedDate}
+          onSelectDate={(date) => setSelectedDate(date)}
+        />
       </div>
 
       {/* Passengers */}
