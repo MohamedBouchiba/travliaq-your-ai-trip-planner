@@ -292,8 +292,8 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
-            // Offset center to the right to account for panel overlay (add ~5 degrees longitude)
-            const offsetLng = position.coords.longitude + 8;
+            // Large offset to the right (+20 degrees) to leave space for widget panel
+            const offsetLng = position.coords.longitude + 20;
             map.current?.flyTo({
               center: [offsetLng, position.coords.latitude],
               zoom: 4, // Continental scale
@@ -303,9 +303,9 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
             setTimeout(() => onAnimationComplete?.(), 3000);
           },
           () => {
-            // Fallback to Europe centered with offset
+            // Fallback to Europe with large offset to right
             map.current?.flyTo({
-              center: [12, 48], // Offset to right of center Europe
+              center: [25, 48], // Much more to the right
               zoom: 4,
               duration: 3000,
               essential: true,
@@ -315,9 +315,9 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
           { timeout: 5000 }
         );
       } else {
-        // Fallback to Europe
+        // Fallback to Europe with offset
         map.current?.flyTo({
-          center: [12, 48],
+          center: [25, 48],
           zoom: 4,
           duration: 3000,
           essential: true,
