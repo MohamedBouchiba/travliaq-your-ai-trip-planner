@@ -279,15 +279,16 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
 
     hasAnimatedRef.current = true;
 
+    // Add left padding to visually shift the globe to the right (leave space for widget)
+    map.current.setPadding({ left: 350, top: 0, right: 0, bottom: 0 });
+
     // Wait a moment for the globe to be visible, then animate to user location
     const timer = setTimeout(() => {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
-            // Very large offset to the right (+35 degrees) to leave ample space for widget panel
-            const offsetLng = position.coords.longitude + 35;
             map.current?.flyTo({
-              center: [offsetLng, position.coords.latitude],
+              center: [position.coords.longitude, position.coords.latitude],
               zoom: 4, // Continental scale
               duration: 3000,
               essential: true,
@@ -295,9 +296,9 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
             setTimeout(() => onAnimationComplete?.(), 3000);
           },
           () => {
-            // Fallback to Europe with very large offset to right
+            // Fallback to Europe
             map.current?.flyTo({
-              center: [40, 48], // Far to the right
+              center: [10, 48],
               zoom: 4,
               duration: 3000,
               essential: true,
@@ -307,9 +308,9 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
           { timeout: 5000 }
         );
       } else {
-        // Fallback to Europe with large offset
+        // Fallback to Europe
         map.current?.flyTo({
-          center: [40, 48],
+          center: [10, 48],
           zoom: 4,
           duration: 3000,
           essential: true,
