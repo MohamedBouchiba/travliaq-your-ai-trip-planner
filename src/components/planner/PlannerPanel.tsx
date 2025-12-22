@@ -468,6 +468,49 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
           ))}
         </div>
       </div>
+
+      {/* Search Button */}
+      <div className="pt-3">
+        {(() => {
+          const firstLeg = legs[0];
+          const hasFrom = firstLeg?.from?.trim();
+          const hasTo = firstLeg?.to?.trim();
+          const hasDate = firstLeg?.date;
+          const isComplete = hasFrom && hasTo && hasDate;
+          const missingFields: string[] = [];
+          if (!hasFrom) missingFields.push("départ");
+          if (!hasTo) missingFields.push("destination");
+          if (!hasDate) missingFields.push("date");
+
+          return (
+            <>
+              <button
+                onClick={() => {
+                  if (isComplete) {
+                    console.log("Searching flights with:", { legs, passengers, travelClass, options, tripType });
+                    // TODO: Trigger actual flight search
+                  }
+                }}
+                disabled={!isComplete}
+                className={cn(
+                  "w-full py-3 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2",
+                  isComplete
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25"
+                    : "bg-muted text-muted-foreground cursor-not-allowed"
+                )}
+              >
+                <Plane className="h-4 w-4" />
+                Rechercher des vols
+              </button>
+              {!isComplete && missingFields.length > 0 && (
+                <p className="text-[10px] text-muted-foreground text-center mt-2">
+                  Complète : {missingFields.join(", ")}
+                </p>
+              )}
+            </>
+          );
+        })()}
+      </div>
     </div>
   );
 };
