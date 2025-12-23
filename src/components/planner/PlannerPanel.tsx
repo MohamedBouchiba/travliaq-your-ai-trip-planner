@@ -531,6 +531,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
           flights={flightResults || []} 
           isLoading={isSearchingFlights}
           onSelect={(flight) => console.log("Selected flight:", flight)}
+          travelers={passengers.length}
         />
       </div>
     );
