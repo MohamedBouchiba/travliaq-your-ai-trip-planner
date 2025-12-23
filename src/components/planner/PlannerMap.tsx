@@ -439,13 +439,11 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       }
     }
 
-    // Get coordinates for each route point
-    const routePoints = flightRoutes
-      .map((route) => {
-        const coords = getCityCoords(route.city);
-        return coords ? { ...route, ...coords } : null;
-      })
-      .filter((p): p is FlightRoutePoint & { lat: number; lng: number } => p !== null);
+    // Use coordinates directly from flightRoutes (already provided by autocomplete)
+    const routePoints = flightRoutes.filter(
+      (route): route is FlightRoutePoint & { lat: number; lng: number } => 
+        typeof route.lat === "number" && typeof route.lng === "number"
+    );
 
     if (routePoints.length === 0) return;
 

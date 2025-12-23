@@ -9,8 +9,8 @@ import type { LocationResult } from "@/hooks/useLocationAutocomplete";
 
 export interface FlightRoutePoint {
   city: string;
-  lat?: number;
-  lng?: number;
+  lat: number;
+  lng: number;
 }
 
 export interface FlightFormData {
@@ -232,20 +232,36 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
 
     if (!onFlightRoutesChange) return;
 
-    // Keep order and duplicates where it matters (multi-destination), but avoid consecutive duplicates
+    // Build route points using coordinates from location metadata
     const sequence: FlightRoutePoint[] = [];
 
     newLegs.forEach((leg, idx) => {
-      const from = leg.from?.trim();
-      const to = leg.to?.trim();
+      const fromLoc = leg.fromLocation;
+      const toLoc = leg.toLocation;
 
-      if (idx === 0 && from) sequence.push({ city: from });
-      if (to) sequence.push({ city: to });
+      // Add origin (only for first leg)
+      if (idx === 0 && fromLoc && fromLoc.lat && fromLoc.lng) {
+        sequence.push({ 
+          city: leg.from || fromLoc.display_name, 
+          lat: fromLoc.lat, 
+          lng: fromLoc.lng 
+        });
+      }
+
+      // Add destination
+      if (toLoc && toLoc.lat && toLoc.lng) {
+        sequence.push({ 
+          city: leg.to || toLoc.display_name, 
+          lat: toLoc.lat, 
+          lng: toLoc.lng 
+        });
+      }
     });
 
+    // Remove consecutive duplicates (same coordinates)
     const cleaned = sequence.filter((p, idx, arr) => {
       const prev = arr[idx - 1];
-      return !prev || prev.city !== p.city;
+      return !prev || prev.lat !== p.lat || prev.lng !== p.lng;
     });
 
     onFlightRoutesChange(cleaned);
