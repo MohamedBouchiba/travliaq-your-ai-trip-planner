@@ -338,7 +338,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
   const searchButtonShownRef = useRef(false);
   
   // Access flight memory
-  const { memory, updateMemory, isReadyToSearch, missingFields, getMemorySummary } = useFlightMemory();
+  const { memory, updateMemory, isReadyToSearch, hasCompleteInfo, needsAirportSelection, missingFields, getMemorySummary } = useFlightMemory();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -348,27 +348,55 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
     scrollToBottom();
   }, [messages]);
 
-  // Show search button automatically when ready
+  // Show appropriate message when we have complete info
   useEffect(() => {
-    if (isReadyToSearch && !searchButtonShownRef.current) {
+    if (!hasCompleteInfo || searchButtonShownRef.current) return;
+    
+    const departure = memory.departure?.city || "départ";
+    const arrival = memory.arrival?.city || "destination";
+    const depCode = memory.departure?.iata ? ` (${memory.departure.iata})` : "";
+    const arrCode = memory.arrival?.iata ? ` (${memory.arrival.iata})` : "";
+    
+    // Format dates
+    const depDate = memory.departureDate ? format(memory.departureDate, "d MMMM yyyy", { locale: fr }) : "-";
+    const retDate = memory.returnDate ? format(memory.returnDate, "d MMMM yyyy", { locale: fr }) : null;
+    const travelers = memory.passengers.adults + memory.passengers.children;
+    
+    // Check if we need airports
+    const needsDepartureAirport = needsAirportSelection.departure;
+    const needsArrivalAirport = needsAirportSelection.arrival;
+    
+    if (needsDepartureAirport || needsArrivalAirport) {
+      // We have cities but need airport selection
       searchButtonShownRef.current = true;
       
-      const departure = memory.departure?.airport || memory.departure?.city || "départ";
-      const arrival = memory.arrival?.airport || memory.arrival?.city || "destination";
-      const depCode = memory.departure?.iata ? ` (${memory.departure.iata})` : "";
-      const arrCode = memory.arrival?.iata ? ` (${memory.arrival.iata})` : "";
+      const neededParts: string[] = [];
+      if (needsDepartureAirport) neededParts.push("départ");
+      if (needsArrivalAirport) neededParts.push("arrivée");
+      
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `info-ready-${Date.now()}`,
+          role: "assistant",
+          text: `Super ! Votre voyage **${departure} → ${arrival}** est configuré :\n\n📅 Départ : ${depDate}${retDate ? `\n📅 Retour : ${retDate}` : ""}\n👥 ${travelers} voyageur${travelers > 1 ? "s" : ""}\n\n${arrival} est une destination fascinante ! Pour rechercher les meilleurs vols, veuillez maintenant sélectionner vos aéroports de ${neededParts.join(" et d'")} dans le panneau de droite. ✈️`,
+        },
+      ]);
+    } else {
+      // All airports selected - ready to search!
+      searchButtonShownRef.current = true;
       
       setMessages((prev) => [
         ...prev,
         {
           id: `search-ready-auto-${Date.now()}`,
           role: "assistant",
-          text: `Parfait ! Votre recherche **${departure}${depCode} → ${arrival}${arrCode}** est prête.\n\n📅 Départ : ${memory.departureDate ? format(memory.departureDate, "d MMMM yyyy", { locale: fr }) : "-"}${memory.returnDate ? `\n📅 Retour : ${format(memory.returnDate, "d MMMM yyyy", { locale: fr })}` : ""}\n👥 ${memory.passengers.adults} voyageur${memory.passengers.adults > 1 ? "s" : ""}`,
+          text: `Parfait ! Votre itinéraire **${departure}${depCode} → ${arrival}${arrCode}** est prêt !\n\n📅 Départ : ${depDate}${retDate ? `\n📅 Retour : ${retDate}` : ""}\n👥 ${travelers} voyageur${travelers > 1 ? "s" : ""}\n\nCliquez ci-dessous pour lancer la recherche. 🚀`,
           hasSearchButton: true,
         },
       ]);
     }
-  }, [isReadyToSearch, memory]);
+  }, [hasCompleteInfo, isReadyToSearch, memory, needsAirportSelection]);
 
   // Reset search button shown when memory is reset
   useEffect(() => {
