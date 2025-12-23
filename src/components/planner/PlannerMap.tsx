@@ -4,6 +4,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import "@/styles/mapbox-overrides.css";
 import type { TabType, MapPin } from "@/pages/TravelPlanner";
 import type { FlightRoutePoint } from "./PlannerPanel";
+import { useFlightMemory } from "@/contexts/FlightMemoryContext";
 
 // Mock data for pins
 const mockFlightPins: MapPin[] = [
@@ -242,8 +243,12 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const routeMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const memoryMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const [mapLoaded, setMapLoaded] = useState(false);
   const hasAnimatedRef = useRef(false);
+
+  // Get route points from flight memory
+  const { getRoutePoints } = useFlightMemory();
 
   // Get pins based on active tab - returns empty by default (no pins shown initially)
   const getPinsForTab = useCallback((tab: TabType): MapPin[] => {
@@ -486,9 +491,152 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     });
   }, [activeTab, mapLoaded, selectedPinId, onPinClick, getPinsForTab]);
 
-  // Draw dynamic flight routes from user input
+  // Draw route markers from FlightMemory (most up-to-date source)
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
+
+    // Clear previous memory markers
+    memoryMarkersRef.current.forEach((marker) => marker.remove());
+    memoryMarkersRef.current = [];
+
+    // Remove previous memory route lines
+    const memorySourceId = "memory-route";
+    const memoryArrowId = "memory-route-arrow";
+    
+    if (map.current.getLayer(memoryArrowId)) {
+      map.current.removeLayer(memoryArrowId);
+    }
+    if (map.current.getLayer(memorySourceId)) {
+      map.current.removeLayer(memorySourceId);
+    }
+    if (map.current.getSource(memorySourceId)) {
+      map.current.removeSource(memorySourceId);
+    }
+
+    const memoryPoints = getRoutePoints();
+    
+    if (memoryPoints.length === 0) return;
+
+    // Create markers for each point
+    memoryPoints.forEach((point, index) => {
+      const el = document.createElement("div");
+      el.className = "memory-route-marker";
+      
+      const isDeparture = point.type === "departure";
+      
+      el.style.cssText = `
+        width: 36px;
+        height: 36px;
+        border-radius: 9999px;
+        background: ${isDeparture ? "hsl(var(--primary))" : "hsl(142 76% 36%)"};
+        border: 3px solid white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        font-size: 14px;
+        font-weight: 700;
+        color: white;
+        user-select: none;
+        z-index: 20;
+      `;
+      el.textContent = isDeparture ? "✈" : "🛬";
+
+      // Add tooltip with label
+      el.title = point.label;
+
+      const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat([point.lng, point.lat])
+        .addTo(map.current!);
+
+      memoryMarkersRef.current.push(marker);
+    });
+
+    // Draw line between departure and arrival if we have both
+    if (memoryPoints.length >= 2) {
+      const departure = memoryPoints.find(p => p.type === "departure");
+      const arrival = memoryPoints.find(p => p.type === "arrival");
+      
+      if (departure && arrival) {
+        map.current.addSource(memorySourceId, {
+          type: "geojson",
+          data: {
+            type: "Feature",
+            properties: {},
+            geometry: {
+              type: "LineString",
+              coordinates: [
+                [departure.lng, departure.lat],
+                [arrival.lng, arrival.lat],
+              ],
+            },
+          },
+        });
+
+        const routeColor = cssHsl("--primary", "221.2 83.2% 53.3%");
+
+        map.current.addLayer({
+          id: memorySourceId,
+          type: "line",
+          source: memorySourceId,
+          layout: {
+            "line-join": "round",
+            "line-cap": "round",
+          },
+          paint: {
+            "line-color": routeColor,
+            "line-width": 3,
+            "line-dasharray": [2, 2],
+            "line-opacity": 0.85,
+          },
+        });
+
+        // Direction arrows along the line
+        map.current.addLayer({
+          id: memoryArrowId,
+          type: "symbol",
+          source: memorySourceId,
+          layout: {
+            "symbol-placement": "line",
+            "symbol-spacing": 90,
+            "text-field": "➜",
+            "text-size": 16,
+            "text-keep-upright": false,
+            "text-rotation-alignment": "map",
+          },
+          paint: {
+            "text-color": routeColor,
+            "text-halo-color": "rgba(0,0,0,0.35)",
+            "text-halo-width": 1,
+          },
+        });
+
+        // Fit map to show both points
+        const bounds = new mapboxgl.LngLatBounds();
+        bounds.extend([departure.lng, departure.lat]);
+        bounds.extend([arrival.lng, arrival.lat]);
+        map.current.fitBounds(bounds, {
+          padding: { top: 100, bottom: 100, left: 450, right: 50 },
+          maxZoom: 6,
+        });
+      }
+    } else if (memoryPoints.length === 1) {
+      // Fly to single point
+      map.current.flyTo({
+        center: [memoryPoints[0].lng, memoryPoints[0].lat],
+        zoom: 5,
+      });
+    }
+  }, [getRoutePoints, mapLoaded]);
+
+  // Draw dynamic flight routes from user input (legacy - for widget input)
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    // Skip if we already have memory-based markers
+    const memoryPoints = getRoutePoints();
+    if (memoryPoints.length > 0) return;
 
     // Clear previous route markers
     routeMarkersRef.current.forEach((marker) => marker.remove());
@@ -625,7 +773,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         zoom: 5,
       });
     }
-  }, [flightRoutes, mapLoaded]);
+  }, [flightRoutes, mapLoaded, getRoutePoints]);
 
   // Update map center/zoom
   useEffect(() => {

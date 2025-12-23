@@ -9,6 +9,7 @@ import type { LocationResult } from "@/hooks/useLocationAutocomplete";
 import { findNearestAirports, Airport } from "@/hooks/useNearestAirports";
 import type { AirportChoice, DualAirportChoice } from "./PlannerChat";
 import FlightResults, { FlightOffer, generateMockFlights } from "./FlightResults";
+import { useFlightMemory, type AirportInfo } from "@/contexts/FlightMemoryContext";
 
 export interface FlightRoutePoint {
   city: string;
@@ -185,6 +186,9 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     includeNearbyAirports: false,
     noEveningFlights: false,
   });
+
+  // Access flight memory for synchronization
+  const { updateMemory } = useFlightMemory();
 
   // Apply flight form data from chat AI
   useEffect(() => {

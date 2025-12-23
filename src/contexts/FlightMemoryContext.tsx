@@ -1,10 +1,15 @@
 import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
 
-// Airport info structure
+// Airport info structure - stores as much info as possible
 export interface AirportInfo {
-  city?: string;
-  airport?: string;
-  iata?: string;
+  // Location hierarchy (most precise to least)
+  airport?: string;      // Airport name (e.g. "Charles de Gaulle")
+  iata?: string;         // IATA code (e.g. "CDG")
+  city?: string;         // City name (e.g. "Paris")
+  country?: string;      // Country name (e.g. "France")
+  countryCode?: string;  // Country code (e.g. "FR")
+  
+  // Coordinates - always use the most precise available
   lat?: number;
   lng?: number;
 }
@@ -32,6 +37,14 @@ export interface FlightMemory {
 // Missing fields type
 export type MissingField = "departure" | "arrival" | "departureDate" | "returnDate" | "passengers";
 
+// Route point for map display
+export interface MemoryRoutePoint {
+  label: string;
+  lat: number;
+  lng: number;
+  type: "departure" | "arrival";
+}
+
 // Context value type
 interface FlightMemoryContextValue {
   memory: FlightMemory;
@@ -40,6 +53,7 @@ interface FlightMemoryContextValue {
   isReadyToSearch: boolean;
   missingFields: MissingField[];
   getMemorySummary: () => string;
+  getRoutePoints: () => MemoryRoutePoint[];
 }
 
 // Initial state
@@ -115,10 +129,16 @@ export function FlightMemoryProvider({ children }: { children: ReactNode }) {
     const parts: string[] = [];
     
     if (memory.departure?.city || memory.departure?.iata) {
-      parts.push(`Départ: ${memory.departure.airport || memory.departure.city}${memory.departure.iata ? ` (${memory.departure.iata})` : ""}`);
+      let depStr = memory.departure.airport || memory.departure.city || "";
+      if (memory.departure.iata) depStr += ` (${memory.departure.iata})`;
+      if (memory.departure.country) depStr += `, ${memory.departure.country}`;
+      parts.push(`Départ: ${depStr}`);
     }
     if (memory.arrival?.city || memory.arrival?.iata) {
-      parts.push(`Arrivée: ${memory.arrival.airport || memory.arrival.city}${memory.arrival.iata ? ` (${memory.arrival.iata})` : ""}`);
+      let arrStr = memory.arrival.airport || memory.arrival.city || "";
+      if (memory.arrival.iata) arrStr += ` (${memory.arrival.iata})`;
+      if (memory.arrival.country) arrStr += `, ${memory.arrival.country}`;
+      parts.push(`Arrivée: ${arrStr}`);
     }
     if (memory.departureDate) {
       parts.push(`Date départ: ${memory.departureDate.toLocaleDateString("fr-FR")}`);
@@ -134,6 +154,38 @@ export function FlightMemoryProvider({ children }: { children: ReactNode }) {
     return parts.join(" | ");
   }, [memory]);
 
+  // Get route points for map display - uses most precise coordinates available
+  const getRoutePoints = useCallback((): MemoryRoutePoint[] => {
+    const points: MemoryRoutePoint[] = [];
+    
+    if (memory.departure?.lat && memory.departure?.lng) {
+      // Use airport name if available, otherwise city
+      const label = memory.departure.iata 
+        ? `${memory.departure.airport || memory.departure.city} (${memory.departure.iata})`
+        : memory.departure.city || "Départ";
+      points.push({
+        label,
+        lat: memory.departure.lat,
+        lng: memory.departure.lng,
+        type: "departure",
+      });
+    }
+    
+    if (memory.arrival?.lat && memory.arrival?.lng) {
+      const label = memory.arrival.iata
+        ? `${memory.arrival.airport || memory.arrival.city} (${memory.arrival.iata})`
+        : memory.arrival.city || "Arrivée";
+      points.push({
+        label,
+        lat: memory.arrival.lat,
+        lng: memory.arrival.lng,
+        type: "arrival",
+      });
+    }
+    
+    return points;
+  }, [memory]);
+
   const value = useMemo(
     () => ({
       memory,
@@ -142,8 +194,9 @@ export function FlightMemoryProvider({ children }: { children: ReactNode }) {
       isReadyToSearch,
       missingFields,
       getMemorySummary,
+      getRoutePoints,
     }),
-    [memory, updateMemory, resetMemory, isReadyToSearch, missingFields, getMemorySummary]
+    [memory, updateMemory, resetMemory, isReadyToSearch, missingFields, getMemorySummary, getRoutePoints]
   );
 
   return (

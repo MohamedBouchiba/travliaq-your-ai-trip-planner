@@ -406,11 +406,14 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       );
     }
 
-    // Update flight memory with airport info
+    // Update flight memory with full airport info (keep all data)
     const airportInfo: AirportInfo = {
-      city: airport.city_name || airport.name,
       airport: airport.name,
       iata: airport.iata,
+      city: airport.city_name,
+      countryCode: airport.country_code,
+      lat: airport.lat,
+      lng: airport.lon, // Note: Airport type uses 'lon' not 'lng'
     };
     
     if (field === "from") {
