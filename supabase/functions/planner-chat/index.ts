@@ -12,7 +12,7 @@ const flightExtractionTool = {
   type: "function",
   function: {
     name: "update_flight_widget",
-    description: "Extract and update flight search parameters when user mentions travel-related information. Only extract EXPLICIT information - never guess or assume values. If user says 'en famille' or 'avec des enfants', set needsTravelersWidget to true instead of guessing a number.",
+    description: "Extract flight search parameters from user message. CRITICAL: Never guess passenger counts - if user implies multiple travelers without explicit numbers, set needsTravelersWidget to true.",
     parameters: {
       type: "object",
       properties: {
@@ -34,19 +34,19 @@ const flightExtractionTool = {
         },
         adults: {
           type: "number",
-          description: "Number of adult passengers (12+ years). ONLY extract if user gives an EXPLICIT number like '2 adultes', 'nous sommes 3'. Never guess from vague terms."
+          description: "ONLY set if user gives EXPLICIT count like '2 adultes', 'nous sommes 3 adultes', 'je suis seul/solo' (=1). Never guess."
         },
         children: {
           type: "number",
-          description: "Number of children (2-11 years). ONLY extract if user gives an EXPLICIT number like '2 enfants', 'avec 1 enfant de 5 ans'. Never guess."
+          description: "ONLY set if user gives EXPLICIT count like '2 enfants', 'avec 1 enfant de 5 ans'. Never guess."
         },
         infants: {
           type: "number",
-          description: "Number of infants (under 2 years). ONLY extract if explicitly mentioned like '1 bébé', 'un nourrisson'."
+          description: "ONLY set if explicitly mentioned like '1 bébé', 'un nourrisson'. Never guess."
         },
         needsTravelersWidget: {
           type: "boolean",
-          description: "Set to TRUE when user mentions traveling with others but doesn't give exact numbers. Triggers: 'en famille', 'avec des enfants', 'en groupe', 'avec mes enfants', 'voyage familial'. This will show an interactive widget to select exact traveler counts."
+          description: "Set TRUE whenever user implies traveling with others WITHOUT giving exact numbers. Triggers include: 'en famille', 'avec ma famille', 'en groupe', 'groupe d'amis', 'avec des amis', 'entre amis', 'avec des copains', 'avec des copines', 'avec mes potes', 'entre potes', 'avec des enfants', 'avec mes enfants', 'voyage familial', 'vacances en famille', 'en couple', 'avec ma femme/mon mari', 'avec mon/ma conjoint(e)', 'avec mes parents', 'en tribu', 'tous ensemble', 'on part à plusieurs', 'voyage de groupe', 'avec les enfants', 'toute la famille', 'week-end entre amis', 'escapade en groupe'. Basically ANY mention of traveling with others where you don't have explicit numbers."
         },
         tripType: {
           type: "string",
