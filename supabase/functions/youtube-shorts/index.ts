@@ -12,11 +12,11 @@ interface YouTubeVideo {
   thumbnail: string;
   channelTitle: string;
   publishedAt: string;
-  viewCount?: string;
+  category: string;
 }
 
 interface YouTubeSearchResponse {
-  items: {
+  items?: {
     id: { videoId: string };
     snippet: {
       title: string;
@@ -32,6 +32,108 @@ interface YouTubeSearchResponse {
   }[];
 }
 
+// Categories with their search queries (in English for better results)
+const CATEGORY_QUERIES = {
+  monuments: [
+    "famous landmarks",
+    "must see monuments",
+    "best attractions",
+    "iconic places",
+    "historical sites",
+  ],
+  activities: [
+    "things to do",
+    "best activities",
+    "what to do",
+    "top experiences",
+    "adventure activities",
+  ],
+  city: [
+    "travel guide",
+    "city tour",
+    "walking tour",
+    "travel vlog",
+    "hidden gems",
+  ],
+  food: [
+    "best restaurants",
+    "food tour",
+    "where to eat",
+  ],
+  hotel: [
+    "best hotels",
+    "where to stay",
+    "luxury hotel tour",
+  ],
+};
+
+// Define rotation order (less food, more monuments/activities)
+const CATEGORY_ROTATION = [
+  "monuments",
+  "city", 
+  "activities",
+  "monuments",
+  "city",
+  "food",
+  "activities",
+  "hotel",
+  "monuments",
+  "city",
+  "activities",
+  "monuments",
+];
+
+async function searchYouTube(
+  apiKey: string, 
+  city: string, 
+  category: string, 
+  query: string
+): Promise<YouTubeVideo[]> {
+  const searchParams = new URLSearchParams({
+    part: "snippet",
+    q: `${city} ${query} #shorts`,
+    type: "video",
+    videoDuration: "short",
+    maxResults: "3", // Get 3 per category
+    order: "relevance",
+    relevanceLanguage: "en", // English preferred
+    safeSearch: "moderate",
+    key: apiKey,
+  });
+
+  const searchUrl = `https://www.googleapis.com/youtube/v3/search?${searchParams}`;
+
+  try {
+    const response = await fetch(searchUrl, {
+      headers: {
+        "Referer": "https://cinbnmlfpffmyjmkwbco.supabase.co",
+      },
+    });
+
+    if (!response.ok) {
+      console.error(`[youtube-shorts] API error for ${category}: ${response.status}`);
+      return [];
+    }
+
+    const data: YouTubeSearchResponse = await response.json();
+
+    return (data.items || []).map((item) => ({
+      id: item.id.videoId,
+      title: item.snippet.title,
+      description: item.snippet.description,
+      thumbnail: item.snippet.thumbnails.high?.url ||
+                 item.snippet.thumbnails.medium?.url ||
+                 item.snippet.thumbnails.default?.url || "",
+      channelTitle: item.snippet.channelTitle,
+      publishedAt: item.snippet.publishedAt,
+      category,
+    }));
+  } catch (error) {
+    console.error(`[youtube-shorts] Error searching ${category}:`, error);
+    return [];
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -39,7 +141,7 @@ serve(async (req) => {
   }
 
   try {
-    const { city, language = "fr" } = await req.json();
+    const { city } = await req.json();
 
     if (!city) {
       return new Response(
@@ -57,76 +159,68 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[youtube-shorts] Searching for Shorts about: ${city}`);
+    console.log(`[youtube-shorts] Searching varied content for: ${city}`);
 
-    // Build search queries for travel-related Shorts
-    const searchQueries = [
-      `${city} travel #shorts`,
-      `${city} things to do #shorts`,
-      `visit ${city} #shorts`,
-      `${city} food tour #shorts`,
-      `${city} hidden gems #shorts`,
-    ];
+    // Fetch from multiple categories in parallel
+    const categoryPromises = Object.entries(CATEGORY_QUERIES).map(
+      async ([category, queries]) => {
+        // Pick a random query from this category
+        const randomQuery = queries[Math.floor(Math.random() * queries.length)];
+        return searchYouTube(apiKey, city, category, randomQuery);
+      }
+    );
 
-    // Pick a random query to get varied results
-    const randomQuery = searchQueries[Math.floor(Math.random() * searchQueries.length)];
+    const categoryResults = await Promise.all(categoryPromises);
 
-    // Search for YouTube Shorts (videos under 60 seconds, vertical format)
-    const searchParams = new URLSearchParams({
-      part: "snippet",
-      q: randomQuery,
-      type: "video",
-      videoDuration: "short", // Only short videos (< 4 minutes, closest to Shorts)
-      maxResults: "12",
-      order: "relevance",
-      relevanceLanguage: language,
-      safeSearch: "moderate",
-      key: apiKey,
-    });
+    // Flatten all results
+    const allVideos: YouTubeVideo[] = categoryResults.flat();
 
-    const searchUrl = `https://www.googleapis.com/youtube/v3/search?${searchParams}`;
-    console.log(`[youtube-shorts] Fetching from YouTube API...`);
-
-    const response = await fetch(searchUrl, {
-      headers: {
-        "Referer": "https://cinbnmlfpffmyjmkwbco.supabase.co",
-      },
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[youtube-shorts] YouTube API error: ${response.status} - ${errorText}`);
-      return new Response(
-        JSON.stringify({ error: "YouTube API error", details: errorText }),
-        { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Group by category for rotation
+    const videosByCategory: Record<string, YouTubeVideo[]> = {};
+    for (const video of allVideos) {
+      if (!videosByCategory[video.category]) {
+        videosByCategory[video.category] = [];
+      }
+      videosByCategory[video.category].push(video);
     }
 
-    const data: YouTubeSearchResponse = await response.json();
-    console.log(`[youtube-shorts] Found ${data.items?.length || 0} videos`);
+    // Build final list following rotation pattern
+    const finalVideos: YouTubeVideo[] = [];
+    const usedIds = new Set<string>();
+    const categoryIndices: Record<string, number> = {};
 
-    // Transform to cleaner format
-    const videos: YouTubeVideo[] = (data.items || []).map((item) => ({
-      id: item.id.videoId,
-      title: item.snippet.title,
-      description: item.snippet.description,
-      thumbnail: item.snippet.thumbnails.high?.url || 
-                 item.snippet.thumbnails.medium?.url || 
-                 item.snippet.thumbnails.default?.url || "",
-      channelTitle: item.snippet.channelTitle,
-      publishedAt: item.snippet.publishedAt,
-    }));
+    for (const category of CATEGORY_ROTATION) {
+      const categoryVideos = videosByCategory[category] || [];
+      const currentIndex = categoryIndices[category] || 0;
+
+      // Find next unused video from this category
+      for (let i = 0; i < categoryVideos.length; i++) {
+        const video = categoryVideos[(currentIndex + i) % categoryVideos.length];
+        if (!usedIds.has(video.id)) {
+          finalVideos.push(video);
+          usedIds.add(video.id);
+          categoryIndices[category] = (currentIndex + i + 1) % categoryVideos.length;
+          break;
+        }
+      }
+
+      // Stop if we have enough videos
+      if (finalVideos.length >= 12) break;
+    }
+
+    console.log(`[youtube-shorts] Returning ${finalVideos.length} varied videos`);
+    console.log(`[youtube-shorts] Categories: ${finalVideos.map(v => v.category).join(', ')}`);
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         city,
-        query: randomQuery,
-        videos,
-        count: videos.length 
+        videos: finalVideos,
+        count: finalVideos.length,
+        categories: Object.keys(videosByCategory),
       }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
 
