@@ -55,6 +55,8 @@ export type MissingField = "departure" | "arrival" | "departureDate" | "returnDa
 // Route point for map display
 export interface MemoryRoutePoint {
   label: string;
+  city?: string; // The actual city name (separate from airport name)
+  country?: string;
   lat: number;
   lng: number;
   type: "departure" | "arrival" | "waypoint";
@@ -297,6 +299,8 @@ export function FlightMemoryProvider({ children }: { children: ReactNode }) {
           : memory.departure.city || "Départ";
         points.push({
           label,
+          city: memory.departure.city,
+          country: memory.departure.country,
           lat: memory.departure.lat,
           lng: memory.departure.lng,
           type: "departure",
@@ -309,6 +313,8 @@ export function FlightMemoryProvider({ children }: { children: ReactNode }) {
           : memory.arrival.city || "Arrivée";
         points.push({
           label,
+          city: memory.arrival.city,
+          country: memory.arrival.country,
           lat: memory.arrival.lat,
           lng: memory.arrival.lng,
           type: "arrival",
