@@ -1,17 +1,46 @@
 import { useState, useEffect } from "react";
-import { Plane, ChevronDown, ChevronUp, Luggage, Star, Zap, Moon, Clock } from "lucide-react";
+import { Plane, ChevronDown, ChevronUp, Luggage, Star, Zap, Moon, Clock, Leaf, Info, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Flight segment with enriched data
 export interface FlightSegment {
   departureTime: string;
   arrivalTime: string;
   departureAirport: string;
+  departureAirportName?: string;
   arrivalAirport: string;
+  arrivalAirportName?: string;
   duration: string;
+  durationMinutes?: number;
   airline: string;
-  airlineCode: string;
+  airlineCode?: string;
+  airlineLogo?: string;
   flightNumber: string;
   aircraft?: string;
+  legroom?: string;
+  seatInfo?: string;
+  extensions?: string[];
+}
+
+export interface Layover {
+  duration: number;
+  durationLabel: string;
+  airportCode: string;
+  airportName: string;
+  city: string;
+  overnight: boolean;
+}
+
+export interface CarbonEmissions {
+  co2e: number;
+  typicalForRoute: number;
+  differencePercent: number;
+  isLower: boolean;
+}
+
+export interface Baggage {
+  carryOn: number;
+  checked: number;
 }
 
 export interface FlightOffer {
@@ -20,13 +49,21 @@ export interface FlightOffer {
   currency: string;
   outbound: FlightSegment[];
   inbound?: FlightSegment[];
+  layovers?: Layover[];
   stops: number;
   totalDuration: string;
+  totalDurationMinutes?: number;
   cabinClass: string;
+  airlineLogo?: string;
+  airline?: string;
+  carbonEmissions?: CarbonEmissions;
+  baggage?: Baggage;
+  selfTransfer?: boolean;
   isBestPrice?: boolean;
   isFastest?: boolean;
+  isLowestEmissions?: boolean;
   hasNightLayover?: boolean;
-  layoverDuration?: string;
+  layoverDuration?: string; // Legacy support
 }
 
 interface FlightResultsProps {
@@ -34,16 +71,36 @@ interface FlightResultsProps {
   isLoading?: boolean;
   onSelect?: (flight: FlightOffer) => void;
   travelers?: number;
-  routeLabel?: string; // e.g. "BRU → CPH" for header
+  routeLabel?: string;
   tripType?: "roundtrip" | "oneway" | "multi";
 }
 
-// Airline logos
-const getAirlineLogo = (code: string) => {
-  return `https://images.kiwi.com/airlines/64/${code}.png`;
+// Get airline logo - prefer API logo, fallback to Kiwi
+const getAirlineLogo = (segment: FlightSegment) => {
+  if (segment.airlineLogo) return segment.airlineLogo;
+  if (segment.airlineCode) return `https://images.kiwi.com/airlines/64/${segment.airlineCode}.png`;
+  return null;
 };
 
-// Flight card - COMPACT VERTICAL LAYOUT
+// Format CO2 emissions
+const formatCO2 = (grams: number): string => {
+  const kg = grams / 1000;
+  if (kg >= 1000) return `${(kg / 1000).toFixed(1)}t`;
+  return `${Math.round(kg)}kg`;
+};
+
+// Segment detail row component
+const SegmentDetailRow = ({ label, value, icon: Icon }: { label: string; value: string; icon?: React.ElementType }) => (
+  <div className="flex items-center justify-between text-xs">
+    <span className="text-muted-foreground flex items-center gap-1">
+      {Icon && <Icon className="h-3 w-3" />}
+      {label}
+    </span>
+    <span className="text-foreground font-medium">{value}</span>
+  </div>
+);
+
+// Flight card component
 const FlightCard = ({ 
   flight, 
   onSelect,
@@ -73,6 +130,15 @@ const FlightCard = ({
       return () => clearTimeout(timer);
     }
   }, [isExpanded]);
+
+  const logoUrl = getAirlineLogo(mainSegment) || flight.airlineLogo;
+  const displayAirline = flight.airline || mainSegment.airline;
+  
+  // Get layover info for display
+  const layoverInfo = flight.layovers?.[0];
+  const layoverDisplay = layoverInfo 
+    ? `${layoverInfo.durationLabel} à ${layoverInfo.city}`
+    : flight.layoverDuration;
   
   return (
     <div 
@@ -88,16 +154,21 @@ const FlightCard = ({
       }}
     >
       {/* Badges row */}
-      {(isFirst || flight.isFastest || flight.hasNightLayover) && (
+      {(isFirst || flight.isFastest || flight.isLowestEmissions || flight.hasNightLayover) && (
         <div className="px-3 pt-2 pb-0 flex gap-1.5 flex-wrap">
           {isFirst && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-semibold">
-              <Star className="h-2.5 w-2.5" /> Recommandé
+              <Star className="h-2.5 w-2.5" /> Meilleur prix
             </span>
           )}
           {flight.isFastest && !isFirst && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[11px] font-semibold dark:bg-amber-900/30 dark:text-amber-400">
               <Zap className="h-2.5 w-2.5" /> Plus rapide
+            </span>
+          )}
+          {flight.isLowestEmissions && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[11px] font-semibold dark:bg-green-900/30 dark:text-green-400">
+              <Leaf className="h-2.5 w-2.5" /> Moins de CO₂
             </span>
           )}
           {flight.hasNightLayover && (
@@ -115,16 +186,20 @@ const FlightCard = ({
           {/* Airline logo */}
           <div className="shrink-0">
             <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center border border-border">
-              <img 
-                src={getAirlineLogo(mainSegment.airlineCode)} 
-                alt={mainSegment.airline}
-                className="w-6 h-6 object-contain"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                }}
-              />
-              <span className="hidden text-xs font-bold text-muted-foreground">{mainSegment.airlineCode}</span>
+              {logoUrl ? (
+                <img 
+                  src={logoUrl} 
+                  alt={displayAirline}
+                  className="w-6 h-6 object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+              ) : null}
+              <span className={cn("text-xs font-bold text-muted-foreground", logoUrl && "hidden")}>
+                {displayAirline?.substring(0, 2).toUpperCase()}
+              </span>
             </div>
           </div>
           
@@ -153,10 +228,10 @@ const FlightCard = ({
                     "text-[10px] font-medium",
                     flight.stops === 0 ? "text-green-600" : "text-amber-600"
                   )}>
-                    {flight.stops === 0 ? "Direct" : `${flight.stops} escale`}
+                    {flight.stops === 0 ? "Direct" : `${flight.stops} escale${flight.stops > 1 ? 's' : ''}`}
                   </span>
-                  {flight.stops > 0 && flight.layoverDuration && (
-                    <span className="text-[9px] text-muted-foreground block leading-tight">{flight.layoverDuration}</span>
+                  {flight.stops > 0 && layoverDisplay && (
+                    <span className="text-[9px] text-muted-foreground block leading-tight">{layoverDisplay}</span>
                   )}
                 </div>
               </div>
@@ -200,11 +275,11 @@ const FlightCard = ({
       >
         {isExpanded ? (
           <>
-            <ChevronUp className="h-3.5 w-3.5" /> Masquer
+            <ChevronUp className="h-3.5 w-3.5" /> Masquer les détails
           </>
         ) : (
           <>
-            <ChevronDown className="h-3.5 w-3.5" /> Détails
+            <ChevronDown className="h-3.5 w-3.5" /> Voir les détails
           </>
         )}
       </button>
@@ -213,12 +288,12 @@ const FlightCard = ({
       <div
         className={cn(
           "overflow-hidden transition-all duration-300 ease-out",
-          isExpanded ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0"
+          isExpanded ? "max-h-[1200px] opacity-100" : "max-h-0 opacity-0"
         )}
       >
         {showDetails && (
           <div className="border-t border-border bg-muted/30 p-4 space-y-5">
-            {/* Outbound */}
+            {/* Outbound flights */}
             <div>
               <div className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-2 uppercase tracking-wider">
                 <Plane className="h-4 w-4" /> Vol aller
@@ -227,23 +302,31 @@ const FlightCard = ({
                 {flight.outbound.map((segment, idx) => (
                   <div key={idx}>
                     <div className="bg-card rounded-xl p-3 border border-border">
-                      <div className="flex items-center gap-3">
+                      {/* Segment header with times */}
+                      <div className="flex items-center gap-3 mb-3">
                         <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center border border-border shrink-0">
-                          <img 
-                            src={getAirlineLogo(segment.airlineCode)} 
-                            alt={segment.airline}
-                            className="w-5 h-5 object-contain"
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                          />
+                          {getAirlineLogo(segment) ? (
+                            <img 
+                              src={getAirlineLogo(segment)!} 
+                              alt={segment.airline}
+                              className="w-5 h-5 object-contain"
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <span className="text-xs font-bold text-muted-foreground">{segment.airline?.substring(0, 2)}</span>
+                          )}
                         </div>
                         
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-base font-bold">{segment.departureTime}</span>
                             <span className="text-xs text-muted-foreground">{segment.departureAirport}</span>
-                            <Plane className="h-3 w-3 text-muted-foreground mx-1 shrink-0" />
+                            <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
                             <span className="text-base font-bold">{segment.arrivalTime}</span>
                             <span className="text-xs text-muted-foreground">{segment.arrivalAirport}</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {segment.airline} • {segment.flightNumber}
                           </div>
                         </div>
                         
@@ -252,20 +335,68 @@ const FlightCard = ({
                             <Clock className="h-3 w-3" />
                             {segment.duration}
                           </div>
-                          <div className="text-[10px] text-muted-foreground">{segment.flightNumber}</div>
                         </div>
                       </div>
+                      
+                      {/* Segment details grid */}
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/50">
+                        {segment.aircraft && (
+                          <SegmentDetailRow label="Appareil" value={segment.aircraft} icon={Plane} />
+                        )}
+                        {segment.legroom && (
+                          <SegmentDetailRow label="Espace jambes" value={segment.legroom} />
+                        )}
+                        {segment.seatInfo && (
+                          <SegmentDetailRow label="Confort" value={segment.seatInfo} />
+                        )}
+                        {segment.departureAirportName && (
+                          <div className="col-span-2 text-[10px] text-muted-foreground">
+                            {segment.departureAirportName} → {segment.arrivalAirportName}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Extensions (amenities) */}
+                      {segment.extensions && segment.extensions.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-border/50">
+                          <div className="flex flex-wrap gap-1">
+                            {segment.extensions.slice(0, 4).map((ext, i) => (
+                              <span 
+                                key={i} 
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-[9px] text-muted-foreground"
+                              >
+                                {ext.includes("Wi-Fi") && "📶"}
+                                {ext.includes("USB") && "🔌"}
+                                {ext.includes("video") && "📺"}
+                                {ext.includes("legroom") && "🦵"}
+                                {ext}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     
                     {/* Layover between segments */}
-                    {idx < flight.outbound.length - 1 && (
+                    {idx < flight.outbound.length - 1 && flight.layovers?.[idx] && (
                       <div className="flex items-center gap-3 py-3 px-4">
-                        <div className="w-1 h-8 bg-amber-400 rounded-full ml-5" />
-                        <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-                          <Moon className="h-4 w-4" />
-                          <span className="text-sm font-medium">
-                            Escale {flight.layoverDuration ? `· ${flight.layoverDuration}` : ''}
-                          </span>
+                        <div className={cn(
+                          "w-1 h-8 rounded-full ml-5",
+                          flight.layovers[idx].overnight ? "bg-indigo-400" : "bg-amber-400"
+                        )} />
+                        <div className={cn(
+                          "flex items-center gap-2",
+                          flight.layovers[idx].overnight ? "text-indigo-600 dark:text-indigo-400" : "text-amber-600 dark:text-amber-400"
+                        )}>
+                          {flight.layovers[idx].overnight ? <Moon className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+                          <div>
+                            <span className="text-sm font-medium">
+                              Escale à {flight.layovers[idx].city}
+                            </span>
+                            <span className="text-xs opacity-80 ml-2">
+                              {flight.layovers[idx].durationLabel}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -274,7 +405,7 @@ const FlightCard = ({
               </div>
             </div>
             
-            {/* Inbound */}
+            {/* Inbound flights */}
             {flight.inbound && flight.inbound.length > 0 && (
               <div>
                 <div className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-2 uppercase tracking-wider">
@@ -286,19 +417,21 @@ const FlightCard = ({
                       <div className="bg-card rounded-xl p-3 border border-border">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center border border-border shrink-0">
-                            <img 
-                              src={getAirlineLogo(segment.airlineCode)} 
-                              alt={segment.airline}
-                              className="w-5 h-5 object-contain"
-                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                            />
+                            {getAirlineLogo(segment) ? (
+                              <img 
+                                src={getAirlineLogo(segment)!} 
+                                alt={segment.airline}
+                                className="w-5 h-5 object-contain"
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              />
+                            ) : null}
                           </div>
                           
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="text-base font-bold">{segment.departureTime}</span>
                               <span className="text-xs text-muted-foreground">{segment.departureAirport}</span>
-                              <Plane className="h-3 w-3 text-muted-foreground mx-1 shrink-0" />
+                              <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
                               <span className="text-base font-bold">{segment.arrivalTime}</span>
                               <span className="text-xs text-muted-foreground">{segment.arrivalAirport}</span>
                             </div>
@@ -313,27 +446,59 @@ const FlightCard = ({
                           </div>
                         </div>
                       </div>
-                      
-                      {idx < flight.inbound!.length - 1 && (
-                        <div className="flex items-center gap-3 py-3 px-4">
-                          <div className="w-1 h-8 bg-amber-400 rounded-full ml-5" />
-                          <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-                            <Moon className="h-4 w-4" />
-                            <span className="text-sm font-medium">Escale</span>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
               </div>
             )}
             
-            {/* Baggage info */}
-            <div className="flex items-center gap-2 pt-3 border-t border-border">
-              <Luggage className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Bagage cabine inclus</span>
+            {/* Footer info: baggage + emissions */}
+            <div className="flex items-center justify-between gap-4 pt-3 border-t border-border">
+              {/* Baggage info */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Luggage className="h-4 w-4 text-muted-foreground" />
+                  <div className="text-sm">
+                    {flight.baggage ? (
+                      <span className="text-foreground">
+                        {flight.baggage.carryOn > 0 && `${flight.baggage.carryOn} cabine`}
+                        {flight.baggage.carryOn > 0 && flight.baggage.checked > 0 && " + "}
+                        {flight.baggage.checked > 0 && `${flight.baggage.checked} soute`}
+                        {flight.baggage.carryOn === 0 && flight.baggage.checked === 0 && "Non inclus"}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Bagage cabine inclus</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Carbon emissions */}
+              {flight.carbonEmissions && (
+                <div className={cn(
+                  "flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium",
+                  flight.carbonEmissions.isLower 
+                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                    : "bg-muted text-muted-foreground"
+                )}>
+                  <Leaf className="h-3 w-3" />
+                  <span>{formatCO2(flight.carbonEmissions.co2e)} CO₂</span>
+                  {flight.carbonEmissions.differencePercent !== 0 && (
+                    <span className="opacity-80">
+                      ({flight.carbonEmissions.differencePercent > 0 ? "+" : ""}{flight.carbonEmissions.differencePercent}%)
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
+            
+            {/* Self transfer warning */}
+            {flight.selfTransfer && (
+              <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-xs">
+                <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>Ce vol implique un self-transfer : vous devrez récupérer vos bagages et repasser les contrôles de sécurité.</span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -352,10 +517,6 @@ const FlightSkeleton = ({ delay = 0 }: { delay?: number }) => (
     <div className="flex items-start gap-4">
       <div className="shrink-0">
         <div className="w-12 h-12 rounded-xl bg-muted animate-pulse" />
-        <div className="mt-2 space-y-1">
-          <div className="h-3 bg-muted rounded w-14 mx-auto animate-pulse" />
-          <div className="h-2 bg-muted rounded w-10 mx-auto animate-pulse" />
-        </div>
       </div>
       
       <div className="flex-1">
@@ -380,7 +541,7 @@ const FlightSkeleton = ({ delay = 0 }: { delay?: number }) => (
             <div className="h-8 bg-muted rounded w-20 animate-pulse" />
             <div className="h-3 bg-muted rounded w-14 animate-pulse" />
           </div>
-          <div className="h-12 bg-muted rounded w-28 animate-pulse" />
+          <div className="h-10 bg-muted rounded w-28 animate-pulse" />
         </div>
       </div>
     </div>
@@ -442,7 +603,7 @@ const FlightResults = ({ flights, isLoading, onSelect, travelers = 1, routeLabel
   
   return (
     <div className="space-y-4">
-      {/* Route header - clearly visible */}
+      {/* Route header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border pb-3 -mx-4 px-4 pt-1">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-lg font-bold text-foreground">
@@ -484,7 +645,7 @@ const FlightResults = ({ flights, isLoading, onSelect, travelers = 1, routeLabel
 
 export default FlightResults;
 
-// Mock flight data generator
+// Mock flight data generator (for fallback/testing)
 export const generateMockFlights = (from: string, to: string): FlightOffer[] => {
   const airlines = [
     { name: "Air France", code: "AF" },
@@ -492,10 +653,8 @@ export const generateMockFlights = (from: string, to: string): FlightOffer[] => 
     { name: "British Airways", code: "BA" },
     { name: "KLM", code: "KL" },
     { name: "Vueling", code: "VY" },
-    { name: "Ryanair", code: "FR" },
   ];
   
-  const layoverAirports = ["CDG", "AMS", "FRA", "LHR", "MAD"];
   const fromCode = from.match(/\(([A-Z]{3})\)/)?.[1] || from.substring(0, 3).toUpperCase();
   const toCode = to.match(/\(([A-Z]{3})\)/)?.[1] || to.substring(0, 3).toUpperCase();
   
@@ -507,11 +666,7 @@ export const generateMockFlights = (from: string, to: string): FlightOffer[] => 
     const departHour = 6 + Math.floor(Math.random() * 14);
     const durationHours = 1 + Math.floor(Math.random() * 4);
     const durationMins = Math.floor(Math.random() * 50);
-    const hasReturn = Math.random() > 0.3;
     const stops = Math.random() > 0.6 ? 1 : 0;
-    const hasNightLayover = stops > 0 && Math.random() > 0.5;
-    const layoverMins = stops > 0 ? 45 + Math.floor(Math.random() * 120) : 0;
-    const layoverAirport = stops > 0 ? layoverAirports[Math.floor(Math.random() * layoverAirports.length)] : null;
     
     const formatTime = (h: number, m: number) => {
       const hour = h % 24;
@@ -519,69 +674,37 @@ export const generateMockFlights = (from: string, to: string): FlightOffer[] => 
     };
     
     const depMins = Math.floor(Math.random() * 6) * 10;
-    const arrMins = Math.floor(Math.random() * 6) * 10;
-    
-    const outboundSegments: FlightSegment[] = [];
-    if (stops > 0 && layoverAirport) {
-      const firstDuration = Math.floor(durationHours / 2);
-      outboundSegments.push({
-        departureTime: formatTime(departHour, depMins),
-        arrivalTime: formatTime(departHour + firstDuration, arrMins),
-        departureAirport: fromCode,
-        arrivalAirport: layoverAirport,
-        duration: `${firstDuration}h${Math.floor(Math.random() * 30)}`,
-        airline: airline.name,
-        airlineCode: airline.code,
-        flightNumber: `${airline.code}${Math.floor(Math.random() * 9000) + 1000}`,
-      });
-      const secondDepartHour = departHour + firstDuration + Math.floor(layoverMins / 60);
-      outboundSegments.push({
-        departureTime: formatTime(secondDepartHour, (arrMins + layoverMins) % 60),
-        arrivalTime: formatTime(departHour + durationHours + Math.floor(layoverMins / 60), arrMins),
-        departureAirport: layoverAirport,
-        arrivalAirport: toCode,
-        duration: `${durationHours - firstDuration}h${Math.floor(Math.random() * 30)}`,
-        airline: airline.name,
-        airlineCode: airline.code,
-        flightNumber: `${airline.code}${Math.floor(Math.random() * 9000) + 1000}`,
-      });
-    } else {
-      outboundSegments.push({
-        departureTime: formatTime(departHour, depMins),
-        arrivalTime: formatTime(departHour + durationHours, arrMins),
-        departureAirport: fromCode,
-        arrivalAirport: toCode,
-        duration: `${durationHours}h${durationMins > 0 ? durationMins : ''}`,
-        airline: airline.name,
-        airlineCode: airline.code,
-        flightNumber: `${airline.code}${Math.floor(Math.random() * 9000) + 1000}`,
-      });
-    }
     
     flights.push({
       id: `flight-${i}`,
       price,
       currency: "€",
       stops,
-      totalDuration: `${durationHours + Math.floor(layoverMins / 60)}h${((durationMins + layoverMins) % 60) || ''}`,
+      totalDuration: `${durationHours}h${durationMins > 0 ? durationMins : ''}`,
+      totalDurationMinutes: durationHours * 60 + durationMins,
       cabinClass: "Économique",
       isBestPrice: i === 0,
       isFastest: i === 1,
-      hasNightLayover,
-      layoverDuration: stops > 0 ? `${Math.floor(layoverMins / 60)}h${layoverMins % 60} à ${layoverAirport}` : undefined,
-      outbound: outboundSegments,
-      inbound: hasReturn ? [
-        {
-          departureTime: formatTime(departHour + 6, depMins),
-          arrivalTime: formatTime(departHour + 6 + durationHours, arrMins),
-          departureAirport: toCode,
-          arrivalAirport: fromCode,
-          duration: `${durationHours}h${durationMins > 0 ? durationMins : ''}`,
-          airline: airline.name,
-          airlineCode: airline.code,
-          flightNumber: `${airline.code}${Math.floor(Math.random() * 9000) + 1000}`,
-        },
-      ] : undefined,
+      outbound: [{
+        departureTime: formatTime(departHour, depMins),
+        arrivalTime: formatTime(departHour + durationHours, depMins),
+        departureAirport: fromCode,
+        arrivalAirport: toCode,
+        duration: `${durationHours}h${durationMins > 0 ? durationMins : ''}`,
+        airline: airline.name,
+        airlineCode: airline.code,
+        flightNumber: `${airline.code}${Math.floor(Math.random() * 9000) + 1000}`,
+        aircraft: "Airbus A320",
+        legroom: "76 cm",
+        seatInfo: "Average legroom",
+      }],
+      baggage: { carryOn: 1, checked: 0 },
+      carbonEmissions: {
+        co2e: 120000 + Math.random() * 50000,
+        typicalForRoute: 130000,
+        differencePercent: Math.floor(Math.random() * 20) - 10,
+        isLower: Math.random() > 0.5,
+      },
     });
   }
   
