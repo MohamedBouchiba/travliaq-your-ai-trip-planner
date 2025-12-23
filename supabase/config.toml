@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.nearest-airports]
 verify_jwt = false
+
+[functions.destination-fact]
+verify_jwt = false
