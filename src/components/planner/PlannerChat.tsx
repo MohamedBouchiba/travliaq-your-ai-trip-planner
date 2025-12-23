@@ -26,6 +26,10 @@ export interface FlightFormData {
   departureDate?: string;
   returnDate?: string;
   passengers?: number;
+  adults?: number;
+  children?: number;
+  infants?: number;
+  needsTravelersWidget?: boolean;
   tripType?: "roundtrip" | "oneway" | "multi";
 }
 
@@ -43,7 +47,7 @@ export interface DualAirportChoice {
 }
 
 // Widget types for inline interactions
-type WidgetType = "datePicker" | "returnDatePicker" | "passengerCount";
+type WidgetType = "datePicker" | "returnDatePicker" | "travelersSelector";
 
 interface ChatMessage {
   id: string;
@@ -255,6 +259,113 @@ const DatePickerWidget = ({
   );
 };
 
+// Travelers Selector Widget - UX simplifié pour choisir adultes, enfants, bébés
+const TravelersWidget = ({ 
+  initialValues = { adults: 1, children: 0, infants: 0 },
+  onConfirm 
+}: { 
+  initialValues?: { adults: number; children: number; infants: number };
+  onConfirm: (travelers: { adults: number; children: number; infants: number }) => void;
+}) => {
+  const [adults, setAdults] = useState(initialValues.adults);
+  const [children, setChildren] = useState(initialValues.children);
+  const [infants, setInfants] = useState(initialValues.infants);
+  const [confirmed, setConfirmed] = useState(false);
+
+  const handleConfirm = () => {
+    setConfirmed(true);
+    onConfirm({ adults, children, infants });
+  };
+
+  const CounterButton = ({ 
+    value, 
+    onChange, 
+    min = 0, 
+    max = 9 
+  }: { 
+    value: number; 
+    onChange: (v: number) => void; 
+    min?: number; 
+    max?: number;
+  }) => (
+    <div className="flex items-center gap-3">
+      <button
+        type="button"
+        onClick={() => onChange(Math.max(min, value - 1))}
+        disabled={value <= min || confirmed}
+        className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center text-lg font-medium hover:bg-muted/80 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+      >
+        −
+      </button>
+      <span className="w-6 text-center font-semibold text-lg">{value}</span>
+      <button
+        type="button"
+        onClick={() => onChange(Math.min(max, value + 1))}
+        disabled={value >= max || confirmed}
+        className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center text-lg font-medium hover:bg-muted/80 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+      >
+        +
+      </button>
+    </div>
+  );
+
+  if (confirmed) {
+    return (
+      <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary text-sm font-medium">
+        <span>✓</span>
+        <span>
+          {adults} adulte{adults > 1 ? "s" : ""}
+          {children > 0 && `, ${children} enfant${children > 1 ? "s" : ""}`}
+          {infants > 0 && `, ${infants} bébé${infants > 1 ? "s" : ""}`}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 p-4 rounded-2xl bg-muted/50 border border-border/50 space-y-4 max-w-xs">
+      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        Nombre de voyageurs
+      </div>
+      
+      {/* Adults */}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="font-medium text-sm">Adultes</div>
+          <div className="text-xs text-muted-foreground">12 ans et +</div>
+        </div>
+        <CounterButton value={adults} onChange={setAdults} min={1} />
+      </div>
+      
+      {/* Children */}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="font-medium text-sm">Enfants</div>
+          <div className="text-xs text-muted-foreground">2-11 ans</div>
+        </div>
+        <CounterButton value={children} onChange={setChildren} />
+      </div>
+      
+      {/* Infants */}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="font-medium text-sm">Bébés</div>
+          <div className="text-xs text-muted-foreground">Moins de 2 ans</div>
+        </div>
+        <CounterButton value={infants} onChange={setInfants} max={adults} />
+      </div>
+
+      {/* Confirm button */}
+      <button
+        onClick={handleConfirm}
+        className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all shadow-md shadow-primary/20"
+      >
+        Confirmer ({adults + children + infants} voyageur{adults + children + infants > 1 ? "s" : ""})
+      </button>
+    </div>
+  );
+};
+
 // Markdown message component
 const MarkdownMessage = ({ content }: { content: string }) => (
   <ReactMarkdown
@@ -302,7 +413,14 @@ function flightDataToMemory(flightData: FlightFormData): Partial<{
   if (flightData.returnDate) {
     updates.returnDate = new Date(flightData.returnDate);
   }
-  if (flightData.passengers) {
+  // Handle new adults/children/infants format
+  if (flightData.adults !== undefined || flightData.children !== undefined || flightData.infants !== undefined) {
+    updates.passengers = { 
+      adults: flightData.adults || 1, 
+      children: flightData.children || 0, 
+      infants: flightData.infants || 0 
+    };
+  } else if (flightData.passengers) {
     updates.passengers = { adults: flightData.passengers, children: 0, infants: 0 };
   }
   if (flightData.tripType) {
@@ -569,6 +687,38 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
     setTimeout(() => askNextMissingField(), 300);
   };
 
+  // Handle travelers selection from widget
+  const handleTravelersSelect = (messageId: string, travelers: { adults: number; children: number; infants: number }) => {
+    // Update memory
+    updateMemory({ passengers: travelers });
+
+    // Remove widget from message (already handled by the component showing confirmation)
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId ? { ...m, widget: undefined } : m
+      )
+    );
+
+    // Build confirmation text
+    const parts = [`${travelers.adults} adulte${travelers.adults > 1 ? "s" : ""}`];
+    if (travelers.children > 0) {
+      parts.push(`${travelers.children} enfant${travelers.children > 1 ? "s" : ""}`);
+    }
+    if (travelers.infants > 0) {
+      parts.push(`${travelers.infants} bébé${travelers.infants > 1 ? "s" : ""}`);
+    }
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `confirm-travelers-${Date.now()}`,
+        role: "assistant",
+        text: `Parfait ! ${parts.join(", ")}. Tu peux maintenant cliquer sur "Rechercher" pour trouver les meilleurs vols ! 🔍`,
+        hasSearchButton: true,
+      },
+    ]);
+  };
+
   // Ask for the next missing field
   const askNextMissingField = () => {
     const remaining = missingFields.filter(f => {
@@ -824,8 +974,14 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       const { content, flightData } = await streamResponse(apiMessages, messageId);
       const { cleanContent, action } = parseAction(content || "Désolé, je n'ai pas pu répondre.");
 
+      // Detect if we need to show travelers widget
+      let showTravelersWidget = false;
+      
       if (flightData && Object.keys(flightData).length > 0) {
-        // Update memory with extracted data
+        // Check if needsTravelersWidget is set
+        showTravelersWidget = flightData.needsTravelersWidget === true;
+        
+        // Update memory with extracted data (excluding the widget flag)
         const memoryUpdates = flightDataToMemory(flightData);
         updateMemory(memoryUpdates);
 
@@ -848,7 +1004,9 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
 
       // Check if AI response suggests showing a widget
       let widget: WidgetType | undefined;
-      if (cleanContent.toLowerCase().includes("date") && missingFields.includes("departureDate")) {
+      if (showTravelersWidget) {
+        widget = "travelersSelector";
+      } else if (cleanContent.toLowerCase().includes("date") && missingFields.includes("departureDate")) {
         widget = "datePicker";
       } else if (cleanContent.toLowerCase().includes("retour") && missingFields.includes("returnDate")) {
         widget = "returnDatePicker";
@@ -977,6 +1135,14 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
                     value={memory.returnDate}
                     onChange={(date) => handleDateSelect(m.id, "return", date)}
                     minDate={memory.departureDate || undefined}
+                  />
+                )}
+
+                {/* Travelers Selector Widget */}
+                {m.widget === "travelersSelector" && (
+                  <TravelersWidget
+                    initialValues={memory.passengers}
+                    onConfirm={(travelers) => handleTravelersSelect(m.id, travelers)}
                   />
                 )}
 
