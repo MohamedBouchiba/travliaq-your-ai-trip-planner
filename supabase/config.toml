@@ -1,5 +1,8 @@
 project_id = "cinbnmlfpffmyjmkwbco"
 
+[functions.youtube-shorts]
+verify_jwt = false
+
 [functions.geocode]
 verify_jwt = false
 

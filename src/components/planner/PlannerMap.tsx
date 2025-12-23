@@ -6,6 +6,15 @@ import type { TabType, MapPin } from "@/pages/TravelPlanner";
 import type { FlightRoutePoint } from "./PlannerPanel";
 import { useFlightMemory } from "@/contexts/FlightMemoryContext";
 
+// Destination click event for popup
+export interface DestinationClickEvent {
+  cityName: string;
+  countryName?: string;
+  lat: number;
+  lng: number;
+  screenPosition: { x: number; y: number };
+}
+
 // Mock data for pins
 const mockFlightPins: MapPin[] = [
   { id: "cdg", type: "flights", lat: 49.0097, lng: 2.5479, title: "Paris CDG", subtitle: "Aéroport", price: 0 },
@@ -235,9 +244,10 @@ interface PlannerMapProps {
   onAnimationComplete?: () => void;
   isPanelOpen?: boolean;
   userLocation?: UserLocation | null;
+  onDestinationClick?: (event: DestinationClickEvent) => void;
 }
 
-const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flightRoutes = [], animateToUserLocation = false, onAnimationComplete, isPanelOpen = false, userLocation }: PlannerMapProps) => {
+const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flightRoutes = [], animateToUserLocation = false, onAnimationComplete, isPanelOpen = false, userLocation, onDestinationClick }: PlannerMapProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
@@ -523,6 +533,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       el.className = "memory-route-marker";
       
       const isDeparture = point.type === "departure";
+      const isArrival = point.type === "arrival";
       
       el.style.cssText = `
         width: 36px;
@@ -540,11 +551,46 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         color: white;
         user-select: none;
         z-index: 20;
+        transition: transform 0.2s ease;
       `;
       el.textContent = isDeparture ? "✈" : "🛬";
 
       // Add tooltip with label
       el.title = point.label;
+
+      // Add hover effect
+      el.addEventListener("mouseenter", () => {
+        el.style.transform = "scale(1.15)";
+      });
+      el.addEventListener("mouseleave", () => {
+        el.style.transform = "scale(1)";
+      });
+
+      // Add click handler for arrival destinations (open popup)
+      if (isArrival && onDestinationClick) {
+        el.addEventListener("click", (e) => {
+          e.stopPropagation();
+          
+          // Get screen position of the marker
+          const rect = el.getBoundingClientRect();
+          const screenPosition = {
+            x: rect.left + rect.width / 2,
+            y: rect.top,
+          };
+
+          // Parse city name from label (format: "City (IATA)" or just "City")
+          const labelMatch = point.label.match(/^([^(]+)/);
+          const cityName = labelMatch ? labelMatch[1].trim() : point.label;
+
+          onDestinationClick({
+            cityName,
+            countryName: undefined, // Could be enhanced with memory data
+            lat: point.lat,
+            lng: point.lng,
+            screenPosition,
+          });
+        });
+      }
 
       const marker = new mapboxgl.Marker({ element: el })
         .setLngLat([point.lng, point.lat])
@@ -628,7 +674,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         zoom: 5,
       });
     }
-  }, [getRoutePoints, mapLoaded]);
+  }, [getRoutePoints, mapLoaded, onDestinationClick]);
 
   // Clean up legacy route markers on mount (no longer used - memory is the single source of truth)
   useEffect(() => {

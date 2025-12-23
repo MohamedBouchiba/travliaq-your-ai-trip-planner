@@ -1,11 +1,13 @@
 import { useCallback, useState, useRef } from "react";
 import { Helmet } from "react-helmet-async";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import PlannerMap from "@/components/planner/PlannerMap";
+import PlannerMap, { DestinationClickEvent } from "@/components/planner/PlannerMap";
 import PlannerPanel, { FlightRoutePoint, CountrySelectionEvent } from "@/components/planner/PlannerPanel";
 import PlannerCard from "@/components/planner/PlannerCard";
 import PlannerChat, { FlightFormData, PlannerChatRef, AirportChoice, DualAirportChoice } from "@/components/planner/PlannerChat";
 import PlannerTopBar from "@/components/planner/PlannerTopBar";
+import DestinationPopup from "@/components/planner/DestinationPopup";
+import YouTubeShortsPanel from "@/components/planner/YouTubeShortsPanel";
 import type { Airport } from "@/hooks/useNearestAirports";
 import { FlightMemoryProvider } from "@/contexts/FlightMemoryContext";
 
@@ -52,6 +54,19 @@ const TravelPlanner = () => {
   const searchMessageSentRef = useRef(false);
   const chatRef = useRef<PlannerChatRef>(null);
 
+  // Destination popup state
+  const [destinationPopup, setDestinationPopup] = useState<{
+    cityName: string;
+    countryName?: string;
+    position: { x: number; y: number };
+  } | null>(null);
+
+  // YouTube panel state
+  const [youtubePanel, setYoutubePanel] = useState<{
+    city: string;
+    countryName?: string;
+  } | null>(null);
+
   const handleTabChange = useCallback((tab: TabType) => {
     // Toggle: if clicking on the same tab and panel is visible, close it
     if (tab === activeTab && isPanelVisible) {
@@ -96,6 +111,27 @@ const TravelPlanner = () => {
       chatRef.current?.offerFlightSearch(from, to);
     }
   }, []);
+
+  // Handle destination marker click
+  const handleDestinationClick = useCallback((event: DestinationClickEvent) => {
+    setDestinationPopup({
+      cityName: event.cityName,
+      countryName: event.countryName,
+      position: event.screenPosition,
+    });
+  }, []);
+
+  // Open YouTube panel from popup
+  const handleOpenYouTube = useCallback(() => {
+    if (destinationPopup) {
+      setYoutubePanel({
+        city: destinationPopup.cityName,
+        countryName: destinationPopup.countryName,
+      });
+      setDestinationPopup(null);
+      setIsPanelVisible(true);
+    }
+  }, [destinationPopup]);
 
   return (
     <FlightMemoryProvider>
@@ -172,33 +208,58 @@ const TravelPlanner = () => {
                 }}
                 isPanelOpen={isPanelVisible}
                 userLocation={initialAnimationDone ? userLocation : null}
+                onDestinationClick={handleDestinationClick}
               />
 
               {/* Overlay tabs */}
               <PlannerTopBar activeTab={activeTab} onTabChange={handleTabChange} />
 
-              {/* Overlay panel */}
-              <PlannerPanel
-                activeTab={activeTab}
-                layout="overlay"
-                isVisible={isPanelVisible}
-                onClose={() => setIsPanelVisible(false)}
-                onMapMove={(center, zoom) => {
-                  setMapCenter(center);
-                  setMapZoom(zoom);
-                }}
-                onFlightRoutesChange={setFlightRoutes}
-                flightFormData={flightFormData}
-                onFlightFormDataConsumed={() => setFlightFormData(null)}
-                onCountrySelected={handleCountrySelected}
-                onAskAirportChoice={handleAskAirportChoice}
-                onAskDualAirportChoice={handleAskDualAirportChoice}
-                selectedAirport={selectedAirport}
-                onSelectedAirportConsumed={() => setSelectedAirport(null)}
-                onUserLocationDetected={setUserLocation}
-                onSearchReady={handleSearchReady}
-                triggerSearch={triggerFlightSearch}
-                onSearchTriggered={() => setTriggerFlightSearch(false)}
+              {/* YouTube Shorts Panel (takes over the regular panel) */}
+              {youtubePanel ? (
+                <aside className="pointer-events-none absolute top-16 left-4 bottom-4 w-[380px] z-10">
+                  <div className="pointer-events-auto h-full overflow-hidden rounded-2xl bg-card/95 backdrop-blur-xl border border-border/50 shadow-lg">
+                    <YouTubeShortsPanel
+                      city={youtubePanel.city}
+                      countryName={youtubePanel.countryName}
+                      isOpen={true}
+                      onClose={() => setYoutubePanel(null)}
+                    />
+                  </div>
+                </aside>
+              ) : (
+                /* Regular Overlay panel */
+                <PlannerPanel
+                  activeTab={activeTab}
+                  layout="overlay"
+                  isVisible={isPanelVisible}
+                  onClose={() => setIsPanelVisible(false)}
+                  onMapMove={(center, zoom) => {
+                    setMapCenter(center);
+                    setMapZoom(zoom);
+                  }}
+                  onFlightRoutesChange={setFlightRoutes}
+                  flightFormData={flightFormData}
+                  onFlightFormDataConsumed={() => setFlightFormData(null)}
+                  onCountrySelected={handleCountrySelected}
+                  onAskAirportChoice={handleAskAirportChoice}
+                  onAskDualAirportChoice={handleAskDualAirportChoice}
+                  selectedAirport={selectedAirport}
+                  onSelectedAirportConsumed={() => setSelectedAirport(null)}
+                  onUserLocationDetected={setUserLocation}
+                  onSearchReady={handleSearchReady}
+                  triggerSearch={triggerFlightSearch}
+                  onSearchTriggered={() => setTriggerFlightSearch(false)}
+                />
+              )}
+
+              {/* Destination popup on map marker click */}
+              <DestinationPopup
+                cityName={destinationPopup?.cityName || ""}
+                countryName={destinationPopup?.countryName}
+                isOpen={!!destinationPopup}
+                onClose={() => setDestinationPopup(null)}
+                onDiscoverClick={handleOpenYouTube}
+                position={destinationPopup?.position}
               />
 
               {/* Floating card on map */}
