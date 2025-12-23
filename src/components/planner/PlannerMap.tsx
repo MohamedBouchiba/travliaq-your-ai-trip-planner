@@ -217,6 +217,12 @@ function cssHsl(varName: string, fallbackHsl = "222.2 47.4% 11.2%") {
   return `hsl(${hsl})`;
 }
 
+interface UserLocation {
+  lat: number;
+  lng: number;
+  city: string;
+}
+
 interface PlannerMapProps {
   activeTab: TabType;
   center: [number, number];
@@ -227,13 +233,15 @@ interface PlannerMapProps {
   animateToUserLocation?: boolean;
   onAnimationComplete?: () => void;
   isPanelOpen?: boolean;
+  userLocation?: UserLocation | null;
 }
 
-const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flightRoutes = [], animateToUserLocation = false, onAnimationComplete, isPanelOpen = false }: PlannerMapProps) => {
+const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flightRoutes = [], animateToUserLocation = false, onAnimationComplete, isPanelOpen = false, userLocation }: PlannerMapProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const routeMarkersRef = useRef<mapboxgl.Marker[]>([]);
+  const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const hasAnimatedRef = useRef(false);
 
@@ -348,6 +356,70 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       resizeObserver.disconnect();
     };
   }, [mapLoaded]);
+
+  // Show user location marker after animation completes
+  useEffect(() => {
+    if (!map.current || !mapLoaded || !userLocation) return;
+
+    // Remove previous user marker
+    if (userMarkerRef.current) {
+      userMarkerRef.current.remove();
+      userMarkerRef.current = null;
+    }
+
+    // Create user location marker with pulsing effect
+    const el = document.createElement("div");
+    el.className = "user-location-marker";
+    el.innerHTML = `
+      <div style="
+        position: relative;
+        width: 20px;
+        height: 20px;
+      ">
+        <div style="
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          background: hsl(var(--primary) / 0.3);
+          animation: pulse 2s ease-out infinite;
+        "></div>
+        <div style="
+          position: absolute;
+          inset: 4px;
+          border-radius: 9999px;
+          background: hsl(var(--primary));
+          border: 2px solid white;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        "></div>
+      </div>
+    `;
+
+    // Add pulse animation style if not already present
+    if (!document.getElementById("user-marker-style")) {
+      const style = document.createElement("style");
+      style.id = "user-marker-style";
+      style.textContent = `
+        @keyframes pulse {
+          0% { transform: scale(1); opacity: 1; }
+          100% { transform: scale(2.5); opacity: 0; }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    const marker = new mapboxgl.Marker({ element: el })
+      .setLngLat([userLocation.lng, userLocation.lat])
+      .addTo(map.current);
+
+    userMarkerRef.current = marker;
+
+    return () => {
+      if (userMarkerRef.current) {
+        userMarkerRef.current.remove();
+        userMarkerRef.current = null;
+      }
+    };
+  }, [mapLoaded, userLocation]);
 
   // Update markers when tab changes
   useEffect(() => {

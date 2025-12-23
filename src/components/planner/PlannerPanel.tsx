@@ -29,6 +29,12 @@ export interface CountrySelectionEvent {
   country: LocationResult;
 }
 
+export interface UserLocation {
+  lat: number;
+  lng: number;
+  city: string;
+}
+
 interface PlannerPanelProps {
   activeTab: TabType;
   onMapMove: (center: [number, number], zoom: number) => void;
@@ -42,6 +48,7 @@ interface PlannerPanelProps {
   onAskAirportChoice?: (choice: AirportChoice) => void;
   selectedAirport?: SelectedAirport | null;
   onSelectedAirportConsumed?: () => void;
+  onUserLocationDetected?: (location: UserLocation) => void;
 }
 
 const tabLabels: Record<TabType, string> = {
@@ -51,7 +58,7 @@ const tabLabels: Record<TabType, string> = {
   preferences: "Préférences",
 };
 
-const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVisible = true, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed, onCountrySelected, onAskAirportChoice, selectedAirport, onSelectedAirportConsumed }: PlannerPanelProps) => {
+const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVisible = true, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed, onCountrySelected, onAskAirportChoice, selectedAirport, onSelectedAirportConsumed, onUserLocationDetected }: PlannerPanelProps) => {
   if (!isVisible && layout === "overlay") return null;
 
   const wrapperClass =
@@ -80,7 +87,7 @@ const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVis
           </div>
         )}
         <div className="flex-1 overflow-y-auto themed-scroll p-4 max-h-[calc(100vh-8rem)]">
-          {activeTab === "flights" && <FlightsPanel onMapMove={onMapMove} onFlightRoutesChange={onFlightRoutesChange} flightFormData={flightFormData} onFlightFormDataConsumed={onFlightFormDataConsumed} onCountrySelected={onCountrySelected} onAskAirportChoice={onAskAirportChoice} selectedAirport={selectedAirport} onSelectedAirportConsumed={onSelectedAirportConsumed} />}
+          {activeTab === "flights" && <FlightsPanel onMapMove={onMapMove} onFlightRoutesChange={onFlightRoutesChange} flightFormData={flightFormData} onFlightFormDataConsumed={onFlightFormDataConsumed} onCountrySelected={onCountrySelected} onAskAirportChoice={onAskAirportChoice} selectedAirport={selectedAirport} onSelectedAirportConsumed={onSelectedAirportConsumed} onUserLocationDetected={onUserLocationDetected} />}
           {activeTab === "activities" && <ActivitiesPanel />}
           {activeTab === "stays" && <StaysPanel />}
           {activeTab === "preferences" && <PreferencesPanel />}
@@ -141,7 +148,7 @@ interface FlightOptions {
 }
 
 // Flights Panel
-const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed, onCountrySelected, onAskAirportChoice, selectedAirport, onSelectedAirportConsumed }: { 
+const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed, onCountrySelected, onAskAirportChoice, selectedAirport, onSelectedAirportConsumed, onUserLocationDetected }: { 
   onMapMove: (center: [number, number], zoom: number) => void;
   onFlightRoutesChange?: (routes: FlightRoutePoint[]) => void;
   flightFormData?: FlightFormData | null;
@@ -150,6 +157,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
   onAskAirportChoice?: (choice: AirportChoice) => void;
   selectedAirport?: SelectedAirport | null;
   onSelectedAirportConsumed?: () => void;
+  onUserLocationDetected?: (location: UserLocation) => void;
 }) => {
   const [tripType, setTripType] = useState<"roundtrip" | "oneway" | "multi">("roundtrip");
   const [isSearchingAirports, setIsSearchingAirports] = useState(false);
@@ -238,7 +246,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
         const response = await fetch("https://ipapi.co/json/");
         if (response.ok) {
           const data = await response.json();
-          if (data.city && data.country_name) {
+          if (data.city && data.country_name && data.latitude && data.longitude) {
             const userCity = `${data.city}, ${data.country_name}`;
             setLegs((prev) => {
               if (prev.length > 0 && !prev[0].from) {
@@ -248,6 +256,13 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
               }
               return prev;
             });
+            
+            // Notify parent with location coordinates for map marker
+            onUserLocationDetected?.({
+              lat: data.latitude,
+              lng: data.longitude,
+              city: userCity,
+            });
           }
         }
       } catch {
@@ -255,7 +270,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
       }
     };
     detectUserCity();
-  }, []);
+  }, [onUserLocationDetected]);
 
   // Search for airports for a city
   const resolveAirportsForCity = async (cityName: string, field: "from" | "to"): Promise<Airport | null> => {

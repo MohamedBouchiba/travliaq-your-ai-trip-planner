@@ -29,6 +29,13 @@ export interface SelectedAirport {
   airport: Airport;
 }
 
+// User detected location
+export interface UserLocation {
+  lat: number;
+  lng: number;
+  city: string;
+}
+
 const TravelPlanner = () => {
   const [activeTab, setActiveTab] = useState<TabType>("flights");
   const [selectedPin, setSelectedPin] = useState<MapPin | null>(null);
@@ -39,6 +46,7 @@ const TravelPlanner = () => {
   const [initialAnimationDone, setInitialAnimationDone] = useState(false);
   const [flightFormData, setFlightFormData] = useState<FlightFormData | null>(null);
   const [selectedAirport, setSelectedAirport] = useState<SelectedAirport | null>(null);
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const chatRef = useRef<PlannerChatRef>(null);
 
   const handleTabChange = useCallback((tab: TabType) => {
@@ -135,6 +143,7 @@ const TravelPlanner = () => {
                 animateToUserLocation={!initialAnimationDone}
                 onAnimationComplete={() => setInitialAnimationDone(true)}
                 isPanelOpen={isPanelVisible}
+                userLocation={initialAnimationDone ? userLocation : null}
               />
 
               {/* Overlay tabs */}
@@ -157,6 +166,7 @@ const TravelPlanner = () => {
                 onAskAirportChoice={handleAskAirportChoice}
                 selectedAirport={selectedAirport}
                 onSelectedAirportConsumed={() => setSelectedAirport(null)}
+                onUserLocationDetected={setUserLocation}
               />
 
               {/* Floating card on map */}
