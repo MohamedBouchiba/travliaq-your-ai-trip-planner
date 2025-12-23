@@ -630,19 +630,15 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     }
   }, [getRoutePoints, mapLoaded]);
 
-  // Draw dynamic flight routes from user input (legacy - for widget input)
+  // Clean up legacy route markers on mount (no longer used - memory is the single source of truth)
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
 
-    // Skip if we already have memory-based markers
-    const memoryPoints = getRoutePoints();
-    if (memoryPoints.length > 0) return;
-
-    // Clear previous route markers
+    // Clear any legacy route markers
     routeMarkersRef.current.forEach((marker) => marker.remove());
     routeMarkersRef.current = [];
 
-    // Remove previous dynamic routes
+    // Remove legacy dynamic routes
     for (let i = 0; i < 20; i++) {
       const sourceId = `dynamic-route-${i}`;
       const arrowId = `dynamic-route-arrow-${i}`;
@@ -658,122 +654,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         map.current.removeSource(sourceId);
       }
     }
-
-    // Use coordinates directly from flightRoutes (already provided by autocomplete)
-    const routePoints = flightRoutes.filter(
-      (route): route is FlightRoutePoint & { lat: number; lng: number } => 
-        typeof route.lat === "number" && typeof route.lng === "number"
-    );
-
-    if (routePoints.length === 0) return;
-
-    // Create markers for each point with numbering
-    routePoints.forEach((point, index) => {
-      const el = document.createElement("div");
-      el.className = "route-marker";
-      el.style.cssText = `
-        width: 32px;
-        height: 32px;
-        border-radius: 9999px;
-        background: hsl(var(--primary));
-        border: 3px solid white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        font-size: 12px;
-        font-weight: 700;
-        color: hsl(var(--primary-foreground));
-        user-select: none;
-        z-index: 10;
-      `;
-      el.textContent = `${index + 1}`;
-
-      const marker = new mapboxgl.Marker({ element: el })
-        .setLngLat([point.lng, point.lat])
-        .addTo(map.current!);
-
-      routeMarkersRef.current.push(marker);
-    });
-
-    // Draw lines between consecutive points (no price labels)
-    for (let i = 0; i < routePoints.length - 1; i++) {
-      const from = routePoints[i];
-      const to = routePoints[i + 1];
-      const sourceId = `dynamic-route-${i}`;
-
-      map.current.addSource(sourceId, {
-        type: "geojson",
-        data: {
-          type: "Feature",
-          properties: {},
-          geometry: {
-            type: "LineString",
-            coordinates: [
-              [from.lng, from.lat],
-              [to.lng, to.lat],
-            ],
-          },
-        },
-      });
-
-      const routeColor = cssHsl("--primary", "221.2 83.2% 53.3%");
-
-      map.current.addLayer({
-        id: sourceId,
-        type: "line",
-        source: sourceId,
-        layout: {
-          "line-join": "round",
-          "line-cap": "round",
-        },
-        paint: {
-          "line-color": routeColor,
-          "line-width": 3,
-          "line-dasharray": [2, 2],
-          "line-opacity": 0.85,
-        },
-      });
-
-      // Direction arrows along the line
-      map.current.addLayer({
-        id: `dynamic-route-arrow-${i}`,
-        type: "symbol",
-        source: sourceId,
-        layout: {
-          "symbol-placement": "line",
-          "symbol-spacing": 90,
-          "text-field": "➜",
-          "text-size": 16,
-          "text-keep-upright": false,
-          "text-rotation-alignment": "map",
-        },
-        paint: {
-          "text-color": routeColor,
-          "text-halo-color": "rgba(0,0,0,0.35)",
-          "text-halo-width": 1,
-        },
-      });
-    }
-
-    // Fit map to show all points if we have at least 2
-    if (routePoints.length >= 2) {
-      const bounds = new mapboxgl.LngLatBounds();
-      routePoints.forEach((point) => {
-        bounds.extend([point.lng, point.lat]);
-      });
-      map.current.fitBounds(bounds, {
-        padding: { top: 100, bottom: 100, left: 450, right: 50 },
-        maxZoom: 6,
-      });
-    } else if (routePoints.length === 1) {
-      map.current.flyTo({
-        center: [routePoints[0].lng, routePoints[0].lat],
-        zoom: 5,
-      });
-    }
-  }, [flightRoutes, mapLoaded, getRoutePoints]);
+  }, [mapLoaded]);
 
   // Update map center/zoom
   useEffect(() => {
