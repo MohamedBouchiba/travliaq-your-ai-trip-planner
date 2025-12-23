@@ -140,6 +140,9 @@ const TravelPlanner = () => {
                   setSelectedAirport({ field: action.field, airport: action.airport });
                 }
                 if (action.type === "triggerFlightSearch") {
+                  // Open the flights panel and trigger search
+                  setActiveTab("flights");
+                  setIsPanelVisible(true);
                   setTriggerFlightSearch(true);
                 }
                 setSelectedPin(null);
