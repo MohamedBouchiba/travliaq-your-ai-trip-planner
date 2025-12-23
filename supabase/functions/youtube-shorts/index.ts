@@ -32,36 +32,18 @@ interface YouTubeSearchResponse {
   }[];
 }
 
-// SIMPLIFIED: Only 2 categories to reduce API quota usage
-// travel (80%) + food (20%)
-const SEARCH_QUERIES = {
-  travel: [
-    "travel vlog",
-    "travel guide",
-    "visit tour",
-    "trip travel",
-    "explore travel",
-  ],
-  food: [
-    "food tour travel",
-    "restaurant travel",
-    "street food travel",
-  ],
-};
-
 // Keywords to exclude non-travel content
 const EXCLUDE_KEYWORDS = [
   "emperor", "empire", "comic", "comics", "movie", "film", "game", "gaming",
   "song", "music", "album", "band", "anime", "cartoon", "byzantine", "roman emperor",
 ];
 
-// Lighter filter - just exclude bad content, don't require travel keywords
+// Lighter filter - just exclude bad content
 function isAcceptable(video: YouTubeVideo): boolean {
   const titleLower = video.title.toLowerCase();
   const descLower = video.description.toLowerCase();
   const combined = `${titleLower} ${descLower}`;
   
-  // Exclude non-travel content
   for (const keyword of EXCLUDE_KEYWORDS) {
     if (combined.includes(keyword)) {
       console.log(`[youtube-shorts] Excluding "${video.title}" - contains "${keyword}"`);
@@ -72,22 +54,18 @@ function isAcceptable(video: YouTubeVideo): boolean {
   return true;
 }
 
-async function searchYouTube(
-  apiKey: string, 
-  city: string, 
-  category: string, 
-  query: string
-): Promise<YouTubeVideo[]> {
-  // Simple query: city + query + shorts
-  const searchQuery = `${city} ${query} #shorts`;
+// Single optimized search - only 1 API call per city
+async function searchYouTube(apiKey: string, city: string): Promise<YouTubeVideo[]> {
+  // Simple query focused on travel
+  const searchQuery = `${city} travel #shorts`;
   
   const searchParams = new URLSearchParams({
     part: "snippet",
     q: searchQuery,
     type: "video",
     videoDuration: "short",
-    maxResults: "10", // Get more results per call
-    order: "relevance",
+    maxResults: "8", // Get 8, filter down to 4
+    order: "viewCount", // Sort by views - most popular first
     safeSearch: "moderate",
     key: apiKey,
   });
@@ -103,7 +81,7 @@ async function searchYouTube(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[youtube-shorts] API error for ${category}: ${response.status} - ${errorText}`);
+      console.error(`[youtube-shorts] API error: ${response.status} - ${errorText}`);
       return [];
     }
 
@@ -118,29 +96,19 @@ async function searchYouTube(
                  item.snippet.thumbnails.default?.url || "",
       channelTitle: item.snippet.channelTitle,
       publishedAt: item.snippet.publishedAt,
-      category,
+      category: "travel",
     }));
 
-    // Light filter - just exclude bad content
-    const acceptable = videos.filter(v => isAcceptable(v));
+    // Filter and take only top 4
+    const acceptable = videos.filter(v => isAcceptable(v)).slice(0, 4);
     
-    console.log(`[youtube-shorts] ${category}: ${videos.length} found, ${acceptable.length} acceptable`);
+    console.log(`[youtube-shorts] Found ${videos.length}, returning ${acceptable.length} (sorted by views)`);
     
     return acceptable;
   } catch (error) {
-    console.error(`[youtube-shorts] Error searching ${category}:`, error);
+    console.error(`[youtube-shorts] Error:`, error);
     return [];
   }
-}
-
-// Shuffle array randomly
-function shuffle<T>(array: T[]): T[] {
-  const result = [...array];
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-  return result;
 }
 
 serve(async (req) => {
@@ -168,49 +136,18 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[youtube-shorts] Searching for: ${city}`);
+    console.log(`[youtube-shorts] Searching for: ${city} (1 API call, max 4 videos)`);
 
-    // Only 2 API calls to save quota: 1 travel + 1 food
-    const travelQuery = SEARCH_QUERIES.travel[Math.floor(Math.random() * SEARCH_QUERIES.travel.length)];
-    const foodQuery = SEARCH_QUERIES.food[Math.floor(Math.random() * SEARCH_QUERIES.food.length)];
+    // Single API call - optimized for quota
+    const videos = await searchYouTube(apiKey, city);
 
-    const [travelVideos, foodVideos] = await Promise.all([
-      searchYouTube(apiKey, city, "travel", travelQuery),
-      searchYouTube(apiKey, city, "food", foodQuery),
-    ]);
-
-    // Combine: take up to 8 travel + 3 food, then shuffle
-    const usedIds = new Set<string>();
-    const finalVideos: YouTubeVideo[] = [];
-
-    // Add travel videos (max 8)
-    for (const video of travelVideos) {
-      if (!usedIds.has(video.id) && finalVideos.length < 8) {
-        finalVideos.push(video);
-        usedIds.add(video.id);
-      }
-    }
-
-    // Add food videos (max 3)
-    let foodCount = 0;
-    for (const video of foodVideos) {
-      if (!usedIds.has(video.id) && foodCount < 3) {
-        finalVideos.push(video);
-        usedIds.add(video.id);
-        foodCount++;
-      }
-    }
-
-    // Shuffle the results for variety
-    const shuffled = shuffle(finalVideos);
-
-    console.log(`[youtube-shorts] Returning ${shuffled.length} videos (travel: ${finalVideos.length - foodCount}, food: ${foodCount})`);
+    console.log(`[youtube-shorts] Returning ${videos.length} videos for ${city}`);
 
     return new Response(
       JSON.stringify({
         city,
-        videos: shuffled,
-        count: shuffled.length,
+        videos,
+        count: videos.length,
       }),
       {
         status: 200,

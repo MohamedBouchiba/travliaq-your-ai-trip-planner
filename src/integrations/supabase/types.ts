@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       airports: {
         Row: {
+          airport_type: string | null
           city_name: string | null
           country_code: string | null
           country_name: string | null
@@ -27,10 +28,12 @@ export type Database = {
           longitude: number
           name: string
           name_norm: string
+          scheduled_service: string | null
           slug: string
           updated_at: string | null
         }
         Insert: {
+          airport_type?: string | null
           city_name?: string | null
           country_code?: string | null
           country_name?: string | null
@@ -42,10 +45,12 @@ export type Database = {
           longitude: number
           name: string
           name_norm: string
+          scheduled_service?: string | null
           slug: string
           updated_at?: string | null
         }
         Update: {
+          airport_type?: string | null
           city_name?: string | null
           country_code?: string | null
           country_name?: string | null
@@ -57,6 +62,7 @@ export type Database = {
           longitude?: number
           name?: string
           name_norm?: string
+          scheduled_service?: string | null
           slug?: string
           updated_at?: string | null
         }
@@ -692,6 +698,33 @@ export type Database = {
       }
     }
     Views: {
+      commercial_airports: {
+        Row: {
+          airport_type: string | null
+          country_code: string | null
+          iata: string | null
+          location: unknown
+          name: string | null
+          scheduled_service: string | null
+        }
+        Insert: {
+          airport_type?: string | null
+          country_code?: string | null
+          iata?: string | null
+          location?: unknown
+          name?: string | null
+          scheduled_service?: string | null
+        }
+        Update: {
+          airport_type?: string | null
+          country_code?: string | null
+          iata?: string | null
+          location?: unknown
+          name?: string | null
+          scheduled_service?: string | null
+        }
+        Relationships: []
+      }
       search_autocomplete: {
         Row: {
           country_code: string | null
