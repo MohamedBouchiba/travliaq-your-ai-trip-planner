@@ -384,10 +384,10 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
           // Fetch airports for both cities if needed
           const [fromAirportsResult, toAirportsResult, factResult] = await Promise.all([
             needsDepartureAirport && memory.departure?.city 
-              ? findNearestAirports(memory.departure.city, 5, memory.departure.countryCode)
+              ? findNearestAirports(memory.departure.city, 3, memory.departure.countryCode)
               : null,
             needsArrivalAirport && memory.arrival?.city
-              ? findNearestAirports(memory.arrival.city, 5, memory.arrival.countryCode)
+              ? findNearestAirports(memory.arrival.city, 3, memory.arrival.countryCode)
               : null,
             memory.arrival?.city
               ? supabase.functions.invoke("destination-fact", {
