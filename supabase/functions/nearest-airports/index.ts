@@ -15,7 +15,7 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { city, limit = 3 } = await req.json();
+    const { city, country_code, limit = 3 } = await req.json();
 
     if (!city || typeof city !== "string" || city.length < 2) {
       return new Response(
@@ -24,12 +24,22 @@ serve(async (req: Request) => {
       );
     }
 
-    console.log(`[nearest-airports] Searching airports near: "${city}", limit: ${limit}`);
+    // Build request body with optional country_code
+    const requestBody: { city: string; limit: number; country_code?: string } = {
+      city,
+      limit: Math.min(limit, 10),
+    };
+    
+    if (country_code && typeof country_code === "string" && country_code.length === 2) {
+      requestBody.country_code = country_code.toUpperCase();
+    }
+
+    console.log(`[nearest-airports] Searching airports near: "${city}"${country_code ? ` (${country_code})` : ""}, limit: ${limit}`);
 
     const response = await fetch(`${RAILWAY_API_URL}/nearest-airports`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ city, limit: Math.min(limit, 10) }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
