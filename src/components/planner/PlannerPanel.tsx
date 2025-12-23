@@ -429,9 +429,56 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     onSearchTriggered?.();
   }, [triggerSearch, legs, onSearchTriggered]);
 
-  // Notify parent of route changes when legs change
+  // Notify parent of route changes when legs change AND sync with memory
   const handleLegsChange = (newLegs: FlightLeg[]) => {
     setLegs(newLegs);
+
+    // Sync with flight memory for map display
+    const firstLeg = newLegs[0];
+    if (firstLeg) {
+      const memoryUpdate: Parameters<typeof updateMemory>[0] = {};
+      
+      // Sync departure
+      if (firstLeg.fromLocation) {
+        const loc = firstLeg.fromLocation;
+        memoryUpdate.departure = {
+          city: loc.type === 'airport' ? undefined : loc.name,
+          airport: loc.type === 'airport' ? loc.name : undefined,
+          iata: loc.iata,
+          lat: loc.lat,
+          lng: loc.lng,
+          country: loc.country_name,
+          countryCode: loc.country_code,
+        };
+      }
+      
+      // Sync arrival
+      if (firstLeg.toLocation) {
+        const loc = firstLeg.toLocation;
+        memoryUpdate.arrival = {
+          city: loc.type === 'airport' ? undefined : loc.name,
+          airport: loc.type === 'airport' ? loc.name : undefined,
+          iata: loc.iata,
+          lat: loc.lat,
+          lng: loc.lng,
+          country: loc.country_name,
+          countryCode: loc.country_code,
+        };
+      }
+      
+      // Sync dates
+      if (firstLeg.date) {
+        memoryUpdate.departureDate = firstLeg.date;
+      }
+      if (firstLeg.returnDate) {
+        memoryUpdate.returnDate = firstLeg.returnDate;
+      }
+      
+      // Only update if we have changes
+      if (Object.keys(memoryUpdate).length > 0) {
+        updateMemory(memoryUpdate);
+      }
+    }
 
     if (!onFlightRoutesChange) return;
 
