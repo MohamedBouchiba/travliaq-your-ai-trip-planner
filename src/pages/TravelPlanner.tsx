@@ -48,6 +48,7 @@ const TravelPlanner = () => {
   const [selectedAirport, setSelectedAirport] = useState<SelectedAirport | null>(null);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [triggerFlightSearch, setTriggerFlightSearch] = useState(false);
+  const [searchMessageSent, setSearchMessageSent] = useState(false);
   const chatRef = useRef<PlannerChatRef>(null);
 
   const handleTabChange = useCallback((tab: TabType) => {
@@ -88,8 +89,12 @@ const TravelPlanner = () => {
   }, []);
 
   const handleSearchReady = useCallback((from: string, to: string) => {
-    chatRef.current?.offerFlightSearch(from, to);
-  }, []);
+    // Only show the search message once
+    if (!searchMessageSent) {
+      setSearchMessageSent(true);
+      chatRef.current?.offerFlightSearch(from, to);
+    }
+  }, [searchMessageSent]);
 
   return (
     <>
@@ -126,10 +131,15 @@ const TravelPlanner = () => {
                 if (action.type === "updateFlight") {
                   setFlightFormData(action.flightData);
                   setIsPanelVisible(true);
+                  // Reset search message flag for new search
+                  setSearchMessageSent(false);
                 }
                 if (action.type === "selectAirport") {
                   // Pass selected airport to the panel
                   setSelectedAirport({ field: action.field, airport: action.airport });
+                }
+                if (action.type === "triggerFlightSearch") {
+                  setTriggerFlightSearch(true);
                 }
                 setSelectedPin(null);
               }}
