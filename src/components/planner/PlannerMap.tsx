@@ -529,6 +529,15 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
 
     // Create markers for each point
     memoryPoints.forEach((point, index) => {
+      // Outer container for stable positioning
+      const container = document.createElement("div");
+      container.className = "memory-route-marker-container";
+      container.style.cssText = `
+        width: 36px;
+        height: 36px;
+        position: relative;
+      `;
+
       const el = document.createElement("div");
       el.className = "memory-route-marker";
       
@@ -551,27 +560,31 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         color: white;
         user-select: none;
         z-index: 20;
-        transition: transform 0.2s ease;
+        transition: box-shadow 0.2s ease, border-color 0.2s ease;
       `;
       el.textContent = isDeparture ? "✈" : "🛬";
 
       // Add tooltip with label
       el.title = point.label;
 
-      // Add hover effect
+      // Add hover effect (shadow only, no transform to avoid position issues)
       el.addEventListener("mouseenter", () => {
-        el.style.transform = "scale(1.15)";
+        el.style.boxShadow = "0 6px 20px rgba(0,0,0,0.4)";
+        el.style.borderColor = "hsl(var(--primary))";
       });
       el.addEventListener("mouseleave", () => {
-        el.style.transform = "scale(1)";
+        el.style.boxShadow = "0 4px 12px rgba(0,0,0,0.3)";
+        el.style.borderColor = "white";
       });
+
+      container.appendChild(el);
 
       // Add click handler for arrival destinations (open popup)
       if (isArrival && onDestinationClick) {
         el.addEventListener("click", (e) => {
           e.stopPropagation();
           
-          // Get screen position of the marker
+          // Get screen position of the marker element
           const rect = el.getBoundingClientRect();
           const screenPosition = {
             x: rect.left + rect.width / 2,
@@ -592,7 +605,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         });
       }
 
-      const marker = new mapboxgl.Marker({ element: el })
+      const marker = new mapboxgl.Marker({ element: container })
         .setLngLat([point.lng, point.lat])
         .addTo(map.current!);
 
