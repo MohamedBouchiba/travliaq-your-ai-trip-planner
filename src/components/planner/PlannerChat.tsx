@@ -1038,14 +1038,22 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
 
   // Handle date selection from widget
   const handleDateSelect = (messageId: string, dateType: "departure" | "return", date: Date) => {
-    // Update memory
+    // Compute updated memory snapshot to avoid stale reads
+    let nextMem = {
+      ...memory,
+      passengers: { ...memory.passengers },
+    };
+
     if (dateType === "departure") {
+      nextMem = { ...nextMem, departureDate: date };
       updateMemory({ departureDate: date });
-      
+
       // If we have a pending trip duration, calculate return date
       if (pendingTripDurationRef.current) {
         const duration = pendingTripDurationRef.current;
         const match = duration.match(/(\d+)\s*(semaine|jour|week|day)/i);
+        let computedReturn: Date | null = null;
+
         if (match) {
           const num = parseInt(match[1]);
           const unit = match[2].toLowerCase();
@@ -1053,13 +1061,20 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
           if (unit.includes("semaine") || unit.includes("week")) {
             days = num * 7;
           }
-          const returnDate = new Date(date);
-          returnDate.setDate(returnDate.getDate() + days);
-          updateMemory({ returnDate });
+          computedReturn = addDays(date, days);
+        } else if (duration.toLowerCase().includes("semaine") || duration.toLowerCase().includes("week")) {
+          computedReturn = addDays(date, 7);
         }
+
+        if (computedReturn) {
+          nextMem = { ...nextMem, returnDate: computedReturn };
+          updateMemory({ returnDate: computedReturn });
+        }
+
         pendingTripDurationRef.current = null;
       }
     } else {
+      nextMem = { ...nextMem, returnDate: date };
       updateMemory({ returnDate: date });
     }
 
@@ -1078,19 +1093,17 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
     // Check if we need to show travelers widget next
     if (dateType === "departure" && pendingTravelersWidgetRef.current) {
       pendingTravelersWidgetRef.current = false;
-      
-      // Calculate and show return date if we had duration
-      let returnInfo = "";
-      if (memory.returnDate) {
-        returnInfo = ` Retour prévu le ${format(memory.returnDate, "d MMMM", { locale: fr })}.`;
-      }
-      
+
+      const computedReturnInfo = nextMem.returnDate
+        ? ` Retour prévu le ${format(nextMem.returnDate, "d MMMM", { locale: fr })}.`
+        : "";
+
       setMessages((prev) => [
         ...prev,
         {
           id: `confirm-date-${Date.now()}`,
           role: "assistant",
-          text: `${confirmText}${returnInfo} Maintenant, combien êtes-vous ? 🧳`,
+          text: `${confirmText}${computedReturnInfo} Maintenant, combien êtes-vous ? 🧳`,
           widget: "travelersSelector",
         },
       ]);
@@ -1103,9 +1116,9 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
           text: confirmText,
         },
       ]);
-      
-      // Ask for next missing field if any
-      setTimeout(() => askNextMissingField(), 300);
+
+      // Ask for next missing field if any (based on updated snapshot)
+      setTimeout(() => askNextMissingField(nextMem), 0);
     }
   };
 
@@ -1182,19 +1195,21 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
   };
 
   // Ask for the next missing field
-  const askNextMissingField = () => {
-    const remaining = missingFields.filter(f => {
-      if (f === "departure" && memory.departure) return false;
-      if (f === "arrival" && memory.arrival) return false;
-      if (f === "departureDate" && memory.departureDate) return false;
-      if (f === "returnDate" && memory.returnDate) return false;
-      return true;
-    });
+  const askNextMissingField = (memOverride?: typeof memory) => {
+    const mem = memOverride ?? memory;
 
-    if (remaining.length === 0) return;
+    // Compute missing fields from current memory snapshot (avoid stale state/race conditions)
+    const computedMissing: MissingField[] = [];
+    if (!mem.departure?.iata && !mem.departure?.city) computedMissing.push("departure");
+    if (!mem.arrival?.iata && !mem.arrival?.city) computedMissing.push("arrival");
+    if (!mem.departureDate) computedMissing.push("departureDate");
+    if (mem.tripType === "roundtrip" && !mem.returnDate) computedMissing.push("returnDate");
+    if (mem.passengers.adults < 1) computedMissing.push("passengers");
 
-    const nextField = remaining[0];
-    
+    if (computedMissing.length === 0) return;
+
+    const nextField = computedMissing[0];
+
     if (nextField === "departureDate") {
       setMessages((prev) => [
         ...prev,
@@ -1202,10 +1217,15 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
           id: `ask-date-${Date.now()}`,
           role: "assistant",
           text: "Quand souhaitez-vous partir ? 📅",
-          widget: "datePicker",
+          // If roundtrip and no duration, prefer a range picker to minimize interactions
+          widget: mem.tripType === "roundtrip" && !pendingTripDurationRef.current ? "dateRangePicker" : "datePicker",
+          widgetData: {
+            preferredMonth: pendingPreferredMonthRef.current || undefined,
+            tripDuration: pendingTripDurationRef.current || undefined,
+          },
         },
       ]);
-    } else if (nextField === "returnDate" && memory.tripType === "roundtrip") {
+    } else if (nextField === "returnDate" && mem.tripType === "roundtrip") {
       setMessages((prev) => [
         ...prev,
         {
@@ -1213,6 +1233,10 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
           role: "assistant",
           text: "Et quand souhaitez-vous revenir ? 📅",
           widget: "returnDatePicker",
+          widgetData: {
+            preferredMonth: pendingPreferredMonthRef.current || undefined,
+            tripDuration: pendingTripDurationRef.current || undefined,
+          },
         },
       ]);
     }
@@ -1407,6 +1431,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
     },
   }));
 
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
   const send = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -1439,31 +1465,46 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       // Detect which widget to show (PRIORITY: only ONE widget at a time)
       let showDateWidget = false;
       let showTravelersWidget = false;
-      
+
+      // We'll build an up-to-date memory snapshot to avoid stale state in this tick
+      let nextMem = {
+        ...memory,
+        passengers: { ...memory.passengers },
+      };
+
       if (flightData && Object.keys(flightData).length > 0) {
         // Check widget flags - prioritize date widget first
         showDateWidget = flightData.needsDateWidget === true;
         showTravelersWidget = flightData.needsTravelersWidget === true;
-        
+
         // Store pending widgets for sequential display
         if (showDateWidget && showTravelersWidget) {
           // Date widget first, then travelers
           pendingTravelersWidgetRef.current = true;
         }
-        
+
         // Store trip duration for return date calculation
         if (flightData.tripDuration) {
           pendingTripDurationRef.current = flightData.tripDuration;
         }
-        
+
         // Store preferred month for calendar navigation
         if (flightData.preferredMonth) {
           pendingPreferredMonthRef.current = flightData.preferredMonth;
         }
-        
+
         // Update memory with extracted data (excluding widget flags)
         const memoryUpdates = flightDataToMemory(flightData);
         updateMemory(memoryUpdates);
+
+        // Apply updates locally for immediate, consistent decisions
+        nextMem = {
+          ...nextMem,
+          ...memoryUpdates,
+          passengers: memoryUpdates.passengers
+            ? { ...nextMem.passengers, ...memoryUpdates.passengers }
+            : nextMem.passengers,
+        };
 
         const destCity = flightData.to;
         if (destCity) {
@@ -1476,33 +1517,45 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
         } else {
           onAction({ type: "tab", tab: "flights" });
         }
-        
+
         onAction({ type: "updateFlight", flightData });
       } else if (action) {
         onAction(action);
       }
 
       // Determine widget to show - ONLY ONE at a time, with priority order:
-      // 1. Date range picker (if tripDuration specified AND no dates yet)
-      // 2. Date picker (if needsDateWidget and no departure date yet)
-      // 3. Travelers selector (if needsTravelersWidget)
+      // - If user hasn't given any dates: prefer a single interaction
+      //   - If duration is known: pick departure only (return will be computed)
+      //   - Else (roundtrip): pick a range (departure + return)
+      // - If departure is known but return is missing (roundtrip): ask return
+      // - Else travelers if needed
       let widget: WidgetType | undefined;
-      if (showDateWidget && !memory.departureDate) {
-        // Use dateRangePicker if we have a trip duration, otherwise single date picker
-        if (pendingTripDurationRef.current) {
-          widget = "dateRangePicker";
-        } else {
-          widget = "datePicker";
+
+      if (showDateWidget) {
+        if (!nextMem.departureDate) {
+          if (pendingTripDurationRef.current) {
+            widget = "datePicker";
+          } else if (nextMem.tripType === "roundtrip") {
+            widget = "dateRangePicker";
+          } else {
+            widget = "datePicker";
+          }
+        } else if (nextMem.tripType === "roundtrip" && !nextMem.returnDate) {
+          widget = "returnDatePicker";
         }
-      } else if (showTravelersWidget) {
+      }
+
+      if (!widget && showTravelersWidget) {
         widget = "travelersSelector";
       }
 
       // Build widget data
-      const widgetData = widget ? {
-        preferredMonth: pendingPreferredMonthRef.current || undefined,
-        tripDuration: pendingTripDurationRef.current || undefined,
-      } : undefined;
+      const widgetData = widget
+        ? {
+            preferredMonth: pendingPreferredMonthRef.current || undefined,
+            tripDuration: pendingTripDurationRef.current || undefined,
+          }
+        : undefined;
 
       setMessages((prev) =>
         prev.map((m) =>
@@ -1527,6 +1580,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       );
     } finally {
       setIsLoading(false);
+      // Always restore focus to the input to minimize clicks
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
   };
 
@@ -1673,6 +1728,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
         <div className="max-w-3xl mx-auto">
           <div className="relative flex items-end gap-2 rounded-2xl border border-border bg-muted/30 p-2 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20">
             <textarea
+              ref={inputRef}
               value={input}
               onChange={(e) => {
                 setInput(e.target.value);
@@ -1688,6 +1744,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   send();
+                  // Ensure focus stays on input (minimize clicks)
+                  setTimeout(() => inputRef.current?.focus(), 0);
                 }
               }}
             />
