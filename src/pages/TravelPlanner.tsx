@@ -141,7 +141,12 @@ const TravelPlanner = () => {
                 selectedPinId={selectedPin?.id}
                 flightRoutes={flightRoutes}
                 animateToUserLocation={!initialAnimationDone}
-                onAnimationComplete={() => setInitialAnimationDone(true)}
+                onAnimationComplete={() => {
+                  setInitialAnimationDone(true);
+                  // Open the flights panel after the animation to show user's location
+                  setIsPanelVisible(true);
+                  setActiveTab("flights");
+                }}
                 isPanelOpen={isPanelVisible}
                 userLocation={initialAnimationDone ? userLocation : null}
               />
