@@ -50,7 +50,7 @@ export const useLocationAutocomplete = (
   const query = useQuery({
     queryKey: ["location-autocomplete", debouncedSearch, types.join(",")],
     queryFn: async (): Promise<LocationResult[]> => {
-      if (!debouncedSearch || debouncedSearch.length < 2) {
+      if (!debouncedSearch || debouncedSearch.length < 3) {
         return [];
       }
 
@@ -68,7 +68,7 @@ export const useLocationAutocomplete = (
       const data: ApiAutocompleteResult[] = await response.json();
 
       // Transform API response to our format
-      return data.map((item) => {
+      const results = data.map((item) => {
         let displayName = item.name;
         
         if (item.type === "airport" && item.iata) {
@@ -91,8 +91,42 @@ export const useLocationAutocomplete = (
           display_name: displayName,
         };
       });
+
+      // Smart sorting: keep original order but ensure mix of types
+      // Take up to 4 results, prioritizing cities but including at least 1 airport if available
+      const cities = results.filter((r) => r.type === "city");
+      const airports = results.filter((r) => r.type === "airport");
+      const countries = results.filter((r) => r.type === "country");
+
+      const sorted: LocationResult[] = [];
+      
+      // Add up to 3 cities first (maintaining original order)
+      sorted.push(...cities.slice(0, 3));
+      
+      // Add at least 1 airport if available and we have room
+      if (airports.length > 0 && sorted.length < 4) {
+        sorted.push(airports[0]);
+      }
+      
+      // Fill remaining slots with cities or airports (maintaining original order)
+      const remaining = results.filter((r) => !sorted.includes(r));
+      while (sorted.length < 4 && remaining.length > 0) {
+        sorted.push(remaining.shift()!);
+      }
+
+      // If no airports were added but we have some, replace the last city with an airport
+      if (airports.length > 0 && !sorted.some((r) => r.type === "airport") && sorted.length > 0) {
+        sorted[sorted.length - 1] = airports[0];
+      }
+
+      // Add countries at the end if there's room
+      if (countries.length > 0 && sorted.length < 4 && !sorted.some((r) => r.type === "country")) {
+        sorted.push(countries[0]);
+      }
+
+      return sorted.slice(0, 4);
     },
-    enabled: enabled && debouncedSearch.length >= 2,
+    enabled: enabled && debouncedSearch.length >= 3,
     staleTime: 60 * 1000, // Cache for 1 minute
   });
 

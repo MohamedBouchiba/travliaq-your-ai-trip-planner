@@ -86,7 +86,7 @@ function CityInput({ value, onChange, placeholder, icon, onCountrySelected }: Ci
     const newValue = e.target.value;
     setSearch(newValue);
     onChange(newValue);
-    if (!isOpen && newValue.length >= 2) {
+    if (!isOpen && newValue.length >= 3) {
       setIsOpen(true);
     }
   };
@@ -136,11 +136,11 @@ function CityInput({ value, onChange, placeholder, icon, onCountrySelected }: Ci
           </div>
         ) : locations.length === 0 ? (
           <div className="p-3 text-xs text-muted-foreground text-center">
-            {search.length < 2 ? "Tapez au moins 2 caractères" : "Aucun résultat trouvé"}
+            {search.length < 3 ? "Tapez au moins 3 caractères" : "Aucun résultat trouvé"}
           </div>
         ) : (
           <div className="py-1">
-            {locations.slice(0, 10).map((location) => (
+            {locations.map((location) => (
               <button
                 key={`${location.type}-${location.id}`}
                 onMouseDown={(e) => e.preventDefault()}
