@@ -265,7 +265,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     onSelectedAirportConsumed?.();
   }, [selectedAirport, onSelectedAirportConsumed, onSearchReady]);
 
-  // Detect user's city from IP on mount
+  // Detect user's city from IP on mount and add to memory
   useEffect(() => {
     const detectUserCity = async () => {
       try {
@@ -296,6 +296,17 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
               return prev;
             });
             
+            // Add to flight memory as departure point
+            updateMemory({
+              departure: {
+                city: data.city,
+                country: data.country_name,
+                countryCode: data.country_code,
+                lat: data.latitude,
+                lng: data.longitude,
+              },
+            });
+            
             // Notify parent with location coordinates for map marker
             onUserLocationDetected?.({
               lat: data.latitude,
@@ -309,7 +320,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
       }
     };
     detectUserCity();
-  }, [onUserLocationDetected]);
+  }, [onUserLocationDetected, updateMemory]);
 
   // Search for airports for a city - returns airports list or null if only one (auto-selected)
   const getAirportsForCity = async (cityName: string): Promise<{ airports: Airport[]; cityName: string } | null> => {
