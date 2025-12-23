@@ -32,72 +32,36 @@ interface YouTubeSearchResponse {
   }[];
 }
 
-// Categories with their search queries - TRAVEL focused to avoid unrelated results
-const CATEGORY_QUERIES: Record<string, string[]> = {
-  monuments: [
-    "travel famous landmarks",
-    "travel must see monuments",
-    "travel best attractions",
-    "travel iconic places visit",
-  ],
-  activities: [
-    "travel things to do",
-    "travel best activities",
-    "travel top experiences",
-    "tourism adventure",
-  ],
-  city: [
-    "travel guide tour",
-    "city walking tour travel",
-    "travel vlog visit",
-    "tourism hidden gems",
+// SIMPLIFIED: Only 2 categories to reduce API quota usage
+// travel (80%) + food (20%)
+const SEARCH_QUERIES = {
+  travel: [
+    "travel vlog",
+    "travel guide",
+    "visit tour",
+    "trip travel",
+    "explore travel",
   ],
   food: [
-    "travel food tour",
-    "travel where to eat",
-    "travel street food",
-    "tourism local cuisine",
-  ],
-  hotel: [
-    "travel best hotels",
-    "tourism where to stay",
-    "travel hotel tour",
+    "food tour travel",
+    "restaurant travel",
+    "street food travel",
   ],
 };
 
-// Balanced rotation: monuments, activities, city, food, hotel in a good mix
-const CATEGORY_ROTATION = [
-  "monuments",
-  "activities",
-  "city",
-  "food",
-  "monuments",
-  "activities",
-  "hotel",
-  "city",
-  "food",
-  "monuments",
-  "activities",
-  "city",
-];
-
-// Keywords that indicate non-travel content to exclude
+// Keywords to exclude non-travel content
 const EXCLUDE_KEYWORDS = [
   "emperor", "empire", "comic", "comics", "movie", "film", "game", "gaming",
-  "song", "music", "album", "band", "anime", "cartoon", "documentary history",
-  "ancient rome", "roman emperor", "byzantine", "historical figure",
+  "song", "music", "album", "band", "anime", "cartoon", "byzantine", "roman emperor",
 ];
 
-// Simple filter to check if title/description mentions the city AND is travel-related
-function isRelevantToCity(video: YouTubeVideo, cityName: string): boolean {
-  const cityLower = cityName.toLowerCase();
-  const cityWords = cityLower.split(/[\s,]+/).filter(w => w.length > 2);
-  
+// Lighter filter - just exclude bad content, don't require travel keywords
+function isAcceptable(video: YouTubeVideo): boolean {
   const titleLower = video.title.toLowerCase();
   const descLower = video.description.toLowerCase();
   const combined = `${titleLower} ${descLower}`;
   
-  // First, exclude videos with non-travel keywords
+  // Exclude non-travel content
   for (const keyword of EXCLUDE_KEYWORDS) {
     if (combined.includes(keyword)) {
       console.log(`[youtube-shorts] Excluding "${video.title}" - contains "${keyword}"`);
@@ -105,20 +69,7 @@ function isRelevantToCity(video: YouTubeVideo, cityName: string): boolean {
     }
   }
   
-  // Travel-related keywords that should be present
-  const travelKeywords = ["travel", "tour", "visit", "trip", "tourism", "tourist", "vacation", "destination", "explore", "guide"];
-  const hasTravelContext = travelKeywords.some(kw => combined.includes(kw));
-  
-  // Check if the city name or significant words appear
-  const cityMentioned = combined.includes(cityLower) || cityWords.some(w => combined.includes(w));
-  
-  // Best: city mentioned AND travel context
-  if (cityMentioned && hasTravelContext) return true;
-  
-  // Acceptable: just travel context (for cities with common names)
-  if (hasTravelContext) return true;
-  
-  return false;
+  return true;
 }
 
 async function searchYouTube(
@@ -127,17 +78,16 @@ async function searchYouTube(
   category: string, 
   query: string
 ): Promise<YouTubeVideo[]> {
-  // Use quotes around city name for stricter matching
-  const searchQuery = `"${city}" ${query} #shorts`;
+  // Simple query: city + query + shorts
+  const searchQuery = `${city} ${query} #shorts`;
   
   const searchParams = new URLSearchParams({
     part: "snippet",
     q: searchQuery,
     type: "video",
     videoDuration: "short",
-    maxResults: "5", // Get more to filter out irrelevant ones
+    maxResults: "10", // Get more results per call
     order: "relevance",
-    relevanceLanguage: "en",
     safeSearch: "moderate",
     key: apiKey,
   });
@@ -152,7 +102,8 @@ async function searchYouTube(
     });
 
     if (!response.ok) {
-      console.error(`[youtube-shorts] API error for ${category}: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`[youtube-shorts] API error for ${category}: ${response.status} - ${errorText}`);
       return [];
     }
 
@@ -170,16 +121,26 @@ async function searchYouTube(
       category,
     }));
 
-    // Filter to keep only videos that seem relevant to the city
-    const relevant = videos.filter(v => isRelevantToCity(v, city));
+    // Light filter - just exclude bad content
+    const acceptable = videos.filter(v => isAcceptable(v));
     
-    console.log(`[youtube-shorts] ${category}: ${videos.length} found, ${relevant.length} relevant to "${city}"`);
+    console.log(`[youtube-shorts] ${category}: ${videos.length} found, ${acceptable.length} acceptable`);
     
-    return relevant.length > 0 ? relevant : videos.slice(0, 2); // Fallback to top 2 if no match
+    return acceptable;
   } catch (error) {
     console.error(`[youtube-shorts] Error searching ${category}:`, error);
     return [];
   }
+}
+
+// Shuffle array randomly
+function shuffle<T>(array: T[]): T[] {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 }
 
 serve(async (req) => {
@@ -207,64 +168,49 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[youtube-shorts] Searching varied content for: ${city}`);
+    console.log(`[youtube-shorts] Searching for: ${city}`);
 
-    // Fetch from multiple categories in parallel
-    const categoryPromises = Object.entries(CATEGORY_QUERIES).map(
-      async ([category, queries]) => {
-        // Pick a random query from this category
-        const randomQuery = queries[Math.floor(Math.random() * queries.length)];
-        return searchYouTube(apiKey, city, category, randomQuery);
-      }
-    );
+    // Only 2 API calls to save quota: 1 travel + 1 food
+    const travelQuery = SEARCH_QUERIES.travel[Math.floor(Math.random() * SEARCH_QUERIES.travel.length)];
+    const foodQuery = SEARCH_QUERIES.food[Math.floor(Math.random() * SEARCH_QUERIES.food.length)];
 
-    const categoryResults = await Promise.all(categoryPromises);
+    const [travelVideos, foodVideos] = await Promise.all([
+      searchYouTube(apiKey, city, "travel", travelQuery),
+      searchYouTube(apiKey, city, "food", foodQuery),
+    ]);
 
-    // Flatten all results
-    const allVideos: YouTubeVideo[] = categoryResults.flat();
-
-    // Group by category for rotation
-    const videosByCategory: Record<string, YouTubeVideo[]> = {};
-    for (const video of allVideos) {
-      if (!videosByCategory[video.category]) {
-        videosByCategory[video.category] = [];
-      }
-      videosByCategory[video.category].push(video);
-    }
-
-    // Build final list following rotation pattern
-    const finalVideos: YouTubeVideo[] = [];
+    // Combine: take up to 8 travel + 3 food, then shuffle
     const usedIds = new Set<string>();
-    const categoryIndices: Record<string, number> = {};
+    const finalVideos: YouTubeVideo[] = [];
 
-    for (const category of CATEGORY_ROTATION) {
-      const categoryVideos = videosByCategory[category] || [];
-      const currentIndex = categoryIndices[category] || 0;
-
-      // Find next unused video from this category
-      for (let i = 0; i < categoryVideos.length; i++) {
-        const video = categoryVideos[(currentIndex + i) % categoryVideos.length];
-        if (!usedIds.has(video.id)) {
-          finalVideos.push(video);
-          usedIds.add(video.id);
-          categoryIndices[category] = (currentIndex + i + 1) % categoryVideos.length;
-          break;
-        }
+    // Add travel videos (max 8)
+    for (const video of travelVideos) {
+      if (!usedIds.has(video.id) && finalVideos.length < 8) {
+        finalVideos.push(video);
+        usedIds.add(video.id);
       }
-
-      // Stop if we have enough videos
-      if (finalVideos.length >= 12) break;
     }
 
-    console.log(`[youtube-shorts] Returning ${finalVideos.length} varied videos`);
-    console.log(`[youtube-shorts] Categories: ${finalVideos.map(v => v.category).join(', ')}`);
+    // Add food videos (max 3)
+    let foodCount = 0;
+    for (const video of foodVideos) {
+      if (!usedIds.has(video.id) && foodCount < 3) {
+        finalVideos.push(video);
+        usedIds.add(video.id);
+        foodCount++;
+      }
+    }
+
+    // Shuffle the results for variety
+    const shuffled = shuffle(finalVideos);
+
+    console.log(`[youtube-shorts] Returning ${shuffled.length} videos (travel: ${finalVideos.length - foodCount}, food: ${foodCount})`);
 
     return new Response(
       JSON.stringify({
         city,
-        videos: finalVideos,
-        count: finalVideos.length,
-        categories: Object.keys(videosByCategory),
+        videos: shuffled,
+        count: shuffled.length,
       }),
       {
         status: 200,
