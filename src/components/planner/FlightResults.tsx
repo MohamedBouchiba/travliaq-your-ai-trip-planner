@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plane, ChevronDown, ChevronUp, Luggage, Star, Zap, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
 
 export interface FlightSegment {
   departureTime: string;
@@ -82,31 +81,39 @@ const FlightCard = ({
   onSelect,
   isExpanded,
   onToggleExpand,
-  index
+  isRevealed
 }: { 
   flight: FlightOffer; 
   onSelect?: (flight: FlightOffer) => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
-  index: number;
+  isRevealed: boolean;
 }) => {
   const mainSegment = flight.outbound[0];
   const lastOutbound = flight.outbound[flight.outbound.length - 1];
+  const [showDetails, setShowDetails] = useState(false);
+  
+  useEffect(() => {
+    if (isExpanded) {
+      setShowDetails(true);
+    } else {
+      const timer = setTimeout(() => setShowDetails(false), 250);
+      return () => clearTimeout(timer);
+    }
+  }, [isExpanded]);
   
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ 
-        duration: 0.4, 
-        delay: index * 0.08,
-        ease: [0.25, 0.46, 0.45, 0.94]
-      }}
+    <div 
       className={cn(
-        "relative bg-card border border-border/50 rounded-xl overflow-hidden transition-all duration-200",
+        "relative bg-card border border-border/50 rounded-xl overflow-hidden transition-all duration-300",
         "hover:border-primary/30 hover:shadow-md",
-        isExpanded && "border-primary/50 shadow-md"
+        isExpanded && "border-primary/50 shadow-md",
+        !isRevealed && "opacity-0 translate-y-4",
+        isRevealed && "opacity-100 translate-y-0"
       )}
+      style={{ 
+        transition: "opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s, box-shadow 0.2s" 
+      }}
     >
       {/* Badges - top left */}
       <div className="absolute top-2 left-2 flex gap-1 z-10">
@@ -216,72 +223,85 @@ const FlightCard = ({
       </div>
       
       {/* Expanded details */}
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: "easeInOut" }}
-            className="overflow-hidden"
-          >
-            <div className="border-t border-border/50 bg-muted/30 px-3 py-2.5 space-y-3">
-              {/* Outbound */}
+      <div
+        className={cn(
+          "overflow-hidden transition-all duration-250 ease-out",
+          isExpanded ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
+        )}
+      >
+        {showDetails && (
+          <div className="border-t border-border/50 bg-muted/30 px-3 py-2.5 space-y-3">
+            {/* Outbound */}
+            <div>
+              <div className="text-[10px] font-semibold text-muted-foreground mb-1 flex items-center gap-1.5 uppercase tracking-wide">
+                <Plane className="h-3 w-3" /> Vol aller
+              </div>
+              <div className="space-y-0.5 divide-y divide-border/30">
+                {flight.outbound.map((segment, idx) => (
+                  <FlightSegmentCard key={idx} segment={segment} />
+                ))}
+              </div>
+            </div>
+            
+            {/* Inbound */}
+            {flight.inbound && flight.inbound.length > 0 && (
               <div>
                 <div className="text-[10px] font-semibold text-muted-foreground mb-1 flex items-center gap-1.5 uppercase tracking-wide">
-                  <Plane className="h-3 w-3" /> Vol aller
+                  <Plane className="h-3 w-3 rotate-180" /> Vol retour
                 </div>
                 <div className="space-y-0.5 divide-y divide-border/30">
-                  {flight.outbound.map((segment, idx) => (
+                  {flight.inbound.map((segment, idx) => (
                     <FlightSegmentCard key={idx} segment={segment} />
                   ))}
                 </div>
               </div>
-              
-              {/* Inbound */}
-              {flight.inbound && flight.inbound.length > 0 && (
-                <div>
-                  <div className="text-[10px] font-semibold text-muted-foreground mb-1 flex items-center gap-1.5 uppercase tracking-wide">
-                    <Plane className="h-3 w-3 rotate-180" /> Vol retour
-                  </div>
-                  <div className="space-y-0.5 divide-y divide-border/30">
-                    {flight.inbound.map((segment, idx) => (
-                      <FlightSegmentCard key={idx} segment={segment} />
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Baggage info */}
-              <div className="flex items-center gap-2 pt-1.5 border-t border-border/30">
-                <Luggage className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-[11px] text-muted-foreground">Bagage cabine inclus</span>
-              </div>
+            )}
+            
+            {/* Baggage info */}
+            <div className="flex items-center gap-2 pt-1.5 border-t border-border/30">
+              <Luggage className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-[11px] text-muted-foreground">Bagage cabine inclus</span>
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
-    </motion.div>
+      </div>
+    </div>
   );
 };
 
-// Loading skeleton
-const FlightSkeleton = () => (
-  <div className="bg-card border border-border/50 rounded-xl p-3 pt-8 animate-pulse">
+// Loading skeleton with shimmer effect
+const FlightSkeleton = ({ delay = 0 }: { delay?: number }) => (
+  <div 
+    className="bg-card border border-border/50 rounded-xl p-3 pt-8 overflow-hidden relative"
+    style={{ animationDelay: `${delay}ms` }}
+  >
+    {/* Shimmer overlay */}
+    <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+    
     <div className="flex items-center gap-3">
-      <div className="w-9 h-9 rounded-lg bg-muted" />
+      <div className="w-9 h-9 rounded-lg bg-muted animate-pulse" />
       <div className="space-y-1.5 min-w-[70px]">
-        <div className="h-3 bg-muted rounded w-16" />
-        <div className="h-2 bg-muted rounded w-12" />
+        <div className="h-3 bg-muted rounded w-16 animate-pulse" />
+        <div className="h-2 bg-muted rounded w-12 animate-pulse" />
       </div>
-      <div className="flex-1 flex justify-center gap-3">
-        <div className="h-5 bg-muted rounded w-12" />
-        <div className="h-4 bg-muted rounded w-16" />
-        <div className="h-5 bg-muted rounded w-12" />
+      <div className="flex-1 flex justify-center items-center gap-3">
+        <div className="text-center space-y-1">
+          <div className="h-5 bg-muted rounded w-12 animate-pulse" />
+          <div className="h-2 bg-muted rounded w-8 mx-auto animate-pulse" />
+        </div>
+        <div className="flex-1 max-w-[80px] space-y-1">
+          <div className="h-2 bg-muted rounded w-full animate-pulse" />
+          <div className="h-px bg-muted rounded animate-pulse" />
+          <div className="h-2 bg-muted rounded w-10 mx-auto animate-pulse" />
+        </div>
+        <div className="text-center space-y-1">
+          <div className="h-5 bg-muted rounded w-12 animate-pulse" />
+          <div className="h-2 bg-muted rounded w-8 mx-auto animate-pulse" />
+        </div>
       </div>
       <div className="flex items-center gap-2">
-        <div className="h-6 bg-muted rounded w-14" />
-        <div className="h-7 bg-muted rounded w-20" />
+        <div className="h-6 bg-muted rounded w-14 animate-pulse" />
+        <div className="h-7 bg-muted rounded w-20 animate-pulse" />
       </div>
     </div>
   </div>
@@ -290,13 +310,35 @@ const FlightSkeleton = () => (
 // Main component
 const FlightResults = ({ flights, isLoading, onSelect }: FlightResultsProps) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
+  
+  // Reveal flights one by one with stagger
+  useEffect(() => {
+    if (!isLoading && flights.length > 0) {
+      setRevealedIds(new Set()); // Reset
+      flights.forEach((flight, index) => {
+        setTimeout(() => {
+          setRevealedIds(prev => new Set([...prev, flight.id]));
+        }, index * 120); // 120ms stagger
+      });
+    }
+  }, [flights, isLoading]);
   
   if (isLoading) {
     return (
       <div className="space-y-2">
-        <FlightSkeleton />
-        <FlightSkeleton />
-        <FlightSkeleton />
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs text-muted-foreground">Recherche des meilleurs vols...</p>
+          <div className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '150ms' }} />
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '300ms' }} />
+          </div>
+        </div>
+        <FlightSkeleton delay={0} />
+        <FlightSkeleton delay={100} />
+        <FlightSkeleton delay={200} />
+        <FlightSkeleton delay={300} />
       </div>
     );
   }
@@ -320,14 +362,14 @@ const FlightResults = ({ flights, isLoading, onSelect }: FlightResultsProps) => 
       </div>
       
       {/* Flight cards */}
-      {flights.map((flight, index) => (
+      {flights.map((flight) => (
         <FlightCard
           key={flight.id}
           flight={flight}
           onSelect={onSelect}
           isExpanded={expandedId === flight.id}
           onToggleExpand={() => setExpandedId(expandedId === flight.id ? null : flight.id)}
-          index={index}
+          isRevealed={revealedIds.has(flight.id)}
         />
       ))}
     </div>

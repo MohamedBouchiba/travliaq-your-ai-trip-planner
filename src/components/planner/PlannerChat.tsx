@@ -629,6 +629,19 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
                     disabled={isLoading}
                   />
                 )}
+
+                {/* Flight search button */}
+                {m.hasSearchButton && (
+                  <div className="mt-3">
+                    <button
+                      onClick={() => onAction({ type: "triggerFlightSearch" })}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-primary/20"
+                    >
+                      <Plane className="h-4 w-4" />
+                      Rechercher les vols maintenant
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}

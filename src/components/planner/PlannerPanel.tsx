@@ -243,22 +243,23 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
         } else {
           newLegs[0] = { ...newLegs[0], to: airportDisplay };
         }
+        
+        // Check if both airports are now set after this update
+        const newFrom = field === "from" ? airportDisplay : newLegs[0].from;
+        const newTo = field === "to" ? airportDisplay : newLegs[0].to;
+        const fromHasAirport = /\([A-Z]{3}\)/.test(newFrom || '');
+        const toHasAirport = /\([A-Z]{3}\)/.test(newTo || '');
+        
+        if (fromHasAirport && toHasAirport) {
+          // Defer to next tick to ensure state is updated
+          setTimeout(() => onSearchReady?.(newFrom, newTo), 0);
+        }
       }
       return newLegs;
     });
     
     onSelectedAirportConsumed?.();
-    
-    // Check if both airports are now set, notify chat for search button
-    setTimeout(() => {
-      const firstLeg = legs[0];
-      const fromHasAirport = /\([A-Z]{3}\)/.test(firstLeg?.from || '');
-      const toHasAirport = /\([A-Z]{3}\)/.test(firstLeg?.to || '');
-      if (fromHasAirport && toHasAirport && firstLeg?.date) {
-        onSearchReady?.(firstLeg.from, firstLeg.to);
-      }
-    }, 100);
-  }, [selectedAirport, onSelectedAirportConsumed, legs, onSearchReady]);
+  }, [selectedAirport, onSelectedAirportConsumed, onSearchReady]);
 
   // Detect user's city from IP on mount
   useEffect(() => {
