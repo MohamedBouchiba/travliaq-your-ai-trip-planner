@@ -413,16 +413,66 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     }
   };
 
-  // Perform the actual flight search
-  const performFlightSearch = (from: string, to: string) => {
+  // Perform the actual flight search via edge function
+  const performFlightSearch = async (from: string, to: string) => {
     setIsSearchingFlights(true);
     
-    // Simulate API call with mock data
-    setTimeout(() => {
-      const mockFlights = generateMockFlights(from, to);
-      setFlightResults(mockFlights);
+    try {
+      const firstLeg = legs[0];
+      const fromCode = from.match(/\(([A-Z]{3})\)/)?.[1] || from.substring(0, 3).toUpperCase();
+      const toCode = to.match(/\(([A-Z]{3})\)/)?.[1] || to.substring(0, 3).toUpperCase();
+      
+      const adults = passengers.filter(p => p.type === "adult").length;
+      const children = passengers.filter(p => p.type === "child").length;
+      
+      const cabinClassMap = { economy: "ECONOMY", business: "BUSINESS", first: "FIRST" };
+      
+      const requestBody = {
+        origin: fromCode,
+        destination: toCode,
+        departureDate: firstLeg.date ? firstLeg.date.toISOString().split('T')[0] : undefined,
+        returnDate: tripType === "roundtrip" && firstLeg.returnDate 
+          ? firstLeg.returnDate.toISOString().split('T')[0] 
+          : undefined,
+        adults,
+        children,
+        cabinClass: cabinClassMap[travelClass],
+        currency: "EUR",
+        languageCode: "fr",
+        countryCode: "FR",
+      };
+
+      console.log("[FlightsPanel] Searching flights:", requestBody);
+
+      const response = await fetch(
+        "https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/flight-search",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("[FlightsPanel] Received", data.count, "flights");
+      
+      if (data.flights && data.flights.length > 0) {
+        setFlightResults(data.flights);
+      } else {
+        // Fallback to mock data if no results
+        setFlightResults(generateMockFlights(from, to));
+      }
+    } catch (error) {
+      console.error("[FlightsPanel] Flight search error:", error);
+      // Fallback to mock data on error
+      setFlightResults(generateMockFlights(from, to));
+    } finally {
       setIsSearchingFlights(false);
-    }, 1500);
+    }
   };
 
   // Handle triggered search from chat

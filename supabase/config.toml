@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.destination-fact]
 verify_jwt = false
+
+[functions.flight-search]
+verify_jwt = false
