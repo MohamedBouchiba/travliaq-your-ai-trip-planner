@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      airports: {
+        Row: {
+          city_name: string | null
+          country_code: string | null
+          country_name: string | null
+          created_at: string
+          iata: string
+          icao: string | null
+          latitude: number
+          location: unknown
+          longitude: number
+          name: string
+          name_norm: string
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          city_name?: string | null
+          country_code?: string | null
+          country_name?: string | null
+          created_at?: string
+          iata: string
+          icao?: string | null
+          latitude: number
+          location: unknown
+          longitude: number
+          name: string
+          name_norm: string
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          city_name?: string | null
+          country_code?: string | null
+          country_name?: string | null
+          created_at?: string
+          iata?: string
+          icao?: string | null
+          latitude?: number
+          location?: unknown
+          longitude?: number
+          name?: string
+          name_norm?: string
+          slug?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       answer_enqueues: {
         Row: {
           created_at: string
@@ -80,24 +128,84 @@ export type Database = {
           country_code: string
           created_at: string | null
           id: string
+          latitude: number | null
+          location: unknown
+          longitude: number | null
           name: string
+          population: number | null
           search_text: string | null
+          slug: string
+          state_code: string | null
+          state_name: string | null
+          updated_at: string | null
         }
         Insert: {
           country: string
           country_code: string
           created_at?: string | null
           id?: string
+          latitude?: number | null
+          location?: unknown
+          longitude?: number | null
           name: string
+          population?: number | null
           search_text?: string | null
+          slug: string
+          state_code?: string | null
+          state_name?: string | null
+          updated_at?: string | null
         }
         Update: {
           country?: string
           country_code?: string
           created_at?: string | null
           id?: string
+          latitude?: number | null
+          location?: unknown
+          longitude?: number | null
           name?: string
+          population?: number | null
           search_text?: string | null
+          slug?: string
+          state_code?: string | null
+          state_name?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      countries: {
+        Row: {
+          created_at: string
+          iso2: string
+          iso3: string | null
+          name: string
+          population: number | null
+          region: string | null
+          slug: string
+          subregion: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          iso2: string
+          iso3?: string | null
+          name: string
+          population?: number | null
+          region?: string | null
+          slug: string
+          subregion?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          iso2?: string
+          iso3?: string | null
+          name?: string
+          population?: number | null
+          region?: string | null
+          slug?: string
+          subregion?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -584,7 +692,19 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      search_autocomplete: {
+        Row: {
+          country_code: string | null
+          label: string | null
+          location: unknown
+          rank_signal: number | null
+          ref: string | null
+          slug: string | null
+          type: string | null
+          type_priority: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       claim_questionnaire_response: {
@@ -605,6 +725,7 @@ export type Database = {
       insert_trip_from_json: { Args: { trip_data: Json }; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      unaccent: { Args: { "": string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "user"

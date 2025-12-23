@@ -1,10 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 import { Helmet } from "react-helmet-async";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import PlannerMap from "@/components/planner/PlannerMap";
-import PlannerPanel, { FlightRoutePoint } from "@/components/planner/PlannerPanel";
+import PlannerPanel, { FlightRoutePoint, CountrySelectionEvent } from "@/components/planner/PlannerPanel";
 import PlannerCard from "@/components/planner/PlannerCard";
-import PlannerChat, { FlightFormData } from "@/components/planner/PlannerChat";
+import PlannerChat, { FlightFormData, PlannerChatRef } from "@/components/planner/PlannerChat";
 import PlannerTopBar from "@/components/planner/PlannerTopBar";
 
 export type TabType = "flights" | "activities" | "stays" | "preferences";
@@ -31,6 +31,7 @@ const TravelPlanner = () => {
   const [flightRoutes, setFlightRoutes] = useState<FlightRoutePoint[]>([]);
   const [initialAnimationDone, setInitialAnimationDone] = useState(false);
   const [flightFormData, setFlightFormData] = useState<FlightFormData | null>(null);
+  const chatRef = useRef<PlannerChatRef>(null);
 
   const handleTabChange = useCallback((tab: TabType) => {
     // Toggle: if clicking on the same tab and panel is visible, close it
@@ -56,6 +57,11 @@ const TravelPlanner = () => {
     setSelectedPin(null);
   }, []);
 
+  const handleCountrySelected = useCallback((event: CountrySelectionEvent) => {
+    // Trigger the chat to ask about city in this country
+    chatRef.current?.injectSystemMessage(event);
+  }, []);
+
   return (
     <>
       <Helmet>
@@ -72,6 +78,7 @@ const TravelPlanner = () => {
           {/* Left: Chat - resizable */}
           <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
             <PlannerChat
+              ref={chatRef}
               onAction={(action) => {
                 if (action.type === "tab") {
                   setActiveTab(action.tab);
@@ -130,6 +137,7 @@ const TravelPlanner = () => {
                 onFlightRoutesChange={setFlightRoutes}
                 flightFormData={flightFormData}
                 onFlightFormDataConsumed={() => setFlightFormData(null)}
+                onCountrySelected={handleCountrySelected}
               />
 
               {/* Floating card on map */}

@@ -1,8 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useImperativeHandle, forwardRef } from "react";
 import { Send, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/logo-travliaq.png";
+import type { LocationResult } from "@/hooks/useLocationAutocomplete";
+import type { CountrySelectionEvent } from "./PlannerPanel";
 
 export type ChatQuickAction =
   | { type: "tab"; tab: "flights" | "activities" | "stays" | "preferences" }
@@ -21,13 +23,18 @@ export interface FlightFormData {
 
 interface ChatMessage {
   id: string;
-  role: "assistant" | "user";
+  role: "assistant" | "user" | "system";
   text: string;
   isTyping?: boolean;
+  isHidden?: boolean; // Hidden messages are sent to LLM but not shown
 }
 
 interface PlannerChatProps {
   onAction: (action: ChatQuickAction) => void;
+}
+
+export interface PlannerChatRef {
+  injectSystemMessage: (event: CountrySelectionEvent) => void;
 }
 
 // City coordinates for map actions
@@ -100,7 +107,7 @@ function parseAction(content: string): { cleanContent: string; action: ChatQuick
   return { cleanContent, action: null };
 }
 
-export default function PlannerChat({ onAction }: PlannerChatProps) {
+const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onAction }, ref) => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -119,6 +126,74 @@ export default function PlannerChat({ onAction }: PlannerChatProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Expose method to inject system messages (for country selection)
+  useImperativeHandle(ref, () => ({
+    injectSystemMessage: async (event: CountrySelectionEvent) => {
+      const fieldName = event.field === "from" ? "départ" : "destination";
+      const countryName = event.country.name;
+      
+      // Create a hidden system message to inform the LLM about the country selection
+      const systemText = `[SYSTÈME] L'utilisateur a sélectionné le pays "${countryName}" comme ${fieldName}. Pour les vols, nous avons besoin d'un aéroport ou d'une ville précise, pas d'un pays. Demande-lui quelle ville dans ${countryName} il souhaite utiliser comme ${fieldName}.`;
+      
+      // Add a hidden message for context
+      setMessages((prev) => [
+        ...prev,
+        { id: `system-${Date.now()}`, role: "system" as const, text: systemText, isHidden: true },
+      ]);
+
+      // Trigger the LLM to respond
+      setIsLoading(true);
+      const typingId = `typing-${Date.now()}`;
+      setMessages((prev) => [
+        ...prev,
+        { id: typingId, role: "assistant", text: "", isTyping: true },
+      ]);
+
+      try {
+        // Build conversation history including the system message
+        const apiMessages = messages
+          .filter((m) => !m.isTyping && m.id !== "welcome")
+          .map((m) => ({ role: m.role === "system" ? "user" : m.role, content: m.text }));
+        apiMessages.push({ role: "user", content: systemText });
+
+        const { data, error } = await supabase.functions.invoke("planner-chat", {
+          body: { messages: apiMessages },
+        });
+
+        if (error) {
+          console.error("Chat API error:", error);
+          throw new Error(error.message);
+        }
+
+        const rawContent = data?.content || `Dans quelle ville de ${countryName} souhaitez-vous partir/arriver ?`;
+        const { cleanContent } = parseAction(rawContent);
+
+        setMessages((prev) =>
+          prev
+            .filter((m) => m.id !== typingId)
+            .concat({
+              id: `bot-${Date.now()}`,
+              role: "assistant",
+              text: cleanContent,
+            })
+        );
+      } catch (err) {
+        console.error("Failed to get chat response:", err);
+        setMessages((prev) =>
+          prev
+            .filter((m) => m.id !== typingId)
+            .concat({
+              id: `bot-${Date.now()}`,
+              role: "assistant",
+              text: `Je vois que vous avez sélectionné ${countryName}. Dans quelle ville de ce pays souhaitez-vous ${event.field === "from" ? "partir" : "arriver"} ?`,
+            })
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    },
+  }));
 
   const send = async () => {
     if (!input.trim() || isLoading) return;
@@ -142,10 +217,10 @@ export default function PlannerChat({ onAction }: PlannerChatProps) {
     ]);
 
     try {
-      // Build conversation history for API
+      // Build conversation history for API (exclude hidden system messages from display but include in context)
       const apiMessages = messages
         .filter((m) => !m.isTyping && m.id !== "welcome")
-        .map((m) => ({ role: m.role, content: m.text }));
+        .map((m) => ({ role: m.role === "system" ? "user" : m.role, content: m.text }));
       apiMessages.push({ role: "user", content: userText });
 
       const { data, error } = await supabase.functions.invoke("planner-chat", {
@@ -213,7 +288,7 @@ export default function PlannerChat({ onAction }: PlannerChatProps) {
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto py-6 px-4 space-y-6">
-          {messages.map((m) => (
+          {messages.filter((m) => !m.isHidden).map((m) => (
             <div
               key={m.id}
               className={cn(
@@ -314,4 +389,8 @@ export default function PlannerChat({ onAction }: PlannerChatProps) {
       </div>
     </aside>
   );
-}
+});
+
+PlannerChatComponent.displayName = "PlannerChat";
+
+export default PlannerChatComponent;

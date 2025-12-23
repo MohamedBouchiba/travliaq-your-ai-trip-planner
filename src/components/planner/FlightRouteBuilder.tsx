@@ -1,12 +1,11 @@
 import { useState, useRef, useEffect } from "react";
-import { Plus, X, ArrowLeftRight, MapPin, PlaneTakeoff, PlaneLanding } from "lucide-react";
+import { Plus, X, ArrowLeftRight, MapPin, PlaneTakeoff, PlaneLanding, Globe, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import PlannerCalendar from "./PlannerCalendar";
-import { useCitySearch, City } from "@/hooks/useCitySearch";
+import { useLocationAutocomplete, LocationResult, LocationType } from "@/hooks/useLocationAutocomplete";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-
 
 export interface FlightLeg {
   id: string;
@@ -14,6 +13,9 @@ export interface FlightLeg {
   to: string;
   date?: Date;
   returnDate?: Date;
+  // Location metadata for when we need to handle country selection
+  fromLocation?: LocationResult;
+  toLocation?: LocationResult;
 }
 
 interface FlightRouteBuilderProps {
@@ -21,21 +23,35 @@ interface FlightRouteBuilderProps {
   onLegsChange: (legs: FlightLeg[]) => void;
   maxLegs?: number;
   tripType?: "roundtrip" | "oneway" | "multi";
+  onCountrySelected?: (field: "from" | "to", country: LocationResult) => void;
 }
 
 interface CityInputProps {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string, location?: LocationResult) => void;
   placeholder: string;
   icon?: "from" | "to";
+  onCountrySelected?: (country: LocationResult) => void;
 }
 
-function CityInput({ value, onChange, placeholder, icon }: CityInputProps) {
+// Icon for location type
+function LocationTypeIcon({ type }: { type: LocationType }) {
+  switch (type) {
+    case "airport":
+      return <Building2 className="h-3 w-3 text-primary shrink-0" />;
+    case "country":
+      return <Globe className="h-3 w-3 text-amber-500 shrink-0" />;
+    default:
+      return <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />;
+  }
+}
+
+function CityInput({ value, onChange, placeholder, icon, onCountrySelected }: CityInputProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
   const justSelectedRef = useRef(false);
-  const { data: cities = [], isLoading } = useCitySearch(search, isOpen);
+  const { data: locations = [], isLoading } = useLocationAutocomplete(search, isOpen);
 
   // Keep input text in sync with external value (except right after a selection)
   useEffect(() => {
@@ -45,13 +61,25 @@ function CityInput({ value, onChange, placeholder, icon }: CityInputProps) {
     justSelectedRef.current = false;
   }, [value]);
 
-  const handleSelect = (city: City) => {
-    const newValue = `${city.name}, ${city.country}`;
+  const handleSelect = (location: LocationResult) => {
     justSelectedRef.current = true;
-    setSearch(newValue);
-    onChange(newValue);
-    setIsOpen(false);
-    inputRef.current?.blur();
+    
+    if (location.type === "country") {
+      // If a country is selected, notify parent and keep the search open
+      setSearch(location.name);
+      onChange(location.name, location);
+      setIsOpen(false);
+      inputRef.current?.blur();
+      
+      // Trigger the country selection callback
+      onCountrySelected?.(location);
+    } else {
+      // For cities and airports, use the display name
+      setSearch(location.display_name);
+      onChange(location.display_name, location);
+      setIsOpen(false);
+      inputRef.current?.blur();
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,7 +97,6 @@ function CityInput({ value, onChange, placeholder, icon }: CityInputProps) {
   };
 
   const handleBlur = () => {
-    // If blur comes from clicking a suggestion, do nothing (prevents overwriting the selection)
     if (justSelectedRef.current) return;
     if (search.trim() === "" && value) {
       setSearch(value);
@@ -99,7 +126,7 @@ function CityInput({ value, onChange, placeholder, icon }: CityInputProps) {
         </div>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-64 p-0 max-h-60 overflow-y-auto" 
+        className="w-72 p-0 max-h-60 overflow-y-auto" 
         align="start"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
@@ -107,26 +134,40 @@ function CityInput({ value, onChange, placeholder, icon }: CityInputProps) {
           <div className="p-3 text-xs text-muted-foreground text-center">
             Recherche...
           </div>
-        ) : cities.length === 0 ? (
+        ) : locations.length === 0 ? (
           <div className="p-3 text-xs text-muted-foreground text-center">
-            {search.length < 2 ? "Tapez au moins 2 caractères" : "Aucune ville trouvée"}
+            {search.length < 2 ? "Tapez au moins 2 caractères" : "Aucun résultat trouvé"}
           </div>
         ) : (
           <div className="py-1">
-            {cities.slice(0, 8).map((city) => (
+            {locations.slice(0, 10).map((location) => (
               <button
-                key={city.id}
+                key={`${location.type}-${location.id}`}
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => handleSelect(city)}
+                onClick={() => handleSelect(location)}
                 className="w-full px-3 py-2 text-left hover:bg-muted/50 transition-colors flex items-center gap-2"
               >
-                <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
-                <div className="min-w-0">
-                  <div className="text-xs font-medium text-foreground truncate">
-                    {city.name}
+                <LocationTypeIcon type={location.type} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-medium text-foreground truncate flex items-center gap-1.5">
+                    {location.name}
+                    {location.iata && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold">
+                        {location.iata}
+                      </span>
+                    )}
                   </div>
-                  <div className="text-[10px] text-muted-foreground truncate">
-                    {city.country}
+                  <div className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
+                    <span className="capitalize">{
+                      location.type === "airport" ? "Aéroport" :
+                      location.type === "country" ? "Pays" : "Ville"
+                    }</span>
+                    {location.type !== "country" && (
+                      <>
+                        <span>•</span>
+                        <span>{location.country_name}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </button>
@@ -143,9 +184,9 @@ export default function FlightRouteBuilder({
   onLegsChange,
   maxLegs = 4,
   tripType = "roundtrip",
+  onCountrySelected,
 }: FlightRouteBuilderProps) {
   const [activeLegCalendar, setActiveLegCalendar] = useState<string | null>(null);
-  // Persist calendar display preferences
   const [showPrices, setShowPrices] = useState(false);
   const [showWeather, setShowWeather] = useState(false);
 
@@ -158,7 +199,13 @@ export default function FlightRouteBuilder({
   const swapCities = (id: string) => {
     onLegsChange(
       legs.map((leg) =>
-        leg.id === id ? { ...leg, from: leg.to, to: leg.from } : leg
+        leg.id === id ? { 
+          ...leg, 
+          from: leg.to, 
+          to: leg.from,
+          fromLocation: leg.toLocation,
+          toLocation: leg.fromLocation
+        } : leg
       )
     );
   };
@@ -173,6 +220,7 @@ export default function FlightRouteBuilder({
         from: lastLeg?.to || "",
         to: "",
         date: undefined,
+        fromLocation: lastLeg?.toLocation,
       },
     ]);
   };
@@ -187,9 +235,7 @@ export default function FlightRouteBuilder({
 
   const handleDateSelect = (legId: string, range: { from?: Date; to?: Date }) => {
     if (tripType === "roundtrip") {
-      // For round-trip, store both dates
       updateLeg(legId, { date: range.from, returnDate: range.to });
-      // Only close calendar if we have both dates or user explicitly closes
       if (range.from && range.to) {
         setActiveLegCalendar(null);
       }
@@ -201,6 +247,22 @@ export default function FlightRouteBuilder({
     }
   };
 
+  const handleFromChange = (legId: string, value: string, location?: LocationResult) => {
+    updateLeg(legId, { from: value, fromLocation: location });
+    
+    if (location?.type === "country") {
+      onCountrySelected?.("from", location);
+    }
+  };
+
+  const handleToChange = (legId: string, value: string, location?: LocationResult) => {
+    updateLeg(legId, { to: value, toLocation: location });
+    
+    if (location?.type === "country") {
+      onCountrySelected?.("to", location);
+    }
+  };
+
   return (
     <div className="space-y-2">
       {legs.map((leg, index) => (
@@ -209,9 +271,10 @@ export default function FlightRouteBuilder({
             {/* From city */}
             <CityInput
               value={leg.from}
-              onChange={(value) => updateLeg(leg.id, { from: value })}
+              onChange={(value, location) => handleFromChange(leg.id, value, location)}
               placeholder="Départ"
               icon="from"
+              onCountrySelected={(country) => onCountrySelected?.("from", country)}
             />
 
             {/* Swap button */}
@@ -226,11 +289,10 @@ export default function FlightRouteBuilder({
             {/* To city */}
             <CityInput
               value={leg.to}
-              onChange={(value) => {
-                updateLeg(leg.id, { to: value });
-              }}
+              onChange={(value, location) => handleToChange(leg.id, value, location)}
               placeholder="Destination"
               icon="to"
+              onCountrySelected={(country) => onCountrySelected?.("to", country)}
             />
 
             {/* Date picker trigger(s) */}
@@ -286,7 +348,6 @@ export default function FlightRouteBuilder({
           {/* Calendar for this leg */}
           {activeLegCalendar === leg.id && (
             <div className="p-3 rounded-xl border border-border/40 bg-card relative">
-              {/* Close button */}
               <button
                 onClick={() => setActiveLegCalendar(null)}
                 className="absolute top-2 right-2 p-1.5 rounded-full hover:bg-muted/50 transition-colors z-10"

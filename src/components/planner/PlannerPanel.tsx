@@ -5,6 +5,7 @@ import type { TabType } from "@/pages/TravelPlanner";
 import { Slider } from "@/components/ui/slider";
 import PlannerCalendar from "./PlannerCalendar";
 import FlightRouteBuilder, { FlightLeg } from "./FlightRouteBuilder";
+import type { LocationResult } from "@/hooks/useLocationAutocomplete";
 
 export interface FlightRoutePoint {
   city: string;
@@ -21,6 +22,11 @@ export interface FlightFormData {
   tripType?: "roundtrip" | "oneway" | "multi";
 }
 
+export interface CountrySelectionEvent {
+  field: "from" | "to";
+  country: LocationResult;
+}
+
 interface PlannerPanelProps {
   activeTab: TabType;
   onMapMove: (center: [number, number], zoom: number) => void;
@@ -30,6 +36,7 @@ interface PlannerPanelProps {
   onFlightRoutesChange?: (routes: FlightRoutePoint[]) => void;
   flightFormData?: FlightFormData | null;
   onFlightFormDataConsumed?: () => void;
+  onCountrySelected?: (event: CountrySelectionEvent) => void;
 }
 
 const tabLabels: Record<TabType, string> = {
@@ -39,7 +46,7 @@ const tabLabels: Record<TabType, string> = {
   preferences: "Préférences",
 };
 
-const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVisible = true, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed }: PlannerPanelProps) => {
+const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVisible = true, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed, onCountrySelected }: PlannerPanelProps) => {
   if (!isVisible && layout === "overlay") return null;
 
   const wrapperClass =
@@ -68,7 +75,7 @@ const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVis
           </div>
         )}
         <div className="flex-1 overflow-y-auto themed-scroll p-4 max-h-[calc(100vh-8rem)]">
-          {activeTab === "flights" && <FlightsPanel onMapMove={onMapMove} onFlightRoutesChange={onFlightRoutesChange} flightFormData={flightFormData} onFlightFormDataConsumed={onFlightFormDataConsumed} />}
+          {activeTab === "flights" && <FlightsPanel onMapMove={onMapMove} onFlightRoutesChange={onFlightRoutesChange} flightFormData={flightFormData} onFlightFormDataConsumed={onFlightFormDataConsumed} onCountrySelected={onCountrySelected} />}
           {activeTab === "activities" && <ActivitiesPanel />}
           {activeTab === "stays" && <StaysPanel />}
           {activeTab === "preferences" && <PreferencesPanel />}
@@ -129,11 +136,12 @@ interface FlightOptions {
 }
 
 // Flights Panel
-const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed }: { 
+const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed, onCountrySelected }: { 
   onMapMove: (center: [number, number], zoom: number) => void;
   onFlightRoutesChange?: (routes: FlightRoutePoint[]) => void;
   flightFormData?: FlightFormData | null;
   onFlightFormDataConsumed?: () => void;
+  onCountrySelected?: (event: CountrySelectionEvent) => void;
 }) => {
   const [tripType, setTripType] = useState<"roundtrip" | "oneway" | "multi">("roundtrip");
   const [legs, setLegs] = useState<FlightLeg[]>([
@@ -328,6 +336,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
         onLegsChange={handleLegsChange}
         maxLegs={getMaxLegs()}
         tripType={tripType}
+        onCountrySelected={(field, country) => onCountrySelected?.({ field, country })}
       />
 
       {/* Passengers & Baggage Section */}
