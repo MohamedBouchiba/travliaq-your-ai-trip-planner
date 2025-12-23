@@ -87,7 +87,11 @@ serve(async (req) => {
     const searchUrl = `https://www.googleapis.com/youtube/v3/search?${searchParams}`;
     console.log(`[youtube-shorts] Fetching from YouTube API...`);
 
-    const response = await fetch(searchUrl);
+    const response = await fetch(searchUrl, {
+      headers: {
+        "Referer": "https://cinbnmlfpffmyjmkwbco.supabase.co",
+      },
+    });
     
     if (!response.ok) {
       const errorText = await response.text();
