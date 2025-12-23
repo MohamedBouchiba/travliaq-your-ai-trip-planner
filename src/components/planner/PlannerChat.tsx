@@ -30,6 +30,10 @@ export interface FlightFormData {
   children?: number;
   infants?: number;
   needsTravelersWidget?: boolean;
+  needsDateWidget?: boolean;
+  tripDuration?: string;
+  preferredMonth?: string;
+  budgetHint?: string;
   tripType?: "roundtrip" | "oneway" | "multi";
 }
 
@@ -454,6 +458,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
   ]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchButtonShownRef = useRef(false);
+  const pendingTravelersWidgetRef = useRef(false); // Track if we need to show travelers widget after date selection
+  const pendingTripDurationRef = useRef<string | null>(null); // Store trip duration for calculating return date
   
   // Access flight memory
   const { memory, updateMemory, isReadyToSearch, hasCompleteInfo, needsAirportSelection, missingFields, getMemorySummary } = useFlightMemory();
@@ -658,6 +664,24 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
     // Update memory
     if (dateType === "departure") {
       updateMemory({ departureDate: date });
+      
+      // If we have a pending trip duration, calculate return date
+      if (pendingTripDurationRef.current) {
+        const duration = pendingTripDurationRef.current;
+        const match = duration.match(/(\d+)\s*(semaine|jour|week|day)/i);
+        if (match) {
+          const num = parseInt(match[1]);
+          const unit = match[2].toLowerCase();
+          let days = num;
+          if (unit.includes("semaine") || unit.includes("week")) {
+            days = num * 7;
+          }
+          const returnDate = new Date(date);
+          returnDate.setDate(returnDate.getDate() + days);
+          updateMemory({ returnDate });
+        }
+        pendingTripDurationRef.current = null;
+      }
     } else {
       updateMemory({ returnDate: date });
     }
@@ -669,22 +693,43 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       )
     );
 
-    // Add confirmation
+    // Add confirmation message
     const confirmText = dateType === "departure"
       ? `✓ Date de départ : **${format(date, "d MMMM yyyy", { locale: fr })}**`
       : `✓ Date de retour : **${format(date, "d MMMM yyyy", { locale: fr })}**`;
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `confirm-date-${Date.now()}`,
-        role: "assistant",
-        text: confirmText,
-      },
-    ]);
-
-    // Ask for next missing field if any
-    setTimeout(() => askNextMissingField(), 300);
+    // Check if we need to show travelers widget next
+    if (dateType === "departure" && pendingTravelersWidgetRef.current) {
+      pendingTravelersWidgetRef.current = false;
+      
+      // Calculate and show return date if we had duration
+      let returnInfo = "";
+      if (memory.returnDate) {
+        returnInfo = ` Retour prévu le ${format(memory.returnDate, "d MMMM", { locale: fr })}.`;
+      }
+      
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `confirm-date-${Date.now()}`,
+          role: "assistant",
+          text: `${confirmText}${returnInfo} Maintenant, combien êtes-vous ? 🧳`,
+          widget: "travelersSelector",
+        },
+      ]);
+    } else {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `confirm-date-${Date.now()}`,
+          role: "assistant",
+          text: confirmText,
+        },
+      ]);
+      
+      // Ask for next missing field if any
+      setTimeout(() => askNextMissingField(), 300);
+    }
   };
 
   // Handle travelers selection from widget
@@ -974,14 +1019,27 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       const { content, flightData } = await streamResponse(apiMessages, messageId);
       const { cleanContent, action } = parseAction(content || "Désolé, je n'ai pas pu répondre.");
 
-      // Detect if we need to show travelers widget
+      // Detect which widget to show (PRIORITY: only ONE widget at a time)
+      let showDateWidget = false;
       let showTravelersWidget = false;
       
       if (flightData && Object.keys(flightData).length > 0) {
-        // Check if needsTravelersWidget is set
+        // Check widget flags - prioritize date widget first
+        showDateWidget = flightData.needsDateWidget === true;
         showTravelersWidget = flightData.needsTravelersWidget === true;
         
-        // Update memory with extracted data (excluding the widget flag)
+        // Store pending widgets for sequential display
+        if (showDateWidget && showTravelersWidget) {
+          // Date widget first, then travelers
+          pendingTravelersWidgetRef.current = true;
+        }
+        
+        // Store trip duration for return date calculation
+        if (flightData.tripDuration) {
+          pendingTripDurationRef.current = flightData.tripDuration;
+        }
+        
+        // Update memory with extracted data (excluding widget flags)
         const memoryUpdates = flightDataToMemory(flightData);
         updateMemory(memoryUpdates);
 
@@ -1002,14 +1060,14 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
         onAction(action);
       }
 
-      // Check if AI response suggests showing a widget
+      // Determine widget to show - ONLY ONE at a time, with priority order:
+      // 1. Date picker (if needsDateWidget and no departure date yet)
+      // 2. Travelers selector (if needsTravelersWidget)
       let widget: WidgetType | undefined;
-      if (showTravelersWidget) {
-        widget = "travelersSelector";
-      } else if (cleanContent.toLowerCase().includes("date") && missingFields.includes("departureDate")) {
+      if (showDateWidget && !memory.departureDate) {
         widget = "datePicker";
-      } else if (cleanContent.toLowerCase().includes("retour") && missingFields.includes("returnDate")) {
-        widget = "returnDatePicker";
+      } else if (showTravelersWidget) {
+        widget = "travelersSelector";
       }
 
       setMessages((prev) =>

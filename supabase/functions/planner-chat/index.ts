@@ -12,46 +12,62 @@ const flightExtractionTool = {
   type: "function",
   function: {
     name: "update_flight_widget",
-    description: "Extract flight search parameters from user message. CRITICAL: Never guess passenger counts - if user implies multiple travelers without explicit numbers, set needsTravelersWidget to true.",
+    description: "Extract ONLY explicit flight info. Never guess or infer values. If info is vague, set the corresponding 'needs*Widget' flag to show an interactive widget instead.",
     parameters: {
       type: "object",
       properties: {
         from: {
           type: "string",
-          description: "Departure city or airport. Extract from phrases like 'depuis Paris', 'from Brussels', 'je pars de Lyon', 'départ de Nice'"
+          description: "Departure city. ONLY extract if explicitly mentioned: 'depuis Paris', 'de Lyon', 'je pars de Nice'. Never guess."
         },
         to: {
           type: "string", 
-          description: "Destination city or airport. Extract from phrases like 'aller à Rome', 'vers Tokyo', 'destination Barcelone', 'pour New York'"
+          description: "Destination city. Extract from: 'aller à Rome', 'vers Tokyo', 'direction Barcelone'."
         },
         departureDate: {
           type: "string",
-          description: "Departure date in ISO format YYYY-MM-DD. Parse dates like '15 janvier', 'next week', 'in March', 'le 20 mars 2025'. Use current year 2025 if not specified."
+          description: "ONLY extract if user gives EXACT date like 'le 15 janvier', 'le 20 mars'. NEVER extract from vague terms like 'en février', 'au printemps', 'cet été', 'dans 2 semaines'. For vague dates, use needsDateWidget instead."
         },
         returnDate: {
           type: "string",
-          description: "Return date in ISO format YYYY-MM-DD. Parse from phrases like 'retour le 22', 'jusqu'au 28', 'pendant une semaine' (add 7 days to departure)"
+          description: "ONLY extract if user gives EXACT return date like 'retour le 22'. For duration like '3 semaines', set tripDuration instead."
+        },
+        tripDuration: {
+          type: "string",
+          description: "Duration mentioned: '3 semaines', '10 jours', '1 semaine'. Used to calculate return date AFTER user picks departure date."
+        },
+        preferredMonth: {
+          type: "string",
+          description: "If user mentions a month without specific date: 'en février', 'au mois de mars', 'cet été'. We'll ask for exact date."
         },
         adults: {
           type: "number",
-          description: "ONLY set if user gives EXPLICIT count like '2 adultes', 'nous sommes 3 adultes', 'je suis seul/solo' (=1). Never guess."
+          description: "ONLY if EXPLICIT: '2 adultes', 'nous sommes 3', 'solo/seul' (=1). Never guess."
         },
         children: {
           type: "number",
-          description: "ONLY set if user gives EXPLICIT count like '2 enfants', 'avec 1 enfant de 5 ans'. Never guess."
+          description: "ONLY if EXPLICIT: '2 enfants', '1 enfant de 8 ans'. Never guess."
         },
         infants: {
           type: "number",
-          description: "ONLY set if explicitly mentioned like '1 bébé', 'un nourrisson'. Never guess."
+          description: "ONLY if EXPLICIT: '1 bébé'. Never guess."
+        },
+        needsDateWidget: {
+          type: "boolean",
+          description: "Set TRUE when user mentions VAGUE timing: 'en février', 'au printemps', 'cet été', 'le mois prochain', 'bientôt', 'dans quelques semaines'. This triggers a date picker widget."
         },
         needsTravelersWidget: {
           type: "boolean",
-          description: "Set TRUE whenever user implies traveling with others WITHOUT giving exact numbers. Triggers include: 'en famille', 'avec ma famille', 'en groupe', 'groupe d'amis', 'avec des amis', 'entre amis', 'avec des copains', 'avec des copines', 'avec mes potes', 'entre potes', 'avec des enfants', 'avec mes enfants', 'voyage familial', 'vacances en famille', 'en couple', 'avec ma femme/mon mari', 'avec mon/ma conjoint(e)', 'avec mes parents', 'en tribu', 'tous ensemble', 'on part à plusieurs', 'voyage de groupe', 'avec les enfants', 'toute la famille', 'week-end entre amis', 'escapade en groupe'. Basically ANY mention of traveling with others where you don't have explicit numbers."
+          description: "Set TRUE when user implies multiple travelers WITHOUT exact numbers: 'en famille', 'entre potes', 'entre amis', 'avec des copains', 'en groupe', 'en couple', 'avec mes enfants', etc."
         },
         tripType: {
           type: "string",
           enum: ["roundtrip", "oneway", "multi"],
-          description: "Trip type: 'roundtrip' if return date mentioned or implied, 'oneway' if explicitly one-way, 'multi' for multiple destinations"
+          description: "Trip type based on context. Default to 'roundtrip' if duration or return mentioned."
+        },
+        budgetHint: {
+          type: "string",
+          description: "Budget preference mentioned: 'pas cher', 'économique', 'luxe', 'budget serré'."
         }
       },
       required: []
@@ -66,9 +82,8 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, stream = false } = await req.json();
-    console.log("Received messages:", JSON.stringify(messages, null, 2), "stream:", stream);
-    console.log("Received messages:", JSON.stringify(messages, null, 2), "stream:", stream);
+    const { messages, stream = false, currentStep } = await req.json();
+    console.log("Received messages:", JSON.stringify(messages, null, 2), "stream:", stream, "currentStep:", currentStep);
 
     const AZURE_OPENAI_API_KEY = Deno.env.get("AZURE_OPENAI_API_KEY");
     const AZURE_OPENAI_ENDPOINT = Deno.env.get("AZURE_OPENAI_ENDPOINT");
@@ -81,61 +96,80 @@ serve(async (req) => {
     }
 
     const apiVersion = AZURE_OPENAI_API_VERSION || "2025-01-01-preview";
-    const url = `${AZURE_OPENAI_ENDPOINT}openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=${apiVersion}`;
+    const url = \`\${AZURE_OPENAI_ENDPOINT}openai/deployments/\${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=\${apiVersion}\`;
 
     console.log("Calling Azure OpenAI:", url);
 
-    const systemPrompt = `Tu es un assistant de voyage expert pour Travliaq. Ton rôle est d'aider les utilisateurs à planifier le voyage parfait en collectant les informations nécessaires de manière naturelle et conversationnelle.
+    const systemPrompt = \`Tu es un assistant de voyage bienveillant pour Travliaq. Tu guides l'utilisateur pas à pas, UNE QUESTION À LA FOIS, pour l'aider à trouver son vol idéal.
 
-## TON OBJECTIF PRINCIPAL
-Collecter les informations de vol étape par étape. Tu dois être proactif et poser des questions pertinentes.
+## RÈGLE D'OR : UNE ÉTAPE À LA FOIS
+Tu ne poses qu'UNE SEULE question par message. Tu ne montres qu'UN SEUL widget à la fois.
+Tu agis comme un conseiller patient qui accompagne l'utilisateur doucement.
 
-## RÈGLE CRITIQUE SUR LES VOYAGEURS
-**NE JAMAIS DEVINER le nombre de voyageurs !**
-- Si l'utilisateur dit "en famille", "avec des enfants", "en groupe", "voyage familial" → utilise needsTravelersWidget: true
-- N'extrais le nombre QUE si l'utilisateur donne des chiffres EXPLICITES comme "2 adultes et 1 enfant"
-- Le widget interactif s'affichera automatiquement pour que l'utilisateur sélectionne précisément
+## CE QUE TU NE FAIS JAMAIS
+- ❌ Ne jamais deviner les dates ("en février" → ne PAS mettre "1er au 22 février")
+- ❌ Ne jamais deviner le nombre de voyageurs ("entre potes" → ne PAS mettre 4)
+- ❌ Ne jamais poser plusieurs questions à la fois
+- ❌ Ne jamais montrer plusieurs widgets en même temps
+- ❌ Ne jamais proposer de chercher les aéroports avant d'avoir les infos essentielles
 
-## INFORMATIONS À COLLECTER
-1. **Destination** - Où veut-il aller ?
-2. **Ville de départ** - D'où part-il ?
-3. **Dates** - Quand veut-il partir et revenir ?
-4. **Voyageurs** - Combien d'adultes, enfants, bébés ? (demande TOUJOURS si pas explicite)
+## ORDRE STRICT DES ÉTAPES (une seule à la fois)
 
-## RÈGLES D'INTERACTION
+### Étape 1 : DESTINATION
+Si pas de destination → demande "Où souhaites-tu aller ?"
+Ne passe à l'étape 2 que quand la destination est claire.
 
-### Quand l'utilisateur mentionne un voyage :
-1. UTILISE l'outil update_flight_widget pour extraire les informations EXPLICITES uniquement
-2. Si mention de "famille", "enfants", etc. sans chiffres → needsTravelersWidget: true
-3. Pose UNE question à la fois pour les informations manquantes
+### Étape 2 : DATE DE DÉPART
+Si destination OK mais date vague/absente :
+- Si mois mentionné ("en février") → needsDateWidget: true + message gentil pour demander le jour exact
+- Si aucune date → demande "Quand souhaites-tu partir ?"
+Un widget calendrier s'affichera automatiquement.
 
-### Ordre de priorité :
-1. Si pas de destination → Demande où il veut aller
-2. Si destination mais pas de départ → Demande d'où il part
-3. Si départ et destination mais pas de dates → Demande quand il veut partir
-4. Si dates OK mais voyageurs pas clairs → Le widget s'affiche pour sélection
-5. Si tout est rempli → Confirme et invite à cliquer sur "Rechercher"
+### Étape 3 : DURÉE / DATE RETOUR
+Si date départ OK mais pas de retour :
+- Si durée mentionnée ("3 semaines") → enregistre tripDuration, calcule le retour
+- Sinon → demande "Combien de temps dure ton voyage ?"
 
-## EXEMPLES
+### Étape 4 : VOYAGEURS
+Si dates OK mais voyageurs pas clairs :
+- Si groupe mentionné ("entre potes") → needsTravelersWidget: true
+- Sinon → demande "Combien êtes-vous ?"
+Un widget de sélection s'affichera automatiquement.
 
-Utilisateur: "Je veux aller à Bagdad le 30 janvier pour 14 jours en famille"
-→ update_flight_widget avec {to: "Bagdad", departureDate: "2025-01-30", returnDate: "2025-02-13", tripType: "roundtrip", needsTravelersWidget: true}
-→ "Super choix Bagdad ! 🏛️ J'ai configuré les dates du 30 janvier au 13 février. Sélectionne le nombre de voyageurs ci-dessous pour continuer."
+### Étape 5 : VILLE DE DÉPART
+Seulement quand destination + dates + voyageurs sont OK :
+- Demande "D'où pars-tu ?"
 
-Utilisateur: "On sera 2 adultes et 3 enfants"
-→ update_flight_widget avec {adults: 2, children: 3}
-→ "Parfait, 2 adultes et 3 enfants ! Tu peux maintenant cliquer sur 'Rechercher' 🔍"
+### Étape 6 : CONFIRMATION
+Quand tout est complet → résume et propose de chercher les vols.
 
-Utilisateur: "Voyage solo à Tokyo"
-→ update_flight_widget avec {to: "Tokyo", adults: 1}
-→ "Tokyo en solo, excellent ! 🗼 D'où pars-tu ?"
+## EXEMPLES DE COMPORTEMENT
 
-## IMPORTANT
-- Date actuelle : ${new Date().toISOString().split('T')[0]}
+Utilisateur: "je veux aller a pekin entre pote en février pour 3 semaines pas cher"
+→ Extraction: {to: "Beijing", preferredMonth: "février", tripDuration: "3 semaines", needsTravelersWidget: true, needsDateWidget: true, budgetHint: "pas cher", tripType: "roundtrip"}
+→ Réponse: "Super choix Pékin ! 🏯 Tu mentionnes février – quel jour exactement souhaites-tu partir ?"
+(Le calendrier s'affiche, on s'occupe UNIQUEMENT de la date pour l'instant)
+
+Utilisateur sélectionne le 10 février via widget calendrier
+→ Réponse: "Parfait, départ le 10 février ! Pour 3 semaines, ça fait retour le 3 mars. Maintenant, dis-moi combien vous êtes ?"
+(Le widget voyageurs s'affiche)
+
+Utilisateur confirme 4 adultes
+→ Réponse: "Super, 4 adultes ! D'où partez-vous ?"
+
+Utilisateur: "de Bruxelles"
+→ Réponse: "Excellent ! Récapitulatif : Bruxelles → Pékin, du 10 février au 3 mars, 4 adultes. Clique sur Rechercher pour voir les meilleurs prix ! 🔍"
+
+## STYLE
+- Chaleureux et bienveillant 🌟
+- Emojis avec modération
+- Phrases courtes (1-2 max)
+- Toujours encourageant
+
+## INFOS TECHNIQUES
+- Date actuelle : \${new Date().toISOString().split('T')[0]}
 - Année par défaut : 2025
-- Réponds TOUJOURS en français
-- Réponses courtes (2-3 phrases max)
-- NE JAMAIS inventer de nombre de voyageurs`;
+- Réponds en français\`;
 
     // Non-streaming request (for tool calls)
     const response = await fetch(url, {
