@@ -82,8 +82,8 @@ serve(async (req) => {
 
     console.log("Authenticated user:", user.id);
 
-    const { messages } = await req.json();
-    console.log("Received messages:", JSON.stringify(messages, null, 2));
+    const { messages, stream = false } = await req.json();
+    console.log("Received messages:", JSON.stringify(messages, null, 2), "stream:", stream);
 
     const AZURE_OPENAI_API_KEY = Deno.env.get("AZURE_OPENAI_API_KEY");
     const AZURE_OPENAI_ENDPOINT = Deno.env.get("AZURE_OPENAI_ENDPOINT");
@@ -157,6 +157,7 @@ Utilisateur: "On sera 2"
 - Réponds TOUJOURS en français
 - Garde tes réponses courtes (2-3 phrases max)`;
 
+    // Non-streaming request (for tool calls)
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -172,6 +173,7 @@ Utilisateur: "On sera 2"
         max_tokens: 500,
         tools: [flightExtractionTool],
         tool_choice: "auto",
+        stream: false, // First call is never streamed to handle tools
       }),
     });
 
@@ -217,42 +219,152 @@ Utilisateur: "On sera 2"
 
     // If we got a tool call but no content, we need a follow-up call
     if (!content && choice?.message?.tool_calls) {
-      console.log("Making follow-up call for conversational response");
-      const followUpResponse = await fetch(url, {
-        method: "POST",
-        headers: {
-          "api-key": AZURE_OPENAI_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...messages,
-            choice.message,
-            {
-              role: "tool",
-              tool_call_id: choice.message.tool_calls[0].id,
-              content: JSON.stringify({ 
-                success: true, 
-                message: "Widget mis à jour",
-                extracted: flightData 
-              })
+      console.log("Making follow-up call for conversational response, stream:", stream);
+      
+      const followUpMessages = [
+        { role: "system", content: systemPrompt },
+        ...messages,
+        choice.message,
+        {
+          role: "tool",
+          tool_call_id: choice.message.tool_calls[0].id,
+          content: JSON.stringify({ 
+            success: true, 
+            message: "Widget mis à jour",
+            extracted: flightData 
+          })
+        }
+      ];
+
+      if (stream) {
+        // Streaming response
+        const followUpResponse = await fetch(url, {
+          method: "POST",
+          headers: {
+            "api-key": AZURE_OPENAI_API_KEY,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messages: followUpMessages,
+            temperature: 0.7,
+            max_tokens: 300,
+            stream: true,
+          }),
+        });
+
+        if (!followUpResponse.ok) {
+          const errText = await followUpResponse.text();
+          console.error("Streaming follow-up call failed:", errText);
+          return new Response(JSON.stringify({ content: "J'ai mis à jour la recherche de vol pour toi.", flightData }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Return streaming response with flightData in a special first chunk
+        const encoder = new TextEncoder();
+        const readableStream = new ReadableStream({
+          async start(controller) {
+            // Send flightData first as a special event
+            if (flightData) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "flightData", flightData })}\n\n`));
             }
-          ],
-          temperature: 0.7,
-          max_tokens: 300,
-        }),
+
+            const reader = followUpResponse.body!.getReader();
+            const decoder = new TextDecoder();
+
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split("\n").filter(line => line.trim() !== "");
+
+                for (const line of lines) {
+                  if (line.startsWith("data: ")) {
+                    const jsonStr = line.slice(6);
+                    if (jsonStr === "[DONE]") {
+                      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                      continue;
+                    }
+                    try {
+                      const parsed = JSON.parse(jsonStr);
+                      const delta = parsed.choices?.[0]?.delta?.content;
+                      if (delta) {
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "content", content: delta })}\n\n`));
+                      }
+                    } catch (e) {
+                      // Ignore parse errors for incomplete chunks
+                    }
+                  }
+                }
+              }
+            } finally {
+              reader.releaseLock();
+              controller.close();
+            }
+          }
+        });
+
+        return new Response(readableStream, {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+          },
+        });
+      } else {
+        // Non-streaming follow-up
+        const followUpResponse = await fetch(url, {
+          method: "POST",
+          headers: {
+            "api-key": AZURE_OPENAI_API_KEY,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messages: followUpMessages,
+            temperature: 0.7,
+            max_tokens: 300,
+          }),
+        });
+
+        if (followUpResponse.ok) {
+          const followUpData = await followUpResponse.json();
+          content = followUpData.choices?.[0]?.message?.content || "J'ai mis à jour la recherche de vol pour toi.";
+          console.log("Follow-up response:", content);
+        } else {
+          const errText = await followUpResponse.text();
+          console.error("Follow-up call failed:", errText);
+          content = "J'ai mis à jour la recherche de vol pour toi.";
+        }
+      }
+    } else if (stream && content) {
+      // If we already have content but streaming was requested, simulate streaming
+      const encoder = new TextEncoder();
+      const readableStream = new ReadableStream({
+        async start(controller) {
+          if (flightData) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "flightData", flightData })}\n\n`));
+          }
+          
+          // Send content character by character with small delay
+          for (const char of content) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "content", content: char })}\n\n`));
+          }
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        }
       });
 
-      if (followUpResponse.ok) {
-        const followUpData = await followUpResponse.json();
-        content = followUpData.choices?.[0]?.message?.content || "J'ai mis à jour la recherche de vol pour toi.";
-        console.log("Follow-up response:", content);
-      } else {
-        const errText = await followUpResponse.text();
-        console.error("Follow-up call failed:", errText);
-        content = "J'ai mis à jour la recherche de vol pour toi.";
-      }
+      return new Response(readableStream, {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
+      });
     }
 
     if (!content) {

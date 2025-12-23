@@ -3,6 +3,7 @@ import { Send, User, Plane } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/logo-travliaq.png";
+import ReactMarkdown from "react-markdown";
 import type { LocationResult } from "@/hooks/useLocationAutocomplete";
 import type { CountrySelectionEvent } from "./PlannerPanel";
 import type { Airport } from "@/hooks/useNearestAirports";
@@ -35,6 +36,7 @@ interface ChatMessage {
   role: "assistant" | "user" | "system";
   text: string;
   isTyping?: boolean;
+  isStreaming?: boolean;
   isHidden?: boolean;
   airportChoices?: AirportChoice; // For displaying airport selection buttons
 }
@@ -118,7 +120,7 @@ function parseAction(content: string): { cleanContent: string; action: ChatQuick
   return { cleanContent, action: null };
 }
 
-// Airport button component
+// Compact Airport button component
 const AirportButton = ({ 
   airport, 
   onClick,
@@ -132,27 +134,51 @@ const AirportButton = ({
     onClick={onClick}
     disabled={disabled}
     className={cn(
-      "flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all text-left",
+      "flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-all text-left",
       "bg-card hover:bg-primary/10 hover:border-primary/50",
       "border-border/50 shadow-sm",
       disabled && "opacity-50 cursor-not-allowed"
     )}
   >
-    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-      <Plane className="h-4 w-4 text-primary" />
+    <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center shrink-0">
+      <Plane className="h-3 w-3 text-primary" />
     </div>
     <div className="min-w-0 flex-1">
-      <div className="text-sm font-medium text-foreground flex items-center gap-2">
+      <div className="text-xs font-medium text-foreground flex items-center gap-1.5">
         <span className="truncate">{airport.name}</span>
-        <span className="text-xs px-1.5 py-0.5 rounded bg-primary/20 text-primary font-semibold shrink-0">
+        <span className="text-[10px] px-1 py-0.5 rounded bg-primary/20 text-primary font-semibold shrink-0">
           {airport.iata}
         </span>
       </div>
-      <div className="text-xs text-muted-foreground">
-        {airport.distance_km.toFixed(0)} km de la ville
+      <div className="text-[10px] text-muted-foreground">
+        {airport.distance_km.toFixed(0)} km
       </div>
     </div>
   </button>
+);
+
+// Markdown message component
+const MarkdownMessage = ({ content }: { content: string }) => (
+  <ReactMarkdown
+    components={{
+      p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+      strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+      em: ({ children }) => <em className="italic">{children}</em>,
+      ul: ({ children }) => <ul className="list-disc list-inside mb-1">{children}</ul>,
+      ol: ({ children }) => <ol className="list-decimal list-inside mb-1">{children}</ol>,
+      li: ({ children }) => <li className="text-sm">{children}</li>,
+      code: ({ children }) => (
+        <code className="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded text-xs">{children}</code>
+      ),
+      a: ({ href, children }) => (
+        <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:no-underline">
+          {children}
+        </a>
+      ),
+    }}
+  >
+    {content}
+  </ReactMarkdown>
 );
 
 const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onAction }, ref) => {
@@ -198,6 +224,79 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
     onAction({ type: "selectAirport", field, airport });
   };
 
+  // Stream response from SSE
+  const streamResponse = async (
+    apiMessages: { role: string; content: string }[],
+    messageId: string
+  ): Promise<{ content: string; flightData: FlightFormData | null }> => {
+    let fullContent = "";
+    let flightData: FlightFormData | null = null;
+
+    const response = await fetch(
+      `https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/planner-chat`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpbmJubWxmcGZmbXlqbWt3YmNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc5NDQ2MTQsImV4cCI6MjA3MzUyMDYxNH0.yrju-Pv4OlfU9Et-mRWg0GRHTusL7ZpJevqKemJFbuA",
+        },
+        body: JSON.stringify({ messages: apiMessages, stream: true }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Stream request failed");
+    }
+
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split("\n").filter((line) => line.trim() !== "");
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const jsonStr = line.slice(6);
+          if (jsonStr === "[DONE]") continue;
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+            
+            if (parsed.type === "flightData" && parsed.flightData) {
+              flightData = parsed.flightData;
+            } else if (parsed.type === "content" && parsed.content) {
+              fullContent += parsed.content;
+              // Update message with new content
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === messageId
+                    ? { ...m, text: fullContent, isStreaming: true, isTyping: false }
+                    : m
+                )
+              );
+            }
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+      }
+    }
+
+    // Mark streaming as complete
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId ? { ...m, isStreaming: false } : m
+      )
+    );
+
+    return { content: fullContent, flightData };
+  };
+
   // Expose methods to parent
   useImperativeHandle(ref, () => ({
     injectSystemMessage: async (event: CountrySelectionEvent) => {
@@ -212,10 +311,10 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       ]);
 
       setIsLoading(true);
-      const typingId = `typing-${Date.now()}`;
+      const messageId = `bot-${Date.now()}`;
       setMessages((prev) => [
         ...prev,
-        { id: typingId, role: "assistant", text: "", isTyping: true },
+        { id: messageId, role: "assistant", text: "", isTyping: true },
       ]);
 
       try {
@@ -224,37 +323,29 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
           .map((m) => ({ role: m.role === "system" ? "user" : m.role, content: m.text }));
         apiMessages.push({ role: "user", content: systemText });
 
-        const { data, error } = await supabase.functions.invoke("planner-chat", {
-          body: { messages: apiMessages },
-        });
-
-        if (error) {
-          console.error("Chat API error:", error);
-          throw new Error(error.message);
-        }
-
-        const rawContent = data?.content || `Dans quelle ville de ${countryName} souhaitez-vous partir/arriver ?`;
-        const { cleanContent } = parseAction(rawContent);
+        const { content } = await streamResponse(apiMessages, messageId);
+        const { cleanContent } = parseAction(content || `Dans quelle ville de ${countryName} souhaitez-vous partir/arriver ?`);
 
         setMessages((prev) =>
-          prev
-            .filter((m) => m.id !== typingId)
-            .concat({
-              id: `bot-${Date.now()}`,
-              role: "assistant",
-              text: cleanContent,
-            })
+          prev.map((m) =>
+            m.id === messageId
+              ? { ...m, text: cleanContent, isTyping: false, isStreaming: false }
+              : m
+          )
         );
       } catch (err) {
         console.error("Failed to get chat response:", err);
         setMessages((prev) =>
-          prev
-            .filter((m) => m.id !== typingId)
-            .concat({
-              id: `bot-${Date.now()}`,
-              role: "assistant",
-              text: `Je vois que vous avez sélectionné ${countryName}. Dans quelle ville de ce pays souhaitez-vous ${event.field === "from" ? "partir" : "arriver"} ?`,
-            })
+          prev.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  text: `Je vois que vous avez sélectionné ${countryName}. Dans quelle ville de ce pays souhaitez-vous ${event.field === "from" ? "partir" : "arriver"} ?`,
+                  isTyping: false,
+                  isStreaming: false,
+                }
+              : m
+          )
         );
       } finally {
         setIsLoading(false);
@@ -291,10 +382,10 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
     setInput("");
     setIsLoading(true);
 
-    const typingId = `typing-${Date.now()}`;
+    const messageId = `bot-${Date.now()}`;
     setMessages((prev) => [
       ...prev,
-      { id: typingId, role: "assistant", text: "", isTyping: true },
+      { id: messageId, role: "assistant", text: "", isTyping: true },
     ]);
 
     try {
@@ -303,20 +394,11 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
         .map((m) => ({ role: m.role === "system" ? "user" : m.role, content: m.text }));
       apiMessages.push({ role: "user", content: userText });
 
-      const { data, error } = await supabase.functions.invoke("planner-chat", {
-        body: { messages: apiMessages },
-      });
+      const { content, flightData } = await streamResponse(apiMessages, messageId);
+      const { cleanContent, action } = parseAction(content || "Désolé, je n'ai pas pu répondre.");
 
-      if (error) {
-        console.error("Chat API error:", error);
-        throw new Error(error.message);
-      }
-
-      const rawContent = data?.content || "Désolé, je n'ai pas pu répondre.";
-      const { cleanContent, action } = parseAction(rawContent);
-
-      if (data?.flightData) {
-        const destCity = data.flightData.to;
+      if (flightData && Object.keys(flightData).length > 0) {
+        const destCity = flightData.to;
         if (destCity) {
           const coords = getCityCoords(destCity.toLowerCase().split(",")[0].trim());
           if (coords) {
@@ -328,30 +410,31 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
           onAction({ type: "tab", tab: "flights" });
         }
         
-        onAction({ type: "updateFlight", flightData: data.flightData });
+        onAction({ type: "updateFlight", flightData });
       } else if (action) {
         onAction(action);
       }
 
       setMessages((prev) =>
-        prev
-          .filter((m) => m.id !== typingId)
-          .concat({
-            id: `bot-${Date.now()}`,
-            role: "assistant",
-            text: cleanContent,
-          })
+        prev.map((m) =>
+          m.id === messageId
+            ? { ...m, text: cleanContent, isTyping: false, isStreaming: false }
+            : m
+        )
       );
     } catch (err) {
       console.error("Failed to get chat response:", err);
       setMessages((prev) =>
-        prev
-          .filter((m) => m.id !== typingId)
-          .concat({
-            id: `error-${Date.now()}`,
-            role: "assistant",
-            text: "Désolé, une erreur s'est produite. Veuillez réessayer.",
-          })
+        prev.map((m) =>
+          m.id === messageId
+            ? {
+                ...m,
+                text: "Désolé, une erreur s'est produite. Veuillez réessayer.",
+                isTyping: false,
+                isStreaming: false,
+              }
+            : m
+        )
       );
     } finally {
       setIsLoading(false);
@@ -409,13 +492,18 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
                       <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                     </div>
                   ) : (
-                    m.text
+                    <>
+                      <MarkdownMessage content={m.text} />
+                      {m.isStreaming && (
+                        <span className="inline-block w-1.5 h-4 bg-current ml-0.5 animate-pulse" />
+                      )}
+                    </>
                   )}
                 </div>
 
                 {/* Airport choice buttons */}
                 {m.airportChoices && (
-                  <div className="mt-3 space-y-2 max-w-[85%]">
+                  <div className="mt-2 flex flex-wrap gap-2 max-w-[85%]">
                     {m.airportChoices.airports.map((airport) => (
                       <AirportButton
                         key={airport.iata}
