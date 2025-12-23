@@ -1,16 +1,18 @@
 import { useState, useRef, useEffect, useImperativeHandle, forwardRef } from "react";
-import { Send, User } from "lucide-react";
+import { Send, User, Plane } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/logo-travliaq.png";
 import type { LocationResult } from "@/hooks/useLocationAutocomplete";
 import type { CountrySelectionEvent } from "./PlannerPanel";
+import type { Airport } from "@/hooks/useNearestAirports";
 
 export type ChatQuickAction =
   | { type: "tab"; tab: "flights" | "activities" | "stays" | "preferences" }
   | { type: "zoom"; center: [number, number]; zoom: number }
   | { type: "tabAndZoom"; tab: "flights" | "activities" | "stays" | "preferences"; center: [number, number]; zoom: number }
-  | { type: "updateFlight"; flightData: FlightFormData };
+  | { type: "updateFlight"; flightData: FlightFormData }
+  | { type: "selectAirport"; field: "from" | "to"; airport: Airport };
 
 export interface FlightFormData {
   from?: string;
@@ -21,12 +23,20 @@ export interface FlightFormData {
   tripType?: "roundtrip" | "oneway" | "multi";
 }
 
+// Airport selection for chat buttons
+export interface AirportChoice {
+  field: "from" | "to";
+  cityName: string;
+  airports: Airport[];
+}
+
 interface ChatMessage {
   id: string;
   role: "assistant" | "user" | "system";
   text: string;
   isTyping?: boolean;
-  isHidden?: boolean; // Hidden messages are sent to LLM but not shown
+  isHidden?: boolean;
+  airportChoices?: AirportChoice; // For displaying airport selection buttons
 }
 
 interface PlannerChatProps {
@@ -35,6 +45,7 @@ interface PlannerChatProps {
 
 export interface PlannerChatRef {
   injectSystemMessage: (event: CountrySelectionEvent) => void;
+  askAirportChoice: (choice: AirportChoice) => void;
 }
 
 // City coordinates for map actions
@@ -107,6 +118,43 @@ function parseAction(content: string): { cleanContent: string; action: ChatQuick
   return { cleanContent, action: null };
 }
 
+// Airport button component
+const AirportButton = ({ 
+  airport, 
+  onClick,
+  disabled 
+}: { 
+  airport: Airport; 
+  onClick: () => void;
+  disabled?: boolean;
+}) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className={cn(
+      "flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all text-left",
+      "bg-card hover:bg-primary/10 hover:border-primary/50",
+      "border-border/50 shadow-sm",
+      disabled && "opacity-50 cursor-not-allowed"
+    )}
+  >
+    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+      <Plane className="h-4 w-4 text-primary" />
+    </div>
+    <div className="min-w-0 flex-1">
+      <div className="text-sm font-medium text-foreground flex items-center gap-2">
+        <span className="truncate">{airport.name}</span>
+        <span className="text-xs px-1.5 py-0.5 rounded bg-primary/20 text-primary font-semibold shrink-0">
+          {airport.iata}
+        </span>
+      </div>
+      <div className="text-xs text-muted-foreground">
+        {airport.distance_km.toFixed(0)} km de la ville
+      </div>
+    </div>
+  </button>
+);
+
 const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onAction }, ref) => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -127,22 +175,42 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
     scrollToBottom();
   }, [messages]);
 
-  // Expose method to inject system messages (for country selection)
+  // Handle airport selection from buttons
+  const handleAirportSelect = (messageId: string, field: "from" | "to", airport: Airport) => {
+    // Remove the airport choice buttons from the message
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId ? { ...m, airportChoices: undefined } : m
+      )
+    );
+
+    // Add confirmation message
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `confirm-${Date.now()}`,
+        role: "assistant",
+        text: `Parfait ! J'ai sélectionné l'aéroport **${airport.name} (${airport.iata})** comme ${field === "from" ? "point de départ" : "destination"}.`,
+      },
+    ]);
+
+    // Notify parent to update the flight form
+    onAction({ type: "selectAirport", field, airport });
+  };
+
+  // Expose methods to parent
   useImperativeHandle(ref, () => ({
     injectSystemMessage: async (event: CountrySelectionEvent) => {
       const fieldName = event.field === "from" ? "départ" : "destination";
       const countryName = event.country.name;
       
-      // Create a hidden system message to inform the LLM about the country selection
       const systemText = `[SYSTÈME] L'utilisateur a sélectionné le pays "${countryName}" comme ${fieldName}. Pour les vols, nous avons besoin d'un aéroport ou d'une ville précise, pas d'un pays. Demande-lui quelle ville dans ${countryName} il souhaite utiliser comme ${fieldName}.`;
       
-      // Add a hidden message for context
       setMessages((prev) => [
         ...prev,
         { id: `system-${Date.now()}`, role: "system" as const, text: systemText, isHidden: true },
       ]);
 
-      // Trigger the LLM to respond
       setIsLoading(true);
       const typingId = `typing-${Date.now()}`;
       setMessages((prev) => [
@@ -151,7 +219,6 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       ]);
 
       try {
-        // Build conversation history including the system message
         const apiMessages = messages
           .filter((m) => !m.isTyping && m.id !== "welcome")
           .map((m) => ({ role: m.role === "system" ? "user" : m.role, content: m.text }));
@@ -193,6 +260,21 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
         setIsLoading(false);
       }
     },
+
+    askAirportChoice: (choice: AirportChoice) => {
+      const fieldLabel = choice.field === "from" ? "départ" : "destination";
+      const messageId = `airport-choice-${Date.now()}`;
+      
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: messageId,
+          role: "assistant",
+          text: `🛫 La ville de **${choice.cityName}** a plusieurs aéroports. Lequel souhaitez-vous utiliser comme ${fieldLabel} ?`,
+          airportChoices: choice,
+        },
+      ]);
+    },
   }));
 
   const send = async () => {
@@ -209,7 +291,6 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
     setInput("");
     setIsLoading(true);
 
-    // Add typing indicator
     const typingId = `typing-${Date.now()}`;
     setMessages((prev) => [
       ...prev,
@@ -217,7 +298,6 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
     ]);
 
     try {
-      // Build conversation history for API (exclude hidden system messages from display but include in context)
       const apiMessages = messages
         .filter((m) => !m.isTyping && m.id !== "welcome")
         .map((m) => ({ role: m.role === "system" ? "user" : m.role, content: m.text }));
@@ -235,9 +315,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       const rawContent = data?.content || "Désolé, je n'ai pas pu répondre.";
       const { cleanContent, action } = parseAction(rawContent);
 
-      // Handle flight data from AI
       if (data?.flightData) {
-        // First open the flights panel and zoom if destination is known
         const destCity = data.flightData.to;
         if (destCity) {
           const coords = getCityCoords(destCity.toLowerCase().split(",")[0].trim());
@@ -250,11 +328,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
           onAction({ type: "tab", tab: "flights" });
         }
         
-        // Then update the flight form
         onAction({ type: "updateFlight", flightData: data.flightData });
-      }
-      // Trigger map/tab action if present (and no flight data already handled)
-      else if (action) {
+      } else if (action) {
         onAction(action);
       }
 
@@ -337,6 +412,20 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
                     m.text
                   )}
                 </div>
+
+                {/* Airport choice buttons */}
+                {m.airportChoices && (
+                  <div className="mt-3 space-y-2 max-w-[85%]">
+                    {m.airportChoices.airports.map((airport) => (
+                      <AirportButton
+                        key={airport.iata}
+                        airport={airport}
+                        onClick={() => handleAirportSelect(m.id, m.airportChoices!.field, airport)}
+                        disabled={isLoading}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ))}

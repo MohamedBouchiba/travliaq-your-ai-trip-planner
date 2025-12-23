@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.location-autocomplete]
 verify_jwt = false
+
+[functions.nearest-airports]
+verify_jwt = false

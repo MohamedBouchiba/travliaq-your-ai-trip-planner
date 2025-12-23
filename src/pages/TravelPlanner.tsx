@@ -4,8 +4,9 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import PlannerMap from "@/components/planner/PlannerMap";
 import PlannerPanel, { FlightRoutePoint, CountrySelectionEvent } from "@/components/planner/PlannerPanel";
 import PlannerCard from "@/components/planner/PlannerCard";
-import PlannerChat, { FlightFormData, PlannerChatRef } from "@/components/planner/PlannerChat";
+import PlannerChat, { FlightFormData, PlannerChatRef, AirportChoice } from "@/components/planner/PlannerChat";
 import PlannerTopBar from "@/components/planner/PlannerTopBar";
+import type { Airport } from "@/hooks/useNearestAirports";
 
 export type TabType = "flights" | "activities" | "stays" | "preferences";
 
@@ -22,6 +23,12 @@ export interface MapPin {
   duration?: string;
 }
 
+// Selected airport info to pass to FlightsPanel
+export interface SelectedAirport {
+  field: "from" | "to";
+  airport: Airport;
+}
+
 const TravelPlanner = () => {
   const [activeTab, setActiveTab] = useState<TabType>("flights");
   const [selectedPin, setSelectedPin] = useState<MapPin | null>(null);
@@ -31,6 +38,7 @@ const TravelPlanner = () => {
   const [flightRoutes, setFlightRoutes] = useState<FlightRoutePoint[]>([]);
   const [initialAnimationDone, setInitialAnimationDone] = useState(false);
   const [flightFormData, setFlightFormData] = useState<FlightFormData | null>(null);
+  const [selectedAirport, setSelectedAirport] = useState<SelectedAirport | null>(null);
   const chatRef = useRef<PlannerChatRef>(null);
 
   const handleTabChange = useCallback((tab: TabType) => {
@@ -60,6 +68,10 @@ const TravelPlanner = () => {
   const handleCountrySelected = useCallback((event: CountrySelectionEvent) => {
     // Trigger the chat to ask about city in this country
     chatRef.current?.injectSystemMessage(event);
+  }, []);
+
+  const handleAskAirportChoice = useCallback((choice: AirportChoice) => {
+    chatRef.current?.askAirportChoice(choice);
   }, []);
 
   return (
@@ -97,6 +109,10 @@ const TravelPlanner = () => {
                 if (action.type === "updateFlight") {
                   setFlightFormData(action.flightData);
                   setIsPanelVisible(true);
+                }
+                if (action.type === "selectAirport") {
+                  // Pass selected airport to the panel
+                  setSelectedAirport({ field: action.field, airport: action.airport });
                 }
                 setSelectedPin(null);
               }}
@@ -138,6 +154,9 @@ const TravelPlanner = () => {
                 flightFormData={flightFormData}
                 onFlightFormDataConsumed={() => setFlightFormData(null)}
                 onCountrySelected={handleCountrySelected}
+                onAskAirportChoice={handleAskAirportChoice}
+                selectedAirport={selectedAirport}
+                onSelectedAirportConsumed={() => setSelectedAirport(null)}
               />
 
               {/* Floating card on map */}

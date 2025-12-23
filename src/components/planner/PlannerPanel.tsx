@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
-import { Calendar as CalendarIcon, Users, Plane, MapPin, Building2, Star, Clock, Wifi, Car, Coffee, Wind, X, Heart, Utensils, TreePine, Palette, Waves, Dumbbell, Sparkles } from "lucide-react";
+import { Calendar as CalendarIcon, Users, Plane, MapPin, Building2, Star, Clock, Wifi, Car, Coffee, Wind, X, Heart, Utensils, TreePine, Palette, Waves, Dumbbell, Sparkles, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { TabType } from "@/pages/TravelPlanner";
+import type { TabType, SelectedAirport } from "@/pages/TravelPlanner";
 import { Slider } from "@/components/ui/slider";
 import PlannerCalendar from "./PlannerCalendar";
 import FlightRouteBuilder, { FlightLeg } from "./FlightRouteBuilder";
 import type { LocationResult } from "@/hooks/useLocationAutocomplete";
+import { findNearestAirports, Airport } from "@/hooks/useNearestAirports";
+import type { AirportChoice } from "./PlannerChat";
 
 export interface FlightRoutePoint {
   city: string;
@@ -37,6 +39,9 @@ interface PlannerPanelProps {
   flightFormData?: FlightFormData | null;
   onFlightFormDataConsumed?: () => void;
   onCountrySelected?: (event: CountrySelectionEvent) => void;
+  onAskAirportChoice?: (choice: AirportChoice) => void;
+  selectedAirport?: SelectedAirport | null;
+  onSelectedAirportConsumed?: () => void;
 }
 
 const tabLabels: Record<TabType, string> = {
@@ -46,7 +51,7 @@ const tabLabels: Record<TabType, string> = {
   preferences: "Préférences",
 };
 
-const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVisible = true, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed, onCountrySelected }: PlannerPanelProps) => {
+const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVisible = true, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed, onCountrySelected, onAskAirportChoice, selectedAirport, onSelectedAirportConsumed }: PlannerPanelProps) => {
   if (!isVisible && layout === "overlay") return null;
 
   const wrapperClass =
@@ -75,7 +80,7 @@ const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVis
           </div>
         )}
         <div className="flex-1 overflow-y-auto themed-scroll p-4 max-h-[calc(100vh-8rem)]">
-          {activeTab === "flights" && <FlightsPanel onMapMove={onMapMove} onFlightRoutesChange={onFlightRoutesChange} flightFormData={flightFormData} onFlightFormDataConsumed={onFlightFormDataConsumed} onCountrySelected={onCountrySelected} />}
+          {activeTab === "flights" && <FlightsPanel onMapMove={onMapMove} onFlightRoutesChange={onFlightRoutesChange} flightFormData={flightFormData} onFlightFormDataConsumed={onFlightFormDataConsumed} onCountrySelected={onCountrySelected} onAskAirportChoice={onAskAirportChoice} selectedAirport={selectedAirport} onSelectedAirportConsumed={onSelectedAirportConsumed} />}
           {activeTab === "activities" && <ActivitiesPanel />}
           {activeTab === "stays" && <StaysPanel />}
           {activeTab === "preferences" && <PreferencesPanel />}
@@ -136,14 +141,18 @@ interface FlightOptions {
 }
 
 // Flights Panel
-const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed, onCountrySelected }: { 
+const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed, onCountrySelected, onAskAirportChoice, selectedAirport, onSelectedAirportConsumed }: { 
   onMapMove: (center: [number, number], zoom: number) => void;
   onFlightRoutesChange?: (routes: FlightRoutePoint[]) => void;
   flightFormData?: FlightFormData | null;
   onFlightFormDataConsumed?: () => void;
   onCountrySelected?: (event: CountrySelectionEvent) => void;
+  onAskAirportChoice?: (choice: AirportChoice) => void;
+  selectedAirport?: SelectedAirport | null;
+  onSelectedAirportConsumed?: () => void;
 }) => {
   const [tripType, setTripType] = useState<"roundtrip" | "oneway" | "multi">("roundtrip");
+  const [isSearchingAirports, setIsSearchingAirports] = useState(false);
   const [legs, setLegs] = useState<FlightLeg[]>([
     { id: crypto.randomUUID(), from: "", to: "", date: undefined, returnDate: undefined },
   ]);
@@ -200,6 +209,28 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     onFlightFormDataConsumed?.();
   }, [flightFormData, onFlightFormDataConsumed]);
 
+  // Handle airport selection from chat
+  useEffect(() => {
+    if (!selectedAirport) return;
+    
+    const { field, airport } = selectedAirport;
+    const airportDisplay = `${airport.name} (${airport.iata})`;
+    
+    setLegs((prev) => {
+      const newLegs = [...prev];
+      if (newLegs.length > 0) {
+        if (field === "from") {
+          newLegs[0] = { ...newLegs[0], from: airportDisplay };
+        } else {
+          newLegs[0] = { ...newLegs[0], to: airportDisplay };
+        }
+      }
+      return newLegs;
+    });
+    
+    onSelectedAirportConsumed?.();
+  }, [selectedAirport, onSelectedAirportConsumed]);
+
   // Detect user's city from IP on mount
   useEffect(() => {
     const detectUserCity = async () => {
@@ -225,6 +256,60 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     };
     detectUserCity();
   }, []);
+
+  // Search for airports for a city
+  const resolveAirportsForCity = async (cityName: string, field: "from" | "to"): Promise<Airport | null> => {
+    const result = await findNearestAirports(cityName, 3);
+    if (!result || result.airports.length === 0) return null;
+    
+    // If only one airport, return it directly
+    if (result.airports.length === 1) {
+      return result.airports[0];
+    }
+    
+    // Multiple airports: ask user to choose via chat
+    onAskAirportChoice?.({ field, cityName, airports: result.airports });
+    return null; // Will be resolved via chat selection
+  };
+
+  // Handle search button click - check for airports first
+  const handleSearchClick = async () => {
+    const firstLeg = legs[0];
+    if (!firstLeg?.from?.trim() || !firstLeg?.to?.trim() || !firstLeg?.date) return;
+    
+    setIsSearchingAirports(true);
+    
+    try {
+      // Check if "from" is a city (no IATA code in parentheses)
+      const fromHasAirport = /\([A-Z]{3}\)/.test(firstLeg.from);
+      const toHasAirport = /\([A-Z]{3}\)/.test(firstLeg.to);
+      
+      if (!fromHasAirport) {
+        const airport = await resolveAirportsForCity(firstLeg.from.split(",")[0].trim(), "from");
+        if (airport) {
+          setLegs((prev) => [{ ...prev[0], from: `${airport.name} (${airport.iata})` }]);
+        } else {
+          // Multiple airports - waiting for user choice
+          return;
+        }
+      }
+      
+      if (!toHasAirport) {
+        const airport = await resolveAirportsForCity(firstLeg.to.split(",")[0].trim(), "to");
+        if (airport) {
+          setLegs((prev) => [{ ...prev[0], to: `${airport.name} (${airport.iata})` }]);
+        } else {
+          // Multiple airports - waiting for user choice
+          return;
+        }
+      }
+      
+      // All airports resolved, proceed with search
+      console.log("Searching flights with:", { legs, passengers, travelClass, options, tripType });
+    } finally {
+      setIsSearchingAirports(false);
+    }
+  };
 
   // Notify parent of route changes when legs change
   const handleLegsChange = (newLegs: FlightLeg[]) => {
@@ -510,22 +595,26 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
           return (
             <>
               <button
-                onClick={() => {
-                  if (isComplete) {
-                    console.log("Searching flights with:", { legs, passengers, travelClass, options, tripType });
-                    // TODO: Trigger actual flight search
-                  }
-                }}
-                disabled={!isComplete}
+                onClick={handleSearchClick}
+                disabled={!isComplete || isSearchingAirports}
                 className={cn(
                   "w-full py-3 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2",
-                  isComplete
+                  isComplete && !isSearchingAirports
                     ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25"
                     : "bg-muted text-muted-foreground cursor-not-allowed"
                 )}
               >
-                <Plane className="h-4 w-4" />
-                Rechercher des vols
+                {isSearchingAirports ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Vérification des aéroports...
+                  </>
+                ) : (
+                  <>
+                    <Plane className="h-4 w-4" />
+                    Rechercher des vols
+                  </>
+                )}
               </button>
               {!isComplete && missingFields.length > 0 && (
                 <p className="text-[10px] text-muted-foreground text-center mt-2">
