@@ -51,6 +51,8 @@ interface FlightMemoryContextValue {
   updateMemory: (partial: Partial<FlightMemory>) => void;
   resetMemory: () => void;
   isReadyToSearch: boolean;
+  hasCompleteInfo: boolean; // Has cities/dates but may need airport selection
+  needsAirportSelection: { departure: boolean; arrival: boolean };
   missingFields: MissingField[];
   getMemorySummary: () => string;
   getRoutePoints: () => MemoryRoutePoint[];
@@ -119,10 +121,21 @@ export function FlightMemoryProvider({ children }: { children: ReactNode }) {
     return missing;
   }, [memory]);
 
-  // Ready to search when all mandatory fields are filled
-  const isReadyToSearch = useMemo(() => {
+  // Check if we need airport selection (have city but no IATA)
+  const needsAirportSelection = useMemo(() => ({
+    departure: Boolean(memory.departure?.city && !memory.departure?.iata),
+    arrival: Boolean(memory.arrival?.city && !memory.arrival?.iata),
+  }), [memory.departure, memory.arrival]);
+
+  // Has complete basic info (cities, dates) but may still need airport selection
+  const hasCompleteInfo = useMemo(() => {
     return missingFields.length === 0;
   }, [missingFields]);
+
+  // Ready to search when all mandatory fields are filled AND airports are selected
+  const isReadyToSearch = useMemo(() => {
+    return hasCompleteInfo && !needsAirportSelection.departure && !needsAirportSelection.arrival;
+  }, [hasCompleteInfo, needsAirportSelection]);
 
   // Get a summary of the current memory for the AI
   const getMemorySummary = useCallback(() => {
@@ -192,11 +205,13 @@ export function FlightMemoryProvider({ children }: { children: ReactNode }) {
       updateMemory,
       resetMemory,
       isReadyToSearch,
+      hasCompleteInfo,
+      needsAirportSelection,
       missingFields,
       getMemorySummary,
       getRoutePoints,
     }),
-    [memory, updateMemory, resetMemory, isReadyToSearch, missingFields, getMemorySummary, getRoutePoints]
+    [memory, updateMemory, resetMemory, isReadyToSearch, hasCompleteInfo, needsAirportSelection, missingFields, getMemorySummary, getRoutePoints]
   );
 
   return (
