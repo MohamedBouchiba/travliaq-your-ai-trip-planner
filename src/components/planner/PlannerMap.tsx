@@ -527,6 +527,43 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     
     if (memoryPoints.length === 0) return;
 
+    // Helper to extract city name from various formats
+    const extractCityName = (label: string): string => {
+      // Common airport name patterns to strip:
+      // "Charles de Gaulle (CDG)" -> look for city in memory
+      // "Paris Charles de Gaulle" -> "Paris"
+      // "Brussels Airport (BRU)" -> "Brussels"
+      // "Copenhagen Airport (CPH)" -> "Copenhagen"
+      
+      // Remove IATA code in parentheses
+      let cityName = label.replace(/\s*\([A-Z]{3}\)\s*$/, "").trim();
+      
+      // Remove common airport suffixes
+      const airportSuffixes = [
+        " Airport", " International", " Intl", " Aéroport",
+        " Charles de Gaulle", " Orly", " Schiphol", " Heathrow",
+        " Gatwick", " Stansted", " Luton", " Beauvais",
+        " Kastrup", " Zaventem", " El Prat", " Barajas",
+        " Fiumicino", " Marco Polo", " Malpensa", " Linate"
+      ];
+      
+      for (const suffix of airportSuffixes) {
+        if (cityName.toLowerCase().endsWith(suffix.toLowerCase())) {
+          cityName = cityName.slice(0, -suffix.length).trim();
+          break;
+        }
+      }
+      
+      // If still looks like airport name, try to get first word (often city)
+      if (cityName.includes(" ") && cityName.length > 20) {
+        // Long name, take first word as city guess
+        cityName = cityName.split(" ")[0];
+      }
+      
+      return cityName || label;
+    };
+
+
     // Create markers for each point
     memoryPoints.forEach((point, index) => {
       // Outer container for stable positioning
@@ -591,13 +628,12 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
             y: rect.top,
           };
 
-          // Parse city name from label (format: "City (IATA)" or just "City")
-          const labelMatch = point.label.match(/^([^(]+)/);
-          const cityName = labelMatch ? labelMatch[1].trim() : point.label;
+          // Use city from memory if available, otherwise extract from label
+          const cityName = point.city || extractCityName(point.label);
 
           onDestinationClick({
             cityName,
-            countryName: undefined, // Could be enhanced with memory data
+            countryName: point.country,
             lat: point.lat,
             lng: point.lng,
             screenPosition,
