@@ -7,7 +7,7 @@ import PlannerCalendar from "./PlannerCalendar";
 import FlightRouteBuilder, { FlightLeg } from "./FlightRouteBuilder";
 import type { LocationResult } from "@/hooks/useLocationAutocomplete";
 import { findNearestAirports, Airport } from "@/hooks/useNearestAirports";
-import type { AirportChoice } from "./PlannerChat";
+import type { AirportChoice, DualAirportChoice } from "./PlannerChat";
 
 export interface FlightRoutePoint {
   city: string;
@@ -46,6 +46,7 @@ interface PlannerPanelProps {
   onFlightFormDataConsumed?: () => void;
   onCountrySelected?: (event: CountrySelectionEvent) => void;
   onAskAirportChoice?: (choice: AirportChoice) => void;
+  onAskDualAirportChoice?: (choices: DualAirportChoice) => void;
   selectedAirport?: SelectedAirport | null;
   onSelectedAirportConsumed?: () => void;
   onUserLocationDetected?: (location: UserLocation) => void;
@@ -58,7 +59,7 @@ const tabLabels: Record<TabType, string> = {
   preferences: "Préférences",
 };
 
-const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVisible = true, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed, onCountrySelected, onAskAirportChoice, selectedAirport, onSelectedAirportConsumed, onUserLocationDetected }: PlannerPanelProps) => {
+const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVisible = true, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed, onCountrySelected, onAskAirportChoice, onAskDualAirportChoice, selectedAirport, onSelectedAirportConsumed, onUserLocationDetected }: PlannerPanelProps) => {
   if (!isVisible && layout === "overlay") return null;
 
   const wrapperClass =
@@ -87,7 +88,7 @@ const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVis
           </div>
         )}
         <div className="flex-1 overflow-y-auto themed-scroll p-4 max-h-[calc(100vh-8rem)]">
-          {activeTab === "flights" && <FlightsPanel onMapMove={onMapMove} onFlightRoutesChange={onFlightRoutesChange} flightFormData={flightFormData} onFlightFormDataConsumed={onFlightFormDataConsumed} onCountrySelected={onCountrySelected} onAskAirportChoice={onAskAirportChoice} selectedAirport={selectedAirport} onSelectedAirportConsumed={onSelectedAirportConsumed} onUserLocationDetected={onUserLocationDetected} />}
+          {activeTab === "flights" && <FlightsPanel onMapMove={onMapMove} onFlightRoutesChange={onFlightRoutesChange} flightFormData={flightFormData} onFlightFormDataConsumed={onFlightFormDataConsumed} onCountrySelected={onCountrySelected} onAskAirportChoice={onAskAirportChoice} onAskDualAirportChoice={onAskDualAirportChoice} selectedAirport={selectedAirport} onSelectedAirportConsumed={onSelectedAirportConsumed} onUserLocationDetected={onUserLocationDetected} />}
           {activeTab === "activities" && <ActivitiesPanel />}
           {activeTab === "stays" && <StaysPanel />}
           {activeTab === "preferences" && <PreferencesPanel />}
@@ -148,13 +149,14 @@ interface FlightOptions {
 }
 
 // Flights Panel
-const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed, onCountrySelected, onAskAirportChoice, selectedAirport, onSelectedAirportConsumed, onUserLocationDetected }: { 
+const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed, onCountrySelected, onAskAirportChoice, onAskDualAirportChoice, selectedAirport, onSelectedAirportConsumed, onUserLocationDetected }: { 
   onMapMove: (center: [number, number], zoom: number) => void;
   onFlightRoutesChange?: (routes: FlightRoutePoint[]) => void;
   flightFormData?: FlightFormData | null;
   onFlightFormDataConsumed?: () => void;
   onCountrySelected?: (event: CountrySelectionEvent) => void;
   onAskAirportChoice?: (choice: AirportChoice) => void;
+  onAskDualAirportChoice?: (choices: DualAirportChoice) => void;
   selectedAirport?: SelectedAirport | null;
   onSelectedAirportConsumed?: () => void;
   onUserLocationDetected?: (location: UserLocation) => void;
@@ -285,23 +287,15 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     detectUserCity();
   }, [onUserLocationDetected]);
 
-  // Search for airports for a city
-  const resolveAirportsForCity = async (cityName: string, field: "from" | "to"): Promise<Airport | null> => {
+  // Search for airports for a city - returns airports list or null if only one (auto-selected)
+  const getAirportsForCity = async (cityName: string): Promise<{ airports: Airport[]; cityName: string } | null> => {
     try {
       const result = await findNearestAirports(cityName, 3);
       if (!result || result.airports.length === 0) return null;
       
-      // If only one airport, return it directly
-      if (result.airports.length === 1) {
-        return result.airports[0];
-      }
-      
-      // Multiple airports: ask user to choose via chat
-      onAskAirportChoice?.({ field, cityName, airports: result.airports });
-      return null; // Will be resolved via chat selection
+      return { airports: result.airports, cityName };
     } catch (error) {
       console.warn(`[FlightsPanel] Could not resolve airports for "${cityName}":`, error);
-      // API unavailable - skip airport resolution and continue
       return null;
     }
   };
@@ -321,26 +315,60 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
       let updatedFrom = firstLeg.from;
       let updatedTo = firstLeg.to;
       
-      if (!fromHasAirport) {
-        const airport = await resolveAirportsForCity(firstLeg.from.split(",")[0].trim(), "from");
-        if (airport) {
+      // Collect airport choices needed
+      let fromChoice: AirportChoice | undefined;
+      let toChoice: AirportChoice | undefined;
+      
+      // Check both cities in parallel
+      const [fromResult, toResult] = await Promise.all([
+        !fromHasAirport ? getAirportsForCity(firstLeg.from.split(",")[0].trim()) : null,
+        !toHasAirport ? getAirportsForCity(firstLeg.to.split(",")[0].trim()) : null,
+      ]);
+      
+      // Process "from" result
+      if (fromResult) {
+        if (fromResult.airports.length === 1) {
+          // Only one airport, auto-select it
+          const airport = fromResult.airports[0];
           updatedFrom = `${airport.name} (${airport.iata})`;
           setLegs((prev) => prev.map((leg, idx) => 
             idx === 0 ? { ...leg, from: updatedFrom } : leg
           ));
+        } else if (fromResult.airports.length > 1) {
+          // Multiple airports, need user choice
+          fromChoice = { field: "from", cityName: fromResult.cityName, airports: fromResult.airports };
         }
-        // If no airport found or API down, continue with city name
       }
       
-      if (!toHasAirport) {
-        const airport = await resolveAirportsForCity(firstLeg.to.split(",")[0].trim(), "to");
-        if (airport) {
+      // Process "to" result
+      if (toResult) {
+        if (toResult.airports.length === 1) {
+          // Only one airport, auto-select it
+          const airport = toResult.airports[0];
           updatedTo = `${airport.name} (${airport.iata})`;
           setLegs((prev) => prev.map((leg, idx) => 
             idx === 0 ? { ...leg, to: updatedTo } : leg
           ));
+        } else if (toResult.airports.length > 1) {
+          // Multiple airports, need user choice
+          toChoice = { field: "to", cityName: toResult.cityName, airports: toResult.airports };
         }
-        // If no airport found or API down, continue with city name
+      }
+      
+      // If both need choices, use dual selection (one message)
+      if (fromChoice && toChoice) {
+        onAskDualAirportChoice?.({ from: fromChoice, to: toChoice });
+        return; // Wait for user selection before searching
+      }
+      
+      // If only one needs choice, use single selection
+      if (fromChoice) {
+        onAskAirportChoice?.(fromChoice);
+        return;
+      }
+      if (toChoice) {
+        onAskAirportChoice?.(toChoice);
+        return;
       }
       
       // Proceed with search (API will handle city-to-airport resolution if needed)

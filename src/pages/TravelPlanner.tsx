@@ -4,7 +4,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import PlannerMap from "@/components/planner/PlannerMap";
 import PlannerPanel, { FlightRoutePoint, CountrySelectionEvent } from "@/components/planner/PlannerPanel";
 import PlannerCard from "@/components/planner/PlannerCard";
-import PlannerChat, { FlightFormData, PlannerChatRef, AirportChoice } from "@/components/planner/PlannerChat";
+import PlannerChat, { FlightFormData, PlannerChatRef, AirportChoice, DualAirportChoice } from "@/components/planner/PlannerChat";
 import PlannerTopBar from "@/components/planner/PlannerTopBar";
 import type { Airport } from "@/hooks/useNearestAirports";
 
@@ -80,6 +80,10 @@ const TravelPlanner = () => {
 
   const handleAskAirportChoice = useCallback((choice: AirportChoice) => {
     chatRef.current?.askAirportChoice(choice);
+  }, []);
+
+  const handleAskDualAirportChoice = useCallback((choices: DualAirportChoice) => {
+    chatRef.current?.askDualAirportChoice(choices);
   }, []);
 
   return (
@@ -169,6 +173,7 @@ const TravelPlanner = () => {
                 onFlightFormDataConsumed={() => setFlightFormData(null)}
                 onCountrySelected={handleCountrySelected}
                 onAskAirportChoice={handleAskAirportChoice}
+                onAskDualAirportChoice={handleAskDualAirportChoice}
                 selectedAirport={selectedAirport}
                 onSelectedAirportConsumed={() => setSelectedAirport(null)}
                 onUserLocationDetected={setUserLocation}

@@ -31,6 +31,12 @@ export interface AirportChoice {
   airports: Airport[];
 }
 
+// Dual airport selection (both departure and destination in one message)
+export interface DualAirportChoice {
+  from?: AirportChoice;
+  to?: AirportChoice;
+}
+
 interface ChatMessage {
   id: string;
   role: "assistant" | "user" | "system";
@@ -38,7 +44,8 @@ interface ChatMessage {
   isTyping?: boolean;
   isStreaming?: boolean;
   isHidden?: boolean;
-  airportChoices?: AirportChoice; // For displaying airport selection buttons
+  airportChoices?: AirportChoice; // For displaying airport selection buttons (single)
+  dualAirportChoices?: DualAirportChoice; // For displaying both from/to selections
 }
 
 interface PlannerChatProps {
@@ -48,6 +55,7 @@ interface PlannerChatProps {
 export interface PlannerChatRef {
   injectSystemMessage: (event: CountrySelectionEvent) => void;
   askAirportChoice: (choice: AirportChoice) => void;
+  askDualAirportChoice: (choices: DualAirportChoice) => void;
 }
 
 // City coordinates for map actions
@@ -120,7 +128,7 @@ function parseAction(content: string): { cleanContent: string; action: ChatQuick
   return { cleanContent, action: null };
 }
 
-// Ultra-compact inline Airport button component
+// Compact inline Airport button component
 const AirportButton = ({ 
   airport, 
   onClick,
@@ -134,17 +142,64 @@ const AirportButton = ({
     onClick={onClick}
     disabled={disabled}
     className={cn(
-      "inline-flex items-center gap-1.5 px-2 py-1 rounded-md border transition-all",
+      "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all text-left",
       "bg-card hover:bg-primary/10 hover:border-primary/50",
-      "border-border/50 text-xs",
+      "border-border/50 text-xs w-full",
       disabled && "opacity-50 cursor-not-allowed"
     )}
   >
-    <span className="font-semibold text-primary">{airport.iata}</span>
-    <span className="text-muted-foreground">·</span>
-    <span className="text-foreground truncate max-w-[120px]">{airport.city_name || airport.name.split(" ")[0]}</span>
-    <span className="text-muted-foreground text-[10px]">({airport.distance_km.toFixed(0)}km)</span>
+    <span className="font-bold text-primary text-sm">{airport.iata}</span>
+    <span className="flex-1 truncate text-foreground">{airport.city_name || airport.name.split(" ")[0]}</span>
+    <span className="text-muted-foreground text-[10px] shrink-0">{airport.distance_km.toFixed(0)}km</span>
   </button>
+);
+
+// Dual airport selection component
+const DualAirportSelection = ({
+  choices,
+  onSelect,
+  disabled,
+}: {
+  choices: DualAirportChoice;
+  onSelect: (field: "from" | "to", airport: Airport) => void;
+  disabled?: boolean;
+}) => (
+  <div className="mt-3 grid grid-cols-2 gap-3">
+    {choices.from && (
+      <div className="space-y-1.5">
+        <div className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+          <span className="text-primary">✈</span> Départ · {choices.from.cityName}
+        </div>
+        <div className="space-y-1">
+          {choices.from.airports.map((airport) => (
+            <AirportButton
+              key={airport.iata}
+              airport={airport}
+              onClick={() => onSelect("from", airport)}
+              disabled={disabled}
+            />
+          ))}
+        </div>
+      </div>
+    )}
+    {choices.to && (
+      <div className="space-y-1.5">
+        <div className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+          <span className="text-primary">🛬</span> Arrivée · {choices.to.cityName}
+        </div>
+        <div className="space-y-1">
+          {choices.to.airports.map((airport) => (
+            <AirportButton
+              key={airport.iata}
+              airport={airport}
+              onClick={() => onSelect("to", airport)}
+              disabled={disabled}
+            />
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
 );
 
 // Markdown message component
@@ -191,22 +246,46 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
     scrollToBottom();
   }, [messages]);
 
-  // Handle airport selection from buttons
-  const handleAirportSelect = (messageId: string, field: "from" | "to", airport: Airport) => {
-    // Remove the airport choice buttons from the message
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === messageId ? { ...m, airportChoices: undefined } : m
-      )
-    );
+  // Handle airport selection from buttons (single or dual)
+  const handleAirportSelect = (messageId: string, field: "from" | "to", airport: Airport, isDual?: boolean) => {
+    if (isDual) {
+      // For dual selection, update the message to remove the selected column
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== messageId || !m.dualAirportChoices) return m;
+          
+          const updated = { ...m.dualAirportChoices };
+          if (field === "from") delete updated.from;
+          if (field === "to") delete updated.to;
+          
+          // If both are now selected, remove the whole choices block
+          const stillHasChoices = updated.from || updated.to;
+          return { 
+            ...m, 
+            dualAirportChoices: stillHasChoices ? updated : undefined 
+          };
+        })
+      );
+    } else {
+      // For single selection, remove the airport choices
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId ? { ...m, airportChoices: undefined } : m
+        )
+      );
+    }
 
-    // Add confirmation message
+    // Add brief inline confirmation (no duplicate IATA code)
+    const confirmText = field === "from" 
+      ? `✓ Départ : **${airport.name}**`
+      : `✓ Arrivée : **${airport.name}**`;
+
     setMessages((prev) => [
       ...prev,
       {
-        id: `confirm-${Date.now()}`,
+        id: `confirm-${Date.now()}-${field}`,
         role: "assistant",
-        text: `Parfait ! J'ai sélectionné l'aéroport **${airport.name} (${airport.iata})** comme ${field === "from" ? "point de départ" : "destination"}.`,
+        text: confirmText,
       },
     ]);
 
@@ -356,6 +435,25 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
         },
       ]);
     },
+
+    askDualAirportChoice: (choices: DualAirportChoice) => {
+      const messageId = `dual-airport-choice-${Date.now()}`;
+      
+      // Build a message describing both selections needed
+      const parts: string[] = [];
+      if (choices.from) parts.push(`**${choices.from.cityName}** (départ)`);
+      if (choices.to) parts.push(`**${choices.to.cityName}** (arrivée)`);
+      
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: messageId,
+          role: "assistant",
+          text: `Plusieurs aéroports sont disponibles pour ${parts.join(" et ")}. Sélectionnez vos préférences :`,
+          dualAirportChoices: choices,
+        },
+      ]);
+    },
   }));
 
   const send = async () => {
@@ -491,18 +589,27 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
                   )}
                 </div>
 
-                {/* Airport choice buttons */}
+                {/* Airport choice buttons - single */}
                 {m.airportChoices && (
                   <div className="mt-2 flex flex-wrap gap-2 max-w-[85%]">
                     {m.airportChoices.airports.map((airport) => (
                       <AirportButton
                         key={airport.iata}
                         airport={airport}
-                        onClick={() => handleAirportSelect(m.id, m.airportChoices!.field, airport)}
+                        onClick={() => handleAirportSelect(m.id, m.airportChoices!.field, airport, false)}
                         disabled={isLoading}
                       />
                     ))}
                   </div>
+                )}
+
+                {/* Dual airport selection (from + to side by side) */}
+                {m.dualAirportChoices && (
+                  <DualAirportSelection
+                    choices={m.dualAirportChoices}
+                    onSelect={(field, airport) => handleAirportSelect(m.id, field, airport, true)}
+                    disabled={isLoading}
+                  />
                 )}
               </div>
             </div>
