@@ -62,6 +62,10 @@ interface ChatMessage {
   dualAirportChoices?: DualAirportChoice;
   hasSearchButton?: boolean;
   widget?: WidgetType;
+  widgetData?: {
+    preferredMonth?: string; // e.g. "février", "march", "summer"
+    tripDuration?: string;
+  };
 }
 
 interface PlannerChatProps {
@@ -219,19 +223,70 @@ const DualAirportSelection = ({
   </div>
 );
 
+// Helper to parse month from string (French/English)
+const parsePreferredMonth = (monthStr?: string): Date | null => {
+  if (!monthStr) return null;
+  
+  const monthMap: Record<string, number> = {
+    "janvier": 0, "january": 0, "jan": 0,
+    "février": 1, "fevrier": 1, "february": 1, "feb": 1,
+    "mars": 2, "march": 2, "mar": 2,
+    "avril": 3, "april": 3, "apr": 3,
+    "mai": 4, "may": 4,
+    "juin": 5, "june": 5, "jun": 5,
+    "juillet": 6, "july": 6, "jul": 6,
+    "août": 7, "aout": 7, "august": 7, "aug": 7,
+    "septembre": 8, "september": 8, "sep": 8, "sept": 8,
+    "octobre": 9, "october": 9, "oct": 9,
+    "novembre": 10, "november": 10, "nov": 10,
+    "décembre": 11, "decembre": 11, "december": 11, "dec": 11,
+    // Seasons
+    "printemps": 3, "spring": 3,
+    "été": 6, "ete": 6, "summer": 6,
+    "automne": 9, "autumn": 9, "fall": 9,
+    "hiver": 0, "winter": 0,
+  };
+  
+  const normalized = monthStr.toLowerCase().trim();
+  const monthIndex = monthMap[normalized];
+  
+  if (monthIndex !== undefined) {
+    const now = new Date();
+    let year = now.getFullYear();
+    // If the month is in the past this year, use next year
+    if (monthIndex < now.getMonth() || (monthIndex === now.getMonth() && now.getDate() > 15)) {
+      year++;
+    }
+    return new Date(year, monthIndex, 1);
+  }
+  
+  return null;
+};
+
 // Inline Date Picker Widget - Embedded calendar (not popover) for better chat UX
 const DatePickerWidget = ({ 
   label, 
   value, 
   onChange,
-  minDate
+  minDate,
+  preferredMonth
 }: { 
   label: string;
   value: Date | null;
   onChange: (date: Date) => void;
   minDate?: Date;
+  preferredMonth?: string;
 }) => {
-  const [baseMonth, setBaseMonth] = useState<Date>(startOfMonth(value || minDate || new Date()));
+  // Determine initial month: preferredMonth > value > minDate > today
+  const getInitialMonth = () => {
+    const parsed = parsePreferredMonth(preferredMonth);
+    if (parsed) return startOfMonth(parsed);
+    if (value) return startOfMonth(value);
+    if (minDate) return startOfMonth(minDate);
+    return startOfMonth(new Date());
+  };
+  
+  const [baseMonth, setBaseMonth] = useState<Date>(getInitialMonth());
   const [confirmed, setConfirmed] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(value);
 
@@ -366,12 +421,21 @@ const DatePickerWidget = ({
 // Date Range Picker Widget - Sélection départ ET retour dans un seul widget
 const DateRangePickerWidget = ({ 
   onConfirm,
-  tripDuration
+  tripDuration,
+  preferredMonth
 }: { 
   onConfirm: (departure: Date, returnDate: Date) => void;
   tripDuration?: string; // e.g. "une semaine", "3 jours"
+  preferredMonth?: string; // e.g. "février", "summer"
 }) => {
-  const [baseMonth, setBaseMonth] = useState<Date>(startOfMonth(new Date()));
+  // Determine initial month from preferredMonth
+  const getInitialMonth = () => {
+    const parsed = parsePreferredMonth(preferredMonth);
+    if (parsed) return startOfMonth(parsed);
+    return startOfMonth(new Date());
+  };
+  
+  const [baseMonth, setBaseMonth] = useState<Date>(getInitialMonth());
   const [confirmed, setConfirmed] = useState(false);
   const [departureDate, setDepartureDate] = useState<Date | null>(null);
   const [returnDate, setReturnDate] = useState<Date | null>(null);
@@ -772,6 +836,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
   const searchButtonShownRef = useRef(false);
   const pendingTravelersWidgetRef = useRef(false); // Track if we need to show travelers widget after date selection
   const pendingTripDurationRef = useRef<string | null>(null); // Store trip duration for calculating return date
+  const pendingPreferredMonthRef = useRef<string | null>(null); // Store preferred month for calendar navigation
   
   // Access flight memory
   const { memory, updateMemory, isReadyToSearch, hasCompleteInfo, needsAirportSelection, missingFields, getMemorySummary } = useFlightMemory();
@@ -1391,6 +1456,11 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
           pendingTripDurationRef.current = flightData.tripDuration;
         }
         
+        // Store preferred month for calendar navigation
+        if (flightData.preferredMonth) {
+          pendingPreferredMonthRef.current = flightData.preferredMonth;
+        }
+        
         // Update memory with extracted data (excluding widget flags)
         const memoryUpdates = flightDataToMemory(flightData);
         updateMemory(memoryUpdates);
@@ -1428,10 +1498,16 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
         widget = "travelersSelector";
       }
 
+      // Build widget data
+      const widgetData = widget ? {
+        preferredMonth: pendingPreferredMonthRef.current || undefined,
+        tripDuration: pendingTripDurationRef.current || undefined,
+      } : undefined;
+
       setMessages((prev) =>
         prev.map((m) =>
           m.id === messageId
-            ? { ...m, text: cleanContent, isTyping: false, isStreaming: false, widget }
+            ? { ...m, text: cleanContent, isTyping: false, isStreaming: false, widget, widgetData }
             : m
         )
       );
@@ -1543,6 +1619,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
                     label="Choisir la date de départ"
                     value={memory.departureDate}
                     onChange={(date) => handleDateSelect(m.id, "departure", date)}
+                    preferredMonth={m.widgetData?.preferredMonth}
                   />
                 )}
                 {m.widget === "returnDatePicker" && (
@@ -1551,13 +1628,15 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
                     value={memory.returnDate}
                     onChange={(date) => handleDateSelect(m.id, "return", date)}
                     minDate={memory.departureDate || undefined}
+                    preferredMonth={m.widgetData?.preferredMonth}
                   />
                 )}
 
                 {/* Date Range Picker Widget (departure + return) */}
                 {m.widget === "dateRangePicker" && (
                   <DateRangePickerWidget
-                    tripDuration={pendingTripDurationRef.current || undefined}
+                    tripDuration={m.widgetData?.tripDuration}
+                    preferredMonth={m.widgetData?.preferredMonth}
                     onConfirm={(dep, ret) => handleDateRangeSelect(m.id, dep, ret)}
                   />
                 )}
