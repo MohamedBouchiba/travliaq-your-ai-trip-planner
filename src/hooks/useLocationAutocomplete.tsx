@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export type LocationType = "city" | "airport" | "country";
 
@@ -25,8 +26,6 @@ interface ApiAutocompleteResult {
   latitude: number;
   longitude: number;
 }
-
-const API_BASE_URL = "https://travliaq-api-production.up.railway.app";
 
 /**
  * Hook for location autocomplete using the Travliaq API
@@ -55,16 +54,22 @@ export const useLocationAutocomplete = (
       }
 
       const typesParam = types.join(",");
-      const url = `${API_BASE_URL}/autocomplete?q=${encodeURIComponent(debouncedSearch)}&limit=10&types=${typesParam}`;
-
+      const supabaseUrl = "https://cinbnmlfpffmyjmkwbco.supabase.co";
+      const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpbmJubWxmcGZmbXlqbWt3YmNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc5NDQ2MTQsImV4cCI6MjA3MzUyMDYxNH0.yrju-Pv4OlfU9Et-mRWg0GRHTusL7ZpJevqKemJFbuA";
+      
+      const url = `${supabaseUrl}/functions/v1/location-autocomplete?q=${encodeURIComponent(debouncedSearch)}&limit=10&types=${typesParam}`;
+      
       const response = await fetch(url, {
-        headers: { accept: "application/json" },
+        headers: {
+          "apikey": supabaseKey,
+          "Authorization": `Bearer ${supabaseKey}`,
+        },
       });
-
+      
       if (!response.ok) {
         throw new Error("Failed to fetch autocomplete results");
       }
-
+      
       const data: ApiAutocompleteResult[] = await response.json();
 
       // Transform API response to our format
