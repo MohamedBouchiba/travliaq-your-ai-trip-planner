@@ -248,7 +248,13 @@ export default function FlightRouteBuilder({
   };
 
   const handleFromChange = (legId: string, value: string, location?: LocationResult) => {
-    updateLeg(legId, { from: value, fromLocation: location });
+    // Only update location if explicitly provided (from dropdown selection)
+    // Don't overwrite with undefined when user is just typing
+    const updates: Partial<FlightLeg> = { from: value };
+    if (location !== undefined) {
+      updates.fromLocation = location;
+    }
+    updateLeg(legId, updates);
     
     if (location?.type === "country") {
       onCountrySelected?.("from", location);
@@ -256,7 +262,13 @@ export default function FlightRouteBuilder({
   };
 
   const handleToChange = (legId: string, value: string, location?: LocationResult) => {
-    updateLeg(legId, { to: value, toLocation: location });
+    // Only update location if explicitly provided (from dropdown selection)
+    // Don't overwrite with undefined when user is just typing
+    const updates: Partial<FlightLeg> = { to: value };
+    if (location !== undefined) {
+      updates.toLocation = location;
+    }
+    updateLeg(legId, updates);
     
     if (location?.type === "country") {
       onCountrySelected?.("to", location);

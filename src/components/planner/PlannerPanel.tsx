@@ -325,7 +325,9 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
         const airport = await resolveAirportsForCity(firstLeg.from.split(",")[0].trim(), "from");
         if (airport) {
           updatedFrom = `${airport.name} (${airport.iata})`;
-          setLegs((prev) => [{ ...prev[0], from: updatedFrom }]);
+          setLegs((prev) => prev.map((leg, idx) => 
+            idx === 0 ? { ...leg, from: updatedFrom } : leg
+          ));
         }
         // If no airport found or API down, continue with city name
       }
@@ -334,7 +336,9 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
         const airport = await resolveAirportsForCity(firstLeg.to.split(",")[0].trim(), "to");
         if (airport) {
           updatedTo = `${airport.name} (${airport.iata})`;
-          setLegs((prev) => [{ ...prev[0], to: updatedTo }]);
+          setLegs((prev) => prev.map((leg, idx) => 
+            idx === 0 ? { ...leg, to: updatedTo } : leg
+          ));
         }
         // If no airport found or API down, continue with city name
       }
