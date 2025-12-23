@@ -168,14 +168,14 @@ const FlightCard = ({
           </div>
         </div>
         
-        {/* Price + Button row */}
-        <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
-          <div className="flex-1 text-center">
-            <span className="text-xl font-bold text-foreground">{flight.price * travelers}</span>
-            <span className="text-sm text-muted-foreground ml-0.5">{flight.currency}</span>
+        {/* Price + Button - Compact inline */}
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <div className="flex items-baseline gap-1">
+            <span className="text-lg font-bold text-foreground">{flight.price * travelers}</span>
+            <span className="text-sm text-muted-foreground">{flight.currency}</span>
             {travelers > 1 && (
-              <span className="text-[10px] text-muted-foreground block">
-                {flight.price} {flight.currency}/pers.
+              <span className="text-[10px] text-muted-foreground ml-1">
+                ({flight.price} {flight.currency}/pers.)
               </span>
             )}
           </div>
@@ -184,7 +184,7 @@ const FlightCard = ({
               e.stopPropagation();
               onSelect?.(flight);
             }}
-            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
+            className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
           >
             Sélectionner
           </button>
