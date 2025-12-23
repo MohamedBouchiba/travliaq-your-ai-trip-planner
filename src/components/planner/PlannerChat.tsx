@@ -7,9 +7,7 @@ import ReactMarkdown from "react-markdown";
 import type { CountrySelectionEvent } from "./PlannerPanel";
 import { findNearestAirports, type Airport } from "@/hooks/useNearestAirports";
 import { useFlightMemory, type AirportInfo, type MissingField } from "@/contexts/FlightMemoryContext";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from "date-fns";
+import { format, addMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameDay, isSameMonth, isBefore, startOfDay } from "date-fns";
 import { fr } from "date-fns/locale";
 
 export type ChatQuickAction =
@@ -221,7 +219,7 @@ const DualAirportSelection = ({
   </div>
 );
 
-// Inline Date Picker Widget
+// Inline Date Picker Widget - Embedded calendar (not popover) for better chat UX
 const DatePickerWidget = ({ 
   label, 
   value, 
@@ -233,32 +231,132 @@ const DatePickerWidget = ({
   onChange: (date: Date) => void;
   minDate?: Date;
 }) => {
-  const [open, setOpen] = useState(false);
+  const [baseMonth, setBaseMonth] = useState<Date>(startOfMonth(value || minDate || new Date()));
+  const [confirmed, setConfirmed] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(value);
+
+  const weekStartsOn = 1; // Monday
+  const weekDayLabels = ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"];
+  
+  // Get days for the current month
+  const getMonthDays = () => {
+    const start = startOfWeek(startOfMonth(baseMonth), { weekStartsOn });
+    const end = endOfWeek(endOfMonth(baseMonth), { weekStartsOn });
+    const days: Date[] = [];
+    let cur = start;
+    while (cur <= end) {
+      days.push(cur);
+      cur = addDays(cur, 1);
+    }
+    return days;
+  };
+
+  const days = getMonthDays();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const handleDayClick = (day: Date) => {
+    const isDisabled = minDate ? isBefore(day, startOfDay(minDate)) : isBefore(day, today);
+    if (isDisabled) return;
+    setSelectedDate(day);
+  };
+
+  const handleConfirm = () => {
+    if (selectedDate) {
+      setConfirmed(true);
+      onChange(selectedDate);
+    }
+  };
+
+  if (confirmed && selectedDate) {
+    return (
+      <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary text-sm font-medium">
+        <CalendarIcon className="h-4 w-4" />
+        <span>{format(selectedDate, "d MMMM yyyy", { locale: fr })}</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="mt-3">
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <button className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-muted/50 border border-border/50 text-sm font-medium hover:bg-muted hover:border-primary/30 transition-all">
-            <CalendarIcon className="h-4 w-4 text-primary" />
-            {value ? format(value, "d MMMM yyyy", { locale: fr }) : label}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={value || undefined}
-            onSelect={(date) => {
-              if (date) {
-                onChange(date);
-                setOpen(false);
-              }
-            }}
-            disabled={(date) => minDate ? date < minDate : date < new Date()}
-            initialFocus
-          />
-        </PopoverContent>
-      </Popover>
+    <div className="mt-3 p-4 rounded-2xl bg-muted/50 border border-border/50 max-w-xs">
+      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
+        {label}
+      </div>
+      
+      {/* Month navigation */}
+      <div className="flex items-center justify-between mb-3">
+        <button
+          type="button"
+          className="h-8 w-8 rounded-lg border border-border hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-foreground transition-all"
+          onClick={() => setBaseMonth(addMonths(baseMonth, -1))}
+          aria-label="Mois précédent"
+        >
+          ‹
+        </button>
+        <span className="text-sm font-medium">
+          {format(baseMonth, "MMMM yyyy", { locale: fr })}
+        </span>
+        <button
+          type="button"
+          className="h-8 w-8 rounded-lg border border-border hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-foreground transition-all"
+          onClick={() => setBaseMonth(addMonths(baseMonth, 1))}
+          aria-label="Mois suivant"
+        >
+          ›
+        </button>
+      </div>
+      
+      {/* Week day labels */}
+      <div className="grid grid-cols-7 gap-1 mb-2">
+        {weekDayLabels.map((lbl, idx) => (
+          <div key={idx} className="text-center text-[10px] text-muted-foreground font-medium">
+            {lbl}
+          </div>
+        ))}
+      </div>
+      
+      {/* Days grid */}
+      <div className="grid grid-cols-7 gap-1">
+        {days.map((day, idx) => {
+          const inMonth = isSameMonth(day, baseMonth);
+          const isSelected = selectedDate && isSameDay(day, selectedDate);
+          const isToday = isSameDay(day, today);
+          const isDisabled = minDate ? isBefore(day, startOfDay(minDate)) : isBefore(day, today);
+
+          return (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => handleDayClick(day)}
+              disabled={isDisabled}
+              className={cn(
+                "aspect-square w-9 h-9 flex items-center justify-center rounded-lg text-xs transition-all",
+                "hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/50",
+                !inMonth && "text-muted-foreground/30",
+                isSelected && "bg-primary text-primary-foreground font-semibold shadow-md",
+                isToday && !isSelected && "border-2 border-primary text-primary font-medium",
+                isDisabled && "opacity-30 cursor-not-allowed hover:bg-transparent"
+              )}
+            >
+              {format(day, "d")}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Confirm button */}
+      <button
+        onClick={handleConfirm}
+        disabled={!selectedDate}
+        className={cn(
+          "w-full mt-4 py-2.5 rounded-xl text-sm font-medium transition-all",
+          selectedDate 
+            ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/20" 
+            : "bg-muted text-muted-foreground cursor-not-allowed"
+        )}
+      >
+        {selectedDate ? `Confirmer : ${format(selectedDate, "d MMMM", { locale: fr })}` : "Sélectionnez une date"}
+      </button>
     </div>
   );
 };
