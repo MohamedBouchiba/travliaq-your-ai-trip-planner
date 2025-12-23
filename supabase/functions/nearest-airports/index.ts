@@ -5,7 +5,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const RAILWAY_API_URL = "https://travliaq-production.up.railway.app";
+// Prefer env var so we can switch upstream without redeploying code
+const RAILWAY_API_URL = Deno.env.get("TRAVLIAQ_API_URL") ?? "https://travliaq-api-production.up.railway.app";
 
 serve(async (req: Request) => {
   // Handle CORS preflight
