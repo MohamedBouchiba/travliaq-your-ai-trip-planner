@@ -101,7 +101,7 @@ export const RangeCalendar: React.FC<RangeCalendarProps> = ({
                   !inMonth && "text-muted-foreground/40",
                   inRange && "bg-primary/20",
                   (isStart || isEnd) && "bg-primary text-primary-foreground font-semibold",
-                  today && !isStart && !isEnd && "border-2 border-primary",
+                  today && !isStart && !isEnd && "text-primary/60 bg-primary/5",
                   isDisabled && "opacity-30 cursor-not-allowed hover:bg-transparent"
                 )}
               >

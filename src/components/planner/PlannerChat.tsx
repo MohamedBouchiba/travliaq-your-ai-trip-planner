@@ -256,7 +256,8 @@ const DatePickerWidget = ({
   today.setHours(0, 0, 0, 0);
 
   const handleDayClick = (day: Date) => {
-    const isDisabled = minDate ? isBefore(day, startOfDay(minDate)) : isBefore(day, today);
+    const minCheck = minDate ? startOfDay(minDate) : startOfDay(addDays(today, 1)); // Tomorrow minimum
+    const isDisabled = isBefore(day, minCheck);
     if (isDisabled) return;
     setSelectedDate(day);
   };
@@ -317,11 +318,12 @@ const DatePickerWidget = ({
       
       {/* Days grid */}
       <div className="grid grid-cols-7 gap-1">
-        {days.map((day, idx) => {
+      {days.map((day, idx) => {
           const inMonth = isSameMonth(day, baseMonth);
           const isSelected = selectedDate && isSameDay(day, selectedDate);
           const isToday = isSameDay(day, today);
-          const isDisabled = minDate ? isBefore(day, startOfDay(minDate)) : isBefore(day, today);
+          const minCheck = minDate ? startOfDay(minDate) : startOfDay(addDays(today, 1)); // Tomorrow minimum
+          const isDisabled = isBefore(day, minCheck);
 
           return (
             <button
@@ -334,7 +336,7 @@ const DatePickerWidget = ({
                 "hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/50",
                 !inMonth && "text-muted-foreground/30",
                 isSelected && "bg-primary text-primary-foreground font-semibold shadow-md",
-                isToday && !isSelected && "border-2 border-primary text-primary font-medium",
+                isToday && !isSelected && "text-primary/60 bg-primary/5", // Subtle today indicator
                 isDisabled && "opacity-30 cursor-not-allowed hover:bg-transparent"
               )}
             >
