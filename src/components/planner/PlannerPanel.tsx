@@ -287,17 +287,23 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
 
   // Search for airports for a city
   const resolveAirportsForCity = async (cityName: string, field: "from" | "to"): Promise<Airport | null> => {
-    const result = await findNearestAirports(cityName, 3);
-    if (!result || result.airports.length === 0) return null;
-    
-    // If only one airport, return it directly
-    if (result.airports.length === 1) {
-      return result.airports[0];
+    try {
+      const result = await findNearestAirports(cityName, 3);
+      if (!result || result.airports.length === 0) return null;
+      
+      // If only one airport, return it directly
+      if (result.airports.length === 1) {
+        return result.airports[0];
+      }
+      
+      // Multiple airports: ask user to choose via chat
+      onAskAirportChoice?.({ field, cityName, airports: result.airports });
+      return null; // Will be resolved via chat selection
+    } catch (error) {
+      console.warn(`[FlightsPanel] Could not resolve airports for "${cityName}":`, error);
+      // API unavailable - skip airport resolution and continue
+      return null;
     }
-    
-    // Multiple airports: ask user to choose via chat
-    onAskAirportChoice?.({ field, cityName, airports: result.airports });
-    return null; // Will be resolved via chat selection
   };
 
   // Handle search button click - check for airports first
@@ -312,27 +318,28 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
       const fromHasAirport = /\([A-Z]{3}\)/.test(firstLeg.from);
       const toHasAirport = /\([A-Z]{3}\)/.test(firstLeg.to);
       
+      let updatedFrom = firstLeg.from;
+      let updatedTo = firstLeg.to;
+      
       if (!fromHasAirport) {
         const airport = await resolveAirportsForCity(firstLeg.from.split(",")[0].trim(), "from");
         if (airport) {
-          setLegs((prev) => [{ ...prev[0], from: `${airport.name} (${airport.iata})` }]);
-        } else {
-          // Multiple airports - waiting for user choice
-          return;
+          updatedFrom = `${airport.name} (${airport.iata})`;
+          setLegs((prev) => [{ ...prev[0], from: updatedFrom }]);
         }
+        // If no airport found or API down, continue with city name
       }
       
       if (!toHasAirport) {
         const airport = await resolveAirportsForCity(firstLeg.to.split(",")[0].trim(), "to");
         if (airport) {
-          setLegs((prev) => [{ ...prev[0], to: `${airport.name} (${airport.iata})` }]);
-        } else {
-          // Multiple airports - waiting for user choice
-          return;
+          updatedTo = `${airport.name} (${airport.iata})`;
+          setLegs((prev) => [{ ...prev[0], to: updatedTo }]);
         }
+        // If no airport found or API down, continue with city name
       }
       
-      // All airports resolved, proceed with search
+      // Proceed with search (API will handle city-to-airport resolution if needed)
       console.log("Searching flights with:", { legs, passengers, travelClass, options, tripType });
     } finally {
       setIsSearchingAirports(false);
