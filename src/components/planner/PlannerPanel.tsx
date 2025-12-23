@@ -594,6 +594,8 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
           isLoading={isSearchingFlights}
           onSelect={(flight) => console.log("Selected flight:", flight)}
           travelers={passengers.length}
+          routeLabel={`${legs[0]?.from?.match(/\(([A-Z]{3})\)/)?.[1] || legs[0]?.from || "?"} → ${legs[0]?.to?.match(/\(([A-Z]{3})\)/)?.[1] || legs[0]?.to || "?"}`}
+          tripType={tripType}
         />
       </div>
     );

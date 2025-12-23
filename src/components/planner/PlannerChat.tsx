@@ -49,7 +49,7 @@ export interface DualAirportChoice {
 }
 
 // Widget types for inline interactions
-type WidgetType = "datePicker" | "returnDatePicker" | "dateRangePicker" | "travelersSelector";
+type WidgetType = "datePicker" | "returnDatePicker" | "dateRangePicker" | "travelersSelector" | "tripTypeConfirm";
 
 interface ChatMessage {
   id: string;
@@ -746,6 +746,77 @@ const TravelersWidget = ({
   );
 };
 
+// Trip Type Confirmation Widget - Quick chips for roundtrip / oneway / multi
+const TripTypeConfirmWidget = ({
+  currentType = "roundtrip",
+  onConfirm,
+}: {
+  currentType?: "roundtrip" | "oneway" | "multi";
+  onConfirm: (tripType: "roundtrip" | "oneway" | "multi") => void;
+}) => {
+  const [confirmed, setConfirmed] = useState(false);
+  const [selected, setSelected] = useState(currentType);
+
+  const handleSelect = (type: "roundtrip" | "oneway" | "multi") => {
+    setSelected(type);
+    setConfirmed(true);
+    onConfirm(type);
+  };
+
+  if (confirmed) {
+    const label =
+      selected === "roundtrip"
+        ? "Aller-retour"
+        : selected === "oneway"
+        ? "Aller simple"
+        : "Multi-destinations";
+    return (
+      <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary text-sm font-medium">
+        <span>✓</span>
+        <span>{label}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      <button
+        onClick={() => handleSelect("roundtrip")}
+        className={cn(
+          "px-4 py-2 rounded-xl text-sm font-medium transition-all",
+          selected === "roundtrip"
+            ? "bg-primary text-primary-foreground shadow-md"
+            : "bg-muted text-foreground hover:bg-muted/80"
+        )}
+      >
+        ↔ Aller-retour
+      </button>
+      <button
+        onClick={() => handleSelect("oneway")}
+        className={cn(
+          "px-4 py-2 rounded-xl text-sm font-medium transition-all",
+          selected === "oneway"
+            ? "bg-primary text-primary-foreground shadow-md"
+            : "bg-muted text-foreground hover:bg-muted/80"
+        )}
+      >
+        → Aller simple
+      </button>
+      <button
+        onClick={() => handleSelect("multi")}
+        className={cn(
+          "px-4 py-2 rounded-xl text-sm font-medium transition-all",
+          selected === "multi"
+            ? "bg-primary text-primary-foreground shadow-md"
+            : "bg-muted text-foreground hover:bg-muted/80"
+        )}
+      >
+        🔀 Multi-destinations
+      </button>
+    </div>
+  );
+};
+
 // Markdown message component
 const MarkdownMessage = ({ content }: { content: string }) => (
   <ReactMarkdown
@@ -1143,15 +1214,53 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       parts.push(`${travelers.infants} bébé${travelers.infants > 1 ? "s" : ""}`);
     }
 
+    // Now ask trip type confirmation before search
     setMessages((prev) => [
       ...prev,
       {
         id: `confirm-travelers-${Date.now()}`,
         role: "assistant",
-        text: `Parfait ! ${parts.join(", ")}. Tu peux maintenant cliquer sur "Rechercher" pour trouver les meilleurs vols ! 🔍`,
-        hasSearchButton: true,
+        text: `Parfait, ${parts.join(", ")} ! C'est bien un aller-retour ?`,
+        widget: "tripTypeConfirm",
       },
     ]);
+  };
+
+  // Handle trip type confirmation
+  const handleTripTypeConfirm = (messageId: string, tripType: "roundtrip" | "oneway" | "multi") => {
+    // Update memory
+    updateMemory({ tripType });
+
+    // Remove widget from message
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId ? { ...m, widget: undefined } : m
+      )
+    );
+
+    if (tripType === "multi") {
+      // Multi-destinations: ask for all destinations
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `ask-multi-${Date.now()}`,
+          role: "assistant",
+          text: `Super ! Pour un voyage multi-destinations, indiquez-moi toutes vos étapes (ex: "Paris → Rome → Barcelone → Paris" ou listez vos villes). 🗺️`,
+        },
+      ]);
+    } else {
+      // Roundtrip or oneway: ready to search
+      const label = tripType === "roundtrip" ? "Aller-retour" : "Aller simple";
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `search-ready-${Date.now()}`,
+          role: "assistant",
+          text: `Parfait, **${label}** confirmé ! Cliquez ci-dessous pour lancer la recherche. 🚀`,
+          hasSearchButton: true,
+        },
+      ]);
+    }
   };
 
   // Handle date range selection (both departure AND return)
@@ -1701,6 +1810,14 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
                   <TravelersWidget
                     initialValues={memory.passengers}
                     onConfirm={(travelers) => handleTravelersSelect(m.id, travelers)}
+                  />
+                )}
+
+                {/* Trip Type Confirmation Widget */}
+                {m.widget === "tripTypeConfirm" && (
+                  <TripTypeConfirmWidget
+                    currentType={memory.tripType}
+                    onConfirm={(tripType) => handleTripTypeConfirm(m.id, tripType)}
                   />
                 )}
 

@@ -34,6 +34,8 @@ interface FlightResultsProps {
   isLoading?: boolean;
   onSelect?: (flight: FlightOffer) => void;
   travelers?: number;
+  routeLabel?: string; // e.g. "BRU → CPH" for header
+  tripType?: "roundtrip" | "oneway" | "multi";
 }
 
 // Airline logos
@@ -386,7 +388,7 @@ const FlightSkeleton = ({ delay = 0 }: { delay?: number }) => (
 );
 
 // Main component
-const FlightResults = ({ flights, isLoading, onSelect, travelers = 1 }: FlightResultsProps) => {
+const FlightResults = ({ flights, isLoading, onSelect, travelers = 1, routeLabel, tripType = "roundtrip" }: FlightResultsProps) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
   
@@ -427,13 +429,41 @@ const FlightResults = ({ flights, isLoading, onSelect, travelers = 1 }: FlightRe
       </div>
     );
   }
+
+  // Build route header from first flight if not provided
+  const displayRoute = routeLabel || (() => {
+    const first = flights[0];
+    const from = first.outbound[0]?.departureAirport || "?";
+    const to = first.outbound[first.outbound.length - 1]?.arrivalAirport || "?";
+    return `${from} → ${to}`;
+  })();
+
+  const tripLabel = tripType === "roundtrip" ? "Aller-retour" : tripType === "oneway" ? "Aller simple" : "Multi-destinations";
   
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          <span className="font-semibold text-foreground">{flights.length}</span> vol{flights.length > 1 ? "s" : ""} trouvé{flights.length > 1 ? "s" : ""}
-        </p>
+      {/* Route header - clearly visible */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border pb-3 -mx-4 px-4 pt-1">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-lg font-bold text-foreground">
+            <Plane className="h-5 w-5 text-primary" />
+            <span>{displayRoute}</span>
+          </div>
+          <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-primary/10 text-primary">
+            {tripLabel}
+          </span>
+        </div>
+        <div className="flex items-center justify-between mt-1">
+          <p className="text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">{flights.length}</span> vol{flights.length > 1 ? "s" : ""} trouvé{flights.length > 1 ? "s" : ""}
+          </p>
+          {flights.length > 3 && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <ChevronDown className="h-3 w-3 animate-bounce" />
+              Scroll pour plus
+            </p>
+          )}
+        </div>
       </div>
       
       {flights.map((flight, index) => (
