@@ -384,6 +384,9 @@ export default function FlightRouteBuilder({
                 showWeather={showWeather}
                 onShowPricesChange={setShowPrices}
                 onShowWeatherChange={setShowWeather}
+                origin={leg.fromLocation?.iata || leg.from?.match(/\(([A-Z]{3})\)/)?.[1]}
+                destination={leg.toLocation?.iata || leg.to?.match(/\(([A-Z]{3})\)/)?.[1]}
+                tripType={tripType}
               />
             </div>
           )}
