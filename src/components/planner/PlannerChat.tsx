@@ -1022,7 +1022,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
   // Convert stored messages to ChatMessage (with widgets/typing state)
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-  // Sync from storedMessages when session changes
+  // Sync from storedMessages when switching sessions (avoid feedback loop)
   useEffect(() => {
     setMessages(
       storedMessages.map((m) => ({
@@ -1033,7 +1033,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
         hasSearchButton: m.hasSearchButton,
       }))
     );
-  }, [storedMessages, activeSessionId]);
+  }, [activeSessionId]);
 
   // Persist chat history when messages change (debounced via hook)
   const persistMessages = useCallback(
@@ -1068,9 +1068,21 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
   const pendingPreferredMonthRef = useRef<string | null>(null); // Store preferred month for calendar navigation
   const citySelectionShownForCountryRef = useRef<string | null>(null); // Prevent duplicate city selection messages
   const pendingFromCountryRef = useRef<{ code: string; name: string } | null>(null); // Track departure country selection
+
+  // When switching conversations, reset transient refs so workflow can restart cleanly
+  useEffect(() => {
+    searchButtonShownRef.current = false;
+    pendingTravelersWidgetRef.current = false;
+    pendingTripDurationRef.current = null;
+    pendingPreferredMonthRef.current = null;
+    citySelectionShownForCountryRef.current = null;
+    pendingFromCountryRef.current = null;
+    setIsLoading(false);
+    setInput("");
+  }, [activeSessionId]);
   
   // Access flight memory
-  const { memory, updateMemory, isReadyToSearch, hasCompleteInfo, needsAirportSelection, missingFields, getMemorySummary } = useFlightMemory();
+  const { memory, updateMemory, resetMemory, isReadyToSearch, hasCompleteInfo, needsAirportSelection, missingFields, getMemorySummary } = useFlightMemory();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -2204,8 +2216,13 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
         activeSessionId={activeSessionId}
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
-        onSelectSession={selectSession}
-        onNewSession={createNewSession}
+        onSelectSession={(sessionId) => {
+          selectSession(sessionId);
+        }}
+        onNewSession={() => {
+          createNewSession();
+          resetMemory();
+        }}
         onDeleteSession={deleteSession}
       />
 

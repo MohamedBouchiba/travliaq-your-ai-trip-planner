@@ -738,7 +738,15 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
         const memoryUpdate: Parameters<typeof updateMemory>[0] = {
           tripType,
         };
-        
+
+        // If user cleared the fields, keep them empty by clearing memory too
+        if ((firstLeg.from || "").trim() === "") {
+          memoryUpdate.departure = null;
+        }
+        if ((firstLeg.to || "").trim() === "") {
+          memoryUpdate.arrival = null;
+        }
+
         // Sync departure
         if (firstLeg.fromLocation) {
           const loc = firstLeg.fromLocation;
@@ -752,7 +760,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
             countryCode: loc.country_code,
           };
         }
-        
+
         // Sync arrival
         if (firstLeg.toLocation) {
           const loc = firstLeg.toLocation;
@@ -766,7 +774,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
             countryCode: loc.country_code,
           };
         }
-        
+
         // Sync dates
         if (firstLeg.date) {
           memoryUpdate.departureDate = firstLeg.date;
@@ -774,7 +782,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
         if (firstLeg.returnDate) {
           memoryUpdate.returnDate = firstLeg.returnDate;
         }
-        
+
         updateMemory(memoryUpdate);
       }
     }

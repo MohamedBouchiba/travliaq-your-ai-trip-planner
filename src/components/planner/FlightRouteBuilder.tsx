@@ -103,9 +103,8 @@ function CityInput({ value, onChange, placeholder, icon, onCountrySelected }: Ci
   const handleBlur = () => {
     setIsFocused(false);
     if (justSelectedRef.current) return;
-    if (search.trim() === "" && value) {
-      setSearch(value);
-    }
+    // IMPORTANT: if user cleared the input, keep it empty (do not restore previous value)
+    if (search.trim() === "") return;
   };
 
   // Only show placeholder when not focused and no value
@@ -256,28 +255,36 @@ export default function FlightRouteBuilder({
   };
 
   const handleFromChange = (legId: string, value: string, location?: LocationResult) => {
-    // Only update location if explicitly provided (from dropdown selection)
-    // Don't overwrite with undefined when user is just typing
     const updates: Partial<FlightLeg> = { from: value };
-    if (location !== undefined) {
+
+    // If user clears the field, also clear the associated metadata
+    if (value.trim() === "") {
+      updates.fromLocation = undefined;
+    } else if (location !== undefined) {
+      // Only update location if explicitly provided (from dropdown selection)
       updates.fromLocation = location;
     }
+
     updateLeg(legId, updates);
-    
+
     if (location?.type === "country") {
       onCountrySelected?.("from", location);
     }
   };
 
   const handleToChange = (legId: string, value: string, location?: LocationResult) => {
-    // Only update location if explicitly provided (from dropdown selection)
-    // Don't overwrite with undefined when user is just typing
     const updates: Partial<FlightLeg> = { to: value };
-    if (location !== undefined) {
+
+    // If user clears the field, also clear the associated metadata
+    if (value.trim() === "") {
+      updates.toLocation = undefined;
+    } else if (location !== undefined) {
+      // Only update location if explicitly provided (from dropdown selection)
       updates.toLocation = location;
     }
+
     updateLeg(legId, updates);
-    
+
     if (location?.type === "country") {
       onCountrySelected?.("to", location);
     }
