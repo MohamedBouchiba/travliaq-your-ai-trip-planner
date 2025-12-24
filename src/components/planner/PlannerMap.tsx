@@ -460,7 +460,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       document.head.appendChild(style);
     }
 
-    const marker = new mapboxgl.Marker({ element: el })
+    const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
       .setLngLat([userLocation.lng, userLocation.lat])
       .addTo(map.current);
 
@@ -679,7 +679,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         });
       }
 
-      const marker = new mapboxgl.Marker({ element: container })
+      const marker = new mapboxgl.Marker({ element: container, anchor: "center" })
         .setLngLat([point.lng, point.lat])
         .addTo(map.current!);
 
