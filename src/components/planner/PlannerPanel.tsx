@@ -69,8 +69,8 @@ const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVis
 
   const wrapperClass =
     layout === "overlay"
-      ? "pointer-events-none absolute top-16 left-4 bottom-4 w-[420px] z-10"
-      : "w-96 lg:w-[480px] xl:w-[520px] border-l border-border bg-card overflow-y-auto themed-scroll shrink-0";
+      ? "pointer-events-none absolute top-16 left-4 bottom-4 w-[320px] sm:w-[360px] md:w-[400px] lg:w-[420px] xl:w-[480px] 2xl:w-[540px] z-10"
+      : "w-80 sm:w-96 lg:w-[480px] xl:w-[520px] 2xl:w-[600px] border-l border-border bg-card overflow-y-auto themed-scroll shrink-0";
 
   const innerClass = layout === "overlay" ? "pointer-events-auto h-full overflow-y-auto themed-scroll" : "";
 
