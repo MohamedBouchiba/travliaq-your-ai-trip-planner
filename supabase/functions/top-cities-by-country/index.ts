@@ -137,15 +137,29 @@ const cityDescriptions: Record<string, string> = {
   "hong kong": "Skyline spectaculaire, dim sum et shopping paradis.",
 };
 
-function getCityDescription(cityName: string, countryName: string): string {
+// Country code to country name mapping for fallback
+const countryNames: Record<string, string> = {
+  "FR": "France", "QA": "Qatar", "US": "États-Unis", "JP": "Japon", "ES": "Espagne",
+  "IT": "Italie", "GB": "Royaume-Uni", "DE": "Allemagne", "TH": "Thaïlande", "AE": "Émirats",
+  "MA": "Maroc", "EG": "Égypte", "GR": "Grèce", "PT": "Portugal", "NL": "Pays-Bas",
+  "BE": "Belgique", "AT": "Autriche", "CZ": "Tchéquie", "HU": "Hongrie", "PL": "Pologne",
+  "SG": "Singapour", "AU": "Australie", "BR": "Brésil", "MX": "Mexique", "AR": "Argentine",
+  "KR": "Corée du Sud", "IN": "Inde", "TR": "Turquie", "RU": "Russie", "ZA": "Afrique du Sud",
+  "ID": "Indonésie", "VN": "Vietnam", "CN": "Chine", "CA": "Canada",
+};
+
+function getCityDescription(cityName: string, countryName: string | undefined, countryCode: string): string {
   const normalizedCity = cityName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   
   if (cityDescriptions[normalizedCity]) {
     return cityDescriptions[normalizedCity];
   }
   
+  // Use countryName if available, otherwise lookup by code, fallback to "ce pays"
+  const displayCountry = countryName || countryNames[countryCode.toUpperCase()] || "ce pays";
+  
   // Fallback generic description
-  return `Ville importante de ${countryName} offrant une expérience authentique et des découvertes uniques.`;
+  return `Ville importante de ${displayCountry} offrant une expérience authentique et des découvertes uniques.`;
 }
 
 serve(async (req) => {
@@ -187,19 +201,19 @@ serve(async (req) => {
     }
 
     const data: ApiResponse = await response.json();
-    console.log(`Received ${data.cities?.length || 0} cities for ${data.country_name}`);
+    console.log(`Received ${data.cities?.length || 0} cities for ${data.country_name || countryCode}`);
 
-    // Enrich cities with descriptions
+    // Enrich cities with descriptions (pass countryCode for fallback)
     const enrichedCities = (data.cities || []).map((city) => ({
       ...city,
-      description: city.description || getCityDescription(city.name, data.country_name),
+      description: city.description || getCityDescription(city.name, data.country_name, countryCode),
     }));
 
     return new Response(
       JSON.stringify({
         cities: enrichedCities,
-        country_name: data.country_name,
-        country_code: data.country_code,
+        country_name: data.country_name || countryNames[countryCode.toUpperCase()] || countryCode,
+        country_code: data.country_code || countryCode,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
