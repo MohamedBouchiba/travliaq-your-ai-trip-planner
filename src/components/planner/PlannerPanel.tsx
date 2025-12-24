@@ -335,7 +335,51 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     }
   };
 
-  // Handle search button click - check for airports first
+  // Check if a leg value is a country (no city, just a country name)
+  const isCountryOnly = (value: string, location?: LocationResult): boolean => {
+    // If we have location metadata and it's explicitly a country
+    if (location?.type === "country") return true;
+    
+    // Check common country patterns (no comma = likely country)
+    const hasComma = value.includes(",");
+    const hasAirportCode = /\([A-Z]{3}\)/.test(value);
+    
+    // If no comma and no airport code, might be a country
+    if (!hasComma && !hasAirportCode) {
+      // Additional check: could be a simple city name, but countries are usually single words
+      // For safety, we'll rely on the location metadata when available
+      return false;
+    }
+    
+    return false;
+  };
+
+  // Fetch cities for a country and ask user to choose
+  const fetchCitiesForCountry = async (countryCode: string, countryName: string, field: "from" | "to"): Promise<boolean> => {
+    try {
+      const response = await fetch(
+        `https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/top-cities-by-country?country_code=${countryCode}&limit=5`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.cities && data.cities.length > 0) {
+          // We have cities - notify chat to show city selection
+          // For now, return true to indicate we need city selection
+          return true;
+        }
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
+  // Handle search button click - check for countries/cities/airports first
   const handleSearchClick = async () => {
     const firstLeg = legs[0];
     if (!firstLeg?.from?.trim() || !firstLeg?.to?.trim() || !firstLeg?.date) return;
@@ -343,6 +387,51 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     setIsSearchingAirports(true);
     
     try {
+      // First check if either location is a COUNTRY (not a city)
+      const fromIsCountry = firstLeg.fromLocation?.type === "country";
+      const toIsCountry = firstLeg.toLocation?.type === "country";
+      
+      // If either is a country, we need to ask user to select a city first
+      if (fromIsCountry || toIsCountry) {
+        // Create a message asking for city selection
+        const countriesNeedingSelection = [];
+        if (fromIsCountry && firstLeg.fromLocation) {
+          countriesNeedingSelection.push({
+            field: "from" as const,
+            countryCode: firstLeg.fromLocation.country_code,
+            countryName: firstLeg.fromLocation.name,
+          });
+        }
+        if (toIsCountry && firstLeg.toLocation) {
+          countriesNeedingSelection.push({
+            field: "to" as const,
+            countryCode: firstLeg.toLocation.country_code,
+            countryName: firstLeg.toLocation.name,
+          });
+        }
+        
+        // Notify parent to show city selection in chat (step by step)
+        // We'll use the country selection event for this
+        if (countriesNeedingSelection.length > 0) {
+          const first = countriesNeedingSelection[0];
+          onCountrySelected?.({
+            field: first.field,
+            country: {
+              id: first.countryCode,
+              name: first.countryName,
+              type: "country",
+              country_code: first.countryCode,
+              country_name: first.countryName,
+              lat: 0,
+              lng: 0,
+              display_name: first.countryName,
+            },
+          });
+          setIsSearchingAirports(false);
+          return;
+        }
+      }
+      
       // Check if "from" is a city (no IATA code in parentheses)
       const fromHasAirport = /\([A-Z]{3}\)/.test(firstLeg.from);
       const toHasAirport = /\([A-Z]{3}\)/.test(firstLeg.to);

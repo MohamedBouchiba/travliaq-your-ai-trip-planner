@@ -2041,6 +2041,14 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
                   />
                 )}
 
+                {/* City Selection Widget */}
+                {m.widget === "citySelector" && m.widgetData?.citySelection && (
+                  <CitySelectionWidget
+                    citySelection={m.widgetData.citySelection}
+                    onSelect={(cityName) => handleCitySelect(m.id, cityName, m.widgetData!.citySelection!.countryName)}
+                  />
+                )}
+
                 {/* Flight search button */}
                 {m.hasSearchButton && (
                   <div className="mt-3">
