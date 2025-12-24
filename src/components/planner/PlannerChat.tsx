@@ -1374,12 +1374,12 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
   };
 
   // Handle city selection from widget
-  const handleCitySelect = async (messageId: string, cityName: string, countryName: string) => {
+  const handleCitySelect = async (messageId: string, cityName: string, countryName: string, countryCode: string) => {
     // Reset country selection ref to allow re-selection later
     citySelectionShownForCountryRef.current = null;
     
-    // Update memory with the selected city
-    updateMemory({ arrival: { city: cityName, country: countryName } });
+    // Update memory with the selected city AND country code (important for API calls)
+    updateMemory({ arrival: { city: cityName, country: countryName, countryCode } });
 
     // Remove widget from message
     setMessages((prev) =>
@@ -1640,9 +1640,9 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
   };
 
   // Handle departure city selection (from country)
-  const handleDepartureCitySelect = async (messageId: string, cityName: string, countryName: string) => {
-    // Update memory with the selected departure city
-    updateMemory({ departure: { city: cityName, country: countryName } });
+  const handleDepartureCitySelect = async (messageId: string, cityName: string, countryName: string, countryCode: string) => {
+    // Update memory with the selected departure city AND country code (important for API calls)
+    updateMemory({ departure: { city: cityName, country: countryName, countryCode } });
     pendingFromCountryRef.current = null;
 
     // Remove widget from message
@@ -2275,11 +2275,12 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
                   <CitySelectionWidget
                     citySelection={m.widgetData.citySelection}
                     onSelect={(cityName) => {
+                      const { countryCode, countryName } = m.widgetData!.citySelection!;
                       // Check if this is a departure or destination city selection
                       if (m.widgetData?.isDeparture) {
-                        handleDepartureCitySelect(m.id, cityName, m.widgetData!.citySelection!.countryName);
+                        handleDepartureCitySelect(m.id, cityName, countryName, countryCode);
                       } else {
-                        handleCitySelect(m.id, cityName, m.widgetData!.citySelection!.countryName);
+                        handleCitySelect(m.id, cityName, countryName, countryCode);
                       }
                     }}
                   />
