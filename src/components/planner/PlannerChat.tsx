@@ -1,5 +1,7 @@
-import { useState, useRef, useEffect, useImperativeHandle, forwardRef } from "react";
-import { Send, User, Plane, CalendarIcon } from "lucide-react";
+import { useState, useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from "react";
+import { Send, User, Plane, CalendarIcon, History } from "lucide-react";
+import { ChatHistorySidebar } from "./ChatHistorySidebar";
+import { useChatSessions, type StoredMessage } from "@/hooks/useChatSessions";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/logo-travliaq.png";
@@ -1002,57 +1004,62 @@ function getMissingFieldLabel(field: MissingField): string {
 }
 
 const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onAction }, ref) => {
-  const CHAT_STORAGE_KEY = "travliaq_planner_chat_messages";
+  // Chat sessions hook for multi-conversation management
+  const {
+    sessions,
+    activeSessionId,
+    messages: storedMessages,
+    updateMessages: updateStoredMessages,
+    selectSession,
+    createNewSession,
+    deleteSession,
+  } = useChatSessions();
 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    try {
-      const raw = localStorage.getItem(CHAT_STORAGE_KEY);
-      if (!raw) throw new Error("no stored chat");
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error("invalid stored chat");
-      // Restore only safe/displayable parts (no widgets/typing state)
-      return parsed
-        .filter((m: any) => m && typeof m.text === "string" && (m.role === "assistant" || m.role === "user" || m.role === "system"))
-        .slice(-200)
-        .map((m: any) => ({
-          id: String(m.id || crypto.randomUUID()),
-          role: m.role,
-          text: m.text,
-          isHidden: Boolean(m.isHidden),
-          hasSearchButton: Boolean(m.hasSearchButton),
-        }));
-    } catch {
-      return [
-        {
-          id: "welcome",
-          role: "assistant",
-          text: "Bonjour ! Je suis votre assistant de voyage. Dites-moi où vous souhaitez aller et je vous aiderai à planifier votre voyage.",
-        },
-      ];
-    }
-  });
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
-  // Persist chat history (texts) so it survives refresh
+  // Convert stored messages to ChatMessage (with widgets/typing state)
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  // Sync from storedMessages when session changes
   useEffect(() => {
-    try {
-      const toStore = messages
-        .filter((m) => !m.isHidden)
+    setMessages(
+      storedMessages.map((m) => ({
+        id: m.id,
+        role: m.role,
+        text: m.text,
+        isHidden: m.isHidden,
+        hasSearchButton: m.hasSearchButton,
+      }))
+    );
+  }, [storedMessages, activeSessionId]);
+
+  // Persist chat history when messages change (debounced via hook)
+  const persistMessages = useCallback(
+    (msgs: ChatMessage[]) => {
+      const toStore: StoredMessage[] = msgs
         .filter((m) => !m.isTyping)
         .map((m) => ({
           id: m.id,
           role: m.role,
           text: m.text,
-          hasSearchButton: Boolean(m.hasSearchButton),
-          isHidden: Boolean(m.isHidden),
+          hasSearchButton: m.hasSearchButton,
+          isHidden: m.isHidden,
         }))
         .slice(-200);
-      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(toStore));
-    } catch {
-      // ignore
+      updateStoredMessages(toStore);
+    },
+    [updateStoredMessages]
+  );
+
+  // Persist on message changes (excluding typing indicators)
+  useEffect(() => {
+    const nonTyping = messages.filter((m) => !m.isTyping);
+    if (nonTyping.length > 0) {
+      persistMessages(messages);
     }
-  }, [messages]);
+  }, [messages, persistMessages]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchButtonShownRef = useRef(false);
@@ -2190,7 +2197,32 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
   };
 
   return (
-    <aside className="h-full w-full bg-background flex flex-col">
+    <aside className="h-full w-full bg-background flex flex-col relative overflow-hidden">
+      {/* Chat History Sidebar */}
+      <ChatHistorySidebar
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        onSelectSession={selectSession}
+        onNewSession={createNewSession}
+        onDeleteSession={deleteSession}
+      />
+
+      {/* Header with history button */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+        <button
+          onClick={() => setIsHistoryOpen(true)}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <History className="h-4 w-4" />
+          <span className="text-sm font-medium">Historique</span>
+        </button>
+        <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+          {sessions.find((s) => s.id === activeSessionId)?.title || "Nouvelle conversation"}
+        </div>
+      </div>
+
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto py-6 px-4 space-y-6">
