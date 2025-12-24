@@ -1497,12 +1497,9 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
   // Fetch cities for a country and show the widget
   const fetchAndShowCities = async (messageId: string, countryCode: string, countryName: string) => {
     try {
-      const response = await supabase.functions.invoke("top-cities-by-country", {
-        body: null,
-        headers: { "Content-Type": "application/json" },
-      });
+      // We must call this edge function with query params (GET) so it has `country_code`.
+      // (Using `supabase.functions.invoke` here would POST without query params and return 400.)
 
-      // Use fetch directly since we need query params
       const fetchResponse = await fetch(
         `https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/top-cities-by-country?country_code=${countryCode}&limit=5`,
         {
@@ -1573,7 +1570,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
   const fetchAndShowCitiesForDeparture = async (messageId: string, countryCode: string, countryName: string) => {
     try {
       const fetchResponse = await fetch(
-        `https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/top-cities-by-country?countryCode=${countryCode}&limit=5`,
+        `https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/top-cities-by-country?country_code=${countryCode}&limit=5`,
         {
           method: "GET",
           headers: {
