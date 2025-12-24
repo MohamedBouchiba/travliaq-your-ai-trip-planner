@@ -1183,12 +1183,15 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       );
     }
 
-    // Update flight memory with full airport info (keep all data)
+    // Update flight memory with full airport info (keep all data, preserve existing country info)
+    const existingInfo = field === "from" ? memory.departure : memory.arrival;
     const airportInfo: AirportInfo = {
       airport: airport.name,
       iata: airport.iata,
       city: airport.city_name,
-      countryCode: airport.country_code,
+      // Preserve existing country/countryCode if we had them (from city selection), otherwise use airport's code
+      country: existingInfo?.country,
+      countryCode: airport.country_code || existingInfo?.countryCode,
       lat: airport.lat,
       lng: airport.lon, // Note: Airport type uses 'lon' not 'lng'
     };
