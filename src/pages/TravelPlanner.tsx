@@ -177,8 +177,9 @@ const TravelPlanner = () => {
                 if (action.type === "updateFlight") {
                   setFlightFormData(action.flightData);
                   setIsPanelVisible(true);
-                  // Reset search message flag for new search
+                  // Reset search message flag and country selection for new search
                   searchMessageSentRef.current = false;
+                  lastCountrySelectedRef.current = null;
                 }
                 if (action.type === "selectAirport") {
                   // Pass selected airport to the panel

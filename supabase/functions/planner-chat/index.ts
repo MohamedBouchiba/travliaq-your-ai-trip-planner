@@ -18,11 +18,19 @@ const flightExtractionTool = {
       properties: {
         from: {
           type: "string",
-          description: "Departure city. ONLY extract if explicitly mentioned: 'depuis Paris', 'de Lyon', 'je pars de Nice'. Never guess."
+          description: "Departure city. ONLY extract if explicitly mentioned: 'depuis Paris', 'de Lyon', 'je pars de Nice'. For COUNTRIES, use fromCountryCode instead."
+        },
+        fromCountryCode: {
+          type: "string",
+          description: "ISO2 country code if user mentions a COUNTRY for departure (e.g., 'depuis la France' = 'FR', 'je pars du Canada' = 'CA'). This triggers city selection for departure."
+        },
+        fromCountryName: {
+          type: "string",
+          description: "Country name in French if user mentions a country instead of a city for departure."
         },
         to: {
           type: "string", 
-          description: "Destination city. Extract from: 'aller à Rome', 'vers Tokyo', 'direction Barcelone'. For COUNTRIES, use needsCitySelection instead."
+          description: "Destination city. Extract from: 'aller à Rome', 'vers Tokyo', 'direction Barcelone'. For COUNTRIES, use toCountryCode instead."
         },
         toCountryCode: {
           type: "string",

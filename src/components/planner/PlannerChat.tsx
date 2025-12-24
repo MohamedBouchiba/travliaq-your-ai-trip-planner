@@ -20,6 +20,8 @@ export type ChatQuickAction =
 
 export interface FlightFormData {
   from?: string;
+  fromCountryCode?: string;
+  fromCountryName?: string;
   to?: string;
   toCountryCode?: string;
   toCountryName?: string;
@@ -1358,6 +1360,9 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
 
   // Handle city selection from widget
   const handleCitySelect = async (messageId: string, cityName: string, countryName: string) => {
+    // Reset country selection ref to allow re-selection later
+    citySelectionShownForCountryRef.current = null;
+    
     // Update memory with the selected city
     updateMemory({ arrival: { city: cityName, country: countryName } });
 
@@ -1368,21 +1373,109 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       )
     );
 
+    // Determine which date widget to show based on what we know
+    // Logic:
+    // - If tripDuration is known → show datePicker (we can calculate return)
+    // - If tripType is oneway → show datePicker
+    // - Otherwise → show dateRangePicker (need both dates)
+    const hasTripDuration = !!pendingTripDurationRef.current;
+    const isOneway = memory.tripType === "oneway";
+    
     // Show date widget next if dates are not set
     if (!memory.departureDate) {
+      let widgetType: WidgetType;
+      let messageText: string;
+      
+      if (hasTripDuration) {
+        // Duration known → just need departure date
+        widgetType = "datePicker";
+        messageText = `Excellent choix, **${cityName}** ! 😊 Tu as mentionné ${pendingTripDurationRef.current}. Choisis ta date de départ :`;
+      } else if (isOneway) {
+        // One-way trip → just need departure date
+        widgetType = "datePicker";
+        messageText = `Excellent choix, **${cityName}** ! 😊 Quand souhaites-tu partir ?`;
+      } else {
+        // Need both dates
+        widgetType = "dateRangePicker";
+        messageText = `Excellent choix, **${cityName}** ! 😊 Choisis tes dates de voyage :`;
+      }
+      
       setMessages((prev) => [
         ...prev,
         {
           id: `ask-date-after-city-${Date.now()}`,
           role: "assistant",
-          text: `Excellent choix, **${cityName}** ! 😊 Quand souhaites-tu partir ?`,
-          widget: memory.tripType === "oneway" ? "datePicker" : "dateRangePicker",
+          text: messageText,
+          widget: widgetType,
           widgetData: {
             preferredMonth: pendingPreferredMonthRef.current || undefined,
             tripDuration: pendingTripDurationRef.current || undefined,
           },
         },
       ]);
+    } else if (!memory.returnDate && memory.tripType !== "oneway") {
+      // Have departure but not return
+      if (hasTripDuration) {
+        // Calculate return from duration
+        const duration = pendingTripDurationRef.current!;
+        const match = duration.match(/(\d+)\s*(semaine|jour|week|day)/i);
+        let computedReturn: Date | null = null;
+
+        if (match) {
+          const num = parseInt(match[1]);
+          const unit = match[2].toLowerCase();
+          let days = num;
+          if (unit.includes("semaine") || unit.includes("week")) {
+            days = num * 7;
+          }
+          computedReturn = addDays(memory.departureDate!, days);
+        } else if (duration.toLowerCase().includes("semaine") || duration.toLowerCase().includes("week")) {
+          computedReturn = addDays(memory.departureDate!, 7);
+        }
+
+        if (computedReturn) {
+          updateMemory({ returnDate: computedReturn });
+          pendingTripDurationRef.current = null;
+          
+          // Ask for travelers next
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `ask-travelers-after-city-${Date.now()}`,
+              role: "assistant",
+              text: `Parfait, **${cityName}** du ${format(memory.departureDate!, "d MMMM", { locale: fr })} au ${format(computedReturn, "d MMMM", { locale: fr })} ! Combien êtes-vous ?`,
+              widget: "travelersSelector",
+            },
+          ]);
+        }
+      } else {
+        // Need return date
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `ask-return-after-city-${Date.now()}`,
+            role: "assistant",
+            text: `Excellent choix, **${cityName}** ! Quand souhaites-tu revenir ?`,
+            widget: "returnDatePicker",
+            widgetData: {
+              preferredMonth: pendingPreferredMonthRef.current || undefined,
+            },
+          },
+        ]);
+      }
+    } else {
+      // Dates are complete, ask for travelers if needed
+      if (memory.passengers.adults < 1) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `ask-travelers-after-city-${Date.now()}`,
+            role: "assistant",
+            text: `Excellent choix, **${cityName}** ! Combien êtes-vous ?`,
+            widget: "travelersSelector",
+          },
+        ]);
+      }
     }
   };
 
@@ -1465,6 +1558,10 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
   const handleDateRangeSelect = (messageId: string, departure: Date, returnDate: Date) => {
     // Update memory with both dates
     updateMemory({ departureDate: departure, returnDate: returnDate });
+    
+    // Clear pending refs since dates are now set
+    pendingTripDurationRef.current = null;
+    pendingPreferredMonthRef.current = null;
 
     // Remove widget from message
     setMessages((prev) =>
@@ -1477,6 +1574,17 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
     if (pendingTravelersWidgetRef.current) {
       pendingTravelersWidgetRef.current = false;
       
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `confirm-dates-${Date.now()}`,
+          role: "assistant",
+          text: `✓ **${format(departure, "d MMMM", { locale: fr })}** → **${format(returnDate, "d MMMM yyyy", { locale: fr })}**. Combien êtes-vous ? 🧳`,
+          widget: "travelersSelector",
+        },
+      ]);
+    } else if (memory.passengers.adults < 1) {
+      // Always ask for travelers if not set
       setMessages((prev) => [
         ...prev,
         {
