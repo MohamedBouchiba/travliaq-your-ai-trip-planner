@@ -322,6 +322,102 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     detectUserCity();
   }, [onUserLocationDetected, updateMemory]);
 
+  // Sync memory → widget legs when memory is updated from chat
+  useEffect(() => {
+    // Only sync if memory has meaningful data that differs from current legs
+    const firstLeg = legs[0];
+    if (!firstLeg) return;
+
+    let shouldUpdate = false;
+    const newLeg = { ...firstLeg };
+
+    // Sync departure from memory
+    if (memory.departure) {
+      const memDep = memory.departure;
+      const displayFrom = memDep.iata 
+        ? `${memDep.airport || memDep.city} (${memDep.iata})`
+        : memDep.city 
+          ? `${memDep.city}${memDep.country ? `, ${memDep.country}` : ''}`
+          : null;
+      
+      if (displayFrom && displayFrom !== firstLeg.from) {
+        newLeg.from = displayFrom;
+        newLeg.fromLocation = {
+          id: memDep.iata || memDep.city || "departure",
+          name: memDep.airport || memDep.city || "",
+          type: memDep.iata ? "airport" : "city",
+          country_code: memDep.countryCode || "",
+          country_name: memDep.country || "",
+          iata: memDep.iata,
+          lat: memDep.lat || 0,
+          lng: memDep.lng || 0,
+          display_name: displayFrom,
+        };
+        shouldUpdate = true;
+      }
+    }
+
+    // Sync arrival from memory
+    if (memory.arrival) {
+      const memArr = memory.arrival;
+      const displayTo = memArr.iata 
+        ? `${memArr.airport || memArr.city} (${memArr.iata})`
+        : memArr.city 
+          ? `${memArr.city}${memArr.country ? `, ${memArr.country}` : ''}`
+          : null;
+      
+      if (displayTo && displayTo !== firstLeg.to) {
+        newLeg.to = displayTo;
+        newLeg.toLocation = {
+          id: memArr.iata || memArr.city || "arrival",
+          name: memArr.airport || memArr.city || "",
+          type: memArr.iata ? "airport" : "city",
+          country_code: memArr.countryCode || "",
+          country_name: memArr.country || "",
+          iata: memArr.iata,
+          lat: memArr.lat || 0,
+          lng: memArr.lng || 0,
+          display_name: displayTo,
+        };
+        shouldUpdate = true;
+      }
+    }
+
+    // Sync dates from memory
+    if (memory.departureDate && memory.departureDate !== firstLeg.date) {
+      newLeg.date = memory.departureDate;
+      shouldUpdate = true;
+    }
+    if (memory.returnDate && memory.returnDate !== firstLeg.returnDate) {
+      newLeg.returnDate = memory.returnDate;
+      shouldUpdate = true;
+    }
+
+    // Sync trip type
+    if (memory.tripType !== tripType) {
+      setTripType(memory.tripType);
+    }
+
+    // Sync passengers count
+    const memTotalPassengers = memory.passengers.adults + memory.passengers.children + memory.passengers.infants;
+    if (memTotalPassengers > 0 && memTotalPassengers !== passengers.length) {
+      const newPassengers: Passenger[] = [];
+      for (let i = 0; i < memory.passengers.adults; i++) {
+        newPassengers.push({ id: crypto.randomUUID(), type: "adult", personalItems: 1, cabinBags: 0, checkedBags: 0 });
+      }
+      for (let i = 0; i < memory.passengers.children; i++) {
+        newPassengers.push({ id: crypto.randomUUID(), type: "child", personalItems: 1, cabinBags: 0, checkedBags: 0 });
+      }
+      if (newPassengers.length > 0) {
+        setPassengers(newPassengers);
+      }
+    }
+
+    if (shouldUpdate) {
+      setLegs([newLeg]);
+    }
+  }, [memory.departure, memory.arrival, memory.departureDate, memory.returnDate, memory.tripType, memory.passengers]);
+
   // Search for airports for a city - returns airports list or null if only one (auto-selected)
   const getAirportsForCity = async (cityName: string): Promise<{ airports: Airport[]; cityName: string } | null> => {
     try {
