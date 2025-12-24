@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, Cloud, Sun, CloudRain, ChevronDown, Plane, Check } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { ChevronLeft, ChevronRight, Cloud, Sun, CloudRain, ChevronDown, Plane, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   format,
@@ -38,34 +38,18 @@ interface PlannerCalendarProps {
   showWeather?: boolean;
   onShowPricesChange?: (show: boolean) => void;
   onShowWeatherChange?: (show: boolean) => void;
+  origin?: string; // IATA code
+  destination?: string; // IATA code
+  tripType?: "roundtrip" | "oneway" | "multi";
+  tripDays?: number;
 }
 
-// Mock data for demo
-const generateMockData = (month: Date): Record<string, DayData> => {
-  const data: Record<string, DayData> = {};
-  const start = startOfMonth(month);
-  const end = endOfMonth(month);
-  let current = start;
-
-  while (current <= end) {
-    const key = format(current, "yyyy-MM-dd");
-    const dayOfMonth = current.getDate();
-    
-    const priceBase = 80 + (dayOfMonth % 7) * 15 + (dayOfMonth % 3) * 10;
-    const weatherOptions: ("sunny" | "cloudy" | "rainy")[] = ["sunny", "cloudy", "rainy"];
-    const weatherIndex = (dayOfMonth + current.getMonth()) % 3;
-    
-    data[key] = {
-      price: priceBase,
-      weather: weatherOptions[weatherIndex],
-      temp: 15 + (dayOfMonth % 10),
-    };
-    
-    current = addDays(current, 1);
-  }
-  
-  return data;
-};
+interface CalendarPricesResponse {
+  prices: Record<string, { price: number; returnDate?: string }> | null;
+  currency: string;
+  cheapestDate?: string;
+  cheapestPrice?: number;
+}
 
 const WeatherIcon = ({ weather, className }: { weather: "sunny" | "cloudy" | "rainy"; className?: string }) => {
   switch (weather) {
@@ -86,17 +70,90 @@ export default function PlannerCalendar({
   showWeather: externalShowWeather,
   onShowPricesChange,
   onShowWeatherChange,
+  origin,
+  destination,
+  tripType = "roundtrip",
+  tripDays = 7,
 }: PlannerCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  // Use external state if provided, otherwise use local state
   const [localShowPrices, setLocalShowPrices] = useState(false);
   const [localShowWeather, setLocalShowWeather] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectingReturn, setSelectingReturn] = useState(false);
   
+  // Price loading state
+  const [priceData, setPriceData] = useState<Record<string, DayData>>({});
+  const [isLoadingPrices, setIsLoadingPrices] = useState(false);
+  const [cheapestDate, setCheapestDate] = useState<string | null>(null);
+  
   // Determine which state to use
   const showPrices = externalShowPrices !== undefined ? externalShowPrices : localShowPrices;
   const showWeather = externalShowWeather !== undefined ? externalShowWeather : localShowWeather;
+  
+  // Fetch prices when origin/destination are available and prices are enabled
+  useEffect(() => {
+    if (!showPrices || !origin || !destination) {
+      setPriceData({});
+      setCheapestDate(null);
+      return;
+    }
+    
+    const fetchPrices = async () => {
+      setIsLoadingPrices(true);
+      try {
+        const monthStart = startOfMonth(currentMonth);
+        const monthEnd = endOfMonth(currentMonth);
+        
+        const response = await fetch(
+          "https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/calendar-prices",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              origin,
+              destination,
+              startDate: format(monthStart, "yyyy-MM-dd"),
+              endDate: format(monthEnd, "yyyy-MM-dd"),
+              adults: 1,
+              tripType: tripType === "oneway" ? "ONE_WAY" : "ROUND",
+              tripDays,
+              currency: "EUR",
+            }),
+          }
+        );
+        
+        if (!response.ok) {
+          console.error("[PlannerCalendar] API error:", response.status);
+          setPriceData({});
+          return;
+        }
+        
+        const data: CalendarPricesResponse = await response.json();
+        
+        if (!data.prices) {
+          setPriceData({});
+          setCheapestDate(null);
+          return;
+        }
+        
+        // Transform to DayData format
+        const newPriceData: Record<string, DayData> = {};
+        for (const [date, info] of Object.entries(data.prices)) {
+          newPriceData[date] = { price: Math.round(info.price) };
+        }
+        
+        setPriceData(newPriceData);
+        setCheapestDate(data.cheapestDate || null);
+      } catch (error) {
+        console.error("[PlannerCalendar] Error fetching prices:", error);
+        setPriceData({});
+      } finally {
+        setIsLoadingPrices(false);
+      }
+    };
+    
+    fetchPrices();
+  }, [showPrices, origin, destination, currentMonth, tripType, tripDays]);
   
   const handleShowPricesChange = (value: boolean) => {
     if (onShowPricesChange) {
@@ -114,9 +171,10 @@ export default function PlannerCalendar({
     }
   };
 
+  // Use external data if provided, otherwise use fetched price data
   const dayData = useMemo(() => {
-    return externalDayData || generateMockData(currentMonth);
-  }, [currentMonth, externalDayData]);
+    return externalDayData || priceData;
+  }, [externalDayData, priceData]);
 
   const weekDays = ["L", "M", "M", "J", "V", "S", "D"];
 
@@ -140,17 +198,22 @@ export default function PlannerCalendar({
   const goToPreviousMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
   const goToNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
 
-  const getCheapestDay = () => {
+  // Calculate cheapest day from data if not from API
+  const getCheapestDay = (): string | null => {
     let cheapest: { date: string; price: number } | null = null;
     Object.entries(dayData).forEach(([date, data]) => {
       if (data.price && (!cheapest || data.price < cheapest.price)) {
         cheapest = { date, price: data.price };
       }
     });
-    return cheapest?.date;
+    return cheapest?.date || null;
   };
 
-  const cheapestDay = showPrices ? getCheapestDay() : null;
+  // Use cheapestDate from API or fallback to local calculation
+  const cheapestDay = showPrices ? (cheapestDate || getCheapestDay()) : null;
+  
+  // Show loading indicator for prices
+  const pricesLoading = showPrices && isLoadingPrices && origin && destination;
 
   const handleDateClick = (day: Date) => {
     if (!dateRange?.from || selectingReturn) {
@@ -235,6 +298,7 @@ export default function PlannerCalendar({
             {showPrices && <Check className="h-3 w-3 text-primary-foreground" />}
           </div>
           <span className="text-xs text-foreground">Prix</span>
+          {pricesLoading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
         </label>
         <label className="flex items-center gap-2 cursor-pointer">
           <div
@@ -251,6 +315,13 @@ export default function PlannerCalendar({
           <span className="text-xs text-foreground">Météo</span>
         </label>
       </div>
+      
+      {/* Missing airports warning */}
+      {showPrices && (!origin || !destination) && (
+        <div className="text-[10px] text-muted-foreground text-center py-1 px-2 bg-muted/30 rounded-lg">
+          Sélectionnez un aéroport de départ et d'arrivée pour voir les prix
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between">
