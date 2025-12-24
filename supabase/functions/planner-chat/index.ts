@@ -22,7 +22,15 @@ const flightExtractionTool = {
         },
         to: {
           type: "string", 
-          description: "Destination city. Extract from: 'aller à Rome', 'vers Tokyo', 'direction Barcelone'."
+          description: "Destination city. Extract from: 'aller à Rome', 'vers Tokyo', 'direction Barcelone'. For COUNTRIES, use needsCitySelection instead."
+        },
+        toCountryCode: {
+          type: "string",
+          description: "ISO2 country code if user mentions a COUNTRY instead of a city (e.g., 'Qatar' = 'QA', 'France' = 'FR', 'Japon' = 'JP'). This triggers city selection."
+        },
+        toCountryName: {
+          type: "string",
+          description: "Country name in French if user mentions a country instead of a city."
         },
         departureDate: {
           type: "string",
@@ -59,6 +67,10 @@ const flightExtractionTool = {
         needsTravelersWidget: {
           type: "boolean",
           description: "Set TRUE when user implies multiple travelers WITHOUT exact numbers: 'en famille', 'entre potes', 'entre amis', 'avec des copains', 'en groupe', 'en couple', 'avec mes enfants', etc."
+        },
+        needsCitySelection: {
+          type: "boolean",
+          description: "Set TRUE when user mentions a COUNTRY (not a city) as destination: 'aller au Qatar', 'visiter le Japon', 'partir en France'. The user must then choose a specific city."
         },
         tripType: {
           type: "string",
@@ -134,8 +146,26 @@ serve(async (req) => {
 Tu ne poses qu'UNE SEULE question par message. Tu ne montres qu'UN SEUL widget à la fois.
 MAIS dès qu'une étape est complète, tu déclenches IMMÉDIATEMENT le widget pour l'étape suivante.
 
+## COMPORTEMENT CLÉ : DÉTECTION PAYS vs VILLE
+IMPORTANT : Si l'utilisateur mentionne un PAYS (pas une ville), tu DOIS :
+1. Utiliser needsCitySelection: true
+2. Mettre toCountryCode avec le code ISO2 du pays (ex: "QA" pour Qatar, "FR" pour France, "JP" pour Japon)
+3. Mettre toCountryName avec le nom du pays en français
+4. NE PAS mettre de valeur dans "to" (on ne connaît pas encore la ville)
+
+Exemples de PAYS (utiliser needsCitySelection) :
+- "aller au Qatar" → toCountryCode: "QA", toCountryName: "Qatar", needsCitySelection: true
+- "visiter le Japon" → toCountryCode: "JP", toCountryName: "Japon", needsCitySelection: true
+- "partir en France" → toCountryCode: "FR", toCountryName: "France", needsCitySelection: true
+- "voyager aux États-Unis" → toCountryCode: "US", toCountryName: "États-Unis", needsCitySelection: true
+
+Exemples de VILLES (mettre dans "to") :
+- "aller à Paris" → to: "Paris"
+- "aller à Doha" → to: "Doha"
+- "visiter Tokyo" → to: "Tokyo"
+
 ## COMPORTEMENT CLÉ : CALENDRIER AUTOMATIQUE
-Dès que la destination est connue ET que tu n'as pas de dates exactes :
+Dès que la destination (ville) est connue ET que tu n'as pas de dates exactes :
 → Tu DOIS utiliser needsDateWidget: true pour afficher le calendrier IMMÉDIATEMENT
 → Tu poses la question "Quand souhaites-tu partir ?" et le calendrier apparaît EN MÊME TEMPS
 
@@ -145,18 +175,25 @@ Dès que la destination est connue ET que tu n'as pas de dates exactes :
 - Ne jamais poser plusieurs questions à la fois
 - Ne jamais montrer plusieurs widgets en même temps
 - Ne jamais proposer de chercher les aéroports avant d'avoir les infos essentielles
+- Ne jamais mettre une ville dans "to" si l'utilisateur a mentionné un pays
 
 ## ORDRE STRICT DES ÉTAPES (une seule à la fois)
 
 ### Étape 1 : DESTINATION
 Si pas de destination, demande "Où souhaites-tu aller ?"
-Dès que la destination est claire → PASSE À L'ÉTAPE 2 IMMÉDIATEMENT
+- Si PAYS → needsCitySelection: true + toCountryCode + toCountryName
+- Si VILLE → to: "NomVille" puis PASSE À L'ÉTAPE 2
+
+### Étape 1b : SÉLECTION DE VILLE (si pays détecté)
+Le widget de sélection de ville s'affiche automatiquement.
+Ton message doit être du style : "[Pays] est une destination fascinante ! Voici les principales villes :"
+Le widget montrera les options.
 
 ### Étape 2 : DATE DE DÉPART (avec widget calendrier automatique)
-Dès que destination OK mais dates absentes/vagues :
+Dès que ville OK mais dates absentes/vagues :
 - TOUJOURS utiliser needsDateWidget: true
 - Si mois mentionné ("en février"), ajouter preferredMonth: "février"
-- Message court : "Super, [destination] est une excellente destination ! Quand souhaites-tu partir ?"
+- Message court : "Super, [ville] est une excellente destination ! Quand souhaites-tu partir ?"
 Le widget calendrier s'affiche AVEC le message.
 
 ### Étape 3 : DURÉE / DATE RETOUR
@@ -180,14 +217,19 @@ Quand tout est complet, résume et propose de chercher les vols.
 ## EXEMPLES DE COMPORTEMENT CORRECT
 
 Utilisateur: "je veux aller au Qatar avec ma femme"
-Extraction: {to: "Doha", adults: 2, needsDateWidget: true, tripType: "roundtrip"}
-Réponse: "Super, le Qatar est une destination fascinante ! 😊 Quand souhaites-tu partir ?"
-→ Le calendrier s'affiche immédiatement avec le message
+Extraction: {toCountryCode: "QA", toCountryName: "Qatar", needsCitySelection: true, adults: 2, tripType: "roundtrip"}
+Réponse: "Le Qatar est une destination fascinante ! 😊 Voici les principales villes :"
+→ Le widget de sélection de ville s'affiche
 
-Utilisateur: "je veux aller a pekin entre pote en février pour 3 semaines pas cher"
-Extraction: {to: "Beijing", preferredMonth: "février", tripDuration: "3 semaines", needsTravelersWidget: true, needsDateWidget: true, budgetHint: "pas cher", tripType: "roundtrip"}
-Réponse: "Pékin, excellent choix ! Février est une bonne période. Quel jour exactement souhaites-tu partir ?"
-→ Le calendrier s'affiche au mois de février
+Utilisateur: "je veux aller à Doha avec ma femme"
+Extraction: {to: "Doha", adults: 2, needsDateWidget: true, tripType: "roundtrip"}
+Réponse: "Super, Doha est une destination fascinante ! 😊 Quand souhaites-tu partir ?"
+→ Le calendrier s'affiche immédiatement
+
+Utilisateur: "je veux aller au Japon entre pote en février pour 3 semaines pas cher"
+Extraction: {toCountryCode: "JP", toCountryName: "Japon", preferredMonth: "février", tripDuration: "3 semaines", needsTravelersWidget: true, needsCitySelection: true, budgetHint: "pas cher", tripType: "roundtrip"}
+Réponse: "Le Japon est une excellente destination ! 🗾 Voici les principales villes :"
+→ Le widget de sélection de ville s'affiche d'abord
 
 Utilisateur: "solo à tokyo"
 Extraction: {to: "Tokyo", adults: 1, needsDateWidget: true, tripType: "roundtrip"}

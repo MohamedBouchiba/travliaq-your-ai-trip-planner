@@ -21,6 +21,8 @@ export type ChatQuickAction =
 export interface FlightFormData {
   from?: string;
   to?: string;
+  toCountryCode?: string;
+  toCountryName?: string;
   departureDate?: string;
   returnDate?: string;
   passengers?: number;
@@ -29,6 +31,7 @@ export interface FlightFormData {
   infants?: number;
   needsTravelersWidget?: boolean;
   needsDateWidget?: boolean;
+  needsCitySelection?: boolean;
   tripDuration?: string;
   preferredMonth?: string;
   budgetHint?: string;
@@ -49,7 +52,20 @@ export interface DualAirportChoice {
 }
 
 // Widget types for inline interactions
-type WidgetType = "datePicker" | "returnDatePicker" | "dateRangePicker" | "travelersSelector" | "tripTypeConfirm";
+type WidgetType = "datePicker" | "returnDatePicker" | "dateRangePicker" | "travelersSelector" | "tripTypeConfirm" | "citySelector";
+
+// City choice for country selection
+export interface CityChoice {
+  name: string;
+  description: string;
+  population?: number;
+}
+
+export interface CitySelectionData {
+  countryCode: string;
+  countryName: string;
+  cities: CityChoice[];
+}
 
 interface ChatMessage {
   id: string;
@@ -65,6 +81,7 @@ interface ChatMessage {
   widgetData?: {
     preferredMonth?: string; // e.g. "février", "march", "summer"
     tripDuration?: string;
+    citySelection?: CitySelectionData;
   };
 }
 
@@ -817,7 +834,83 @@ const TripTypeConfirmWidget = ({
   );
 };
 
-// Markdown message component
+// City Selection Widget - Select a city from a country
+const CitySelectionWidget = ({
+  citySelection,
+  onSelect,
+  isLoading = false,
+}: {
+  citySelection: CitySelectionData;
+  onSelect: (cityName: string) => void;
+  isLoading?: boolean;
+}) => {
+  const [confirmed, setConfirmed] = useState(false);
+  const [selectedCity, setSelectedCity] = useState<string | null>(null);
+
+  const handleSelect = (cityName: string) => {
+    setSelectedCity(cityName);
+    setConfirmed(true);
+    onSelect(cityName);
+  };
+
+  if (confirmed && selectedCity) {
+    return (
+      <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary text-sm font-medium">
+        <span>📍</span>
+        <span>{selectedCity}, {citySelection.countryName}</span>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="mt-3 p-4 rounded-2xl bg-muted/50 border border-border/50 max-w-md">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm">Chargement des villes...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 p-4 rounded-2xl bg-muted/50 border border-border/50 max-w-md">
+      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
+        Choisir une ville en {citySelection.countryName}
+      </div>
+      
+      <div className="space-y-2">
+        {citySelection.cities.map((city, idx) => (
+          <button
+            key={city.name}
+            onClick={() => handleSelect(city.name)}
+            className={cn(
+              "w-full text-left p-3 rounded-xl border transition-all",
+              "bg-card hover:bg-primary/10 hover:border-primary/50",
+              "border-border/50 group"
+            )}
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
+                {idx + 1}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-foreground group-hover:text-primary transition-colors">
+                  {city.name}
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                  {city.description}
+                </div>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+
 const MarkdownMessage = ({ content }: { content: string }) => (
   <ReactMarkdown
     components={{
@@ -1263,6 +1356,111 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
     }
   };
 
+  // Handle city selection from widget
+  const handleCitySelect = async (messageId: string, cityName: string, countryName: string) => {
+    // Update memory with the selected city
+    updateMemory({ arrival: { city: cityName, country: countryName } });
+
+    // Remove widget from message
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId ? { ...m, widget: undefined } : m
+      )
+    );
+
+    // Show date widget next if dates are not set
+    if (!memory.departureDate) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `ask-date-after-city-${Date.now()}`,
+          role: "assistant",
+          text: `Excellent choix, **${cityName}** ! 😊 Quand souhaites-tu partir ?`,
+          widget: memory.tripType === "oneway" ? "datePicker" : "dateRangePicker",
+          widgetData: {
+            preferredMonth: pendingPreferredMonthRef.current || undefined,
+            tripDuration: pendingTripDurationRef.current || undefined,
+          },
+        },
+      ]);
+    }
+  };
+
+  // Fetch cities for a country and show the widget
+  const fetchAndShowCities = async (messageId: string, countryCode: string, countryName: string) => {
+    try {
+      const response = await supabase.functions.invoke("top-cities-by-country", {
+        body: null,
+        headers: { "Content-Type": "application/json" },
+      });
+
+      // Use fetch directly since we need query params
+      const fetchResponse = await fetch(
+        `https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/top-cities-by-country?country_code=${countryCode}&limit=5`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpbmJubWxmcGZmbXlqbWt3YmNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc5NDQ2MTQsImV4cCI6MjA3MzUyMDYxNH0.yrju-Pv4OlfU9Et-mRWg0GRHTusL7ZpJevqKemJFbuA",
+          },
+        }
+      );
+
+      const data = await fetchResponse.json();
+      
+      if (data.cities && data.cities.length > 0) {
+        const citySelection: CitySelectionData = {
+          countryCode,
+          countryName,
+          cities: data.cities.map((c: any) => ({
+            name: c.name,
+            description: c.description || `Ville importante de ${countryName}`,
+            population: c.population,
+          })),
+        };
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  isTyping: false,
+                  widget: "citySelector",
+                  widgetData: { ...m.widgetData, citySelection },
+                }
+              : m
+          )
+        );
+      } else {
+        // No cities found, ask manually
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  text: `${countryName} est une destination fascinante ! Dans quelle ville souhaites-tu aller ?`,
+                  isTyping: false,
+                }
+              : m
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching cities:", error);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? {
+                ...m,
+                text: `${countryName} est une destination fascinante ! Dans quelle ville souhaites-tu aller ?`,
+                isTyping: false,
+              }
+            : m
+        )
+      );
+    }
+  };
+
   // Handle date range selection (both departure AND return)
   const handleDateRangeSelect = (messageId: string, departure: Date, returnDate: Date) => {
     // Update memory with both dates
@@ -1582,13 +1780,15 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       };
 
       if (flightData && Object.keys(flightData).length > 0) {
-        // Check widget flags - prioritize date widget first
-        showDateWidget = flightData.needsDateWidget === true;
+        // Check for city selection (country instead of city)
+        const needsCitySelection = flightData.needsCitySelection === true && flightData.toCountryCode;
+        
+        // Check widget flags - prioritize city selection first, then date widget
+        showDateWidget = flightData.needsDateWidget === true && !needsCitySelection;
         showTravelersWidget = flightData.needsTravelersWidget === true;
 
         // Store pending widgets for sequential display
         if (showDateWidget && showTravelersWidget) {
-          // Date widget first, then travelers
           pendingTravelersWidgetRef.current = true;
         }
 
@@ -1614,6 +1814,20 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
             ? { ...nextMem.passengers, ...memoryUpdates.passengers }
             : nextMem.passengers,
         };
+
+        // If country detected, fetch cities and show widget
+        if (needsCitySelection && flightData.toCountryCode && flightData.toCountryName) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === messageId
+                ? { ...m, text: cleanContent, isTyping: false, isStreaming: false }
+                : m
+            )
+          );
+          fetchAndShowCities(messageId, flightData.toCountryCode, flightData.toCountryName);
+          setIsLoading(false);
+          return;
+        }
 
         const destCity = flightData.to;
         if (destCity) {
