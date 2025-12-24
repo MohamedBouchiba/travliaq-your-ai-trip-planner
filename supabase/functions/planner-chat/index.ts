@@ -94,35 +94,33 @@ serve(async (req) => {
   }
 
   try {
-    // Authentication check
+    // Authentication is optional - we log user if available but don't require it
     const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      console.error("Missing authorization header");
-      return new Response(
-        JSON.stringify({ error: "Authentication required" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    let userId = "anonymous";
+    
+    if (authHeader && authHeader !== "Bearer undefined" && authHeader !== "Bearer null") {
+      try {
+        const supabaseClient = createClient(
+          Deno.env.get("SUPABASE_URL")!,
+          Deno.env.get("SUPABASE_ANON_KEY")!,
+          { global: { headers: { Authorization: authHeader } } }
+        );
+
+        const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+        if (!authError && user) {
+          userId = user.id;
+          console.log("Authenticated user:", userId);
+        }
+      } catch (e) {
+        // Silently continue without auth
+        console.log("Auth check skipped (anonymous user)");
+      }
+    } else {
+      console.log("Anonymous user request");
     }
-
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-    if (authError || !user) {
-      console.error("Invalid session:", authError?.message);
-      return new Response(
-        JSON.stringify({ error: "Invalid session" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log("Authenticated user:", user.id);
 
     const { messages, stream = false, currentStep } = await req.json();
-    console.log("Received messages:", JSON.stringify(messages, null, 2), "stream:", stream, "currentStep:", currentStep);
+    console.log("User:", userId, "Messages:", messages.length, "Stream:", stream);
 
     const AZURE_OPENAI_API_KEY = Deno.env.get("AZURE_OPENAI_API_KEY");
     const AZURE_OPENAI_ENDPOINT = Deno.env.get("AZURE_OPENAI_ENDPOINT");
