@@ -148,6 +148,102 @@ const countryNames: Record<string, string> = {
   "ID": "Indonésie", "VN": "Vietnam", "CN": "Chine", "CA": "Canada",
 };
 
+// Fallback cities for common countries when API is unavailable
+const fallbackCities: Record<string, CityInfo[]> = {
+  "FR": [
+    { name: "Paris", country: "France", population: 2161000 },
+    { name: "Marseille", country: "France", population: 861635 },
+    { name: "Lyon", country: "France", population: 513275 },
+    { name: "Toulouse", country: "France", population: 471941 },
+    { name: "Nice", country: "France", population: 343064 },
+  ],
+  "ES": [
+    { name: "Madrid", country: "Espagne", population: 3223334 },
+    { name: "Barcelone", country: "Espagne", population: 1620343 },
+    { name: "Valence", country: "Espagne", population: 791413 },
+    { name: "Séville", country: "Espagne", population: 688711 },
+    { name: "Malaga", country: "Espagne", population: 571026 },
+  ],
+  "IT": [
+    { name: "Rome", country: "Italie", population: 2872800 },
+    { name: "Milan", country: "Italie", population: 1352000 },
+    { name: "Naples", country: "Italie", population: 967069 },
+    { name: "Turin", country: "Italie", population: 886837 },
+    { name: "Florence", country: "Italie", population: 382258 },
+  ],
+  "GB": [
+    { name: "Londres", country: "Royaume-Uni", population: 8982000 },
+    { name: "Birmingham", country: "Royaume-Uni", population: 1141816 },
+    { name: "Manchester", country: "Royaume-Uni", population: 547627 },
+    { name: "Glasgow", country: "Royaume-Uni", population: 626410 },
+    { name: "Liverpool", country: "Royaume-Uni", population: 494814 },
+  ],
+  "DE": [
+    { name: "Berlin", country: "Allemagne", population: 3644826 },
+    { name: "Hambourg", country: "Allemagne", population: 1841179 },
+    { name: "Munich", country: "Allemagne", population: 1471508 },
+    { name: "Cologne", country: "Allemagne", population: 1085664 },
+    { name: "Francfort", country: "Allemagne", population: 753056 },
+  ],
+  "US": [
+    { name: "New York", country: "États-Unis", population: 8336817 },
+    { name: "Los Angeles", country: "États-Unis", population: 3979576 },
+    { name: "Chicago", country: "États-Unis", population: 2693976 },
+    { name: "Miami", country: "États-Unis", population: 442241 },
+    { name: "Las Vegas", country: "États-Unis", population: 641903 },
+  ],
+  "JP": [
+    { name: "Tokyo", country: "Japon", population: 13960000 },
+    { name: "Osaka", country: "Japon", population: 2691000 },
+    { name: "Kyoto", country: "Japon", population: 1475000 },
+    { name: "Yokohama", country: "Japon", population: 3749000 },
+    { name: "Nagoya", country: "Japon", population: 2296000 },
+  ],
+  "QA": [
+    { name: "Doha", country: "Qatar", population: 587055 },
+    { name: "Al Wakrah", country: "Qatar", population: 80000 },
+    { name: "Al Khor", country: "Qatar", population: 31000 },
+  ],
+  "AE": [
+    { name: "Dubaï", country: "Émirats", population: 3137000 },
+    { name: "Abu Dhabi", country: "Émirats", population: 1483000 },
+    { name: "Sharjah", country: "Émirats", population: 1405000 },
+  ],
+  "TH": [
+    { name: "Bangkok", country: "Thaïlande", population: 10539000 },
+    { name: "Phuket", country: "Thaïlande", population: 416582 },
+    { name: "Chiang Mai", country: "Thaïlande", population: 127240 },
+    { name: "Pattaya", country: "Thaïlande", population: 119532 },
+  ],
+  "PT": [
+    { name: "Lisbonne", country: "Portugal", population: 544851 },
+    { name: "Porto", country: "Portugal", population: 237591 },
+    { name: "Faro", country: "Portugal", population: 64560 },
+  ],
+  "GR": [
+    { name: "Athènes", country: "Grèce", population: 664046 },
+    { name: "Thessalonique", country: "Grèce", population: 315196 },
+    { name: "Héraklion", country: "Grèce", population: 173993 },
+  ],
+  "MA": [
+    { name: "Marrakech", country: "Maroc", population: 928850 },
+    { name: "Casablanca", country: "Maroc", population: 3359818 },
+    { name: "Fès", country: "Maroc", population: 1112072 },
+    { name: "Tanger", country: "Maroc", population: 947952 },
+  ],
+  "NL": [
+    { name: "Amsterdam", country: "Pays-Bas", population: 872680 },
+    { name: "Rotterdam", country: "Pays-Bas", population: 651446 },
+    { name: "La Haye", country: "Pays-Bas", population: 545163 },
+  ],
+  "BE": [
+    { name: "Bruxelles", country: "Belgique", population: 1208542 },
+    { name: "Anvers", country: "Belgique", population: 529247 },
+    { name: "Gand", country: "Belgique", population: 262219 },
+    { name: "Bruges", country: "Belgique", population: 118284 },
+  ],
+};
+
 function getCityDescription(cityName: string, countryName: string | undefined, countryCode: string): string {
   const normalizedCity = cityName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   
@@ -182,38 +278,48 @@ serve(async (req) => {
 
     console.log(`Fetching top cities for country: ${countryCode}, limit: ${limit}`);
 
-    // Call the external API
-    const apiUrl = `https://travliaq-api-production.up.railway.app/cities/top-by-country/${countryCode.toUpperCase()}?limit=${Math.min(limit, 10)}`;
-    
-    const response = await fetch(apiUrl, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    const upperCode = countryCode.toUpperCase();
+    let cities: CityInfo[] = [];
+    let countryDisplayName = countryNames[upperCode] || countryCode;
 
-    if (!response.ok) {
-      console.error(`API error: ${response.status} ${response.statusText}`);
-      return new Response(
-        JSON.stringify({ error: "Failed to fetch cities", cities: [] }),
-        { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    try {
+      // Call the external API
+      const apiUrl = `https://travliaq-api-production.up.railway.app/cities/top-by-country/${upperCode}?limit=${Math.min(limit, 10)}`;
+      
+      const response = await fetch(apiUrl, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (response.ok) {
+        const data: ApiResponse = await response.json();
+        console.log(`Received ${data.cities?.length || 0} cities from API for ${data.country_name || countryCode}`);
+        cities = data.cities || [];
+        countryDisplayName = data.country_name || countryDisplayName;
+      } else {
+        console.warn(`API returned ${response.status}, using fallback cities`);
+      }
+    } catch (apiError) {
+      console.warn("External API call failed, using fallback:", apiError);
     }
 
-    const data: ApiResponse = await response.json();
-    console.log(`Received ${data.cities?.length || 0} cities for ${data.country_name || countryCode}`);
+    // Use fallback if API returned nothing
+    if (cities.length === 0 && fallbackCities[upperCode]) {
+      console.log(`Using fallback cities for ${upperCode}`);
+      cities = fallbackCities[upperCode].slice(0, limit);
+    }
 
-    // Enrich cities with descriptions (pass countryCode for fallback)
-    const enrichedCities = (data.cities || []).map((city) => ({
+    // Enrich cities with descriptions
+    const enrichedCities = cities.map((city) => ({
       ...city,
-      description: city.description || getCityDescription(city.name, data.country_name, countryCode),
+      description: city.description || getCityDescription(city.name, countryDisplayName, countryCode),
     }));
 
     return new Response(
       JSON.stringify({
         cities: enrichedCities,
-        country_name: data.country_name || countryNames[countryCode.toUpperCase()] || countryCode,
-        country_code: data.country_code || countryCode,
+        country_name: countryDisplayName,
+        country_code: upperCode,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
