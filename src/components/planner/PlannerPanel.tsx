@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Calendar as CalendarIcon, Users, Plane, MapPin, Building2, Star, Clock, Wifi, Car, Coffee, Wind, X, Heart, Utensils, TreePine, Palette, Waves, Dumbbell, Sparkles, Loader2, Search, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TabType, SelectedAirport } from "@/pages/TravelPlanner";
@@ -322,11 +322,20 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     detectUserCity();
   }, [onUserLocationDetected, updateMemory]);
 
+  // Track what we last wrote into the widget from memory, to avoid overriding manual typing
+  const lastSyncedRef = useRef<{ from?: string; to?: string }>({});
+
   // Sync memory → widget legs when memory is updated from chat
   useEffect(() => {
-    // Only sync if memory has meaningful data that differs from current legs
     const firstLeg = legs[0];
     if (!firstLeg) return;
+
+    const canOverwrite = (current: string | undefined, lastSynced?: string) => {
+      // If field is empty, we can fill it.
+      if (!current) return true;
+      // If user hasn't changed it since we last synced, we can update it.
+      return current === lastSynced;
+    };
 
     let shouldUpdate = false;
     const newLeg = { ...firstLeg };
@@ -334,13 +343,14 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     // Sync departure from memory
     if (memory.departure) {
       const memDep = memory.departure;
-      const displayFrom = memDep.iata 
+      const displayFrom = memDep.iata
         ? `${memDep.airport || memDep.city} (${memDep.iata})`
-        : memDep.city 
-          ? `${memDep.city}${memDep.country ? `, ${memDep.country}` : ''}`
+        : memDep.city
+          ? `${memDep.city}${memDep.country ? `, ${memDep.country}` : ""}`
           : null;
-      
-      if (displayFrom && displayFrom !== firstLeg.from) {
+
+      const lastFrom = lastSyncedRef.current.from;
+      if (displayFrom && displayFrom !== firstLeg.from && canOverwrite(firstLeg.from, lastFrom)) {
         newLeg.from = displayFrom;
         newLeg.fromLocation = {
           id: memDep.iata || memDep.city || "departure",
@@ -353,6 +363,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
           lng: memDep.lng || 0,
           display_name: displayFrom,
         };
+        lastSyncedRef.current.from = displayFrom;
         shouldUpdate = true;
       }
     }
@@ -360,13 +371,14 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     // Sync arrival from memory
     if (memory.arrival) {
       const memArr = memory.arrival;
-      const displayTo = memArr.iata 
+      const displayTo = memArr.iata
         ? `${memArr.airport || memArr.city} (${memArr.iata})`
-        : memArr.city 
-          ? `${memArr.city}${memArr.country ? `, ${memArr.country}` : ''}`
+        : memArr.city
+          ? `${memArr.city}${memArr.country ? `, ${memArr.country}` : ""}`
           : null;
-      
-      if (displayTo && displayTo !== firstLeg.to) {
+
+      const lastTo = lastSyncedRef.current.to;
+      if (displayTo && displayTo !== firstLeg.to && canOverwrite(firstLeg.to, lastTo)) {
         newLeg.to = displayTo;
         newLeg.toLocation = {
           id: memArr.iata || memArr.city || "arrival",
@@ -379,18 +391,25 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
           lng: memArr.lng || 0,
           display_name: displayTo,
         };
+        lastSyncedRef.current.to = displayTo;
         shouldUpdate = true;
       }
     }
 
-    // Sync dates from memory
-    if (memory.departureDate && memory.departureDate !== firstLeg.date) {
-      newLeg.date = memory.departureDate;
-      shouldUpdate = true;
+    // Sync dates from memory (only if user hasn't edited since last sync)
+    if (memory.departureDate && (!firstLeg.date || firstLeg.date.getTime() === memory.departureDate.getTime())) {
+      // If empty, fill. If different, leave user choice (handled by widget).
+      if (!firstLeg.date) {
+        newLeg.date = memory.departureDate;
+        shouldUpdate = true;
+      }
     }
-    if (memory.returnDate && memory.returnDate !== firstLeg.returnDate) {
-      newLeg.returnDate = memory.returnDate;
-      shouldUpdate = true;
+
+    if (memory.returnDate && (!firstLeg.returnDate || firstLeg.returnDate.getTime() === memory.returnDate.getTime())) {
+      if (!firstLeg.returnDate) {
+        newLeg.returnDate = memory.returnDate;
+        shouldUpdate = true;
+      }
     }
 
     // Sync trip type
@@ -398,7 +417,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
       setTripType(memory.tripType);
     }
 
-    // Sync passengers count
+    // Sync passengers count (only if user hasn't edited since last sync)
     const memTotalPassengers = memory.passengers.adults + memory.passengers.children + memory.passengers.infants;
     if (memTotalPassengers > 0 && memTotalPassengers !== passengers.length) {
       const newPassengers: Passenger[] = [];
@@ -408,15 +427,13 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
       for (let i = 0; i < memory.passengers.children; i++) {
         newPassengers.push({ id: crypto.randomUUID(), type: "child", personalItems: 1, cabinBags: 0, checkedBags: 0 });
       }
-      if (newPassengers.length > 0) {
-        setPassengers(newPassengers);
-      }
+      if (newPassengers.length > 0) setPassengers(newPassengers);
     }
 
     if (shouldUpdate) {
       setLegs([newLeg]);
     }
-  }, [memory.departure, memory.arrival, memory.departureDate, memory.returnDate, memory.tripType, memory.passengers]);
+  }, [memory, legs, passengers.length, tripType]);
 
   // Search for airports for a city - returns airports list or null if only one (auto-selected)
   const getAirportsForCity = async (cityName: string): Promise<{ airports: Airport[]; cityName: string } | null> => {
