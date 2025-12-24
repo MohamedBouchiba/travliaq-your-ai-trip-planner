@@ -188,7 +188,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
   });
 
   // Access flight memory for synchronization
-  const { updateMemory } = useFlightMemory();
+  const { memory, updateMemory } = useFlightMemory();
 
   // Apply flight form data from chat AI
   useEffect(() => {
@@ -443,10 +443,15 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
       let fromChoice: AirportChoice | undefined;
       let toChoice: AirportChoice | undefined;
       
+      // Use memory city names if available (updated by chat city selection), 
+      // otherwise fall back to leg text (e.g. user typed directly in input)
+      const fromCityName = memory.departure?.city || firstLeg.from.split(",")[0].trim();
+      const toCityName = memory.arrival?.city || firstLeg.to.split(",")[0].trim();
+      
       // Check both cities in parallel
       const [fromResult, toResult] = await Promise.all([
-        !fromHasAirport ? getAirportsForCity(firstLeg.from.split(",")[0].trim()) : null,
-        !toHasAirport ? getAirportsForCity(firstLeg.to.split(",")[0].trim()) : null,
+        !fromHasAirport ? getAirportsForCity(fromCityName) : null,
+        !toHasAirport ? getAirportsForCity(toCityName) : null,
       ]);
       
       // Process "from" result
