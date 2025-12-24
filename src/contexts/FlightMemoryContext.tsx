@@ -1,4 +1,7 @@
-import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, ReactNode, useEffect } from "react";
+
+// localStorage key
+const STORAGE_KEY = "travliaq_flight_memory";
 
 // Airport info structure - stores as much info as possible
 export interface AirportInfo {
@@ -98,10 +101,100 @@ const initialMemory: FlightMemory = {
   flexibleDates: false,
 };
 
+// Helper to serialize memory (convert Dates to ISO strings)
+function serializeMemory(memory: FlightMemory): string {
+  return JSON.stringify({
+    ...memory,
+    departureDate: memory.departureDate?.toISOString() || null,
+    returnDate: memory.returnDate?.toISOString() || null,
+    legs: memory.legs.map(leg => ({
+      ...leg,
+      date: leg.date?.toISOString() || null,
+    })),
+  });
+}
+
+// Helper to deserialize memory (convert ISO strings back to Dates)
+function deserializeMemory(json: string): FlightMemory | null {
+  try {
+    const parsed = JSON.parse(json);
+    
+    // Validate basic structure
+    if (!parsed || typeof parsed !== "object") return null;
+    
+    // Convert date strings back to Date objects
+    const memory: FlightMemory = {
+      ...initialMemory,
+      ...parsed,
+      departureDate: parsed.departureDate ? new Date(parsed.departureDate) : null,
+      returnDate: parsed.returnDate ? new Date(parsed.returnDate) : null,
+      legs: (parsed.legs || []).map((leg: any) => ({
+        ...leg,
+        date: leg.date ? new Date(leg.date) : null,
+      })),
+      passengers: {
+        ...initialMemory.passengers,
+        ...parsed.passengers,
+      },
+    };
+    
+    // Validate dates are not in the past (reset if they are)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (memory.departureDate && memory.departureDate < today) {
+      memory.departureDate = null;
+      memory.returnDate = null;
+    }
+    if (memory.returnDate && memory.returnDate < today) {
+      memory.returnDate = null;
+    }
+    
+    return memory;
+  } catch {
+    return null;
+  }
+}
+
+// Load initial state from localStorage
+function loadFromStorage(): FlightMemory {
+  if (typeof window === "undefined") return initialMemory;
+  
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return initialMemory;
+    
+    const parsed = deserializeMemory(stored);
+    return parsed || initialMemory;
+  } catch {
+    return initialMemory;
+  }
+}
+
 const FlightMemoryContext = createContext<FlightMemoryContextValue | null>(null);
 
 export function FlightMemoryProvider({ children }: { children: ReactNode }) {
-  const [memory, setMemory] = useState<FlightMemory>(initialMemory);
+  // Initialize from localStorage
+  const [memory, setMemory] = useState<FlightMemory>(() => loadFromStorage());
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Hydrate from localStorage on mount (client-side only)
+  useEffect(() => {
+    const stored = loadFromStorage();
+    setMemory(stored);
+    setIsHydrated(true);
+  }, []);
+
+  // Persist to localStorage whenever memory changes (after hydration)
+  useEffect(() => {
+    if (!isHydrated) return;
+    
+    try {
+      localStorage.setItem(STORAGE_KEY, serializeMemory(memory));
+    } catch (error) {
+      console.warn("[FlightMemory] Failed to save to localStorage:", error);
+    }
+  }, [memory, isHydrated]);
 
   const updateMemory = useCallback((partial: Partial<FlightMemory>) => {
     setMemory((prev) => {
@@ -123,6 +216,12 @@ export function FlightMemoryProvider({ children }: { children: ReactNode }) {
 
   const resetMemory = useCallback(() => {
     setMemory(initialMemory);
+    // Also clear from localStorage
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Ignore errors
+    }
   }, []);
 
   // Multi-destination helpers
