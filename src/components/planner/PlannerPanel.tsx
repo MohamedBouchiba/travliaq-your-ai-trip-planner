@@ -866,14 +866,14 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
         </div>
         
         {/* Passenger rows */}
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {passengers.map((passenger, index) => (
             <div 
               key={passenger.id}
-              className="flex items-center px-2 py-1.5 rounded-xl bg-muted/20 border border-border/30 hover:border-border/50 transition-colors"
+              className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-muted/20 border border-border/30 hover:border-border/50 transition-colors"
             >
               {/* Type selector */}
-              <div className="flex items-center gap-1.5 shrink-0 mr-3">
+              <div className="flex items-center gap-2 shrink-0">
                 <span className="text-sm">{passenger.type === "adult" ? "👤" : "👶"}</span>
                 <select
                   value={passenger.type}
@@ -886,40 +886,40 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
               </div>
 
               {/* Baggage controls */}
-              <div className="flex items-center gap-1.5 flex-1">
+              <div className="flex items-center justify-center gap-3 flex-1">
                 {/* Cabin bags */}
-                <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors">
-                  <span className="text-[10px]">🧳</span>
-                  <span className="text-[9px] text-muted-foreground">Cabine</span>
+                <div className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                  <span className="text-xs">🧳</span>
+                  <span className="text-[10px] text-muted-foreground">Cabine</span>
                   <button
                     onClick={() => updatePassenger(passenger.id, { cabinBags: Math.max(0, passenger.cabinBags - 1) })}
-                    className="w-4 h-4 rounded bg-background/50 hover:bg-primary/20 hover:text-primary text-foreground flex items-center justify-center text-[10px] font-medium transition-colors ml-0.5"
+                    className="w-5 h-5 rounded bg-background/50 hover:bg-primary/20 hover:text-primary text-foreground flex items-center justify-center text-xs font-medium transition-colors ml-1"
                   >
                     −
                   </button>
-                  <span className="text-[10px] w-3 text-center font-medium">{passenger.cabinBags}</span>
+                  <span className="text-xs w-4 text-center font-medium">{passenger.cabinBags}</span>
                   <button
                     onClick={() => updatePassenger(passenger.id, { cabinBags: Math.min(2, passenger.cabinBags + 1) })}
-                    className="w-4 h-4 rounded bg-background/50 hover:bg-primary/20 hover:text-primary text-foreground flex items-center justify-center text-[10px] font-medium transition-colors"
+                    className="w-5 h-5 rounded bg-background/50 hover:bg-primary/20 hover:text-primary text-foreground flex items-center justify-center text-xs font-medium transition-colors"
                   >
                     +
                   </button>
                 </div>
 
                 {/* Checked bags */}
-                <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors">
-                  <span className="text-[10px]">🛄</span>
-                  <span className="text-[9px] text-muted-foreground">Soute</span>
+                <div className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                  <span className="text-xs">🛄</span>
+                  <span className="text-[10px] text-muted-foreground">Soute</span>
                   <button
                     onClick={() => updatePassenger(passenger.id, { checkedBags: Math.max(0, passenger.checkedBags - 1) })}
-                    className="w-4 h-4 rounded bg-background/50 hover:bg-primary/20 hover:text-primary text-foreground flex items-center justify-center text-[10px] font-medium transition-colors ml-0.5"
+                    className="w-5 h-5 rounded bg-background/50 hover:bg-primary/20 hover:text-primary text-foreground flex items-center justify-center text-xs font-medium transition-colors ml-1"
                   >
                     −
                   </button>
-                  <span className="text-[10px] w-3 text-center font-medium">{passenger.checkedBags}</span>
+                  <span className="text-xs w-4 text-center font-medium">{passenger.checkedBags}</span>
                   <button
                     onClick={() => updatePassenger(passenger.id, { checkedBags: passenger.checkedBags + 1 })}
-                    className="w-4 h-4 rounded bg-background/50 hover:bg-primary/20 hover:text-primary text-foreground flex items-center justify-center text-[10px] font-medium transition-colors"
+                    className="w-5 h-5 rounded bg-background/50 hover:bg-primary/20 hover:text-primary text-foreground flex items-center justify-center text-xs font-medium transition-colors"
                   >
                     +
                   </button>
@@ -930,9 +930,9 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
               {passengers.length > 1 && (
                 <button
                   onClick={() => removePassenger(passenger.id)}
-                  className="ml-1 p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
+                  className="ml-2 p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
                 >
-                  <X className="h-3 w-3" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
               )}
             </div>
