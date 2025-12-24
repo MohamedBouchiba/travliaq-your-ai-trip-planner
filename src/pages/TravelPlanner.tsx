@@ -226,7 +226,7 @@ const TravelPlanner = () => {
 
               {/* YouTube Shorts Panel (takes over the regular panel) */}
               {youtubePanel ? (
-                <aside className="pointer-events-none absolute top-16 left-4 bottom-4 w-[380px] z-10">
+                <aside className="pointer-events-none absolute top-16 left-4 bottom-4 w-[320px] sm:w-[360px] md:w-[400px] lg:w-[420px] xl:w-[480px] 2xl:w-[540px] z-10">
                   <div className="pointer-events-auto h-full overflow-hidden rounded-2xl bg-card/95 backdrop-blur-xl border border-border/50 shadow-lg">
                     <YouTubeShortsPanel
                       city={youtubePanel.city}
