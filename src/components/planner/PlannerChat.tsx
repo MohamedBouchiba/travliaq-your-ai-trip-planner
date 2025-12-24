@@ -84,6 +84,7 @@ interface ChatMessage {
     preferredMonth?: string; // e.g. "février", "march", "summer"
     tripDuration?: string;
     citySelection?: CitySelectionData;
+    isDeparture?: boolean; // true if selecting departure city
   };
 }
 
@@ -666,12 +667,24 @@ const TravelersWidget = ({
   initialValues?: { adults: number; children: number; infants: number };
   onConfirm: (travelers: { adults: number; children: number; infants: number }) => void;
 }) => {
-  const [adults, setAdults] = useState(initialValues.adults);
+  const [adults, setAdults] = useState(Math.max(1, initialValues.adults)); // Ensure at least 1 adult
   const [children, setChildren] = useState(initialValues.children);
-  const [infants, setInfants] = useState(initialValues.infants);
+  const [infants, setInfants] = useState(Math.min(initialValues.infants, Math.max(1, initialValues.adults))); // Infants cannot exceed adults
   const [confirmed, setConfirmed] = useState(false);
 
+  // Ensure infants don't exceed adults when adults change
+  const handleAdultsChange = (newAdults: number) => {
+    setAdults(newAdults);
+    if (infants > newAdults) {
+      setInfants(newAdults);
+    }
+  };
+
   const handleConfirm = () => {
+    // Final validation: ensure at least 1 adult
+    if (adults < 1) {
+      return;
+    }
     setConfirmed(true);
     onConfirm({ adults, children, infants });
   };
@@ -733,7 +746,7 @@ const TravelersWidget = ({
           <div className="font-medium text-sm">Adultes</div>
           <div className="text-xs text-muted-foreground">12 ans et +</div>
         </div>
-        <CounterButton value={adults} onChange={setAdults} min={1} />
+        <CounterButton value={adults} onChange={handleAdultsChange} min={1} />
       </div>
       
       {/* Children */}
@@ -1003,6 +1016,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
   const pendingTravelersWidgetRef = useRef(false); // Track if we need to show travelers widget after date selection
   const pendingTripDurationRef = useRef<string | null>(null); // Store trip duration for calculating return date
   const pendingPreferredMonthRef = useRef<string | null>(null); // Store preferred month for calendar navigation
+  const citySelectionShownForCountryRef = useRef<string | null>(null); // Prevent duplicate city selection messages
+  const pendingFromCountryRef = useRef<{ code: string; name: string } | null>(null); // Track departure country selection
   
   // Access flight memory
   const { memory, updateMemory, isReadyToSearch, hasCompleteInfo, needsAirportSelection, missingFields, getMemorySummary } = useFlightMemory();
@@ -1554,6 +1569,108 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
     }
   };
 
+  // Fetch and show cities for departure country selection
+  const fetchAndShowCitiesForDeparture = async (messageId: string, countryCode: string, countryName: string) => {
+    try {
+      const fetchResponse = await fetch(
+        `https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/top-cities-by-country?countryCode=${countryCode}&limit=5`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpbmJubWxmcGZmbXlqbWt3YmNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc5NDQ2MTQsImV4cCI6MjA3MzUyMDYxNH0.yrju-Pv4OlfU9Et-mRWg0GRHTusL7ZpJevqKemJFbuA",
+          },
+        }
+      );
+
+      const data = await fetchResponse.json();
+      
+      if (data.cities && data.cities.length > 0) {
+        const citySelection: CitySelectionData = {
+          countryCode,
+          countryName,
+          cities: data.cities.map((c: any) => ({
+            name: c.name,
+            description: c.description || `Ville importante de ${countryName}`,
+            population: c.population,
+          })),
+        };
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  isTyping: false,
+                  widget: "citySelector",
+                  widgetData: { 
+                    ...m.widgetData, 
+                    citySelection,
+                    isDeparture: true, // Mark as departure city selection
+                  },
+                }
+              : m
+          )
+        );
+      } else {
+        // No cities found, ask manually
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  text: `D'où partez-vous en ${countryName} ? Indiquez-moi la ville.`,
+                  isTyping: false,
+                }
+              : m
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching departure cities:", error);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? {
+                ...m,
+                text: `D'où partez-vous en ${countryName} ? Indiquez-moi la ville.`,
+                isTyping: false,
+              }
+            : m
+        )
+      );
+    }
+  };
+
+  // Handle departure city selection (from country)
+  const handleDepartureCitySelect = async (messageId: string, cityName: string, countryName: string) => {
+    // Update memory with the selected departure city
+    updateMemory({ departure: { city: cityName, country: countryName } });
+    pendingFromCountryRef.current = null;
+
+    // Remove widget from message
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId ? { ...m, widget: undefined } : m
+      )
+    );
+
+    // Now check if we need to ask for destination or continue flow
+    if (!memory.arrival?.city) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `ask-destination-${Date.now()}`,
+          role: "assistant",
+          text: `Parfait, départ de **${cityName}** ! 😊 Où souhaitez-vous aller ?`,
+        },
+      ]);
+    } else {
+      // Destination already set, continue with dates
+      askNextMissingField();
+    }
+  };
+
   // Handle date range selection (both departure AND return)
   const handleDateRangeSelect = (messageId: string, departure: Date, returnDate: Date) => {
     // Update memory with both dates
@@ -1570,21 +1687,14 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       )
     );
 
-    // Check if we need to show travelers widget next
-    if (pendingTravelersWidgetRef.current) {
-      pendingTravelersWidgetRef.current = false;
-      
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `confirm-dates-${Date.now()}`,
-          role: "assistant",
-          text: `✓ **${format(departure, "d MMMM", { locale: fr })}** → **${format(returnDate, "d MMMM yyyy", { locale: fr })}**. Combien êtes-vous ? 🧳`,
-          widget: "travelersSelector",
-        },
-      ]);
-    } else if (memory.passengers.adults < 1) {
-      // Always ask for travelers if not set
+    // Get current passengers count (fresh read from memory after update)
+    const currentPassengers = memory.passengers;
+    const needsTravelersWidget = pendingTravelersWidgetRef.current || currentPassengers.adults < 1;
+    
+    // Reset ref
+    pendingTravelersWidgetRef.current = false;
+    
+    if (needsTravelersWidget) {
       setMessages((prev) => [
         ...prev,
         {
@@ -1741,9 +1851,6 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
     return { content: fullContent, flightData };
   };
 
-  // Prevent duplicate city selection messages
-  const citySelectionShownForCountryRef = useRef<string | null>(null);
-
   // Expose methods to parent
   useImperativeHandle(ref, () => ({
     injectSystemMessage: async (event: CountrySelectionEvent) => {
@@ -1839,9 +1946,16 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       text: userText,
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    // Clear any active widgets when user sends a message (user chose to type instead of click)
+    setMessages((prev) => [
+      ...prev.map((m) => m.widget ? { ...m, widget: undefined } : m),
+      userMessage,
+    ]);
     setInput("");
     setIsLoading(true);
+    
+    // Reset city selection ref since user is typing (might be changing their mind)
+    citySelectionShownForCountryRef.current = null;
 
     const messageId = `bot-${Date.now()}`;
     setMessages((prev) => [
@@ -1869,11 +1983,13 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       };
 
       if (flightData && Object.keys(flightData).length > 0) {
-        // Check for city selection (country instead of city)
-        const needsCitySelection = flightData.needsCitySelection === true && flightData.toCountryCode;
+        // Check for city selection (country instead of city) - handle BOTH from and to
+        const needsDestinationCitySelection = flightData.needsCitySelection === true && flightData.toCountryCode;
+        const needsDepartureCitySelection = flightData.fromCountryCode && !flightData.from;
         
         // Check widget flags - prioritize city selection first, then date widget
-        showDateWidget = flightData.needsDateWidget === true && !needsCitySelection;
+        const skipDateWidget = needsDestinationCitySelection || needsDepartureCitySelection;
+        showDateWidget = flightData.needsDateWidget === true && !skipDateWidget;
         showTravelersWidget = flightData.needsTravelersWidget === true;
 
         // Store pending widgets for sequential display
@@ -1904,8 +2020,13 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
             : nextMem.passengers,
         };
 
-        // If country detected, fetch cities and show widget
-        if (needsCitySelection && flightData.toCountryCode && flightData.toCountryName) {
+        // Handle departure country (fromCountryCode) - store for later if destination also needs selection
+        if (needsDepartureCitySelection && flightData.fromCountryCode && flightData.fromCountryName) {
+          pendingFromCountryRef.current = { code: flightData.fromCountryCode, name: flightData.fromCountryName };
+        }
+
+        // If destination country detected, fetch cities and show widget (priority over departure)
+        if (needsDestinationCitySelection && flightData.toCountryCode && flightData.toCountryName) {
           setMessages((prev) =>
             prev.map((m) =>
               m.id === messageId
@@ -1914,6 +2035,21 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
             )
           );
           fetchAndShowCities(messageId, flightData.toCountryCode, flightData.toCountryName);
+          setIsLoading(false);
+          return;
+        }
+        
+        // If only departure country needs selection (no destination country)
+        if (needsDepartureCitySelection && !needsDestinationCitySelection && flightData.fromCountryCode && flightData.fromCountryName) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === messageId
+                ? { ...m, text: cleanContent, isTyping: false, isStreaming: false }
+                : m
+            )
+          );
+          // Fetch cities for departure country
+          fetchAndShowCitiesForDeparture(messageId, flightData.fromCountryCode, flightData.fromCountryName);
           setIsLoading(false);
           return;
         }
@@ -1984,6 +2120,13 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       );
     } catch (err) {
       console.error("Failed to get chat response:", err);
+      
+      // Reset pending refs on error to avoid stale state
+      pendingTravelersWidgetRef.current = false;
+      pendingTripDurationRef.current = null;
+      pendingPreferredMonthRef.current = null;
+      pendingFromCountryRef.current = null;
+      
       setMessages((prev) =>
         prev.map((m) =>
           m.id === messageId
@@ -2134,7 +2277,14 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
                 {m.widget === "citySelector" && m.widgetData?.citySelection && (
                   <CitySelectionWidget
                     citySelection={m.widgetData.citySelection}
-                    onSelect={(cityName) => handleCitySelect(m.id, cityName, m.widgetData!.citySelection!.countryName)}
+                    onSelect={(cityName) => {
+                      // Check if this is a departure or destination city selection
+                      if (m.widgetData?.isDeparture) {
+                        handleDepartureCitySelect(m.id, cityName, m.widgetData!.citySelection!.countryName);
+                      } else {
+                        handleCitySelect(m.id, cityName, m.widgetData!.citySelection!.countryName);
+                      }
+                    }}
                   />
                 )}
 
