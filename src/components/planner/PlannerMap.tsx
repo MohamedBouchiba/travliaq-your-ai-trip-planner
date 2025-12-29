@@ -613,20 +613,38 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       
       const isDeparture = point.type === "departure";
       const isArrival = point.type === "arrival";
+      const isWaypoint = point.type === "waypoint";
+      const isClickable = !isDeparture; // All points except departure are clickable for videos
+      
+      // Color based on point type
+      const getColors = () => {
+        if (isDeparture) return { main: 'hsl(221.2, 83.2%, 53.3%)', dark: 'hsl(221.2, 83.2%, 43.3%)' };
+        if (isArrival) return { main: 'hsl(142, 76%, 36%)', dark: 'hsl(142, 76%, 26%)' };
+        // Waypoints get a different color (amber/orange)
+        return { main: 'hsl(38, 92%, 50%)', dark: 'hsl(38, 92%, 40%)' };
+      };
+      const colors = getColors();
+      
+      // Icon based on type
+      const getIcon = () => {
+        if (isDeparture) return '✈️';
+        if (isWaypoint) return `${index}`; // Show step number for waypoints
+        return '📍';
+      };
       
       // Create a stylized pin with travel theme
       container.innerHTML = `
-        <div class="travel-pin ${isDeparture ? 'departure' : 'arrival'}" style="
+        <div class="travel-pin ${isDeparture ? 'departure' : isWaypoint ? 'waypoint' : 'arrival'}" style="
           position: relative;
           width: 48px;
           height: 60px;
           display: flex;
           flex-direction: column;
           align-items: center;
-          cursor: pointer;
+          cursor: ${isClickable ? 'pointer' : 'default'};
           filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
           animation: pinDrop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-          animation-delay: ${isDeparture ? '0s' : '0.3s'};
+          animation-delay: ${index * 0.15}s;
           opacity: 0;
           transform: translateY(-20px);
         ">
@@ -636,7 +654,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
             height: 44px;
             border-radius: 50% 50% 50% 0;
             transform: rotate(-45deg);
-            background: linear-gradient(135deg, ${isDeparture ? 'hsl(221.2, 83.2%, 53.3%)' : 'hsl(142, 76%, 36%)'} 0%, ${isDeparture ? 'hsl(221.2, 83.2%, 43.3%)' : 'hsl(142, 76%, 26%)'} 100%);
+            background: linear-gradient(135deg, ${colors.main} 0%, ${colors.dark} 100%);
             border: 3px solid white;
             display: flex;
             align-items: center;
@@ -645,12 +663,14 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
           ">
             <span style="
               transform: rotate(45deg);
-              font-size: 20px;
+              font-size: ${isWaypoint ? '16px' : '20px'};
+              font-weight: ${isWaypoint ? '700' : 'normal'};
+              color: ${isWaypoint ? 'white' : 'inherit'};
               filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2));
-            ">${isDeparture ? '✈️' : '📍'}</span>
+            ">${getIcon()}</span>
           </div>
-          <!-- Pulse ring for arrival -->
-          ${isArrival ? `
+          <!-- Pulse ring for clickable destinations -->
+          ${isClickable ? `
             <div style="
               position: absolute;
               top: 7px;
@@ -658,8 +678,9 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
               width: 44px;
               height: 44px;
               border-radius: 50%;
-              border: 2px solid hsl(142, 76%, 36%);
+              border: 2px solid ${colors.main};
               animation: pulseRing 2s ease-out infinite;
+              animation-delay: ${index * 0.3}s;
               opacity: 0;
             "></div>
           ` : ''}
@@ -696,18 +717,20 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
 
       const pinEl = container.querySelector('.travel-pin') as HTMLElement;
       
-      // Add hover effect
-      pinEl?.addEventListener("mouseenter", () => {
-        pinEl.style.filter = "drop-shadow(0 6px 12px rgba(0,0,0,0.4))";
-        pinEl.style.transform = "scale(1.1)";
-      });
-      pinEl?.addEventListener("mouseleave", () => {
-        pinEl.style.filter = "drop-shadow(0 4px 8px rgba(0,0,0,0.3))";
-        pinEl.style.transform = "scale(1)";
-      });
+      // Add hover effect for clickable pins
+      if (isClickable) {
+        pinEl?.addEventListener("mouseenter", () => {
+          pinEl.style.filter = "drop-shadow(0 6px 12px rgba(0,0,0,0.4))";
+          pinEl.style.transform = "scale(1.1)";
+        });
+        pinEl?.addEventListener("mouseleave", () => {
+          pinEl.style.filter = "drop-shadow(0 4px 8px rgba(0,0,0,0.3))";
+          pinEl.style.transform = "scale(1)";
+        });
+      }
 
-      // Add click handler for arrival destinations (open popup)
-      if (isArrival && onDestinationClick) {
+      // Add click handler for all destination points (not departure)
+      if (isClickable && onDestinationClick) {
         pinEl?.addEventListener("click", (e) => {
           e.stopPropagation();
           
