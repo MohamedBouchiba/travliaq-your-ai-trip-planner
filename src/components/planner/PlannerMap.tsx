@@ -547,25 +547,22 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     memoryMarkersRef.current.forEach((marker) => marker.remove());
     memoryMarkersRef.current = [];
 
-    // Remove previous memory route lines and plane
+    // Remove previous memory route lines
     const memorySourceId = "memory-route";
     const memoryArrowId = "memory-route-arrow";
-    const memoryBgId = `${memorySourceId}-bg`;
-    const planeSourceId = `${memorySourceId}-plane`;
+    const memoryGlowId = `${memorySourceId}-glow`;
     
     // Remove layers in order
-    [memoryArrowId, memorySourceId, memoryBgId, planeSourceId].forEach(layerId => {
+    [memoryArrowId, memorySourceId, memoryGlowId].forEach(layerId => {
       if (map.current?.getLayer(layerId)) {
         map.current.removeLayer(layerId);
       }
     });
     
-    // Remove sources
-    [memorySourceId, planeSourceId].forEach(sourceId => {
-      if (map.current?.getSource(sourceId)) {
-        map.current.removeSource(sourceId);
-      }
-    });
+    // Remove source
+    if (map.current?.getSource(memorySourceId)) {
+      map.current.removeSource(memorySourceId);
+    }
 
     const memoryPoints = getRoutePoints();
     
@@ -766,10 +763,10 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
           arcPoints[arcPoints.length - 1] = endCoords;
         }
         
-        // Create animated flight path
+        // Create animated flight path with progressive drawing effect
         const routeColor = cssHsl("--primary", "221.2 83.2% 53.3%");
         
-        // Add the full route as a background (faded)
+        // Source for the animated line (starts empty, will be progressively filled)
         map.current.addSource(memorySourceId, {
           type: "geojson",
           data: {
@@ -777,28 +774,12 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
             properties: {},
             geometry: {
               type: "LineString",
-              coordinates: arcPoints,
+              coordinates: [arcPoints[0]], // Start with just the first point
             },
           },
         });
 
-        // Background line (faded path)
-        map.current.addLayer({
-          id: `${memorySourceId}-bg`,
-          type: "line",
-          source: memorySourceId,
-          layout: {
-            "line-join": "round",
-            "line-cap": "round",
-          },
-          paint: {
-            "line-color": routeColor,
-            "line-width": 2,
-            "line-opacity": 0.25,
-          },
-        });
-
-        // Animated dashed line
+        // Main animated line
         map.current.addLayer({
           id: memorySourceId,
           type: "line",
@@ -809,101 +790,89 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
           },
           paint: {
             "line-color": routeColor,
-            "line-width": 3,
-            "line-dasharray": [2, 1.5],
+            "line-width": 3.5,
             "line-opacity": 0.9,
           },
         });
 
-        // Animate the dash offset for flying effect
-        let dashOffset = 0;
-        const animateDash = () => {
-          if (!map.current?.getLayer(memorySourceId)) return;
-          dashOffset = (dashOffset + 0.15) % 3.5;
-          map.current.setPaintProperty(memorySourceId, "line-dasharray", [2, 1.5]);
-          requestAnimationFrame(animateDash);
-        };
-        animateDash();
-
-        // Small plane icon moving along the route
-        const planeSourceId = `${memorySourceId}-plane`;
-        map.current.addSource(planeSourceId, {
-          type: "geojson",
-          data: {
-            type: "Feature",
-            properties: { bearing: 0 },
-            geometry: {
-              type: "Point",
-              coordinates: arcPoints[0],
-            },
-          },
-        });
-
-        // Create a custom plane icon layer
+        // Glow effect under the line
         map.current.addLayer({
-          id: planeSourceId,
-          type: "symbol",
-          source: planeSourceId,
+          id: `${memorySourceId}-glow`,
+          type: "line",
+          source: memorySourceId,
           layout: {
-            "icon-image": "airport",
-            "icon-size": 1.2,
-            "icon-rotate": ["get", "bearing"],
-            "icon-rotation-alignment": "map",
-            "icon-allow-overlap": true,
+            "line-join": "round",
+            "line-cap": "round",
           },
-        });
+          paint: {
+            "line-color": routeColor,
+            "line-width": 8,
+            "line-opacity": 0.15,
+            "line-blur": 4,
+          },
+        }, memorySourceId); // Insert below main line
 
-        // Animate plane along the route
-        let planeProgress = 0;
-        const animatePlane = () => {
-          if (!map.current?.getSource(planeSourceId)) return;
+        // Progressive drawing animation
+        let drawProgress = 0;
+        const drawDuration = 1500; // 1.5 seconds to draw the full line
+        const startTime = performance.now();
+        
+        const animateDraw = (currentTime: number) => {
+          if (!map.current?.getSource(memorySourceId)) return;
           
-          planeProgress += 0.003;
-          if (planeProgress > 1) planeProgress = 0;
+          const elapsed = currentTime - startTime;
+          drawProgress = Math.min(1, elapsed / drawDuration);
           
-          const currentIndex = Math.floor(planeProgress * (arcPoints.length - 1));
-          const nextIndex = Math.min(currentIndex + 1, arcPoints.length - 1);
-          const currentPoint = arcPoints[currentIndex];
-          const nextPoint = arcPoints[nextIndex];
+          // Easing function for smooth animation
+          const eased = 1 - Math.pow(1 - drawProgress, 3); // ease-out cubic
           
-          // Calculate bearing for plane rotation
-          const bearing = Math.atan2(
-            nextPoint[0] - currentPoint[0],
-            nextPoint[1] - currentPoint[1]
-          ) * (180 / Math.PI);
+          // Calculate how many points to show
+          const pointCount = Math.max(2, Math.floor(eased * arcPoints.length));
+          const visiblePoints = arcPoints.slice(0, pointCount);
           
-          (map.current.getSource(planeSourceId) as mapboxgl.GeoJSONSource).setData({
+          // Update the line with more points
+          (map.current.getSource(memorySourceId) as mapboxgl.GeoJSONSource).setData({
             type: "Feature",
-            properties: { bearing: bearing },
+            properties: {},
             geometry: {
-              type: "Point",
-              coordinates: currentPoint,
+              type: "LineString",
+              coordinates: visiblePoints,
             },
           });
           
-          requestAnimationFrame(animatePlane);
+          // Continue animation until complete
+          if (drawProgress < 1) {
+            requestAnimationFrame(animateDraw);
+          }
         };
-        animatePlane();
+        
+        // Start the drawing animation
+        requestAnimationFrame(animateDraw);
 
-        // Direction arrows along the line
-        map.current.addLayer({
-          id: memoryArrowId,
-          type: "symbol",
-          source: memorySourceId,
-          layout: {
-            "symbol-placement": "line",
-            "symbol-spacing": 120,
-            "text-field": "›",
-            "text-size": 20,
-            "text-keep-upright": false,
-            "text-rotation-alignment": "map",
-          },
-          paint: {
-            "text-color": routeColor,
-            "text-halo-color": "rgba(255,255,255,0.8)",
-            "text-halo-width": 2,
-          },
-        });
+        // Direction arrows along the line (added after animation completes)
+        setTimeout(() => {
+          if (!map.current?.getSource(memorySourceId)) return;
+          
+          map.current.addLayer({
+            id: memoryArrowId,
+            type: "symbol",
+            source: memorySourceId,
+            layout: {
+              "symbol-placement": "line",
+              "symbol-spacing": 100,
+              "text-field": "›",
+              "text-size": 18,
+              "text-keep-upright": false,
+              "text-rotation-alignment": "map",
+            },
+            paint: {
+              "text-color": routeColor,
+              "text-halo-color": "rgba(255,255,255,0.9)",
+              "text-halo-width": 1.5,
+              "text-opacity": 0.7,
+            },
+          });
+        }, drawDuration + 100);
 
         // Fit map to show both points
         const bounds = new mapboxgl.LngLatBounds();
