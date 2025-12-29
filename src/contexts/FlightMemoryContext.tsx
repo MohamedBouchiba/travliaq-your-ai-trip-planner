@@ -25,6 +25,24 @@ export interface FlightLegMemory {
   date: Date | null;
 }
 
+// Saved state for each trip type to allow switching without data loss
+export interface TripTypeData {
+  roundtrip: {
+    departure: AirportInfo | null;
+    arrival: AirportInfo | null;
+    departureDate: Date | null;
+    returnDate: Date | null;
+  };
+  oneway: {
+    departure: AirportInfo | null;
+    arrival: AirportInfo | null;
+    departureDate: Date | null;
+  };
+  multi: {
+    legs: FlightLegMemory[];
+  };
+}
+
 // Flight memory state
 export interface FlightMemory {
   // Trip type determines how we interpret departure/arrival/legs
@@ -38,6 +56,9 @@ export interface FlightMemory {
 
   // For multi-destination:
   legs: FlightLegMemory[];
+
+  // Saved data for each trip type (allows switching without losing data)
+  savedTripData: TripTypeData;
 
   // Passengers (same for all trip types)
   passengers: {
@@ -83,6 +104,24 @@ interface FlightMemoryContextValue {
   updateLeg: (legId: string, update: Partial<FlightLegMemory>) => void;
 }
 
+// Initial saved trip data
+const initialSavedTripData: TripTypeData = {
+  roundtrip: {
+    departure: null,
+    arrival: null,
+    departureDate: null,
+    returnDate: null,
+  },
+  oneway: {
+    departure: null,
+    arrival: null,
+    departureDate: null,
+  },
+  multi: {
+    legs: [],
+  },
+};
+
 // Initial state
 const initialMemory: FlightMemory = {
   tripType: "roundtrip",
@@ -91,6 +130,7 @@ const initialMemory: FlightMemory = {
   departureDate: null,
   returnDate: null,
   legs: [],
+  savedTripData: initialSavedTripData,
   passengers: {
     adults: 1,
     children: 0,
@@ -103,6 +143,24 @@ const initialMemory: FlightMemory = {
 
 // Helper to serialize memory (convert Dates to ISO strings)
 function serializeMemory(memory: FlightMemory): string {
+  const serializeTripData = (data: TripTypeData) => ({
+    roundtrip: {
+      ...data.roundtrip,
+      departureDate: data.roundtrip.departureDate?.toISOString() || null,
+      returnDate: data.roundtrip.returnDate?.toISOString() || null,
+    },
+    oneway: {
+      ...data.oneway,
+      departureDate: data.oneway.departureDate?.toISOString() || null,
+    },
+    multi: {
+      legs: data.multi.legs.map(leg => ({
+        ...leg,
+        date: leg.date?.toISOString() || null,
+      })),
+    },
+  });
+
   return JSON.stringify({
     ...memory,
     departureDate: memory.departureDate?.toISOString() || null,
@@ -111,6 +169,7 @@ function serializeMemory(memory: FlightMemory): string {
       ...leg,
       date: leg.date?.toISOString() || null,
     })),
+    savedTripData: serializeTripData(memory.savedTripData),
   });
 }
 
@@ -121,6 +180,30 @@ function deserializeMemory(json: string): FlightMemory | null {
     
     // Validate basic structure
     if (!parsed || typeof parsed !== "object") return null;
+
+    // Helper to deserialize saved trip data
+    const deserializeTripData = (data: any): TripTypeData => {
+      if (!data) return initialSavedTripData;
+      return {
+        roundtrip: {
+          departure: data.roundtrip?.departure || null,
+          arrival: data.roundtrip?.arrival || null,
+          departureDate: data.roundtrip?.departureDate ? new Date(data.roundtrip.departureDate) : null,
+          returnDate: data.roundtrip?.returnDate ? new Date(data.roundtrip.returnDate) : null,
+        },
+        oneway: {
+          departure: data.oneway?.departure || null,
+          arrival: data.oneway?.arrival || null,
+          departureDate: data.oneway?.departureDate ? new Date(data.oneway.departureDate) : null,
+        },
+        multi: {
+          legs: (data.multi?.legs || []).map((leg: any) => ({
+            ...leg,
+            date: leg.date ? new Date(leg.date) : null,
+          })),
+        },
+      };
+    };
     
     // Convert date strings back to Date objects
     const memory: FlightMemory = {
@@ -132,6 +215,7 @@ function deserializeMemory(json: string): FlightMemory | null {
         ...leg,
         date: leg.date ? new Date(leg.date) : null,
       })),
+      savedTripData: deserializeTripData(parsed.savedTripData),
       passengers: {
         ...initialMemory.passengers,
         ...parsed.passengers,
@@ -198,7 +282,7 @@ export function FlightMemoryProvider({ children }: { children: ReactNode }) {
 
   const updateMemory = useCallback((partial: Partial<FlightMemory>) => {
     setMemory((prev) => {
-      const updated = { ...prev, ...partial };
+      let updated = { ...prev, ...partial };
       
       // Handle nested passengers update
       if (partial.passengers) {
@@ -208,6 +292,91 @@ export function FlightMemoryProvider({ children }: { children: ReactNode }) {
       // Handle nested legs update
       if (partial.legs) {
         updated.legs = partial.legs;
+      }
+
+      // Handle trip type change - save current state and restore saved state
+      if (partial.tripType && partial.tripType !== prev.tripType) {
+        const newTripType = partial.tripType;
+        const oldTripType = prev.tripType;
+
+        // Save current state to savedTripData
+        const newSavedTripData = { ...prev.savedTripData };
+        
+        if (oldTripType === "roundtrip") {
+          newSavedTripData.roundtrip = {
+            departure: prev.departure,
+            arrival: prev.arrival,
+            departureDate: prev.departureDate,
+            returnDate: prev.returnDate,
+          };
+        } else if (oldTripType === "oneway") {
+          newSavedTripData.oneway = {
+            departure: prev.departure,
+            arrival: prev.arrival,
+            departureDate: prev.departureDate,
+          };
+        } else if (oldTripType === "multi") {
+          newSavedTripData.multi = {
+            legs: prev.legs,
+          };
+        }
+
+        // Restore saved state for new trip type
+        if (newTripType === "roundtrip") {
+          const saved = newSavedTripData.roundtrip;
+          updated.departure = saved.departure;
+          updated.arrival = saved.arrival;
+          updated.departureDate = saved.departureDate;
+          updated.returnDate = saved.returnDate;
+          updated.legs = [];
+        } else if (newTripType === "oneway") {
+          const saved = newSavedTripData.oneway;
+          // If coming from roundtrip, use roundtrip data if oneway is empty
+          if (!saved.departure && prev.tripType === "roundtrip") {
+            updated.departure = prev.departure;
+            updated.arrival = prev.arrival;
+            updated.departureDate = prev.departureDate;
+          } else {
+            updated.departure = saved.departure;
+            updated.arrival = saved.arrival;
+            updated.departureDate = saved.departureDate;
+          }
+          updated.returnDate = null;
+          updated.legs = [];
+        } else if (newTripType === "multi") {
+          const saved = newSavedTripData.multi;
+          // If legs are empty, create initial legs from current departure/arrival
+          if (saved.legs.length === 0 && prev.departure && prev.arrival) {
+            updated.legs = [
+              {
+                id: crypto.randomUUID(),
+                departure: prev.departure,
+                arrival: prev.arrival,
+                date: prev.departureDate,
+              },
+              {
+                id: crypto.randomUUID(),
+                departure: prev.arrival,
+                arrival: null,
+                date: null,
+              },
+            ];
+          } else if (saved.legs.length > 0) {
+            updated.legs = saved.legs;
+          } else {
+            // Empty multi with placeholder legs
+            updated.legs = [
+              { id: crypto.randomUUID(), departure: null, arrival: null, date: null },
+              { id: crypto.randomUUID(), departure: null, arrival: null, date: null },
+            ];
+          }
+          updated.departure = null;
+          updated.arrival = null;
+          updated.departureDate = null;
+          updated.returnDate = null;
+        }
+
+        updated.savedTripData = newSavedTripData;
       }
       
       return updated;
