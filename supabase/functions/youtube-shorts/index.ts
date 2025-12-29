@@ -36,14 +36,24 @@ interface YouTubeSearchResponse {
 const EXCLUDE_KEYWORDS = [
   "emperor", "empire", "comic", "comics", "movie", "film", "game", "gaming",
   "song", "music", "album", "band", "anime", "cartoon", "byzantine", "roman emperor",
+  "airport", "aéroport", "terminal", "runway", "landing", "takeoff", "atterrissage",
+  "décollage", "plane spotting", "aviation", "flight review",
 ];
 
-// Lighter filter - just exclude bad content
+// Keywords that indicate good travel content
+const TRAVEL_INDICATORS = [
+  "visit", "things to do", "travel guide", "tourist", "tourism", "explore",
+  "walking tour", "street food", "hidden gems", "must see", "best places",
+  "visite", "à voir", "que faire", "incontournable", "découvrir", "voyage",
+];
+
+// Filter for travel content and exclude bad content
 function isAcceptable(video: YouTubeVideo): boolean {
   const titleLower = video.title.toLowerCase();
   const descLower = video.description.toLowerCase();
   const combined = `${titleLower} ${descLower}`;
   
+  // Exclude bad content
   for (const keyword of EXCLUDE_KEYWORDS) {
     if (combined.includes(keyword)) {
       console.log(`[youtube-shorts] Excluding "${video.title}" - contains "${keyword}"`);
@@ -56,8 +66,8 @@ function isAcceptable(video: YouTubeVideo): boolean {
 
 // Single optimized search - only 1 API call per city
 async function searchYouTube(apiKey: string, city: string): Promise<YouTubeVideo[]> {
-  // Simple query focused on travel
-  const searchQuery = `${city} travel #shorts`;
+  // Query focused on travel/tourism content, NOT airports
+  const searchQuery = `${city} things to do travel guide #shorts`;
   
   const searchParams = new URLSearchParams({
     part: "snippet",
