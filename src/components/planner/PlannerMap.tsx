@@ -692,12 +692,23 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       const arrival = memoryPoints.find(p => p.type === "arrival");
       
       if (departure && arrival) {
+        // Use exact coordinates from the memory points for the route line
+        // This ensures the line connects precisely to the markers
+        const startCoords: [number, number] = [departure.lng, departure.lat];
+        const endCoords: [number, number] = [arrival.lng, arrival.lat];
+        
         // Create a curved great circle arc for better visual appearance
         const arcPoints = generateGreatCircleArc(
-          [departure.lng, departure.lat],
-          [arrival.lng, arrival.lat],
+          startCoords,
+          endCoords,
           50 // number of points for smooth curve
         );
+        
+        // Ensure first and last points are exactly at marker positions
+        if (arcPoints.length > 0) {
+          arcPoints[0] = startCoords;
+          arcPoints[arcPoints.length - 1] = endCoords;
+        }
         
         map.current.addSource(memorySourceId, {
           type: "geojson",
