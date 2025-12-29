@@ -1917,15 +1917,22 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
   useImperativeHandle(ref, () => ({
     injectSystemMessage: async (event: CountrySelectionEvent) => {
       const countryCode = event.country.country_code;
+      const countryKey = `${event.field}-${countryCode}`;
       
-      // Prevent duplicate messages for the same country
-      if (citySelectionShownForCountryRef.current === countryCode) {
-        console.log("[PlannerChat] Skipping duplicate city selection for", countryCode);
-        return;
+      // Prevent duplicate messages for the same country+field combination within a short time
+      // But allow re-triggering if user clicks the search button again
+      if (citySelectionShownForCountryRef.current === countryKey) {
+        // Check if there's already a citySelector widget visible for this
+        const hasActiveCitySelector = messages.some(
+          (m) => m.widget === "citySelector" && !m.isTyping
+        );
+        if (hasActiveCitySelector) {
+          console.log("[PlannerChat] City selector already visible for", countryKey);
+          return;
+        }
       }
-      citySelectionShownForCountryRef.current = countryCode;
+      citySelectionShownForCountryRef.current = countryKey;
       
-      const fieldName = event.field === "from" ? "départ" : "destination";
       const countryName = event.country.name;
       
       // Instead of calling the AI, directly show the city selection widget

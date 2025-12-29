@@ -687,15 +687,43 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     if (!triggerSearch) return;
     
     const firstLeg = legs[0];
+    
+    // First check if either location is a COUNTRY (needs city selection first)
+    const fromIsCountry = firstLeg?.fromLocation?.type === "country";
+    const toIsCountry = firstLeg?.toLocation?.type === "country";
+    
+    if (fromIsCountry && firstLeg.fromLocation) {
+      // Trigger city selection in chat for departure country
+      onCountrySelected?.({
+        field: "from",
+        country: firstLeg.fromLocation,
+      });
+      onSearchTriggered?.();
+      return;
+    }
+    
+    if (toIsCountry && firstLeg.toLocation) {
+      // Trigger city selection in chat for destination country
+      onCountrySelected?.({
+        field: "to",
+        country: firstLeg.toLocation,
+      });
+      onSearchTriggered?.();
+      return;
+    }
+    
     const fromHasAirport = /\([A-Z]{3}\)/.test(firstLeg?.from || '');
     const toHasAirport = /\([A-Z]{3}\)/.test(firstLeg?.to || '');
     
     if (fromHasAirport && toHasAirport) {
       performFlightSearch(firstLeg.from, firstLeg.to);
+    } else {
+      // Need to find airports for cities - call handleSearchClick instead
+      handleSearchClick();
     }
     
     onSearchTriggered?.();
-  }, [triggerSearch, legs, onSearchTriggered]);
+  }, [triggerSearch, legs, onSearchTriggered, onCountrySelected]);
 
   // Notify parent of route changes when legs change AND sync with memory
   const handleLegsChange = (newLegs: FlightLeg[]) => {
