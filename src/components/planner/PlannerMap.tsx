@@ -739,150 +739,160 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       memoryMarkersRef.current.push(marker);
     });
 
-    // Draw line between departure and arrival if we have both
+    // Draw lines between route points (supports multi-destination)
     if (memoryPoints.length >= 2) {
-      const departure = memoryPoints.find(p => p.type === "departure");
-      const arrival = memoryPoints.find(p => p.type === "arrival");
+      const routeColor = cssHsl("--primary", "221.2 83.2% 53.3%");
+      const bounds = new mapboxgl.LngLatBounds();
       
-      if (departure && arrival) {
-        // Use exact coordinates from the memory points for the route line
-        // This ensures the line connects precisely to the markers
-        const startCoords: [number, number] = [departure.lng, departure.lat];
-        const endCoords: [number, number] = [arrival.lng, arrival.lat];
-        
-        // Create a curved great circle arc for better visual appearance
-        const arcPoints = generateGreatCircleArc(
-          startCoords,
-          endCoords,
-          50 // number of points for smooth curve
-        );
-        
-        // Ensure first and last points are exactly at marker positions
-        if (arcPoints.length > 0) {
-          arcPoints[0] = startCoords;
-          arcPoints[arcPoints.length - 1] = endCoords;
-        }
-        
-        // Create animated flight path with progressive drawing effect
-        const routeColor = cssHsl("--primary", "221.2 83.2% 53.3%");
-        
-        // Source for the animated line (starts empty, will be progressively filled)
-        map.current.addSource(memorySourceId, {
-          type: "geojson",
-          data: {
-            type: "Feature",
-            properties: {},
-            geometry: {
-              type: "LineString",
-              coordinates: [arcPoints[0]], // Start with just the first point
-            },
-          },
+      // Build segments between consecutive points
+      const segments: { start: [number, number]; end: [number, number]; index: number }[] = [];
+      
+      for (let i = 0; i < memoryPoints.length - 1; i++) {
+        const start = memoryPoints[i];
+        const end = memoryPoints[i + 1];
+        segments.push({
+          start: [start.lng, start.lat],
+          end: [end.lng, end.lat],
+          index: i,
         });
-
-        // Main animated line
-        map.current.addLayer({
-          id: memorySourceId,
-          type: "line",
-          source: memorySourceId,
-          layout: {
-            "line-join": "round",
-            "line-cap": "round",
-          },
-          paint: {
-            "line-color": routeColor,
-            "line-width": 3.5,
-            "line-opacity": 0.9,
-          },
-        });
-
-        // Glow effect under the line
-        map.current.addLayer({
-          id: `${memorySourceId}-glow`,
-          type: "line",
-          source: memorySourceId,
-          layout: {
-            "line-join": "round",
-            "line-cap": "round",
-          },
-          paint: {
-            "line-color": routeColor,
-            "line-width": 8,
-            "line-opacity": 0.15,
-            "line-blur": 4,
-          },
-        }, memorySourceId); // Insert below main line
-
-        // Progressive drawing animation
-        let drawProgress = 0;
-        const drawDuration = 1500; // 1.5 seconds to draw the full line
-        const startTime = performance.now();
-        
-        const animateDraw = (currentTime: number) => {
-          if (!map.current?.getSource(memorySourceId)) return;
-          
-          const elapsed = currentTime - startTime;
-          drawProgress = Math.min(1, elapsed / drawDuration);
-          
-          // Easing function for smooth animation
-          const eased = 1 - Math.pow(1 - drawProgress, 3); // ease-out cubic
-          
-          // Calculate how many points to show
-          const pointCount = Math.max(2, Math.floor(eased * arcPoints.length));
-          const visiblePoints = arcPoints.slice(0, pointCount);
-          
-          // Update the line with more points
-          (map.current.getSource(memorySourceId) as mapboxgl.GeoJSONSource).setData({
-            type: "Feature",
-            properties: {},
-            geometry: {
-              type: "LineString",
-              coordinates: visiblePoints,
-            },
-          });
-          
-          // Continue animation until complete
-          if (drawProgress < 1) {
-            requestAnimationFrame(animateDraw);
-          }
-        };
-        
-        // Start the drawing animation
-        requestAnimationFrame(animateDraw);
-
-        // Direction arrows along the line (added after animation completes)
-        setTimeout(() => {
-          if (!map.current?.getSource(memorySourceId)) return;
-          
-          map.current.addLayer({
-            id: memoryArrowId,
-            type: "symbol",
-            source: memorySourceId,
-            layout: {
-              "symbol-placement": "line",
-              "symbol-spacing": 100,
-              "text-field": "›",
-              "text-size": 18,
-              "text-keep-upright": false,
-              "text-rotation-alignment": "map",
-            },
-            paint: {
-              "text-color": routeColor,
-              "text-halo-color": "rgba(255,255,255,0.9)",
-              "text-halo-width": 1.5,
-              "text-opacity": 0.7,
-            },
-          });
-        }, drawDuration + 100);
-
-        // Fit map to show both points
-        const bounds = new mapboxgl.LngLatBounds();
-        bounds.extend([departure.lng, departure.lat]);
-        bounds.extend([arrival.lng, arrival.lat]);
-        map.current.fitBounds(bounds, {
-          padding: { top: 100, bottom: 100, left: 450, right: 50 },
-          maxZoom: 6,
-        });
+        bounds.extend([start.lng, start.lat]);
       }
+      // Add last point to bounds
+      const lastPoint = memoryPoints[memoryPoints.length - 1];
+      bounds.extend([lastPoint.lng, lastPoint.lat]);
+      
+      // Create all arc points for all segments combined
+      const allSegmentArcs: [number, number][][] = segments.map(seg => {
+        const arc = generateGreatCircleArc(seg.start, seg.end, 40);
+        // Ensure precise start/end
+        if (arc.length > 0) {
+          arc[0] = seg.start;
+          arc[arc.length - 1] = seg.end;
+        }
+        return arc;
+      });
+
+      // Create a single source with all segments as a MultiLineString
+      map.current.addSource(memorySourceId, {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "MultiLineString",
+            coordinates: allSegmentArcs.map(arc => [arc[0]]), // Start with first point of each segment
+          },
+        },
+      });
+
+      // Main line layer
+      map.current.addLayer({
+        id: memorySourceId,
+        type: "line",
+        source: memorySourceId,
+        layout: {
+          "line-join": "round",
+          "line-cap": "round",
+        },
+        paint: {
+          "line-color": routeColor,
+          "line-width": 3.5,
+          "line-opacity": 0.9,
+        },
+      });
+
+      // Glow effect
+      map.current.addLayer({
+        id: `${memorySourceId}-glow`,
+        type: "line",
+        source: memorySourceId,
+        layout: {
+          "line-join": "round",
+          "line-cap": "round",
+        },
+        paint: {
+          "line-color": routeColor,
+          "line-width": 8,
+          "line-opacity": 0.15,
+          "line-blur": 4,
+        },
+      }, memorySourceId);
+
+      // Progressive drawing animation for all segments
+      const drawDuration = 1200 + (segments.length - 1) * 400; // Longer for more segments
+      const startTime = performance.now();
+      
+      const animateDraw = (currentTime: number) => {
+        if (!map.current?.getSource(memorySourceId)) return;
+        
+        const elapsed = currentTime - startTime;
+        const totalProgress = Math.min(1, elapsed / drawDuration);
+        
+        // Draw segments progressively, one after another with overlap
+        const segmentProgress = segments.map((_, i) => {
+          const segmentStart = i / segments.length;
+          const segmentEnd = (i + 1) / segments.length;
+          const overlap = 0.2 / segments.length; // Small overlap for smoother transition
+          
+          const progress = Math.max(0, Math.min(1, 
+            (totalProgress - segmentStart + overlap) / (segmentEnd - segmentStart + overlap)
+          ));
+          return 1 - Math.pow(1 - progress, 3); // ease-out cubic
+        });
+        
+        // Build visible coordinates for each segment
+        const visibleCoords = allSegmentArcs.map((arc, i) => {
+          const pointCount = Math.max(2, Math.floor(segmentProgress[i] * arc.length));
+          return arc.slice(0, pointCount);
+        });
+        
+        // Update the source
+        (map.current.getSource(memorySourceId) as mapboxgl.GeoJSONSource).setData({
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "MultiLineString",
+            coordinates: visibleCoords,
+          },
+        });
+        
+        if (totalProgress < 1) {
+          requestAnimationFrame(animateDraw);
+        }
+      };
+      
+      requestAnimationFrame(animateDraw);
+
+      // Direction arrows (after animation)
+      setTimeout(() => {
+        if (!map.current?.getSource(memorySourceId)) return;
+        
+        map.current.addLayer({
+          id: memoryArrowId,
+          type: "symbol",
+          source: memorySourceId,
+          layout: {
+            "symbol-placement": "line",
+            "symbol-spacing": 100,
+            "text-field": "›",
+            "text-size": 18,
+            "text-keep-upright": false,
+            "text-rotation-alignment": "map",
+          },
+          paint: {
+            "text-color": routeColor,
+            "text-halo-color": "rgba(255,255,255,0.9)",
+            "text-halo-width": 1.5,
+            "text-opacity": 0.7,
+          },
+        });
+      }, drawDuration + 100);
+
+      // Fit map to show all points
+      map.current.fitBounds(bounds, {
+        padding: { top: 100, bottom: 100, left: 450, right: 50 },
+        maxZoom: 6,
+      });
     } else if (memoryPoints.length === 1) {
       // Fly to single point
       map.current.flyTo({
