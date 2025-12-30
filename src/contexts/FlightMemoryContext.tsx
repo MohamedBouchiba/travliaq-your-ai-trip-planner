@@ -299,9 +299,20 @@ export function FlightMemoryProvider({ children }: { children: ReactNode }) {
         const newTripType = partial.tripType;
         const oldTripType = prev.tripType;
 
-        // Save current state to savedTripData
-        const newSavedTripData = { ...prev.savedTripData };
+        console.log("[FlightMemory] Trip type change:", oldTripType, "->", newTripType);
+        console.log("[FlightMemory] Current legs to save:", prev.legs.length, prev.legs.map(l => l.departure?.city + " -> " + l.arrival?.city));
+        console.log("[FlightMemory] Current savedTripData.multi.legs:", prev.savedTripData.multi.legs.length);
+
+        // Deep copy savedTripData to avoid mutation issues
+        const newSavedTripData: TripTypeData = {
+          roundtrip: { ...prev.savedTripData.roundtrip },
+          oneway: { ...prev.savedTripData.oneway },
+          multi: { 
+            legs: [...prev.savedTripData.multi.legs], 
+          },
+        };
         
+        // Save current state to savedTripData
         if (oldTripType === "roundtrip") {
           newSavedTripData.roundtrip = {
             departure: prev.departure,
@@ -316,9 +327,11 @@ export function FlightMemoryProvider({ children }: { children: ReactNode }) {
             departureDate: prev.departureDate,
           };
         } else if (oldTripType === "multi") {
+          // Deep copy legs to preserve them
           newSavedTripData.multi = {
-            legs: prev.legs,
+            legs: prev.legs.map(leg => ({ ...leg })),
           };
+          console.log("[FlightMemory] Saved multi legs:", newSavedTripData.multi.legs.length);
         }
 
         // Restore saved state for new trip type
@@ -345,6 +358,8 @@ export function FlightMemoryProvider({ children }: { children: ReactNode }) {
           updated.legs = [];
         } else if (newTripType === "multi") {
           const saved = newSavedTripData.multi;
+          console.log("[FlightMemory] Restoring multi legs:", saved.legs.length, saved.legs.map(l => l.departure?.city + " -> " + l.arrival?.city));
+          
           // If legs are empty, create initial legs from current departure/arrival
           if (saved.legs.length === 0 && prev.departure && prev.arrival) {
             updated.legs = [
@@ -362,7 +377,8 @@ export function FlightMemoryProvider({ children }: { children: ReactNode }) {
               },
             ];
           } else if (saved.legs.length > 0) {
-            updated.legs = saved.legs;
+            // Restore saved legs with deep copy
+            updated.legs = saved.legs.map(leg => ({ ...leg }));
           } else {
             // Empty multi with placeholder legs
             updated.legs = [
@@ -377,6 +393,8 @@ export function FlightMemoryProvider({ children }: { children: ReactNode }) {
         }
 
         updated.savedTripData = newSavedTripData;
+        console.log("[FlightMemory] Final updated.legs:", updated.legs.length);
+        console.log("[FlightMemory] Final savedTripData.multi.legs:", newSavedTripData.multi.legs.length);
       }
       
       return updated;
