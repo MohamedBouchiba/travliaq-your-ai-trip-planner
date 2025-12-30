@@ -4,7 +4,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import PlannerMap, { DestinationClickEvent } from "@/components/planner/PlannerMap";
 import PlannerPanel, { FlightRoutePoint, CountrySelectionEvent } from "@/components/planner/PlannerPanel";
 import PlannerCard from "@/components/planner/PlannerCard";
-import PlannerChat, { FlightFormData, PlannerChatRef, AirportChoice, DualAirportChoice } from "@/components/planner/PlannerChat";
+import PlannerChat, { FlightFormData, PlannerChatRef, AirportChoice, DualAirportChoice, AirportConfirmationData, ConfirmedAirports } from "@/components/planner/PlannerChat";
 import PlannerTopBar from "@/components/planner/PlannerTopBar";
 import DestinationPopup from "@/components/planner/DestinationPopup";
 import YouTubeShortsPanel from "@/components/planner/YouTubeShortsPanel";
@@ -63,6 +63,7 @@ const TravelPlanner = () => {
   const [selectedAirport, setSelectedAirport] = useState<SelectedAirport | null>(null);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [triggerFlightSearch, setTriggerFlightSearch] = useState(false);
+  const [confirmedMultiAirports, setConfirmedMultiAirports] = useState<ConfirmedAirports | null>(null);
   const searchMessageSentRef = useRef(false);
   const chatRef = useRef<PlannerChatRef>(null);
 
@@ -121,6 +122,10 @@ const TravelPlanner = () => {
 
   const handleAskDualAirportChoice = useCallback((choices: DualAirportChoice) => {
     chatRef.current?.askDualAirportChoice(choices);
+  }, []);
+
+  const handleAskAirportConfirmation = useCallback((data: AirportConfirmationData) => {
+    chatRef.current?.askAirportConfirmation(data);
   }, []);
 
   const handleSearchReady = useCallback((from: string, to: string) => {
@@ -203,6 +208,12 @@ const TravelPlanner = () => {
                   setIsPanelVisible(true);
                   setTriggerFlightSearch(true);
                 }
+                if (action.type === "triggerMultiFlightSearch") {
+                  // Open the flights panel and trigger multi-destination search with confirmed airports
+                  setActiveTab("flights");
+                  setIsPanelVisible(true);
+                  setConfirmedMultiAirports(action.confirmedAirports);
+                }
                 setSelectedPin(null);
               }}
             />
@@ -264,12 +275,15 @@ const TravelPlanner = () => {
                   onCountrySelected={handleCountrySelected}
                   onAskAirportChoice={handleAskAirportChoice}
                   onAskDualAirportChoice={handleAskDualAirportChoice}
+                  onAskAirportConfirmation={handleAskAirportConfirmation}
                   selectedAirport={selectedAirport}
                   onSelectedAirportConsumed={() => setSelectedAirport(null)}
                   onUserLocationDetected={setUserLocation}
                   onSearchReady={handleSearchReady}
                   triggerSearch={triggerFlightSearch}
                   onSearchTriggered={() => setTriggerFlightSearch(false)}
+                  confirmedMultiAirports={confirmedMultiAirports}
+                  onConfirmedMultiAirportsConsumed={() => setConfirmedMultiAirports(null)}
                 />
               )}
 
