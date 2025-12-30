@@ -130,6 +130,7 @@ const TravelPlanner = () => {
         city: destinationPopup.cityName,
         countryName: destinationPopup.countryName,
       });
+      window.dispatchEvent(new Event("destination-popup-close"));
       setDestinationPopup(null);
       setIsPanelVisible(true);
     }
@@ -259,7 +260,10 @@ const TravelPlanner = () => {
                 cityName={destinationPopup?.cityName || ""}
                 countryName={destinationPopup?.countryName}
                 isOpen={!!destinationPopup}
-                onClose={() => setDestinationPopup(null)}
+                onClose={() => {
+                  window.dispatchEvent(new Event("destination-popup-close"));
+                  setDestinationPopup(null);
+                }}
                 onDiscoverClick={handleOpenYouTube}
                 position={destinationPopup?.position}
               />

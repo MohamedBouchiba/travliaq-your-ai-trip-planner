@@ -1,3 +1,4 @@
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Play, X, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -10,6 +11,12 @@ interface DestinationPopupProps {
   position?: { x: number; y: number };
 }
 
+const MARGIN = 12;
+const GAP = 18; // gap between pin and popup body
+const ARROW_SIZE = 10; // px
+
+const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+
 const DestinationPopup = ({
   cityName,
   countryName,
@@ -18,15 +25,44 @@ const DestinationPopup = ({
   onDiscoverClick,
   position,
 }: DestinationPopupProps) => {
-  if (!isOpen || !position) return null;
+  const popupRef = useRef<HTMLDivElement | null>(null);
+  const [popupWidth, setPopupWidth] = useState<number>(280);
 
-  // Position popup so its arrow tip matches the clicked geographic point
-  // The popup is translated up by 100%, and the arrow extends 8px below the card.
-  // So we shift the anchor up by 8px so the arrow tip lands exactly on the point.
-  const popupStyle = {
-    left: position.x,
-    top: position.y - 8,
-  };
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const el = popupRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width) setPopupWidth(rect.width);
+  }, [isOpen, cityName, countryName]);
+
+  const layout = useMemo(() => {
+    if (!isOpen || !position) return null;
+
+    const vw = window.innerWidth;
+
+    // Prefer placing the popup to the right of the pin, otherwise place it to the left.
+    const rightCandidate = position.x + GAP;
+    const leftCandidate = position.x - GAP - popupWidth;
+
+    const fitsRight = rightCandidate + popupWidth + MARGIN <= vw;
+    const popupLeft = clamp(
+      fitsRight ? rightCandidate : leftCandidate,
+      MARGIN,
+      vw - popupWidth - MARGIN
+    );
+
+    // Anchor Y: we always place the popup above the pin, with the arrow tip landing on the pin.
+    // Arrow tip is ARROW_SIZE/2 below the card edge due to rotation.
+    const popupTop = position.y - ARROW_SIZE;
+
+    // Arrow X is aligned with the pin, clamped inside the card.
+    const arrowLeft = clamp(position.x - popupLeft, 20, popupWidth - 20);
+
+    return { popupLeft, popupTop, arrowLeft };
+  }, [isOpen, position, popupWidth]);
+
+  if (!layout || !position) return null;
 
   return (
     <AnimatePresence>
@@ -40,17 +76,18 @@ const DestinationPopup = ({
             className="fixed inset-0 z-[55]"
             onClick={onClose}
           />
-          
-          {/* Popup - anchored to the pin position */}
+          {/* Popup */}
           <motion.div
+            ref={popupRef}
             initial={{ opacity: 0, scale: 0.9, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 10 }}
             transition={{ type: "spring", damping: 25, stiffness: 400 }}
             className="fixed z-[60] pointer-events-auto"
             style={{
-              ...popupStyle,
-              transform: "translate(-50%, -100%)",
+              left: layout.popupLeft,
+              top: layout.popupTop,
+              transform: "translateY(-100%)",
             }}
           >
             {/* Card container */}
@@ -91,13 +128,18 @@ const DestinationPopup = ({
               </div>
             </div>
 
-            {/* Arrow pointing down to the clicked point */}
+            {/* Pointer: rotated square positioned so it points to the pin */}
             <div
-              className="absolute left-1/2 -translate-x-1/2 bottom-[-8px] w-0 h-0"
+              className="absolute"
               style={{
-                borderLeft: "8px solid transparent",
-                borderRight: "8px solid transparent",
-                borderTop: "8px solid hsl(var(--card))",
+                left: layout.arrowLeft,
+                bottom: -(ARROW_SIZE / 2),
+                width: ARROW_SIZE,
+                height: ARROW_SIZE,
+                transform: "translateX(-50%) rotate(45deg)",
+                background: "hsl(var(--card))",
+                borderRight: "1px solid hsl(var(--border))",
+                borderBottom: "1px solid hsl(var(--border))",
                 filter: "drop-shadow(0 2px 2px hsl(var(--foreground) / 0.12))",
               }}
             />

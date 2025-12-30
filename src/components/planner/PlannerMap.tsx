@@ -308,6 +308,17 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
+    const handlePopupClose = () => {
+      const prev = (window as any).__selectedDestinationPinEl as HTMLElement | undefined;
+      if (prev) {
+        prev.style.filter = "drop-shadow(0 4px 8px rgba(0,0,0,0.3))";
+        prev.style.transform = "scale(1)";
+      }
+      (window as any).__selectedDestinationPinEl = undefined;
+    };
+
+    window.addEventListener("destination-popup-close", handlePopupClose);
+
     mapboxgl.accessToken = "pk.eyJ1IjoibW9oYW1lZGJvdWNoaWJhIiwiYSI6ImNtZ2t3dHZ0MzAyaDAya3NldXJ1dTkxdTAifQ.vYCeVngdG4_B0Zpms0dQNA";
 
     map.current = new mapboxgl.Map({
@@ -330,6 +341,8 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     });
 
     return () => {
+      window.removeEventListener("destination-popup-close", handlePopupClose);
+      handlePopupClose();
       map.current?.remove();
       map.current = null;
     };
@@ -744,14 +757,28 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       if (isClickable && onDestinationClick) {
         pinEl?.addEventListener("click", (e) => {
           e.stopPropagation();
-          
-          // Get screen position from the rendered marker itself (align arrow with the visible pin)
-          const markerRect = container.getBoundingClientRect();
-          const PIN_CENTER_Y = 22; // center of the 44px pin body
 
+          // Visually emphasize the selected destination pin while the popup is open
+          const deselect = () => {
+            const prev = (window as any).__selectedDestinationPinEl as HTMLElement | undefined;
+            if (prev) {
+              prev.style.filter = "drop-shadow(0 4px 8px rgba(0,0,0,0.3))";
+              prev.style.transform = "scale(1)";
+            }
+          };
+
+          deselect();
+          (window as any).__selectedDestinationPinEl = pinEl;
+          if (pinEl) {
+            pinEl.style.filter = "drop-shadow(0 10px 18px rgba(0,0,0,0.45))";
+            pinEl.style.transform = "scale(1.18)";
+          }
+
+          // Get screen position aligned with the visible pin tip
+          const markerRect = container.getBoundingClientRect();
           const screenPosition = {
             x: markerRect.left + markerRect.width / 2,
-            y: markerRect.top + PIN_CENTER_Y,
+            y: markerRect.bottom,
           };
 
           // Use best city name for YouTube search
