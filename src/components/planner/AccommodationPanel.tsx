@@ -624,75 +624,123 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
     }
   }, [memory.activeAccommodationIndex, activeAccommodation?.lat, activeAccommodation?.lng]);
 
-  // Sync accommodations with flight multi-destination legs (cities + dates)
-  const prevFlightLegsRef = useRef<string>("");
+  // Sync accommodations with flight data (multi-destination OR round-trip/one-way)
+  const prevFlightSyncRef = useRef<string>("");
   useEffect(() => {
-    if (flightMemory.tripType !== "multi") return;
-    
-    const legs = flightMemory.legs;
-    
-    // Build destination info from legs: each leg's arrival is a destination
-    // Check-in = arrival date of current leg, Check-out = departure date of next leg (or same date for last)
-    const destinationInfos = legs
-      .filter((leg, i) => leg.arrival?.city && leg.arrival?.lat && leg.arrival?.lng)
-      .map((leg, i) => {
-        const arrivalDate = leg.date;
-        // Find next leg that departs from this city
-        const nextLeg = legs[i + 1];
-        const departureDate = nextLeg?.date || null;
+    // For multi-destination: sync cities + dates from legs
+    if (flightMemory.tripType === "multi") {
+      const legs = flightMemory.legs;
+      
+      // Build destination info from legs
+      const destinationInfos = legs
+        .filter((leg) => leg.arrival?.city && leg.arrival?.lat && leg.arrival?.lng)
+        .map((leg, i) => {
+          const arrivalDate = leg.date;
+          const nextLeg = legs[i + 1];
+          const departureDate = nextLeg?.date || null;
+          
+          return {
+            city: leg.arrival!.city!,
+            country: leg.arrival?.country || "",
+            countryCode: leg.arrival?.countryCode || "",
+            lat: leg.arrival!.lat!,
+            lng: leg.arrival!.lng!,
+            checkIn: arrivalDate,
+            checkOut: departureDate,
+          };
+        });
+      
+      const legsSignature = JSON.stringify(destinationInfos.map(d => ({
+        city: d.city,
+        checkIn: d.checkIn?.toISOString(),
+        checkOut: d.checkOut?.toISOString(),
+      })));
+      if (legsSignature === prevFlightSyncRef.current) return;
+      prevFlightSyncRef.current = legsSignature;
+      
+      if (destinationInfos.length === 0) return;
+      
+      destinationInfos.forEach((dest) => {
+        const existingIndex = memory.accommodations.findIndex(
+          a => a.city?.toLowerCase() === dest.city.toLowerCase()
+        );
         
-        return {
-          city: leg.arrival!.city!,
-          country: leg.arrival?.country || "",
-          countryCode: leg.arrival?.countryCode || "",
-          lat: leg.arrival!.lat!,
-          lng: leg.arrival!.lng!,
-          checkIn: arrivalDate,
-          checkOut: departureDate,
-        };
+        if (existingIndex >= 0) {
+          const existing = memory.accommodations[existingIndex];
+          if (dest.checkIn || dest.checkOut) {
+            updateAccommodation(existing.id, {
+              checkIn: dest.checkIn || existing.checkIn,
+              checkOut: dest.checkOut || existing.checkOut,
+            });
+          }
+        } else if (destinationInfos.length > 1) {
+          addAccommodation({
+            city: dest.city,
+            country: dest.country,
+            countryCode: dest.countryCode,
+            lat: dest.lat,
+            lng: dest.lng,
+            checkIn: dest.checkIn,
+            checkOut: dest.checkOut,
+          });
+        }
       });
-    
-    // Create a signature to detect real changes
-    const legsSignature = JSON.stringify(destinationInfos.map(d => ({
-      city: d.city,
-      checkIn: d.checkIn?.toISOString(),
-      checkOut: d.checkOut?.toISOString(),
-    })));
-    if (legsSignature === prevFlightLegsRef.current) return;
-    prevFlightLegsRef.current = legsSignature;
-    
-    // Skip if no destinations
-    if (destinationInfos.length === 0) return;
-    
-    // For each destination, either update existing accommodation or create new one
-    destinationInfos.forEach((dest, index) => {
+    } else {
+      // For round-trip and one-way: sync dates from departure/return
+      const departure = flightMemory.arrival; // Destination city
+      const departureDate = flightMemory.departureDate;
+      const returnDate = flightMemory.returnDate;
+      
+      // Create a signature to detect changes
+      const syncSignature = JSON.stringify({
+        city: departure?.city,
+        departureDate: departureDate?.toISOString(),
+        returnDate: returnDate?.toISOString(),
+      });
+      if (syncSignature === prevFlightSyncRef.current) return;
+      prevFlightSyncRef.current = syncSignature;
+      
+      // Only sync if we have destination and at least departure date
+      if (!departure?.city || !departureDate) return;
+      
+      // Find if we have an accommodation for this destination
       const existingIndex = memory.accommodations.findIndex(
-        a => a.city?.toLowerCase() === dest.city.toLowerCase()
+        a => a.city?.toLowerCase() === departure.city!.toLowerCase()
       );
       
       if (existingIndex >= 0) {
         // Update dates for existing accommodation
         const existing = memory.accommodations[existingIndex];
-        if (dest.checkIn || dest.checkOut) {
-          updateAccommodation(existing.id, {
-            checkIn: dest.checkIn || existing.checkIn,
-            checkOut: dest.checkOut || existing.checkOut,
+        updateAccommodation(existing.id, {
+          checkIn: departureDate,
+          checkOut: returnDate || existing.checkOut,
+        });
+      } else if (departure.lat && departure.lng) {
+        // Update first accommodation with destination info + dates
+        const first = memory.accommodations[0];
+        if (first && !first.city) {
+          updateAccommodation(first.id, {
+            city: departure.city,
+            country: departure.country || "",
+            countryCode: departure.countryCode || "",
+            lat: departure.lat,
+            lng: departure.lng,
+            checkIn: departureDate,
+            checkOut: returnDate || null,
           });
         }
-      } else if (destinationInfos.length > 1) {
-        // Create new accommodation for this destination
-        addAccommodation({
-          city: dest.city,
-          country: dest.country,
-          countryCode: dest.countryCode,
-          lat: dest.lat,
-          lng: dest.lng,
-          checkIn: dest.checkIn,
-          checkOut: dest.checkOut,
-        });
       }
-    });
-  }, [flightMemory.tripType, flightMemory.legs, memory.accommodations, addAccommodation, updateAccommodation]);
+    }
+  }, [
+    flightMemory.tripType, 
+    flightMemory.legs, 
+    flightMemory.arrival, 
+    flightMemory.departureDate, 
+    flightMemory.returnDate, 
+    memory.accommodations, 
+    addAccommodation, 
+    updateAccommodation
+  ]);
 
   // Handle destination selection from autocomplete - ONLY here we update the real city
   const handleLocationSelect = (location: LocationResult) => {
@@ -785,24 +833,24 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
 
   return (
     <div className="space-y-4">
-      {/* Accommodation tabs - only show when multiple */}
-      {hasMultipleAccommodations && (
-        <div className="flex gap-1.5 flex-wrap items-center">
-          {memory.accommodations.map((acc, index) => (
-            <button
-              key={acc.id}
-              onClick={() => setActiveAccommodation(index)}
-              className={cn(
-                "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 group",
-                index === memory.activeAccommodationIndex
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border/30"
-              )}
-            >
-              <Hotel className="h-3 w-3" />
-              <span className="max-w-20 truncate">
-                {acc.city || `Hébgt ${index + 1}`}
-              </span>
+      {/* Accommodation tabs + Add button - always visible */}
+      <div className="flex gap-1.5 flex-wrap items-center">
+        {memory.accommodations.map((acc, index) => (
+          <button
+            key={acc.id}
+            onClick={() => setActiveAccommodation(index)}
+            className={cn(
+              "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 group",
+              index === memory.activeAccommodationIndex
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border/30"
+            )}
+          >
+            <Hotel className="h-3 w-3" />
+            <span className="max-w-20 truncate">
+              {acc.city || `Hébgt ${index + 1}`}
+            </span>
+            {memory.accommodations.length > 1 && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -817,16 +865,17 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
               >
                 <X className="h-2.5 w-2.5" />
               </button>
-            </button>
-          ))}
-          <button
-            onClick={handleAddAccommodation}
-            className="flex items-center gap-1 px-2 py-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" />
+            )}
           </button>
-        </div>
-      )}
+        ))}
+        <button
+          onClick={handleAddAccommodation}
+          className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-primary hover:text-primary/80 transition-colors rounded-lg border border-dashed border-primary/30 hover:border-primary/50"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          <span>Ajouter</span>
+        </button>
+      </div>
 
       {/* BLOC 1: Essentiel - Destination, Dates, Voyageurs, Budget */}
       <div className="rounded-xl border border-border/40 bg-card/50 overflow-hidden">
