@@ -600,6 +600,13 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
     setDestinationInput(activeAccommodation?.city || "");
   }, [activeAccommodation?.id, activeAccommodation?.city]);
 
+  // Zoom on map when switching between accommodations
+  useEffect(() => {
+    if (activeAccommodation?.lat && activeAccommodation?.lng && onMapMove) {
+      onMapMove([activeAccommodation.lng, activeAccommodation.lat], 12);
+    }
+  }, [memory.activeAccommodationIndex, activeAccommodation?.lat, activeAccommodation?.lng, onMapMove]);
+
   // Handle destination selection from autocomplete - ONLY here we update the real city
   const handleLocationSelect = (location: LocationResult) => {
     if (location.lat && location.lng) {
@@ -689,8 +696,34 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
 
   if (!activeAccommodation) return null;
 
+  // Section Card Component for consistent styling
+  const SectionCard = ({ 
+    icon: Icon, 
+    title, 
+    children,
+    noPadding = false 
+  }: { 
+    icon: React.ElementType; 
+    title: string; 
+    children: React.ReactNode;
+    noPadding?: boolean;
+  }) => (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Icon className="h-3.5 w-3.5 text-primary" />
+        <span className="text-xs font-medium text-foreground">{title}</span>
+      </div>
+      <div className={cn(
+        "rounded-lg bg-card/40 border border-border/30",
+        !noPadding && "p-3"
+      )}>
+        {children}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Accommodation tabs - only show when multiple */}
       {hasMultipleAccommodations && (
         <div className="flex gap-1.5 flex-wrap items-center">
@@ -734,103 +767,105 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
         </div>
       )}
 
-      {/* Destination + Dates on same row - clean design */}
-      <div className="flex items-center gap-3 p-3 rounded-xl border border-border/40 bg-card/50">
-        {/* Destination */}
-        <div className="flex-1 min-w-0">
-          <DestinationInput
-            value={destinationInput}
-            onChange={handleDestinationInputChange}
-            placeholder="Où allez-vous ?"
-            onLocationSelect={handleLocationSelect}
+      {/* Section 1: Destination & Dates */}
+      <SectionCard icon={MapPin} title="Destination & Dates" noPadding>
+        <div className="flex items-center gap-3 p-3">
+          {/* Destination */}
+          <div className="flex-1 min-w-0">
+            <DestinationInput
+              value={destinationInput}
+              onChange={handleDestinationInputChange}
+              placeholder="Où allez-vous ?"
+              onLocationSelect={handleLocationSelect}
+            />
+          </div>
+          {/* Separator */}
+          <div className="w-px h-6 bg-border/50" />
+          {/* Dates */}
+          <CompactDateRange
+            checkIn={activeAccommodation.checkIn}
+            checkOut={activeAccommodation.checkOut}
+            onChange={handleDatesChange}
           />
         </div>
-        {/* Separator */}
-        <div className="w-px h-6 bg-border/50" />
-        {/* Dates */}
-        <CompactDateRange
-          checkIn={activeAccommodation.checkIn}
-          checkOut={activeAccommodation.checkOut}
-          onChange={handleDatesChange}
-        />
-      </div>
-
-      {/* Add button when single accommodation */}
-      {!hasMultipleAccommodations && (
-        <button
-          onClick={handleAddAccommodation}
-          className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Ajouter un hébergement
-        </button>
-      )}
-
-      {/* Travelers + Rooms row */}
-      <div className="flex gap-2 flex-wrap">
-        <TravelersSelector
-          adults={travelMemory.travelers.adults}
-          children={travelMemory.travelers.children}
-          childrenAges={travelMemory.travelers.childrenAges}
-          onChange={handleTravelersChange}
-        />
-        <RoomsSelector
-          rooms={rooms}
-          travelers={travelMemory.travelers}
-          useAuto={memory.useAutoRooms}
-          onChange={setCustomRooms}
-          onToggleAuto={toggleAutoRooms}
-        />
-      </div>
-
-      {/* Budget per night - compact */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-primary" />
-          <span className="text-xs font-medium">Budget / nuit</span>
-        </div>
-        <div className="flex gap-1.5">
-          {(["eco", "comfort", "premium"] as BudgetPreset[]).map((preset) => (
+        {/* Add button when single accommodation */}
+        {!hasMultipleAccommodations && (
+          <div className="px-3 pb-3 pt-0">
             <button
-              key={preset}
-              onClick={() => handleBudgetPreset(preset)}
-              className={cn(
-                "flex-1 py-2 rounded-lg text-xs font-medium transition-all",
-                activeAccommodation.budgetPreset === preset
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border/30"
-              )}
+              onClick={handleAddAccommodation}
+              className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
             >
-              {BUDGET_PRESETS[preset].label}
+              <Plus className="h-3.5 w-3.5" />
+              Ajouter un hébergement
             </button>
-          ))}
-        </div>
-        {/* Custom inputs inline */}
-        <div className="flex items-center gap-2">
-          <Input
-            type="number"
-            value={customMin}
-            onChange={(e) => setCustomMin(e.target.value)}
-            onBlur={handleCustomBudgetBlur}
-            placeholder="Min"
-            className="text-center text-xs h-8 flex-1"
-          />
-          <span className="text-muted-foreground text-xs">-</span>
-          <Input
-            type="number"
-            value={customMax}
-            onChange={(e) => setCustomMax(e.target.value)}
-            onBlur={handleCustomBudgetBlur}
-            placeholder="Max"
-            className="text-center text-xs h-8 flex-1"
-          />
-          <span className="text-muted-foreground text-xs">€</span>
-        </div>
-      </div>
+          </div>
+        )}
+      </SectionCard>
 
-      {/* Accommodation Type - SEPARATE LINE */}
-      <div className="space-y-1.5">
-        <span className="text-xs font-medium text-muted-foreground">Type d'hébergement</span>
+      {/* Section 2: Travelers & Rooms */}
+      <SectionCard icon={Users} title="Voyageurs & Chambres">
+        <div className="flex gap-2 flex-wrap">
+          <TravelersSelector
+            adults={travelMemory.travelers.adults}
+            children={travelMemory.travelers.children}
+            childrenAges={travelMemory.travelers.childrenAges}
+            onChange={handleTravelersChange}
+          />
+          <RoomsSelector
+            rooms={rooms}
+            travelers={travelMemory.travelers}
+            useAuto={memory.useAutoRooms}
+            onChange={setCustomRooms}
+            onToggleAuto={toggleAutoRooms}
+          />
+        </div>
+      </SectionCard>
+
+      {/* Section 3: Budget */}
+      <SectionCard icon={Building2} title="Budget par nuit">
+        <div className="space-y-2">
+          <div className="flex gap-1.5">
+            {(["eco", "comfort", "premium"] as BudgetPreset[]).map((preset) => (
+              <button
+                key={preset}
+                onClick={() => handleBudgetPreset(preset)}
+                className={cn(
+                  "flex-1 py-2 rounded-lg text-xs font-medium transition-all",
+                  activeAccommodation.budgetPreset === preset
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border/30"
+                )}
+              >
+                {BUDGET_PRESETS[preset].label}
+              </button>
+            ))}
+          </div>
+          {/* Custom inputs inline */}
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              value={customMin}
+              onChange={(e) => setCustomMin(e.target.value)}
+              onBlur={handleCustomBudgetBlur}
+              placeholder="Min"
+              className="text-center text-xs h-8 flex-1"
+            />
+            <span className="text-muted-foreground text-xs">-</span>
+            <Input
+              type="number"
+              value={customMax}
+              onChange={(e) => setCustomMax(e.target.value)}
+              onBlur={handleCustomBudgetBlur}
+              placeholder="Max"
+              className="text-center text-xs h-8 flex-1"
+            />
+            <span className="text-muted-foreground text-xs">€</span>
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* Section 4: Accommodation Type */}
+      <SectionCard icon={Hotel} title="Type d'hébergement">
         <div className="flex gap-1.5 flex-wrap">
           {ACCOMMODATION_TYPES.map((type) => (
             <ChipButton
@@ -844,11 +879,10 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
             </ChipButton>
           ))}
         </div>
-      </div>
+      </SectionCard>
 
-      {/* Rating - SEPARATE LINE */}
-      <div className="space-y-1.5">
-        <span className="text-xs font-medium text-muted-foreground">Note minimum</span>
+      {/* Section 5: Rating */}
+      <SectionCard icon={Star} title="Note minimum">
         <div className="flex gap-1.5">
           {RATING_OPTIONS.map((option) => (
             <button
@@ -866,11 +900,10 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
             </button>
           ))}
         </div>
-      </div>
+      </SectionCard>
 
-      {/* Essential Amenities */}
-      <div className="space-y-1.5">
-        <span className="text-xs font-medium text-muted-foreground">Équipements</span>
+      {/* Section 6: Amenities */}
+      <SectionCard icon={Wifi} title="Équipements essentiels">
         <div className="flex gap-1.5 flex-wrap">
           {ESSENTIAL_AMENITIES.map((amenity) => (
             <ChipButton
@@ -884,20 +917,21 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
             </ChipButton>
           ))}
         </div>
-      </div>
+      </SectionCard>
 
       {/* Advanced Filters */}
       <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
         <CollapsibleTrigger asChild>
-          <button className="w-full flex items-center justify-between py-2 px-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground">
-            <span>Filtres avancés</span>
-            {isAdvancedOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          <button className="w-full flex items-center justify-between py-2.5 px-3 rounded-lg bg-card/40 border border-border/30 hover:bg-card/60 transition-colors text-xs font-medium text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isAdvancedOpen && "rotate-180")} />
+              <span>Filtres avancés</span>
+            </div>
           </button>
         </CollapsibleTrigger>
-        <CollapsibleContent className="pt-3 space-y-3">
+        <CollapsibleContent className="pt-4 space-y-4">
           {/* Meal Plan */}
-          <div className="space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Formule repas</span>
+          <SectionCard icon={Coffee} title="Formule repas">
             <div className="flex gap-1.5 flex-wrap">
               {MEAL_PLANS.map((meal) => (
                 <ChipButton
@@ -911,11 +945,10 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
                 </ChipButton>
               ))}
             </div>
-          </div>
+          </SectionCard>
 
           {/* Views */}
-          <div className="space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Vue</span>
+          <SectionCard icon={Mountain} title="Vue">
             <div className="flex gap-1.5 flex-wrap">
               {VIEW_OPTIONS.map((view) => (
                 <ChipButton
@@ -929,11 +962,10 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
                 </ChipButton>
               ))}
             </div>
-          </div>
+          </SectionCard>
 
           {/* Services */}
-          <div className="space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Services</span>
+          <SectionCard icon={ConciergeBell} title="Services">
             <div className="flex gap-1.5 flex-wrap">
               {SERVICE_OPTIONS.map((service) => (
                 <ChipButton
@@ -947,11 +979,10 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
                 </ChipButton>
               ))}
             </div>
-          </div>
+          </SectionCard>
 
           {/* Accessibility */}
-          <div className="space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Accessibilité</span>
+          <SectionCard icon={Accessibility} title="Accessibilité">
             <div className="flex gap-1.5 flex-wrap">
               {ACCESSIBILITY_OPTIONS.map((access) => (
                 <ChipButton
@@ -965,7 +996,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
                 </ChipButton>
               ))}
             </div>
-          </div>
+          </SectionCard>
         </CollapsibleContent>
       </Collapsible>
 
@@ -983,7 +1014,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
         ) : (
           <>
             <Search className="h-4 w-4 mr-2" />
-            Rechercher
+            Rechercher hébergements
           </>
         )}
       </Button>
