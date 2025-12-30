@@ -128,21 +128,6 @@ const DestinationPopup = ({
               </div>
             </div>
 
-            {/* Pointer: rotated square positioned so it points to the pin */}
-            <div
-              className="absolute"
-              style={{
-                left: layout.arrowLeft,
-                bottom: -(ARROW_SIZE / 2),
-                width: ARROW_SIZE,
-                height: ARROW_SIZE,
-                transform: "translateX(-50%) rotate(45deg)",
-                background: "hsl(var(--card))",
-                borderRight: "1px solid hsl(var(--border))",
-                borderBottom: "1px solid hsl(var(--border))",
-                filter: "drop-shadow(0 2px 2px hsl(var(--foreground) / 0.12))",
-              }}
-            />
           </motion.div>
         </>
       )}
