@@ -20,10 +20,11 @@ const DestinationPopup = ({
 }: DestinationPopupProps) => {
   if (!isOpen || !position) return null;
 
-  // Position popup above the pin with some offset
+  // Position popup so its arrow points exactly to the clicked geographic point
   const popupStyle = {
     left: position.x,
-    top: position.y - 15, // Slightly above the pin
+    // We anchor the popup bottom to the map point (small gap so the arrow is visible)
+    top: position.y - 10,
   };
 
   return (
