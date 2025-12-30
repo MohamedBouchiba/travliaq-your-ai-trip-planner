@@ -7,7 +7,7 @@ import PlannerCalendar from "./PlannerCalendar";
 import FlightRouteBuilder, { FlightLeg } from "./FlightRouteBuilder";
 import type { LocationResult } from "@/hooks/useLocationAutocomplete";
 import { findNearestAirports, Airport } from "@/hooks/useNearestAirports";
-import type { AirportChoice, DualAirportChoice } from "./PlannerChat";
+import type { AirportChoice, DualAirportChoice, AirportConfirmationData, ConfirmedAirports } from "./PlannerChat";
 import FlightResults, { FlightOffer, generateMockFlights } from "./FlightResults";
 import { useFlightMemory, type AirportInfo } from "@/contexts/FlightMemoryContext";
 import AccommodationPanel from "./AccommodationPanel";
@@ -50,12 +50,15 @@ interface PlannerPanelProps {
   onCountrySelected?: (event: CountrySelectionEvent) => void;
   onAskAirportChoice?: (choice: AirportChoice) => void;
   onAskDualAirportChoice?: (choices: DualAirportChoice) => void;
+  onAskAirportConfirmation?: (data: AirportConfirmationData) => void;
   selectedAirport?: SelectedAirport | null;
   onSelectedAirportConsumed?: () => void;
   onUserLocationDetected?: (location: UserLocation) => void;
   onSearchReady?: (from: string, to: string) => void;
   triggerSearch?: boolean;
   onSearchTriggered?: () => void;
+  confirmedMultiAirports?: ConfirmedAirports | null;
+  onConfirmedMultiAirportsConsumed?: () => void;
 }
 
 const tabLabels: Record<TabType, string> = {
@@ -65,7 +68,7 @@ const tabLabels: Record<TabType, string> = {
   preferences: "Préférences",
 };
 
-const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVisible = true, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed, onCountrySelected, onAskAirportChoice, onAskDualAirportChoice, selectedAirport, onSelectedAirportConsumed, onUserLocationDetected, onSearchReady, triggerSearch, onSearchTriggered }: PlannerPanelProps) => {
+const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVisible = true, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed, onCountrySelected, onAskAirportChoice, onAskDualAirportChoice, onAskAirportConfirmation, selectedAirport, onSelectedAirportConsumed, onUserLocationDetected, onSearchReady, triggerSearch, onSearchTriggered, confirmedMultiAirports, onConfirmedMultiAirportsConsumed }: PlannerPanelProps) => {
   if (!isVisible && layout === "overlay") return null;
 
   const wrapperClass =
