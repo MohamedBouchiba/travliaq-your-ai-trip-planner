@@ -567,6 +567,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
     setActiveAccommodation,
     addAccommodation,
     removeAccommodation,
+    updateAccommodation,
     setBudgetPreset,
     setCustomBudget,
     toggleType,
@@ -623,47 +624,75 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
     }
   }, [memory.activeAccommodationIndex, activeAccommodation?.lat, activeAccommodation?.lng]);
 
-  // Sync accommodations with flight multi-destination legs
+  // Sync accommodations with flight multi-destination legs (cities + dates)
   const prevFlightLegsRef = useRef<string>("");
   useEffect(() => {
     if (flightMemory.tripType !== "multi") return;
     
-    // Get unique destination cities from flight legs (arrival cities)
-    const destinationCities = flightMemory.legs
-      .filter(leg => leg.arrival?.city && leg.arrival?.lat && leg.arrival?.lng)
-      .map(leg => ({
-        city: leg.arrival!.city!,
-        country: leg.arrival?.country || "",
-        countryCode: leg.arrival?.countryCode || "",
-        lat: leg.arrival!.lat!,
-        lng: leg.arrival!.lng!,
-      }));
+    const legs = flightMemory.legs;
+    
+    // Build destination info from legs: each leg's arrival is a destination
+    // Check-in = arrival date of current leg, Check-out = departure date of next leg (or same date for last)
+    const destinationInfos = legs
+      .filter((leg, i) => leg.arrival?.city && leg.arrival?.lat && leg.arrival?.lng)
+      .map((leg, i) => {
+        const arrivalDate = leg.date;
+        // Find next leg that departs from this city
+        const nextLeg = legs[i + 1];
+        const departureDate = nextLeg?.date || null;
+        
+        return {
+          city: leg.arrival!.city!,
+          country: leg.arrival?.country || "",
+          countryCode: leg.arrival?.countryCode || "",
+          lat: leg.arrival!.lat!,
+          lng: leg.arrival!.lng!,
+          checkIn: arrivalDate,
+          checkOut: departureDate,
+        };
+      });
     
     // Create a signature to detect real changes
-    const legsSignature = JSON.stringify(destinationCities);
+    const legsSignature = JSON.stringify(destinationInfos.map(d => ({
+      city: d.city,
+      checkIn: d.checkIn?.toISOString(),
+      checkOut: d.checkOut?.toISOString(),
+    })));
     if (legsSignature === prevFlightLegsRef.current) return;
     prevFlightLegsRef.current = legsSignature;
     
-    // Skip if no destinations or only one (handled by normal flow)
-    if (destinationCities.length <= 1) return;
+    // Skip if no destinations
+    if (destinationInfos.length === 0) return;
     
-    // Check which destinations are already in accommodations
-    const existingCities = memory.accommodations.map(a => a.city?.toLowerCase());
-    
-    // Add missing destinations as new accommodation entries
-    destinationCities.forEach(dest => {
-      if (!existingCities.includes(dest.city.toLowerCase())) {
-        addAccommodation();
-        // Wait for the next tick to set the destination
-        setTimeout(() => {
-          // Find the newest accommodation (last one)
-          const newIndex = memory.accommodations.length;
-          setActiveAccommodation(newIndex);
-          setDestination(dest.city, dest.country, dest.countryCode, dest.lat, dest.lng);
-        }, 50);
+    // For each destination, either update existing accommodation or create new one
+    destinationInfos.forEach((dest, index) => {
+      const existingIndex = memory.accommodations.findIndex(
+        a => a.city?.toLowerCase() === dest.city.toLowerCase()
+      );
+      
+      if (existingIndex >= 0) {
+        // Update dates for existing accommodation
+        const existing = memory.accommodations[existingIndex];
+        if (dest.checkIn || dest.checkOut) {
+          updateAccommodation(existing.id, {
+            checkIn: dest.checkIn || existing.checkIn,
+            checkOut: dest.checkOut || existing.checkOut,
+          });
+        }
+      } else if (destinationInfos.length > 1) {
+        // Create new accommodation for this destination
+        addAccommodation({
+          city: dest.city,
+          country: dest.country,
+          countryCode: dest.countryCode,
+          lat: dest.lat,
+          lng: dest.lng,
+          checkIn: dest.checkIn,
+          checkOut: dest.checkOut,
+        });
       }
     });
-  }, [flightMemory.tripType, flightMemory.legs, memory.accommodations, addAccommodation, setActiveAccommodation, setDestination]);
+  }, [flightMemory.tripType, flightMemory.legs, memory.accommodations, addAccommodation, updateAccommodation]);
 
   // Handle destination selection from autocomplete - ONLY here we update the real city
   const handleLocationSelect = (location: LocationResult) => {
