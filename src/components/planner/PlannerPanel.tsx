@@ -186,8 +186,12 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
   const [isSearchingAirports, setIsSearchingAirports] = useState(false);
   const [isSearchingFlights, setIsSearchingFlights] = useState(false);
   const [flightResults, setFlightResults] = useState<FlightOffer[] | null>(null);
-  const [selectedLegIndex, setSelectedLegIndex] = useState<number>(0); // For multi-destination: which leg to search
-  const [searchedLegIndex, setSearchedLegIndex] = useState<number>(0); // Track which leg was searched for results display
+  
+  // Multi-destination: store results for ALL legs, viewing state, and selected flights
+  const [allLegResults, setAllLegResults] = useState<Record<number, FlightOffer[]>>({});
+  const [viewingLegIndex, setViewingLegIndex] = useState<number>(0); // Which leg results to view in dropdown
+  const [selectedFlights, setSelectedFlights] = useState<Record<number, FlightOffer>>({}); // User's chosen flights per leg
+  const [isMultiSearching, setIsMultiSearching] = useState(false); // Searching all legs in parallel
   
   // Initialize legs from memory
   const [legs, setLegs] = useState<FlightLeg[]>(() => {
@@ -641,12 +645,99 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
   };
 
   // Handle search button click - check for countries/cities/airports first
-  // For multi-destination, uses selectedLegIndex to determine which leg to search
+  // For multi-destination, searches ALL legs in parallel
   const handleSearchClick = async () => {
-    // Use the selected leg for multi-destination, or first leg for simple trips
-    const targetLegIndex = tripType === "multi" ? selectedLegIndex : 0;
-    const targetLeg = legs[targetLegIndex];
-    
+    // For multi-destination, search all valid legs in parallel
+    if (tripType === "multi") {
+      // Find all complete legs
+      const validLegs = legs.map((leg, idx) => ({
+        leg,
+        index: idx,
+        isComplete: Boolean(leg.from?.trim() && leg.to?.trim() && leg.date),
+      })).filter(l => l.isComplete);
+
+      if (validLegs.length === 0) return;
+
+      setIsMultiSearching(true);
+      setIsSearchingFlights(true);
+
+      try {
+        // Search all legs in parallel
+        const searchPromises = validLegs.map(async ({ leg, index }) => {
+          const fromCode = leg.from?.match(/\(([A-Z]{3})\)/)?.[1] || leg.from?.substring(0, 3).toUpperCase() || "";
+          const toCode = leg.to?.match(/\(([A-Z]{3})\)/)?.[1] || leg.to?.substring(0, 3).toUpperCase() || "";
+          
+          const adults = passengers.filter(p => p.type === "adult").length;
+          const children = passengers.filter(p => p.type === "child").length;
+          const cabinClassMap = { economy: "ECONOMY", business: "BUSINESS", first: "FIRST" };
+
+          const requestBody = {
+            origin: fromCode,
+            destination: toCode,
+            departureDate: leg.date ? leg.date.toISOString().split('T')[0] : undefined,
+            adults,
+            children,
+            cabinClass: cabinClassMap[travelClass],
+            currency: "EUR",
+            languageCode: "fr",
+            countryCode: "FR",
+          };
+
+          console.log(`[FlightsPanel] Searching leg ${index + 1}:`, requestBody);
+
+          try {
+            const response = await fetch(
+              "https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/flight-search",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(requestBody),
+              }
+            );
+
+            if (!response.ok) {
+              throw new Error(`API error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log(`[FlightsPanel] Leg ${index + 1}: received ${data.count} flights`);
+            
+            return {
+              index,
+              flights: data.flights && data.flights.length > 0 
+                ? data.flights 
+                : generateMockFlights(leg.from || "", leg.to || ""),
+            };
+          } catch (error) {
+            console.error(`[FlightsPanel] Leg ${index + 1} search error:`, error);
+            return {
+              index,
+              flights: generateMockFlights(leg.from || "", leg.to || ""),
+            };
+          }
+        });
+
+        const results = await Promise.all(searchPromises);
+        
+        // Store all results
+        const resultsMap: Record<number, FlightOffer[]> = {};
+        results.forEach(r => {
+          resultsMap[r.index] = r.flights;
+        });
+        setAllLegResults(resultsMap);
+        
+        // Show results for first valid leg
+        setViewingLegIndex(validLegs[0].index);
+        setFlightResults(resultsMap[validLegs[0].index] || []);
+      } finally {
+        setIsMultiSearching(false);
+        setIsSearchingFlights(false);
+      }
+      return;
+    }
+
+    // For simple trips (roundtrip/oneway), original logic
+    const targetLeg = legs[0];
     if (!targetLeg?.from?.trim() || !targetLeg?.to?.trim() || !targetLeg?.date) return;
     
     setIsSearchingAirports(true);
@@ -658,7 +749,6 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
       
       // If either is a country, we need to ask user to select a city first
       if (fromIsCountry || toIsCountry) {
-        // Create a message asking for city selection
         const countriesNeedingSelection = [];
         if (fromIsCountry && targetLeg.fromLocation) {
           countriesNeedingSelection.push({
@@ -675,8 +765,6 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
           });
         }
         
-        // Notify parent to show city selection in chat (step by step)
-        // We'll use the country selection event for this
         if (countriesNeedingSelection.length > 0) {
           const first = countriesNeedingSelection[0];
           onCountrySelected?.({
@@ -704,57 +792,45 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
       let updatedFrom = targetLeg.from;
       let updatedTo = targetLeg.to;
       
-      // Collect airport choices needed
       let fromChoice: AirportChoice | undefined;
       let toChoice: AirportChoice | undefined;
       
-      // Use leg location city names if available, otherwise parse from leg text
       const fromCityName = targetLeg.fromLocation?.name || targetLeg.from.split(",")[0].trim();
       const toCityName = targetLeg.toLocation?.name || targetLeg.to.split(",")[0].trim();
       
-      // Check both cities in parallel
       const [fromResult, toResult] = await Promise.all([
         !fromHasAirport ? getAirportsForCity(fromCityName) : null,
         !toHasAirport ? getAirportsForCity(toCityName) : null,
       ]);
       
-      // Process "from" result
       if (fromResult) {
         if (fromResult.airports.length === 1) {
-          // Only one airport, auto-select it
           const airport = fromResult.airports[0];
           updatedFrom = `${airport.name} (${airport.iata})`;
           setLegs((prev) => prev.map((leg, idx) => 
-            idx === targetLegIndex ? { ...leg, from: updatedFrom } : leg
+            idx === 0 ? { ...leg, from: updatedFrom } : leg
           ));
         } else if (fromResult.airports.length > 1) {
-          // Multiple airports, need user choice
           fromChoice = { field: "from", cityName: fromResult.cityName, airports: fromResult.airports };
         }
       }
       
-      // Process "to" result
       if (toResult) {
         if (toResult.airports.length === 1) {
-          // Only one airport, auto-select it
           const airport = toResult.airports[0];
           updatedTo = `${airport.name} (${airport.iata})`;
           setLegs((prev) => prev.map((leg, idx) => 
-            idx === targetLegIndex ? { ...leg, to: updatedTo } : leg
+            idx === 0 ? { ...leg, to: updatedTo } : leg
           ));
         } else if (toResult.airports.length > 1) {
-          // Multiple airports, need user choice
           toChoice = { field: "to", cityName: toResult.cityName, airports: toResult.airports };
         }
       }
       
-      // If both need choices, use dual selection (one message)
       if (fromChoice && toChoice) {
         onAskDualAirportChoice?.({ from: fromChoice, to: toChoice });
-        return; // Wait for user selection before searching
+        return;
       }
-      
-      // If only one needs choice, use single selection
       if (fromChoice) {
         onAskAirportChoice?.(fromChoice);
         return;
@@ -764,23 +840,18 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
         return;
       }
       
-      // Proceed with search - both airports confirmed
-      // Pass the leg index for multi-destination
-      performFlightSearch(updatedFrom, updatedTo, targetLegIndex);
+      performFlightSearch(updatedFrom, updatedTo, 0);
     } finally {
       setIsSearchingAirports(false);
     }
   };
 
-  // Perform the actual flight search via edge function
-  // For multi-destination, legIndex specifies which leg to search (default 0)
+  // Perform the actual flight search via edge function (for simple trips only)
   const performFlightSearch = async (from: string, to: string, legIndex: number = 0) => {
     setIsSearchingFlights(true);
-    setSearchedLegIndex(legIndex); // Track which leg we're searching
     
     try {
-      // Use the specific leg for multi-destination, or first leg for simple trips
-      const targetLeg = tripType === "multi" ? legs[legIndex] : legs[0];
+      const targetLeg = legs[legIndex];
       const fromCode = from.match(/\(([A-Z]{3})\)/)?.[1] || from.substring(0, 3).toUpperCase();
       const toCode = to.match(/\(([A-Z]{3})\)/)?.[1] || to.substring(0, 3).toUpperCase();
       
@@ -789,14 +860,13 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
       
       const cabinClassMap = { economy: "ECONOMY", business: "BUSINESS", first: "FIRST" };
       
-      // For multi-destination, always search as one-way (no return date)
       const requestBody = {
         origin: fromCode,
         destination: toCode,
         departureDate: targetLeg?.date ? targetLeg.date.toISOString().split('T')[0] : undefined,
         returnDate: tripType === "roundtrip" && targetLeg?.returnDate 
           ? targetLeg.returnDate.toISOString().split('T')[0] 
-          : undefined, // No return date for multi-destination
+          : undefined,
         adults,
         children,
         cabinClass: cabinClassMap[travelClass],
@@ -805,7 +875,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
         countryCode: "FR",
       };
 
-      console.log("[FlightsPanel] Searching flights:", requestBody, tripType === "multi" ? `(leg ${legIndex + 1})` : "");
+      console.log("[FlightsPanel] Searching flights:", requestBody);
 
       const response = await fetch(
         "https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/flight-search",
@@ -826,12 +896,10 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
       if (data.flights && data.flights.length > 0) {
         setFlightResults(data.flights);
       } else {
-        // Fallback to mock data if no results
         setFlightResults(generateMockFlights(from, to));
       }
     } catch (error) {
       console.error("[FlightsPanel] Flight search error:", error);
-      // Fallback to mock data on error
       setFlightResults(generateMockFlights(from, to));
     } finally {
       setIsSearchingFlights(false);
@@ -1060,46 +1128,148 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     setTripType(newType);
   };
 
+  // Handle flight selection for multi-destination
+  const handleFlightSelect = (flight: FlightOffer) => {
+    if (tripType === "multi") {
+      // Save selected flight for this leg
+      setSelectedFlights(prev => ({ ...prev, [viewingLegIndex]: flight }));
+      
+      // Find next leg without a selection
+      const legIndices = Object.keys(allLegResults).map(Number).sort((a, b) => a - b);
+      const currentIdx = legIndices.indexOf(viewingLegIndex);
+      const nextUnselected = legIndices.find((idx, i) => i > currentIdx && !selectedFlights[idx]);
+      
+      if (nextUnselected !== undefined) {
+        // Move to next leg
+        setViewingLegIndex(nextUnselected);
+        setFlightResults(allLegResults[nextUnselected] || []);
+      }
+      // If all selected, stay on current view showing the recap
+    } else {
+      // For simple trips, just log
+      console.log("Selected flight:", flight);
+    }
+  };
+
+  // Calculate total price for multi-destination
+  const getTotalSelectedPrice = () => {
+    return Object.values(selectedFlights).reduce((sum, flight) => sum + flight.price * passengers.length, 0);
+  };
+
+  // Check if all multi-destination flights are selected
+  const allFlightsSelected = tripType === "multi" && 
+    Object.keys(allLegResults).length > 0 &&
+    Object.keys(allLegResults).every(idx => selectedFlights[Number(idx)]);
+
   // Show results view if we have results
-  if (flightResults !== null || isSearchingFlights) {
-    // For multi-destination, use the searched leg; otherwise use first leg
-    const resultLeg = tripType === "multi" ? legs[searchedLegIndex] : legs[0];
+  if (flightResults !== null || isSearchingFlights || Object.keys(allLegResults).length > 0) {
+    // For multi-destination, use the viewing leg; otherwise use first leg
+    const resultLeg = tripType === "multi" ? legs[viewingLegIndex] : legs[0];
     const fromCode = resultLeg?.from?.match(/\(([A-Z]{3})\)/)?.[1] || resultLeg?.from?.split(",")[0]?.trim() || "?";
     const toCode = resultLeg?.to?.match(/\(([A-Z]{3})\)/)?.[1] || resultLeg?.to?.split(",")[0]?.trim() || "?";
+    
+    // Get valid leg indices for dropdown
+    const validLegIndices = Object.keys(allLegResults).map(Number).sort((a, b) => a - b);
     
     return (
       <div className="space-y-4">
         {/* Back button */}
         <button
-          onClick={() => setFlightResults(null)}
+          onClick={() => {
+            setFlightResults(null);
+            setAllLegResults({});
+            setSelectedFlights({});
+          }}
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           Modifier la recherche
         </button>
         
-        {/* Route summary */}
+        {/* Multi-destination: Dropdown to select which leg results to view */}
+        {tripType === "multi" && validLegIndices.length > 1 && (
+          <div className="space-y-2">
+            <span className="text-xs font-medium text-foreground">Sélectionner le segment à afficher</span>
+            <select
+              value={viewingLegIndex}
+              onChange={(e) => {
+                const newIdx = Number(e.target.value);
+                setViewingLegIndex(newIdx);
+                setFlightResults(allLegResults[newIdx] || []);
+              }}
+              className="w-full px-3 py-2.5 rounded-xl text-sm bg-background border border-border/50 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            >
+              {validLegIndices.map(idx => {
+                const leg = legs[idx];
+                const legFromCode = leg?.from?.match(/\(([A-Z]{3})\)/)?.[1] || leg?.from?.split(",")[0]?.trim() || "?";
+                const legToCode = leg?.to?.match(/\(([A-Z]{3})\)/)?.[1] || leg?.to?.split(",")[0]?.trim() || "?";
+                const isSelected = selectedFlights[idx] !== undefined;
+                return (
+                  <option key={idx} value={idx}>
+                    Vol {idx + 1}: {legFromCode} → {legToCode} {isSelected ? "✓" : ""}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        )}
+        
+        {/* Route summary with selection status */}
         <div className="p-3 rounded-xl bg-muted/30 border border-border/30">
-          <div className="flex items-center gap-2 text-sm">
-            {tripType === "multi" && (
-              <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
-                Vol {searchedLegIndex + 1}
-              </span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm">
+              {tripType === "multi" && (
+                <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                  Vol {viewingLegIndex + 1}/{validLegIndices.length}
+                </span>
+              )}
+              <span className="font-medium">{fromCode}</span>
+              <Plane className="h-3 w-3 rotate-90 text-muted-foreground" />
+              <span className="font-medium">{toCode}</span>
+            </div>
+            {tripType === "multi" && selectedFlights[viewingLegIndex] && (
+              <span className="text-xs text-green-600 font-medium">Sélectionné</span>
             )}
-            <span className="font-medium">{fromCode}</span>
-            <Plane className="h-3 w-3 rotate-90 text-muted-foreground" />
-            <span className="font-medium">{toCode}</span>
           </div>
         </div>
+
+        {/* Multi-destination: Recap of all selected flights */}
+        {tripType === "multi" && Object.keys(selectedFlights).length > 0 && (
+          <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/30 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-green-700">Vols sélectionnés</span>
+              <span className="text-xs text-muted-foreground">
+                {Object.keys(selectedFlights).length}/{validLegIndices.length}
+              </span>
+            </div>
+            <div className="space-y-1">
+              {Object.entries(selectedFlights).map(([idx, flight]) => {
+                const leg = legs[Number(idx)];
+                const legFromCode = leg?.from?.match(/\(([A-Z]{3})\)/)?.[1] || "?";
+                const legToCode = leg?.to?.match(/\(([A-Z]{3})\)/)?.[1] || "?";
+                return (
+                  <div key={idx} className="flex items-center justify-between text-xs">
+                    <span>{legFromCode} → {legToCode}</span>
+                    <span className="font-medium">{(flight.price * passengers.length).toFixed(0)} €</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="pt-2 border-t border-green-500/20 flex items-center justify-between">
+              <span className="text-sm font-semibold text-green-700">Total</span>
+              <span className="text-sm font-bold text-green-700">{getTotalSelectedPrice().toFixed(0)} €</span>
+            </div>
+          </div>
+        )}
         
         {/* Results */}
         <FlightResults 
           flights={flightResults || []} 
-          isLoading={isSearchingFlights}
-          onSelect={(flight) => console.log("Selected flight:", flight)}
+          isLoading={isSearchingFlights || isMultiSearching}
+          onSelect={handleFlightSelect}
           travelers={passengers.length}
           routeLabel={`${fromCode} → ${toCode}`}
-          tripType={tripType === "multi" ? "oneway" : tripType} // Multi-destination searches as one-way
+          tripType={tripType === "multi" ? "oneway" : tripType}
         />
       </div>
     );
@@ -1296,11 +1466,11 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
 
       {/* Search Button Section */}
       <div className="pt-3 space-y-3">
-        {/* Multi-destination: Leg selector */}
+        {/* Multi-destination: Summary of legs */}
         {tripType === "multi" && legs.length > 1 && (
           <div className="space-y-2">
-            <span className="text-xs font-medium text-foreground">Sélectionner le vol à rechercher</span>
-            <div className="grid gap-2">
+            <span className="text-xs font-medium text-foreground">Segments à rechercher</span>
+            <div className="grid gap-1.5">
               {legs.map((leg, index) => {
                 const hasFrom = leg.from?.trim();
                 const hasTo = leg.to?.trim();
@@ -1311,37 +1481,32 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
                 const dateStr = leg.date ? leg.date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : "Date ?";
                 
                 return (
-                  <button
+                  <div
                     key={leg.id}
-                    onClick={() => setSelectedLegIndex(index)}
                     className={cn(
-                      "flex items-center justify-between px-3 py-2.5 rounded-xl text-xs transition-all border",
-                      selectedLegIndex === index
-                        ? "bg-primary/10 text-primary border-primary/30"
-                        : "bg-muted/20 text-muted-foreground border-border/30 hover:bg-muted/40 hover:text-foreground",
-                      !isComplete && "opacity-60"
+                      "flex items-center justify-between px-3 py-2 rounded-lg text-xs",
+                      isComplete 
+                        ? "bg-muted/20 text-foreground border border-border/30" 
+                        : "bg-amber-500/10 text-amber-700 border border-amber-500/30"
                     )}
                   >
                     <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold",
-                        selectedLegIndex === index ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                      )}>
+                      <span className="w-4 h-4 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground">
                         {index + 1}
                       </span>
                       <span className="font-medium">{fromCode}</span>
-                      <Plane className="h-3 w-3 rotate-90" />
+                      <Plane className="h-2.5 w-2.5 rotate-90" />
                       <span className="font-medium">{toCode}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-[10px]">{dateStr}</span>
                       {isComplete ? (
-                        <span className="text-green-500">✓</span>
+                        <span className="text-green-500 text-[10px]">✓</span>
                       ) : (
-                        <span className="text-amber-500">⚠</span>
+                        <span className="text-amber-500 text-[10px]">⚠</span>
                       )}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -1350,40 +1515,50 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
 
         {/* Search button */}
         {(() => {
-          // For multi-destination, check the selected leg; otherwise check first leg
-          const targetLeg = tripType === "multi" ? legs[selectedLegIndex] : legs[0];
-          const hasFrom = targetLeg?.from?.trim();
-          const hasTo = targetLeg?.to?.trim();
-          const hasDate = targetLeg?.date;
-          const isComplete = hasFrom && hasTo && hasDate;
-          const missingFields: string[] = [];
-          if (!hasFrom) missingFields.push("départ");
-          if (!hasTo) missingFields.push("destination");
-          if (!hasDate) missingFields.push("date");
+          // For multi-destination, check if at least one leg is complete
+          // For simple trips, check first leg
+          let isComplete = false;
+          let missingInfo: string[] = [];
+          
+          if (tripType === "multi") {
+            const completeLegs = legs.filter(leg => 
+              leg.from?.trim() && leg.to?.trim() && leg.date
+            );
+            isComplete = completeLegs.length >= 2; // At least 2 complete legs for multi
+            if (!isComplete) {
+              missingInfo.push(`${2 - completeLegs.length} segment(s) incomplet(s)`);
+            }
+          } else {
+            const firstLeg = legs[0];
+            const hasFrom = firstLeg?.from?.trim();
+            const hasTo = firstLeg?.to?.trim();
+            const hasDate = firstLeg?.date;
+            isComplete = Boolean(hasFrom && hasTo && hasDate);
+            if (!hasFrom) missingInfo.push("départ");
+            if (!hasTo) missingInfo.push("destination");
+            if (!hasDate) missingInfo.push("date");
+          }
 
-          // For multi, show which leg will be searched
-          const fromCode = targetLeg?.from?.match(/\(([A-Z]{3})\)/)?.[1] || targetLeg?.from?.split(",")[0]?.trim();
-          const toCode = targetLeg?.to?.match(/\(([A-Z]{3})\)/)?.[1] || targetLeg?.to?.split(",")[0]?.trim();
-          const searchLabel = tripType === "multi" && fromCode && toCode
-            ? `Rechercher ${fromCode} → ${toCode}`
+          const searchLabel = tripType === "multi" 
+            ? `Rechercher ${legs.filter(l => l.from?.trim() && l.to?.trim() && l.date).length} vols`
             : "Rechercher des vols";
 
           return (
             <>
               <button
                 onClick={handleSearchClick}
-                disabled={!isComplete || isSearchingAirports}
+                disabled={!isComplete || isSearchingAirports || isMultiSearching}
                 className={cn(
                   "w-full py-3 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2",
-                  isComplete && !isSearchingAirports
+                  isComplete && !isSearchingAirports && !isMultiSearching
                     ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25"
                     : "bg-muted text-muted-foreground cursor-not-allowed"
                 )}
               >
-                {isSearchingAirports ? (
+                {isSearchingAirports || isMultiSearching ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Vérification des aéroports...
+                    {isMultiSearching ? "Recherche en cours..." : "Vérification..."}
                   </>
                 ) : (
                   <>
@@ -1392,10 +1567,9 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
                   </>
                 )}
               </button>
-              {!isComplete && missingFields.length > 0 && (
+              {!isComplete && missingInfo.length > 0 && (
                 <p className="text-[10px] text-muted-foreground text-center mt-2">
-                  {tripType === "multi" ? `Vol ${selectedLegIndex + 1} - Complète : ` : "Complète : "}
-                  {missingFields.join(", ")}
+                  {missingInfo.join(", ")}
                 </p>
               )}
             </>
