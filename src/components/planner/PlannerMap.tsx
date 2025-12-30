@@ -745,11 +745,13 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         pinEl?.addEventListener("click", (e) => {
           e.stopPropagation();
           
-          // Get screen position of the marker element
-          const rect = pinEl.getBoundingClientRect();
+          // Get screen position from the geographic coordinate (robust to DOM/layout changes)
+          const projected = map.current!.project([point.lng, point.lat]);
+          const containerRect = mapContainer.current?.getBoundingClientRect();
+
           const screenPosition = {
-            x: rect.left + rect.width / 2,
-            y: rect.top,
+            x: (containerRect?.left ?? 0) + projected.x,
+            y: (containerRect?.top ?? 0) + projected.y,
           };
 
           // Use best city name for YouTube search
