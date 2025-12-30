@@ -49,6 +49,7 @@ export const useLocationAutocomplete = (
   const query = useQuery({
     queryKey: ["location-autocomplete", debouncedSearch, types.join(",")],
     queryFn: async (): Promise<LocationResult[]> => {
+      // Require 3 characters minimum
       if (!debouncedSearch || debouncedSearch.length < 3) {
         return [];
       }
@@ -130,7 +131,7 @@ export const useLocationAutocomplete = (
 
       return sorted.slice(0, 4);
     },
-    enabled: enabled && debouncedSearch.length >= 3,
+    enabled: enabled && debouncedSearch.length >= 3, // 3 chars minimum
     staleTime: 60 * 1000, // Cache for 1 minute
   });
 

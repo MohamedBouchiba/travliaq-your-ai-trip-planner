@@ -9,6 +9,8 @@ import ReactMarkdown from "react-markdown";
 import type { CountrySelectionEvent } from "./PlannerPanel";
 import { findNearestAirports, type Airport } from "@/hooks/useNearestAirports";
 import { useFlightMemory, type AirportInfo, type MissingField } from "@/contexts/FlightMemoryContext";
+import { useTravelMemory } from "@/contexts/TravelMemoryContext";
+import { useAccommodationMemory } from "@/contexts/AccommodationMemoryContext";
 import { format, addMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameDay, isSameMonth, isBefore, startOfDay } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -2032,9 +2034,10 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
   const streamResponse = async (
     apiMessages: { role: string; content: string }[],
     messageId: string
-  ): Promise<{ content: string; flightData: FlightFormData | null }> => {
+  ): Promise<{ content: string; flightData: FlightFormData | null; accommodationData: any | null }> => {
     let fullContent = "";
     let flightData: FlightFormData | null = null;
+    let accommodationData: any | null = null;
 
     // Include memory context in the request
     const memoryContext = getMemorySummary();
@@ -2084,6 +2087,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
             
             if (parsed.type === "flightData" && parsed.flightData) {
               flightData = parsed.flightData;
+            } else if (parsed.type === "accommodationData" && parsed.accommodationData) {
+              accommodationData = parsed.accommodationData;
             } else if (parsed.type === "content" && parsed.content) {
               fullContent += parsed.content;
               // Update message with new content
@@ -2109,7 +2114,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       )
     );
 
-    return { content: fullContent, flightData };
+    return { content: fullContent, flightData, accommodationData };
   };
 
   // Expose methods to parent
@@ -2237,7 +2242,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
         .map((m) => ({ role: m.role === "system" ? "user" : m.role, content: m.text }));
       apiMessages.push({ role: "user", content: userText });
 
-      const { content, flightData } = await streamResponse(apiMessages, messageId);
+      const { content, flightData, accommodationData } = await streamResponse(apiMessages, messageId);
       const { cleanContent, action } = parseAction(content || "Désolé, je n'ai pas pu répondre.");
 
       // Detect which widget to show (PRIORITY: only ONE widget at a time)

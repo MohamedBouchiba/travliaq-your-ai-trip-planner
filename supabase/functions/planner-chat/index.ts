@@ -443,6 +443,10 @@ Réponse: "Tokyo en solo, super aventure ! 🗼 Quand veux-tu partir ?"
             if (flightData) {
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "flightData", flightData })}\n\n`));
             }
+            // Send accommodationData as a special event
+            if (accommodationData) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "accommodationData", accommodationData })}\n\n`));
+            }
 
             const reader = followUpResponse.body!.getReader();
             const decoder = new TextDecoder();
@@ -521,6 +525,9 @@ Réponse: "Tokyo en solo, super aventure ! 🗼 Quand veux-tu partir ?"
         async start(controller) {
           if (flightData) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "flightData", flightData })}\n\n`));
+          }
+          if (accommodationData) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "accommodationData", accommodationData })}\n\n`));
           }
           
           // Send content character by character with small delay
