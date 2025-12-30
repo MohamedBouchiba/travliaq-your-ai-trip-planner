@@ -1,6 +1,6 @@
-import { Play, X, MapPin, Sparkles, ExternalLink } from "lucide-react";
+import { Play, X, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 
 interface DestinationPopupProps {
   cityName: string;
@@ -19,239 +19,262 @@ const DestinationPopup = ({
   onDiscoverClick,
   position,
 }: DestinationPopupProps) => {
-  const [adjustedPosition, setAdjustedPosition] = useState<{
-    x: number;
-    y: number;
-    arrowPosition: "bottom" | "top" | "left" | "right";
-    arrowOffset: number;
-  } | null>(null);
   const popupRef = useRef<HTMLDivElement>(null);
+  const [popupSize, setPopupSize] = useState({ width: 280, height: 120 });
+  
+  // Calculate the center of the visible map area (accounting for panels)
+  const mapCenter = useMemo(() => {
+    // Assume left panel is ~35% and there might be an overlay panel on right (~400px)
+    const leftOffset = window.innerWidth * 0.35;
+    const rightMargin = 420; // Overlay panel width + some margin
+    const availableWidth = window.innerWidth - leftOffset - rightMargin;
+    const centerX = leftOffset + (availableWidth / 2);
+    const centerY = window.innerHeight / 2;
+    return { x: centerX, y: centerY };
+  }, [isOpen]);
 
-  // Adjust position to stay within viewport and connect to pin
+  // Get popup dimensions after render
   useEffect(() => {
-    if (!position || !isOpen) return;
-
-    // Wait for popup to render to get its actual dimensions
-    requestAnimationFrame(() => {
-      const popupWidth = 300;
-      const popupHeight = 200;
-      const margin = 16;
-      const arrowSize = 12;
-
-      let x = position.x;
-      let y = position.y;
-      let arrowPosition: "bottom" | "top" | "left" | "right" = "bottom";
-      let arrowOffset = 50; // percentage from left/top
-
-      // Calculate available space in each direction
-      const spaceAbove = position.y - 80; // Account for header
-      const spaceBelow = window.innerHeight - position.y - 50;
-      const spaceLeft = position.x - margin;
-      const spaceRight = window.innerWidth - position.x - margin;
-
-      // Determine best position for popup
-      if (spaceAbove >= popupHeight + arrowSize) {
-        // Position above the pin (preferred)
-        y = position.y - arrowSize - 8;
-        arrowPosition = "bottom";
-      } else if (spaceBelow >= popupHeight + arrowSize) {
-        // Position below the pin
-        y = position.y + 60 + arrowSize;
-        arrowPosition = "top";
-      } else if (spaceRight >= popupWidth + arrowSize) {
-        // Position to the right
-        x = position.x + 40 + arrowSize;
-        y = position.y;
-        arrowPosition = "left";
-      } else if (spaceLeft >= popupWidth + arrowSize) {
-        // Position to the left
-        x = position.x - 40 - arrowSize;
-        y = position.y;
-        arrowPosition = "right";
-      } else {
-        // Fallback: center on screen
-        x = window.innerWidth / 2;
-        y = window.innerHeight / 2;
-        arrowPosition = "bottom";
-      }
-
-      // Horizontal adjustment to keep popup in viewport
-      const halfWidth = popupWidth / 2;
-      if (arrowPosition === "bottom" || arrowPosition === "top") {
-        if (x - halfWidth < margin) {
-          const originalX = x;
-          x = halfWidth + margin;
-          // Calculate arrow offset to still point at pin
-          arrowOffset = Math.max(15, Math.min(85, ((originalX - margin) / popupWidth) * 100));
-        } else if (x + halfWidth > window.innerWidth - margin) {
-          const originalX = x;
-          x = window.innerWidth - halfWidth - margin;
-          // Calculate arrow offset
-          const diff = originalX - x;
-          arrowOffset = Math.max(15, Math.min(85, 50 + (diff / popupWidth) * 100));
-        }
-      }
-
-      // Vertical adjustment for left/right positioned popups
-      const halfHeight = popupHeight / 2;
-      if (arrowPosition === "left" || arrowPosition === "right") {
-        if (y - halfHeight < margin + 80) {
-          y = halfHeight + margin + 80;
-        } else if (y + halfHeight > window.innerHeight - margin) {
-          y = window.innerHeight - halfHeight - margin;
-        }
-      }
-
-      setAdjustedPosition({ x, y, arrowPosition, arrowOffset });
-    });
-  }, [position, isOpen]);
-
-  if (!isOpen) return null;
-
-  const getTransformStyle = () => {
-    if (!adjustedPosition) return "translate(-50%, -100%)";
-    switch (adjustedPosition.arrowPosition) {
-      case "bottom":
-        return "translate(-50%, -100%)";
-      case "top":
-        return "translate(-50%, 0%)";
-      case "left":
-        return "translate(0%, -50%)";
-      case "right":
-        return "translate(-100%, -50%)";
-      default:
-        return "translate(-50%, -100%)";
+    if (popupRef.current && isOpen) {
+      const rect = popupRef.current.getBoundingClientRect();
+      setPopupSize({ width: rect.width, height: rect.height });
     }
-  };
+  }, [isOpen, cityName]);
 
-  const getArrowStyles = () => {
-    if (!adjustedPosition) return {};
-    const base = "absolute w-4 h-4 rotate-45 bg-card border-border/60";
+  // Calculate the line path from pin to popup
+  const lineData = useMemo(() => {
+    if (!position || !isOpen) return null;
     
-    switch (adjustedPosition.arrowPosition) {
-      case "bottom":
-        return {
-          className: `${base} border-r border-b`,
-          style: {
-            left: `${adjustedPosition.arrowOffset}%`,
-            bottom: "-6px",
-            transform: "translateX(-50%) rotate(45deg)",
-          },
-        };
-      case "top":
-        return {
-          className: `${base} border-l border-t`,
-          style: {
-            left: `${adjustedPosition.arrowOffset}%`,
-            top: "-6px",
-            transform: "translateX(-50%) rotate(45deg)",
-          },
-        };
-      case "left":
-        return {
-          className: `${base} border-l border-b`,
-          style: {
-            left: "-6px",
-            top: "50%",
-            transform: "translateY(-50%) rotate(45deg)",
-          },
-        };
-      case "right":
-        return {
-          className: `${base} border-r border-t`,
-          style: {
-            right: "-6px",
-            top: "50%",
-            transform: "translateY(-50%) rotate(45deg)",
-          },
-        };
-      default:
-        return { className: base, style: {} };
-    }
-  };
+    const startX = position.x;
+    const startY = position.y;
+    const endX = mapCenter.x;
+    const endY = mapCenter.y;
+    
+    // Calculate control points for a smooth curve
+    const midX = (startX + endX) / 2;
+    const midY = Math.min(startY, endY) - 40; // Arc upward
+    
+    return {
+      start: { x: startX, y: startY },
+      end: { x: endX, y: endY },
+      control: { x: midX, y: midY },
+      path: `M ${startX} ${startY} Q ${midX} ${midY} ${endX} ${endY}`,
+    };
+  }, [position, mapCenter, isOpen]);
 
-  const arrowProps = getArrowStyles();
+  if (!isOpen || !position) return null;
 
   return (
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop for closing on outside click */}
+          {/* Backdrop - subtle darkening */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[55]"
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[55] bg-black/10"
             onClick={onClose}
           />
           
-          {/* Popup */}
+          {/* Animated connection line */}
+          {lineData && (
+            <motion.svg
+              className="fixed inset-0 z-[56] pointer-events-none overflow-visible"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              {/* Glow effect */}
+              <motion.path
+                d={lineData.path}
+                fill="none"
+                stroke="hsl(var(--primary) / 0.3)"
+                strokeWidth="4"
+                strokeLinecap="round"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                exit={{ pathLength: 0 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+              />
+              {/* Main line */}
+              <motion.path
+                d={lineData.path}
+                fill="none"
+                stroke="hsl(var(--primary))"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeDasharray="6 4"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                exit={{ pathLength: 0 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+              />
+              {/* Start dot on the pin */}
+              <motion.circle
+                cx={lineData.start.x}
+                cy={lineData.start.y}
+                r="6"
+                fill="hsl(var(--primary))"
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0, opacity: 0 }}
+                transition={{ delay: 0.1, duration: 0.2 }}
+              />
+              {/* Pulse ring on start */}
+              <motion.circle
+                cx={lineData.start.x}
+                cy={lineData.start.y}
+                r="6"
+                fill="none"
+                stroke="hsl(var(--primary))"
+                strokeWidth="2"
+                initial={{ scale: 1, opacity: 0.8 }}
+                animate={{ 
+                  scale: [1, 2.5], 
+                  opacity: [0.8, 0],
+                }}
+                transition={{ 
+                  duration: 1.5, 
+                  repeat: Infinity,
+                  ease: "easeOut"
+                }}
+              />
+            </motion.svg>
+          )}
+          
+          {/* Popup Card - positioned at map center */}
           <motion.div
             ref={popupRef}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ type: "spring", damping: 25, stiffness: 400 }}
+            initial={{ 
+              opacity: 0, 
+              scale: 0.5,
+              x: position?.x ?? mapCenter.x,
+              y: position?.y ?? mapCenter.y,
+            }}
+            animate={{ 
+              opacity: 1, 
+              scale: 1,
+              x: mapCenter.x,
+              y: mapCenter.y,
+            }}
+            exit={{ 
+              opacity: 0, 
+              scale: 0.5,
+              x: position?.x ?? mapCenter.x,
+              y: position?.y ?? mapCenter.y,
+            }}
+            transition={{ 
+              type: "spring", 
+              damping: 25, 
+              stiffness: 350,
+              mass: 0.8
+            }}
             className="fixed z-[60] pointer-events-auto"
             style={{
-              left: adjustedPosition?.x ?? position?.x ?? "50%",
-              top: adjustedPosition?.y ?? position?.y ?? "50%",
-              transform: getTransformStyle(),
+              transform: "translate(-50%, -50%)",
             }}
           >
-            <div className="bg-card border border-border/60 rounded-2xl shadow-2xl p-4 min-w-[280px] max-w-[320px] relative">
-              {/* Header */}
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
-                    <MapPin className="h-5 w-5 text-primary" />
+            <div className="relative">
+              {/* Glass card */}
+              <div className="bg-card/95 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl overflow-hidden min-w-[260px] max-w-[320px]">
+                {/* Top accent gradient */}
+                <div className="h-1 bg-gradient-to-r from-primary via-primary/80 to-primary/40" />
+                
+                <div className="p-4">
+                  {/* Header with city info */}
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <div className="flex items-center gap-3">
+                      {/* Animated pin icon */}
+                      <motion.div 
+                        className="relative h-11 w-11 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/25"
+                        initial={{ rotate: -10 }}
+                        animate={{ rotate: 0 }}
+                        transition={{ type: "spring", stiffness: 200 }}
+                      >
+                        <span className="text-xl">📍</span>
+                        {/* Sparkle effect */}
+                        <motion.div
+                          className="absolute -top-1 -right-1"
+                          initial={{ scale: 0, rotate: -20 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          transition={{ delay: 0.3, type: "spring" }}
+                        >
+                          <Sparkles className="h-4 w-4 text-amber-400" />
+                        </motion.div>
+                      </motion.div>
+                      
+                      <div className="min-w-0">
+                        <motion.h3 
+                          className="font-bold text-foreground text-lg leading-tight truncate"
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.15 }}
+                        >
+                          {cityName}
+                        </motion.h3>
+                        {countryName && (
+                          <motion.p 
+                            className="text-sm text-muted-foreground truncate"
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.2 }}
+                          >
+                            {countryName}
+                          </motion.p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Close button */}
+                    <motion.button
+                      onClick={onClose}
+                      className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all shrink-0"
+                      aria-label="Fermer"
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <X className="h-4 w-4" />
+                    </motion.button>
                   </div>
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-foreground text-base leading-tight truncate">
-                      {cityName}
-                    </h3>
-                    {countryName && (
-                      <p className="text-sm text-muted-foreground truncate">{countryName}</p>
-                    )}
-                  </div>
+
+                  {/* Discover Button - Main CTA */}
+                  <motion.button
+                    onClick={onDiscoverClick}
+                    className="w-full relative overflow-hidden group rounded-xl p-3.5 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/95 hover:to-primary text-primary-foreground transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-card"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.25 }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {/* Shine effect on hover */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                    
+                    <div className="relative flex items-center justify-center gap-3">
+                      {/* Play icon with pulse */}
+                      <div className="relative">
+                        <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center">
+                          <Play className="h-4 w-4 ml-0.5" fill="currentColor" />
+                        </div>
+                        {/* Pulse ring */}
+                        <div className="absolute inset-0 rounded-full bg-white/20 animate-ping" style={{ animationDuration: "2s" }} />
+                      </div>
+                      
+                      <div className="text-left">
+                        <span className="text-sm font-semibold block">
+                          Découvrir {cityName}
+                        </span>
+                        <span className="text-xs opacity-80">
+                          Vidéos & choses à faire
+                        </span>
+                      </div>
+                    </div>
+                  </motion.button>
                 </div>
-                <button
-                  onClick={onClose}
-                  className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-                  aria-label="Fermer"
-                >
-                  <X className="h-4 w-4" />
-                </button>
               </div>
-
-              {/* Divider */}
-              <div className="h-px bg-border -mx-4 mb-3" />
-
-              {/* Discover Button */}
-              <button
-                onClick={onDiscoverClick}
-                className="w-full flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-primary/10 to-primary/5 hover:from-primary/20 hover:to-primary/10 border border-primary/20 hover:border-primary/40 transition-all group focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-card"
-              >
-                <div className="h-11 w-11 rounded-full bg-primary flex items-center justify-center group-hover:scale-110 transition-transform shrink-0 shadow-md">
-                  <Play className="h-5 w-5 text-primary-foreground ml-0.5" fill="currentColor" />
-                </div>
-                <div className="text-left flex-1 min-w-0">
-                  <span className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                    Voir ce qu'il se passe
-                    <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
-                  </span>
-                  <span className="text-xs text-muted-foreground block">
-                    Vidéos & tendances locales
-                  </span>
-                </div>
-                <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-              </button>
-
-              {/* Arrow pointing to pin */}
-              <div
-                className={arrowProps.className}
-                style={arrowProps.style}
-              />
             </div>
           </motion.div>
         </>
