@@ -696,32 +696,6 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
 
   if (!activeAccommodation) return null;
 
-  // Section Card Component for consistent styling
-  const SectionCard = ({ 
-    icon: Icon, 
-    title, 
-    children,
-    noPadding = false 
-  }: { 
-    icon: React.ElementType; 
-    title: string; 
-    children: React.ReactNode;
-    noPadding?: boolean;
-  }) => (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <Icon className="h-3.5 w-3.5 text-primary" />
-        <span className="text-xs font-medium text-foreground">{title}</span>
-      </div>
-      <div className={cn(
-        "rounded-lg bg-card/40 border border-border/30",
-        !noPadding && "p-3"
-      )}>
-        {children}
-      </div>
-    </div>
-  );
-
   return (
     <div className="space-y-4">
       {/* Accommodation tabs - only show when multiple */}
@@ -767,10 +741,10 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
         </div>
       )}
 
-      {/* Section 1: Destination & Dates */}
-      <SectionCard icon={MapPin} title="Destination & Dates" noPadding>
-        <div className="flex items-center gap-3 p-3">
-          {/* Destination */}
+      {/* BLOC 1: Essentiel - Destination, Dates, Voyageurs, Budget */}
+      <div className="rounded-xl border border-border/40 bg-card/50 overflow-hidden">
+        {/* Ligne 1: Destination + Dates */}
+        <div className="flex items-center gap-3 p-3 border-b border-border/30">
           <div className="flex-1 min-w-0">
             <DestinationInput
               value={destinationInput}
@@ -779,18 +753,77 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
               onLocationSelect={handleLocationSelect}
             />
           </div>
-          {/* Separator */}
-          <div className="w-px h-6 bg-border/50" />
-          {/* Dates */}
+          <div className="w-px h-6 bg-border/40" />
           <CompactDateRange
             checkIn={activeAccommodation.checkIn}
             checkOut={activeAccommodation.checkOut}
             onChange={handleDatesChange}
           />
         </div>
-        {/* Add button when single accommodation */}
+        
+        {/* Ligne 2: Voyageurs + Chambres + Budget */}
+        <div className="p-3 space-y-3">
+          <div className="flex gap-2 flex-wrap">
+            <TravelersSelector
+              adults={travelMemory.travelers.adults}
+              children={travelMemory.travelers.children}
+              childrenAges={travelMemory.travelers.childrenAges}
+              onChange={handleTravelersChange}
+            />
+            <RoomsSelector
+              rooms={rooms}
+              travelers={travelMemory.travelers}
+              useAuto={memory.useAutoRooms}
+              onChange={setCustomRooms}
+              onToggleAuto={toggleAutoRooms}
+            />
+          </div>
+          
+          {/* Budget compact */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground shrink-0">Budget/nuit</span>
+            <div className="flex gap-1 flex-1">
+              {(["eco", "comfort", "premium"] as BudgetPreset[]).map((preset) => (
+                <button
+                  key={preset}
+                  onClick={() => handleBudgetPreset(preset)}
+                  className={cn(
+                    "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all",
+                    activeAccommodation.budgetPreset === preset
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  {BUDGET_PRESETS[preset].label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-1">
+              <Input
+                type="number"
+                value={customMin}
+                onChange={(e) => setCustomMin(e.target.value)}
+                onBlur={handleCustomBudgetBlur}
+                placeholder="Min"
+                className="text-center text-xs h-7 w-14"
+              />
+              <span className="text-muted-foreground text-xs">-</span>
+              <Input
+                type="number"
+                value={customMax}
+                onChange={(e) => setCustomMax(e.target.value)}
+                onBlur={handleCustomBudgetBlur}
+                placeholder="Max"
+                className="text-center text-xs h-7 w-14"
+              />
+              <span className="text-muted-foreground text-xs">€</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Add accommodation button */}
         {!hasMultipleAccommodations && (
-          <div className="px-3 pb-3 pt-0">
+          <div className="px-3 pb-3">
             <button
               onClick={handleAddAccommodation}
               className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
@@ -800,203 +833,151 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
             </button>
           </div>
         )}
-      </SectionCard>
+      </div>
 
-      {/* Section 2: Travelers & Rooms */}
-      <SectionCard icon={Users} title="Voyageurs & Chambres">
-        <div className="flex gap-2 flex-wrap">
-          <TravelersSelector
-            adults={travelMemory.travelers.adults}
-            children={travelMemory.travelers.children}
-            childrenAges={travelMemory.travelers.childrenAges}
-            onChange={handleTravelersChange}
-          />
-          <RoomsSelector
-            rooms={rooms}
-            travelers={travelMemory.travelers}
-            useAuto={memory.useAutoRooms}
-            onChange={setCustomRooms}
-            onToggleAuto={toggleAutoRooms}
-          />
+      {/* BLOC 2: Préférences - Type, Note, Équipements */}
+      <div className="rounded-xl border border-border/40 bg-card/50 p-3 space-y-3">
+        {/* Type d'hébergement */}
+        <div className="space-y-1.5">
+          <span className="text-xs text-muted-foreground">Type</span>
+          <div className="flex gap-1.5 flex-wrap">
+            {ACCOMMODATION_TYPES.map((type) => (
+              <ChipButton
+                key={type.id}
+                icon={type.icon}
+                selected={activeAccommodation.types.includes(type.id)}
+                onClick={() => toggleType(type.id)}
+                compact
+              >
+                {type.label}
+              </ChipButton>
+            ))}
+          </div>
         </div>
-      </SectionCard>
 
-      {/* Section 3: Budget */}
-      <SectionCard icon={Building2} title="Budget par nuit">
-        <div className="space-y-2">
+        {/* Note minimum */}
+        <div className="space-y-1.5">
+          <span className="text-xs text-muted-foreground">Note minimum</span>
           <div className="flex gap-1.5">
-            {(["eco", "comfort", "premium"] as BudgetPreset[]).map((preset) => (
+            {RATING_OPTIONS.map((option) => (
               <button
-                key={preset}
-                onClick={() => handleBudgetPreset(preset)}
+                key={option.value ?? "any"}
+                onClick={() => setMinRating(option.value)}
                 className={cn(
-                  "flex-1 py-2 rounded-lg text-xs font-medium transition-all",
-                  activeAccommodation.budgetPreset === preset
+                  "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1",
+                  activeAccommodation.minRating === option.value
                     ? "bg-primary text-primary-foreground"
-                    : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border/30"
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
                 )}
               >
-                {BUDGET_PRESETS[preset].label}
+                {option.value && <Star className="h-3 w-3" />}
+                {option.label}
               </button>
             ))}
           </div>
-          {/* Custom inputs inline */}
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              value={customMin}
-              onChange={(e) => setCustomMin(e.target.value)}
-              onBlur={handleCustomBudgetBlur}
-              placeholder="Min"
-              className="text-center text-xs h-8 flex-1"
-            />
-            <span className="text-muted-foreground text-xs">-</span>
-            <Input
-              type="number"
-              value={customMax}
-              onChange={(e) => setCustomMax(e.target.value)}
-              onBlur={handleCustomBudgetBlur}
-              placeholder="Max"
-              className="text-center text-xs h-8 flex-1"
-            />
-            <span className="text-muted-foreground text-xs">€</span>
+        </div>
+
+        {/* Équipements */}
+        <div className="space-y-1.5">
+          <span className="text-xs text-muted-foreground">Équipements</span>
+          <div className="flex gap-1.5 flex-wrap">
+            {ESSENTIAL_AMENITIES.map((amenity) => (
+              <ChipButton
+                key={amenity.id}
+                icon={amenity.icon}
+                selected={activeAccommodation.amenities.includes(amenity.id)}
+                onClick={() => toggleAmenity(amenity.id)}
+                compact
+              >
+                {amenity.label}
+              </ChipButton>
+            ))}
           </div>
         </div>
-      </SectionCard>
+      </div>
 
-      {/* Section 4: Accommodation Type */}
-      <SectionCard icon={Hotel} title="Type d'hébergement">
-        <div className="flex gap-1.5 flex-wrap">
-          {ACCOMMODATION_TYPES.map((type) => (
-            <ChipButton
-              key={type.id}
-              icon={type.icon}
-              selected={activeAccommodation.types.includes(type.id)}
-              onClick={() => toggleType(type.id)}
-              compact
-            >
-              {type.label}
-            </ChipButton>
-          ))}
-        </div>
-      </SectionCard>
-
-      {/* Section 5: Rating */}
-      <SectionCard icon={Star} title="Note minimum">
-        <div className="flex gap-1.5">
-          {RATING_OPTIONS.map((option) => (
-            <button
-              key={option.value ?? "any"}
-              onClick={() => setMinRating(option.value)}
-              className={cn(
-                "flex-1 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1",
-                activeAccommodation.minRating === option.value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border/30"
-              )}
-            >
-              {option.value && <Star className="h-3 w-3" />}
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </SectionCard>
-
-      {/* Section 6: Amenities */}
-      <SectionCard icon={Wifi} title="Équipements essentiels">
-        <div className="flex gap-1.5 flex-wrap">
-          {ESSENTIAL_AMENITIES.map((amenity) => (
-            <ChipButton
-              key={amenity.id}
-              icon={amenity.icon}
-              selected={activeAccommodation.amenities.includes(amenity.id)}
-              onClick={() => toggleAmenity(amenity.id)}
-              compact
-            >
-              {amenity.label}
-            </ChipButton>
-          ))}
-        </div>
-      </SectionCard>
-
-      {/* Advanced Filters */}
+      {/* Filtres avancés (repliable) */}
       <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
         <CollapsibleTrigger asChild>
-          <button className="w-full flex items-center justify-between py-2.5 px-3 rounded-lg bg-card/40 border border-border/30 hover:bg-card/60 transition-colors text-xs font-medium text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isAdvancedOpen && "rotate-180")} />
-              <span>Filtres avancés</span>
-            </div>
+          <button className="w-full flex items-center justify-center gap-2 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isAdvancedOpen && "rotate-180")} />
+            <span>Filtres avancés</span>
           </button>
         </CollapsibleTrigger>
-        <CollapsibleContent className="pt-4 space-y-4">
-          {/* Meal Plan */}
-          <SectionCard icon={Coffee} title="Formule repas">
-            <div className="flex gap-1.5 flex-wrap">
-              {MEAL_PLANS.map((meal) => (
-                <ChipButton
-                  key={meal.id}
-                  icon={meal.icon}
-                  selected={activeAccommodation.advancedFilters.mealPlan === meal.id}
-                  onClick={() => handleMealPlanToggle(meal.id)}
-                  compact
-                >
-                  {meal.label}
-                </ChipButton>
-              ))}
+        <CollapsibleContent className="pt-2">
+          <div className="rounded-xl border border-border/40 bg-card/50 p-3 space-y-3">
+            {/* Formule repas */}
+            <div className="space-y-1.5">
+              <span className="text-xs text-muted-foreground">Formule repas</span>
+              <div className="flex gap-1.5 flex-wrap">
+                {MEAL_PLANS.map((meal) => (
+                  <ChipButton
+                    key={meal.id}
+                    icon={meal.icon}
+                    selected={activeAccommodation.advancedFilters.mealPlan === meal.id}
+                    onClick={() => handleMealPlanToggle(meal.id)}
+                    compact
+                  >
+                    {meal.label}
+                  </ChipButton>
+                ))}
+              </div>
             </div>
-          </SectionCard>
 
-          {/* Views */}
-          <SectionCard icon={Mountain} title="Vue">
-            <div className="flex gap-1.5 flex-wrap">
-              {VIEW_OPTIONS.map((view) => (
-                <ChipButton
-                  key={view.id}
-                  icon={view.icon}
-                  selected={activeAccommodation.advancedFilters.views.includes(view.id)}
-                  onClick={() => handleArrayToggle("views", view.id)}
-                  compact
-                >
-                  {view.label}
-                </ChipButton>
-              ))}
+            {/* Vue */}
+            <div className="space-y-1.5">
+              <span className="text-xs text-muted-foreground">Vue</span>
+              <div className="flex gap-1.5 flex-wrap">
+                {VIEW_OPTIONS.map((view) => (
+                  <ChipButton
+                    key={view.id}
+                    icon={view.icon}
+                    selected={activeAccommodation.advancedFilters.views.includes(view.id)}
+                    onClick={() => handleArrayToggle("views", view.id)}
+                    compact
+                  >
+                    {view.label}
+                  </ChipButton>
+                ))}
+              </div>
             </div>
-          </SectionCard>
 
-          {/* Services */}
-          <SectionCard icon={ConciergeBell} title="Services">
-            <div className="flex gap-1.5 flex-wrap">
-              {SERVICE_OPTIONS.map((service) => (
-                <ChipButton
-                  key={service.id}
-                  icon={service.icon}
-                  selected={activeAccommodation.advancedFilters.services.includes(service.id)}
-                  onClick={() => handleArrayToggle("services", service.id)}
-                  compact
-                >
-                  {service.label}
-                </ChipButton>
-              ))}
+            {/* Services */}
+            <div className="space-y-1.5">
+              <span className="text-xs text-muted-foreground">Services</span>
+              <div className="flex gap-1.5 flex-wrap">
+                {SERVICE_OPTIONS.map((service) => (
+                  <ChipButton
+                    key={service.id}
+                    icon={service.icon}
+                    selected={activeAccommodation.advancedFilters.services.includes(service.id)}
+                    onClick={() => handleArrayToggle("services", service.id)}
+                    compact
+                  >
+                    {service.label}
+                  </ChipButton>
+                ))}
+              </div>
             </div>
-          </SectionCard>
 
-          {/* Accessibility */}
-          <SectionCard icon={Accessibility} title="Accessibilité">
-            <div className="flex gap-1.5 flex-wrap">
-              {ACCESSIBILITY_OPTIONS.map((access) => (
-                <ChipButton
-                  key={access.id}
-                  icon={access.icon}
-                  selected={activeAccommodation.advancedFilters.accessibility.includes(access.id)}
-                  onClick={() => handleArrayToggle("accessibility", access.id)}
-                  compact
-                >
-                  {access.label}
-                </ChipButton>
-              ))}
+            {/* Accessibilité */}
+            <div className="space-y-1.5">
+              <span className="text-xs text-muted-foreground">Accessibilité</span>
+              <div className="flex gap-1.5 flex-wrap">
+                {ACCESSIBILITY_OPTIONS.map((access) => (
+                  <ChipButton
+                    key={access.id}
+                    icon={access.icon}
+                    selected={activeAccommodation.advancedFilters.accessibility.includes(access.id)}
+                    onClick={() => handleArrayToggle("accessibility", access.id)}
+                    compact
+                  >
+                    {access.label}
+                  </ChipButton>
+                ))}
+              </div>
             </div>
-          </SectionCard>
+          </div>
         </CollapsibleContent>
       </Collapsible>
 
@@ -1014,7 +995,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
         ) : (
           <>
             <Search className="h-4 w-4 mr-2" />
-            Rechercher hébergements
+            Rechercher
           </>
         )}
       </Button>
