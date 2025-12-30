@@ -1,4 +1,6 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface StoredMessage {
   id: string;
@@ -18,6 +20,7 @@ export interface ChatSession {
 
 const SESSIONS_INDEX_KEY = "travliaq_chat_sessions_index";
 const SESSION_PREFIX = "travliaq_chat_session_";
+const SYNC_DEBOUNCE_MS = 3000;
 
 const generateId = () => crypto.randomUUID();
 
@@ -28,7 +31,6 @@ const getDefaultWelcomeMessage = (): StoredMessage => ({
 });
 
 const generateTitle = (messages: StoredMessage[]): string => {
-  // Find first user message to generate title
   const firstUserMessage = messages.find((m) => m.role === "user");
   if (firstUserMessage) {
     const text = firstUserMessage.text.slice(0, 40);
@@ -38,7 +40,6 @@ const generateTitle = (messages: StoredMessage[]): string => {
 };
 
 const generatePreview = (messages: StoredMessage[]): string => {
-  // Get last non-hidden message
   const lastMessage = [...messages].reverse().find((m) => !m.isHidden && m.text);
   if (lastMessage) {
     const text = lastMessage.text.slice(0, 50);
@@ -47,10 +48,103 @@ const generatePreview = (messages: StoredMessage[]): string => {
   return "Démarrez la conversation...";
 };
 
-export const useChatSessions = () => {
+interface UseChatSessionsOptions {
+  getFlightMemory?: () => Record<string, unknown>;
+  getAccommodationMemory?: () => Record<string, unknown>;
+  getTravelMemory?: () => Record<string, unknown>;
+}
+
+export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
+  const { getFlightMemory, getAccommodationMemory, getTravelMemory } = options;
+  const { user } = useAuth();
+  
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>("");
   const [messages, setMessages] = useState<StoredMessage[]>([]);
+  
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSyncingRef = useRef(false);
+  const lastSyncRef = useRef<number>(0);
+
+  // Sync session to database
+  const syncToDatabase = useCallback(
+    async (sessionId: string, sessionMessages: StoredMessage[], session: ChatSession | undefined) => {
+      if (!user || !sessionId) return;
+      if (isSyncingRef.current) return;
+
+      const now = Date.now();
+      if (now - lastSyncRef.current < SYNC_DEBOUNCE_MS) return;
+
+      isSyncingRef.current = true;
+      lastSyncRef.current = now;
+
+      try {
+        const payload = {
+          chatSessionId: sessionId,
+          flightMemory: getFlightMemory?.() || {},
+          accommodationMemory: getAccommodationMemory?.() || {},
+          travelMemory: getTravelMemory?.() || {},
+          chatMessages: sessionMessages,
+          title: session?.title || generateTitle(sessionMessages),
+          preview: session?.preview || generatePreview(sessionMessages),
+        };
+
+        console.log("[ChatSessions] Syncing to database:", sessionId);
+
+        const { error } = await supabase.functions.invoke("sync-planner-session", {
+          body: payload,
+        });
+
+        if (error) {
+          console.error("[ChatSessions] Sync error:", error);
+        } else {
+          console.log("[ChatSessions] Sync successful");
+        }
+      } catch (error) {
+        console.error("[ChatSessions] Sync failed:", error);
+      } finally {
+        isSyncingRef.current = false;
+      }
+    },
+    [user, getFlightMemory, getAccommodationMemory, getTravelMemory]
+  );
+
+  // Schedule debounced sync
+  const scheduleSyncDebounced = useCallback(
+    (sessionId: string, sessionMessages: StoredMessage[], session: ChatSession | undefined) => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+      syncTimeoutRef.current = setTimeout(() => {
+        syncToDatabase(sessionId, sessionMessages, session);
+      }, SYNC_DEBOUNCE_MS);
+    },
+    [syncToDatabase]
+  );
+
+  // Delete session from database
+  const deleteFromDatabase = useCallback(
+    async (sessionId: string) => {
+      if (!user) return;
+
+      try {
+        console.log("[ChatSessions] Deleting from database:", sessionId);
+
+        // Use DELETE method via query params
+        const { error } = await supabase.functions.invoke(
+          `sync-planner-session?sessionId=${sessionId}`,
+          { method: "DELETE" }
+        );
+
+        if (error) {
+          console.error("[ChatSessions] Delete error:", error);
+        }
+      } catch (error) {
+        console.error("[ChatSessions] Delete failed:", error);
+      }
+    },
+    [user]
+  );
 
   // Load sessions index on mount
   useEffect(() => {
@@ -109,6 +203,30 @@ export const useChatSessions = () => {
     }
   }, []);
 
+  // Sync on visibility change (when user leaves tab)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden" && user && activeSessionId) {
+        const currentSession = sessions.find(s => s.id === activeSessionId);
+        syncToDatabase(activeSessionId, messages, currentSession);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [syncToDatabase, user, activeSessionId, messages, sessions]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Save messages whenever they change
   const saveMessages = useCallback(
     (newMessages: StoredMessage[]) => {
@@ -131,13 +249,20 @@ export const useChatSessions = () => {
               : s
           );
           localStorage.setItem(SESSIONS_INDEX_KEY, JSON.stringify(updated));
+          
+          // Schedule database sync
+          const currentSession = updated.find(s => s.id === activeSessionId);
+          if (user) {
+            scheduleSyncDebounced(activeSessionId, newMessages, currentSession);
+          }
+          
           return updated;
         });
       } catch (e) {
         console.error("Error saving messages:", e);
       }
     },
-    [activeSessionId]
+    [activeSessionId, user, scheduleSyncDebounced]
   );
 
   // Update messages and trigger save
@@ -194,12 +319,17 @@ export const useChatSessions = () => {
 
       setActiveSessionId(newSession.id);
       setMessages(defaultMessages);
+
+      // Sync new session to database
+      if (user) {
+        syncToDatabase(newSession.id, defaultMessages, newSession);
+      }
     } catch (e) {
       console.error("Error creating new session:", e);
     }
 
     return newSession.id;
-  }, []);
+  }, [user, syncToDatabase]);
 
   // Delete a session
   const deleteSession = useCallback(
@@ -207,6 +337,11 @@ export const useChatSessions = () => {
       try {
         // Remove session messages
         localStorage.removeItem(SESSION_PREFIX + sessionId);
+
+        // Delete from database
+        if (user) {
+          deleteFromDatabase(sessionId);
+        }
 
         setSessions((prev) => {
           const updated = prev.filter((s) => s.id !== sessionId);
@@ -227,8 +362,29 @@ export const useChatSessions = () => {
         console.error("Error deleting session:", e);
       }
     },
-    [activeSessionId, selectSession, createNewSession]
+    [activeSessionId, selectSession, createNewSession, user, deleteFromDatabase]
   );
+
+  // Force sync current session to database (for critical actions)
+  const forceSyncToDatabase = useCallback(() => {
+    if (!user || !activeSessionId) return;
+    
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+    
+    const currentSession = sessions.find(s => s.id === activeSessionId);
+    syncToDatabase(activeSessionId, messages, currentSession);
+  }, [user, activeSessionId, messages, sessions, syncToDatabase]);
+
+  // Get current session metadata
+  const getSessionMetadata = useCallback(() => {
+    const currentSession = sessions.find(s => s.id === activeSessionId);
+    return {
+      title: currentSession?.title || "Nouvelle conversation",
+      preview: currentSession?.preview || "Démarrez la conversation...",
+    };
+  }, [sessions, activeSessionId]);
 
   return {
     sessions,
@@ -238,5 +394,7 @@ export const useChatSessions = () => {
     selectSession,
     createNewSession,
     deleteSession,
+    forceSyncToDatabase,
+    getSessionMetadata,
   };
 };

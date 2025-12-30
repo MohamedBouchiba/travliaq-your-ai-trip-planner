@@ -127,6 +127,9 @@ interface AccommodationMemoryContextValue {
   // Batch update (for sync operations that need atomic updates)
   updateMemoryBatch: (updater: (prev: AccommodationMemory) => AccommodationMemory) => void;
 
+  // Serialization for persistence
+  getSerializedState: () => Record<string, unknown>;
+
   // Computed values
   isReadyToSearch: boolean;
   getRoomsSummary: () => string;
@@ -555,6 +558,11 @@ export function AccommodationMemoryProvider({ children }: { children: ReactNode 
     }, 0);
   }, [memory.accommodations]);
 
+  // Get serialized state for persistence
+  const getSerializedState = useCallback((): Record<string, unknown> => {
+    return JSON.parse(serializeMemory(memory));
+  }, [memory]);
+
   const value: AccommodationMemoryContextValue = {
     memory,
     addAccommodation,
@@ -576,6 +584,7 @@ export function AccommodationMemoryProvider({ children }: { children: ReactNode 
     setDestination,
     resetMemory,
     updateMemoryBatch,
+    getSerializedState,
     isReadyToSearch,
     getRoomsSummary,
     getTotalNights,

@@ -52,6 +52,9 @@ interface TravelMemoryContextValue {
   updateDestination: (id: string, update: Partial<DestinationInfo>) => void;
   setActiveDestination: (index: number) => void;
   getActiveDestination: () => DestinationInfo | null;
+
+  // Serialization for persistence
+  getSerializedState: () => Record<string, unknown>;
   
   // Computed values
   hasDestinations: boolean;
@@ -233,6 +236,11 @@ export function TravelMemoryProvider({ children }: { children: ReactNode }) {
   const hasDates = useMemo(() => Boolean(memory.departureDate), [memory.departureDate]);
   const hasTravelers = useMemo(() => memory.travelers.adults >= 1, [memory.travelers.adults]);
 
+  // Get serialized state for persistence
+  const getSerializedState = useCallback((): Record<string, unknown> => {
+    return JSON.parse(serializeMemory(memory));
+  }, [memory]);
+
   const value: TravelMemoryContextValue = {
     memory,
     updateMemory,
@@ -244,6 +252,7 @@ export function TravelMemoryProvider({ children }: { children: ReactNode }) {
     updateDestination,
     setActiveDestination,
     getActiveDestination,
+    getSerializedState,
     hasDestinations,
     hasDates,
     hasTravelers,

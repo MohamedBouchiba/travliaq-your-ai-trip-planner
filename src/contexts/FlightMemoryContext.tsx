@@ -98,6 +98,7 @@ interface FlightMemoryContextValue {
   missingFields: MissingField[];
   getMemorySummary: () => string;
   getRoutePoints: () => MemoryRoutePoint[];
+  getSerializedState: () => Record<string, unknown>;
   // Multi-destination helpers
   addLeg: () => void;
   removeLeg: (legId: string) => void;
@@ -625,6 +626,11 @@ export function FlightMemoryProvider({ children }: { children: ReactNode }) {
     return points;
   }, [memory]);
 
+  // Get serialized state for persistence
+  const getSerializedState = useCallback((): Record<string, unknown> => {
+    return JSON.parse(serializeMemory(memory));
+  }, [memory]);
+
   const value = useMemo(
     () => ({
       memory,
@@ -636,11 +642,12 @@ export function FlightMemoryProvider({ children }: { children: ReactNode }) {
       missingFields,
       getMemorySummary,
       getRoutePoints,
+      getSerializedState,
       addLeg,
       removeLeg,
       updateLeg,
     }),
-    [memory, updateMemory, resetMemory, isReadyToSearch, hasCompleteInfo, needsAirportSelection, missingFields, getMemorySummary, getRoutePoints, addLeg, removeLeg, updateLeg]
+    [memory, updateMemory, resetMemory, isReadyToSearch, hasCompleteInfo, needsAirportSelection, missingFields, getMemorySummary, getRoutePoints, getSerializedState, addLeg, removeLeg, updateLeg]
   );
 
   return (

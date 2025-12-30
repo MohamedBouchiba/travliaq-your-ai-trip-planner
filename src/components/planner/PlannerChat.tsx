@@ -1146,6 +1146,11 @@ function getMissingFieldLabel(field: MissingField): string {
 }
 
 const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onAction }, ref) => {
+  // Access memory contexts for persistence
+  const { getSerializedState: getFlightMemory } = useFlightMemory();
+  const { getSerializedState: getAccommodationMemory } = useAccommodationMemory();
+  const { getSerializedState: getTravelMemory } = useTravelMemory();
+
   // Chat sessions hook for multi-conversation management
   const {
     sessions,
@@ -1155,7 +1160,12 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
     selectSession,
     createNewSession,
     deleteSession,
-  } = useChatSessions();
+    forceSyncToDatabase,
+  } = useChatSessions({
+    getFlightMemory,
+    getAccommodationMemory,
+    getTravelMemory,
+  });
 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);

@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.top-cities-by-country]
 verify_jwt = false
+
+[functions.sync-planner-session]
+verify_jwt = false

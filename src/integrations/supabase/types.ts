@@ -215,6 +215,48 @@ export type Database = {
         }
         Relationships: []
       }
+      planner_sessions: {
+        Row: {
+          accommodation_memory: Json | null
+          chat_messages: Json | null
+          chat_session_id: string
+          created_at: string | null
+          flight_memory: Json | null
+          id: string
+          preview: string | null
+          title: string | null
+          travel_memory: Json | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          accommodation_memory?: Json | null
+          chat_messages?: Json | null
+          chat_session_id: string
+          created_at?: string | null
+          flight_memory?: Json | null
+          id?: string
+          preview?: string | null
+          title?: string | null
+          travel_memory?: Json | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          accommodation_memory?: Json | null
+          chat_messages?: Json | null
+          chat_session_id?: string
+          created_at?: string | null
+          flight_memory?: Json | null
+          id?: string
+          preview?: string | null
+          title?: string | null
+          travel_memory?: Json | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       questionnaire_responses: {
         Row: {
           a_date_depart_approximative: string | null

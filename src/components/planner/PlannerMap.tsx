@@ -953,6 +953,8 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       // Direction arrows (after animation)
       setTimeout(() => {
         if (!map.current?.getSource(memorySourceId)) return;
+        // Check if layer already exists to prevent "Layer already exists" error
+        if (map.current.getLayer(memoryArrowId)) return;
         
         map.current.addLayer({
           id: memoryArrowId,
