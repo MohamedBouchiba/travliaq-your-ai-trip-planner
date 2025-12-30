@@ -300,7 +300,11 @@ function RoomsSelector({
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-3" align="start">
+      <PopoverContent 
+        className="w-72 p-3" 
+        align="start"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <div className="space-y-3">
           {/* Auto toggle */}
           <div className="flex items-center justify-between pb-2 border-b border-border/50">
@@ -618,6 +622,48 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
       }
     }
   }, [memory.activeAccommodationIndex, activeAccommodation?.lat, activeAccommodation?.lng]);
+
+  // Sync accommodations with flight multi-destination legs
+  const prevFlightLegsRef = useRef<string>("");
+  useEffect(() => {
+    if (flightMemory.tripType !== "multi") return;
+    
+    // Get unique destination cities from flight legs (arrival cities)
+    const destinationCities = flightMemory.legs
+      .filter(leg => leg.arrival?.city && leg.arrival?.lat && leg.arrival?.lng)
+      .map(leg => ({
+        city: leg.arrival!.city!,
+        country: leg.arrival?.country || "",
+        countryCode: leg.arrival?.countryCode || "",
+        lat: leg.arrival!.lat!,
+        lng: leg.arrival!.lng!,
+      }));
+    
+    // Create a signature to detect real changes
+    const legsSignature = JSON.stringify(destinationCities);
+    if (legsSignature === prevFlightLegsRef.current) return;
+    prevFlightLegsRef.current = legsSignature;
+    
+    // Skip if no destinations or only one (handled by normal flow)
+    if (destinationCities.length <= 1) return;
+    
+    // Check which destinations are already in accommodations
+    const existingCities = memory.accommodations.map(a => a.city?.toLowerCase());
+    
+    // Add missing destinations as new accommodation entries
+    destinationCities.forEach(dest => {
+      if (!existingCities.includes(dest.city.toLowerCase())) {
+        addAccommodation();
+        // Wait for the next tick to set the destination
+        setTimeout(() => {
+          // Find the newest accommodation (last one)
+          const newIndex = memory.accommodations.length;
+          setActiveAccommodation(newIndex);
+          setDestination(dest.city, dest.country, dest.countryCode, dest.lat, dest.lng);
+        }, 50);
+      }
+    });
+  }, [flightMemory.tripType, flightMemory.legs, memory.accommodations, addAccommodation, setActiveAccommodation, setDestination]);
 
   // Handle destination selection from autocomplete - ONLY here we update the real city
   const handleLocationSelect = (location: LocationResult) => {
