@@ -31,60 +31,88 @@ export interface AdvancedFilters {
   accessibility: string[];
 }
 
-// Accommodation memory state
-export interface AccommodationMemory {
-  // Room configuration
-  useAutoRooms: boolean;
-  customRooms: RoomConfig[];
-
+// Single accommodation entry (one per city/dates)
+export interface AccommodationEntry {
+  id: string;
+  // Destination
+  city: string;
+  country: string;
+  countryCode: string;
+  lat?: number;
+  lng?: number;
+  // Dates (independent from flights)
+  checkIn: Date | null;
+  checkOut: Date | null;
   // Budget (per night)
   budgetPreset: BudgetPreset;
   priceMin: number;
   priceMax: number;
-
   // Accommodation type (max 2)
   types: AccommodationType[];
-
   // Minimum rating (1-10 scale)
   minRating: number | null;
-
   // Essential amenities
   amenities: EssentialAmenity[];
-
   // Advanced filters
   advancedFilters: AdvancedFilters;
+}
+
+// Accommodation memory state
+export interface AccommodationMemory {
+  // List of accommodations (one per city/segment)
+  accommodations: AccommodationEntry[];
+  // Active accommodation index
+  activeAccommodationIndex: number;
+  // Shared room configuration
+  useAutoRooms: boolean;
+  customRooms: RoomConfig[];
 }
 
 // Context value type
 interface AccommodationMemoryContextValue {
   memory: AccommodationMemory;
-  updateMemory: (partial: Partial<AccommodationMemory>) => void;
-  resetMemory: () => void;
-
-  // Budget helpers
+  
+  // Accommodation list management
+  addAccommodation: (entry?: Partial<AccommodationEntry>) => void;
+  removeAccommodation: (id: string) => void;
+  setActiveAccommodation: (index: number) => void;
+  getActiveAccommodation: () => AccommodationEntry | null;
+  updateAccommodation: (id: string, updates: Partial<AccommodationEntry>) => void;
+  
+  // Budget helpers for active accommodation
   setBudgetPreset: (preset: BudgetPreset) => void;
   setCustomBudget: (min: number, max: number) => void;
 
-  // Type helpers
+  // Type helpers for active accommodation
   toggleType: (type: AccommodationType) => void;
 
-  // Amenity helpers
+  // Amenity helpers for active accommodation
   toggleAmenity: (amenity: EssentialAmenity) => void;
 
-  // Rating helpers
+  // Rating helpers for active accommodation
   setMinRating: (rating: number | null) => void;
 
-  // Room helpers
+  // Room helpers (shared)
   getSuggestedRooms: () => RoomConfig[];
   setCustomRooms: (rooms: RoomConfig[]) => void;
   toggleAutoRooms: () => void;
 
-  // Advanced filters
+  // Advanced filters for active accommodation
   updateAdvancedFilters: (filters: Partial<AdvancedFilters>) => void;
+
+  // Dates for active accommodation
+  setDates: (checkIn: Date | null, checkOut: Date | null) => void;
+  
+  // Destination for active accommodation
+  setDestination: (city: string, country: string, countryCode: string, lat?: number, lng?: number) => void;
+
+  // Reset
+  resetMemory: () => void;
 
   // Computed values
   isReadyToSearch: boolean;
   getRoomsSummary: () => string;
+  getTotalNights: () => number;
 }
 
 // Budget presets values
@@ -95,10 +123,14 @@ export const BUDGET_PRESETS: Record<BudgetPreset, { min: number; max: number; la
   custom: { min: 0, max: 500, label: "Personnalisé" },
 };
 
-// Initial state
-const initialMemory: AccommodationMemory = {
-  useAutoRooms: true,
-  customRooms: [],
+// Create a default accommodation entry
+const createDefaultAccommodation = (): AccommodationEntry => ({
+  id: crypto.randomUUID(),
+  city: "",
+  country: "",
+  countryCode: "",
+  checkIn: null,
+  checkOut: null,
   budgetPreset: "comfort",
   priceMin: 80,
   priceMax: 180,
@@ -111,25 +143,51 @@ const initialMemory: AccommodationMemory = {
     services: [],
     accessibility: [],
   },
+});
+
+// Initial state
+const initialMemory: AccommodationMemory = {
+  accommodations: [createDefaultAccommodation()],
+  activeAccommodationIndex: 0,
+  useAutoRooms: true,
+  customRooms: [],
 };
 
-// Serialize for localStorage
+// Serialize for localStorage (convert Dates to ISO strings)
 function serializeMemory(memory: AccommodationMemory): string {
-  return JSON.stringify(memory);
+  const serializable = {
+    ...memory,
+    accommodations: memory.accommodations.map(acc => ({
+      ...acc,
+      checkIn: acc.checkIn ? acc.checkIn.toISOString() : null,
+      checkOut: acc.checkOut ? acc.checkOut.toISOString() : null,
+    })),
+  };
+  return JSON.stringify(serializable);
 }
 
-// Deserialize from localStorage
+// Deserialize from localStorage (convert ISO strings to Dates)
 function deserializeMemory(json: string): AccommodationMemory | null {
   try {
     const parsed = JSON.parse(json);
     if (!parsed || typeof parsed !== "object") return null;
-    return {
-      ...initialMemory,
-      ...parsed,
+    
+    const accommodations = (parsed.accommodations || []).map((acc: any) => ({
+      ...createDefaultAccommodation(),
+      ...acc,
+      checkIn: acc.checkIn ? new Date(acc.checkIn) : null,
+      checkOut: acc.checkOut ? new Date(acc.checkOut) : null,
       advancedFilters: {
-        ...initialMemory.advancedFilters,
-        ...parsed.advancedFilters,
+        ...createDefaultAccommodation().advancedFilters,
+        ...acc.advancedFilters,
       },
+    }));
+    
+    return {
+      accommodations: accommodations.length > 0 ? accommodations : [createDefaultAccommodation()],
+      activeAccommodationIndex: parsed.activeAccommodationIndex || 0,
+      useAutoRooms: parsed.useAutoRooms ?? true,
+      customRooms: parsed.customRooms || [],
     };
   } catch {
     return null;
@@ -174,82 +232,141 @@ export function AccommodationMemoryProvider({ children }: { children: ReactNode 
     }
   }, [memory, isHydrated]);
 
-  const updateMemory = useCallback((partial: Partial<AccommodationMemory>) => {
+  // Get active accommodation
+  const getActiveAccommodation = useCallback((): AccommodationEntry | null => {
+    return memory.accommodations[memory.activeAccommodationIndex] || null;
+  }, [memory.accommodations, memory.activeAccommodationIndex]);
+
+  // Add new accommodation
+  const addAccommodation = useCallback((entry?: Partial<AccommodationEntry>) => {
+    const newAccommodation: AccommodationEntry = {
+      ...createDefaultAccommodation(),
+      ...entry,
+    };
+    setMemory(prev => ({
+      ...prev,
+      accommodations: [...prev.accommodations, newAccommodation],
+      activeAccommodationIndex: prev.accommodations.length,
+    }));
+  }, []);
+
+  // Remove accommodation
+  const removeAccommodation = useCallback((id: string) => {
     setMemory(prev => {
-      const updated = { ...prev, ...partial };
-      if (partial.advancedFilters) {
-        updated.advancedFilters = { ...prev.advancedFilters, ...partial.advancedFilters };
+      const newAccommodations = prev.accommodations.filter(a => a.id !== id);
+      // Ensure at least one accommodation exists
+      if (newAccommodations.length === 0) {
+        return {
+          ...prev,
+          accommodations: [createDefaultAccommodation()],
+          activeAccommodationIndex: 0,
+        };
       }
-      return updated;
+      // Adjust active index if needed
+      const newIndex = Math.min(prev.activeAccommodationIndex, newAccommodations.length - 1);
+      return {
+        ...prev,
+        accommodations: newAccommodations,
+        activeAccommodationIndex: newIndex,
+      };
     });
   }, []);
 
-  const resetMemory = useCallback(() => {
-    setMemory(initialMemory);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {}
+  // Set active accommodation
+  const setActiveAccommodation = useCallback((index: number) => {
+    setMemory(prev => ({
+      ...prev,
+      activeAccommodationIndex: Math.max(0, Math.min(index, prev.accommodations.length - 1)),
+    }));
   }, []);
+
+  // Update specific accommodation
+  const updateAccommodation = useCallback((id: string, updates: Partial<AccommodationEntry>) => {
+    setMemory(prev => ({
+      ...prev,
+      accommodations: prev.accommodations.map(acc => 
+        acc.id === id 
+          ? { 
+              ...acc, 
+              ...updates,
+              advancedFilters: updates.advancedFilters 
+                ? { ...acc.advancedFilters, ...updates.advancedFilters }
+                : acc.advancedFilters,
+            }
+          : acc
+      ),
+    }));
+  }, []);
+
+  // Update active accommodation helper
+  const updateActive = useCallback((updates: Partial<AccommodationEntry>) => {
+    const active = getActiveAccommodation();
+    if (active) {
+      updateAccommodation(active.id, updates);
+    }
+  }, [getActiveAccommodation, updateAccommodation]);
 
   // Budget helpers
   const setBudgetPreset = useCallback((preset: BudgetPreset) => {
     const { min, max } = BUDGET_PRESETS[preset];
-    setMemory(prev => ({
-      ...prev,
-      budgetPreset: preset,
-      priceMin: min,
-      priceMax: max,
-    }));
-  }, []);
+    updateActive({ budgetPreset: preset, priceMin: min, priceMax: max });
+  }, [updateActive]);
 
   const setCustomBudget = useCallback((min: number, max: number) => {
-    setMemory(prev => ({
-      ...prev,
-      budgetPreset: "custom",
-      priceMin: min,
-      priceMax: max,
-    }));
-  }, []);
+    updateActive({ budgetPreset: "custom", priceMin: min, priceMax: max });
+  }, [updateActive]);
 
   // Type helpers
   const toggleType = useCallback((type: AccommodationType) => {
-    setMemory(prev => {
-      if (type === "any") {
-        return { ...prev, types: prev.types.includes("any") ? [] : ["any"] };
-      }
-      const newTypes = prev.types.filter(t => t !== "any");
-      if (newTypes.includes(type)) {
-        return { ...prev, types: newTypes.filter(t => t !== type) };
-      }
-      // Max 2 types
-      if (newTypes.length >= 2) {
-        return { ...prev, types: [newTypes[1], type] };
-      }
-      return { ...prev, types: [...newTypes, type] };
-    });
-  }, []);
+    const active = getActiveAccommodation();
+    if (!active) return;
+    
+    if (type === "any") {
+      updateActive({ types: active.types.includes("any") ? [] : ["any"] });
+      return;
+    }
+    const newTypes = active.types.filter(t => t !== "any");
+    if (newTypes.includes(type)) {
+      updateActive({ types: newTypes.filter(t => t !== type) });
+    } else if (newTypes.length >= 2) {
+      updateActive({ types: [newTypes[1], type] });
+    } else {
+      updateActive({ types: [...newTypes, type] });
+    }
+  }, [getActiveAccommodation, updateActive]);
 
   // Amenity helpers
   const toggleAmenity = useCallback((amenity: EssentialAmenity) => {
-    setMemory(prev => {
-      if (prev.amenities.includes(amenity)) {
-        return { ...prev, amenities: prev.amenities.filter(a => a !== amenity) };
-      }
-      return { ...prev, amenities: [...prev.amenities, amenity] };
-    });
-  }, []);
+    const active = getActiveAccommodation();
+    if (!active) return;
+    
+    if (active.amenities.includes(amenity)) {
+      updateActive({ amenities: active.amenities.filter(a => a !== amenity) });
+    } else {
+      updateActive({ amenities: [...active.amenities, amenity] });
+    }
+  }, [getActiveAccommodation, updateActive]);
 
   // Rating helpers
   const setMinRating = useCallback((rating: number | null) => {
-    setMemory(prev => ({ ...prev, minRating: rating }));
-  }, []);
+    updateActive({ minRating: rating });
+  }, [updateActive]);
+
+  // Dates helpers
+  const setDates = useCallback((checkIn: Date | null, checkOut: Date | null) => {
+    updateActive({ checkIn, checkOut });
+  }, [updateActive]);
+
+  // Destination helpers
+  const setDestination = useCallback((city: string, country: string, countryCode: string, lat?: number, lng?: number) => {
+    updateActive({ city, country, countryCode, lat, lng });
+  }, [updateActive]);
 
   // Room helpers - suggest rooms based on travelers
   const getSuggestedRooms = useCallback((): RoomConfig[] => {
     const { adults, children, childrenAges } = travelMemory.travelers;
     const rooms: RoomConfig[] = [];
 
-    // Simple logic: 2 adults = 1 room, family = 1 family room
     if (adults <= 2 && children === 0) {
       rooms.push({
         id: crypto.randomUUID(),
@@ -258,7 +375,6 @@ export function AccommodationMemoryProvider({ children }: { children: ReactNode 
         childrenAges: [],
       });
     } else if (adults <= 2 && children > 0) {
-      // Family room
       rooms.push({
         id: crypto.randomUUID(),
         adults,
@@ -266,7 +382,6 @@ export function AccommodationMemoryProvider({ children }: { children: ReactNode 
         childrenAges,
       });
     } else {
-      // Multiple rooms needed
       const roomsNeeded = Math.ceil(adults / 2);
       let remainingAdults = adults;
       let remainingChildren = children;
@@ -276,7 +391,6 @@ export function AccommodationMemoryProvider({ children }: { children: ReactNode 
         const roomAdults = Math.min(2, remainingAdults);
         remainingAdults -= roomAdults;
         
-        // Distribute children to first room(s)
         const roomChildren = i === 0 ? Math.min(2, remainingChildren) : 0;
         const roomChildrenAges = remainingChildrenAges.splice(0, roomChildren);
         remainingChildren -= roomChildren;
@@ -310,16 +424,27 @@ export function AccommodationMemoryProvider({ children }: { children: ReactNode 
 
   // Advanced filters
   const updateAdvancedFilters = useCallback((filters: Partial<AdvancedFilters>) => {
-    setMemory(prev => ({
-      ...prev,
-      advancedFilters: { ...prev.advancedFilters, ...filters },
-    }));
+    const active = getActiveAccommodation();
+    if (!active) return;
+    updateActive({
+      advancedFilters: { ...active.advancedFilters, ...filters },
+    });
+  }, [getActiveAccommodation, updateActive]);
+
+  const resetMemory = useCallback(() => {
+    setMemory(initialMemory);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {}
   }, []);
 
   // Computed values
   const isReadyToSearch = useMemo(() => {
-    return hasDestinations && hasDates;
-  }, [hasDestinations, hasDates]);
+    const active = getActiveAccommodation();
+    if (!active) return false;
+    // Ready if we have a destination (from widget or from flights)
+    return (active.city.length > 0) || hasDestinations;
+  }, [getActiveAccommodation, hasDestinations]);
 
   const getRoomsSummary = useCallback((): string => {
     const rooms = memory.useAutoRooms ? getSuggestedRooms() : memory.customRooms;
@@ -328,17 +453,30 @@ export function AccommodationMemoryProvider({ children }: { children: ReactNode 
     if (rooms.length === 1) {
       const room = rooms[0];
       if (room.children > 0) {
-        return `1 chambre familiale (${room.adults} ad. + ${room.children} enf.)`;
+        return `1 chambre familiale (${room.adults} adultes + ${room.children} enfants)`;
       }
       return room.adults === 1 ? "1 chambre simple" : "1 chambre double";
     }
     return `${rooms.length} chambres`;
   }, [memory.useAutoRooms, memory.customRooms, getSuggestedRooms]);
 
+  const getTotalNights = useCallback((): number => {
+    return memory.accommodations.reduce((total, acc) => {
+      if (acc.checkIn && acc.checkOut) {
+        const days = Math.ceil((acc.checkOut.getTime() - acc.checkIn.getTime()) / (1000 * 60 * 60 * 24));
+        return total + Math.max(0, days);
+      }
+      return total;
+    }, 0);
+  }, [memory.accommodations]);
+
   const value: AccommodationMemoryContextValue = {
     memory,
-    updateMemory,
-    resetMemory,
+    addAccommodation,
+    removeAccommodation,
+    setActiveAccommodation,
+    getActiveAccommodation,
+    updateAccommodation,
     setBudgetPreset,
     setCustomBudget,
     toggleType,
@@ -348,8 +486,12 @@ export function AccommodationMemoryProvider({ children }: { children: ReactNode 
     setCustomRooms,
     toggleAutoRooms,
     updateAdvancedFilters,
+    setDates,
+    setDestination,
+    resetMemory,
     isReadyToSearch,
     getRoomsSummary,
+    getTotalNights,
   };
 
   return (

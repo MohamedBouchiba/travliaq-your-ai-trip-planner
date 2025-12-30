@@ -1,18 +1,19 @@
 import { useState, useRef, useEffect } from "react";
 import { 
   Building2, Star, Wifi, Car, Coffee, Wind, MapPin, Users, ChevronDown, ChevronUp, 
-  Search, Waves, BedDouble, Home, Hotel, Castle, Tent, Plus, Minus,
+  Search, Waves, BedDouble, Home, Hotel, Castle, Tent, Plus, Minus, X, CalendarDays,
   Dumbbell, Accessibility, Baby, Dog, Mountain, Building, Flower2, Bus,
-  ConciergeBell, CalendarDays, Droplets, Utensils, ChefHat, Soup, House
+  ConciergeBell, Droplets, Utensils, ChefHat, Soup, House
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTravelMemory } from "@/contexts/TravelMemoryContext";
-import { useAccommodationMemory, BUDGET_PRESETS, type BudgetPreset, type AccommodationType, type EssentialAmenity, type RoomConfig, type MealPlan } from "@/contexts/AccommodationMemoryContext";
+import { useAccommodationMemory, BUDGET_PRESETS, type BudgetPreset, type AccommodationType, type EssentialAmenity, type RoomConfig, type MealPlan, type AccommodationEntry } from "@/contexts/AccommodationMemoryContext";
 import { useFlightMemory } from "@/contexts/FlightMemoryContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { useLocationAutocomplete, LocationResult } from "@/hooks/useLocationAutocomplete";
 import { format, differenceInDays } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -379,6 +380,98 @@ function RoomsSelector({
   );
 }
 
+// Date picker for check-in/check-out
+function DateRangeSelector({
+  checkIn,
+  checkOut,
+  onChange,
+}: {
+  checkIn: Date | null;
+  checkOut: Date | null;
+  onChange: (checkIn: Date | null, checkOut: Date | null) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectingCheckOut, setSelectingCheckOut] = useState(false);
+
+  const nights = checkIn && checkOut ? differenceInDays(checkOut, checkIn) : 0;
+
+  const handleSelect = (date: Date | undefined) => {
+    if (!date) return;
+    
+    if (!checkIn || (checkIn && checkOut) || !selectingCheckOut) {
+      // Selecting check-in
+      onChange(date, null);
+      setSelectingCheckOut(true);
+    } else {
+      // Selecting check-out
+      if (date > checkIn) {
+        onChange(checkIn, date);
+        setIsOpen(false);
+        setSelectingCheckOut(false);
+      } else {
+        // If selected date is before check-in, use it as new check-in
+        onChange(date, null);
+      }
+    }
+  };
+
+  const displayText = checkIn && checkOut
+    ? `${format(checkIn, "d MMM", { locale: fr })} - ${format(checkOut, "d MMM", { locale: fr })} (${nights} nuit${nights > 1 ? "s" : ""})`
+    : checkIn
+    ? `${format(checkIn, "d MMM", { locale: fr })} → ...`
+    : "Sélectionner les dates";
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <button className="flex items-center gap-2 p-2.5 rounded-xl border border-border/40 bg-muted/20 hover:bg-muted/40 transition-colors w-full text-left">
+          <CalendarDays className="h-4 w-4 text-primary shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium">{displayText}</div>
+            {!checkIn && (
+              <div className="text-xs text-muted-foreground">Check-in → Check-out</div>
+            )}
+          </div>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <div className="p-3 border-b border-border/50">
+          <p className="text-xs font-medium text-center">
+            {selectingCheckOut && checkIn ? "Sélectionnez le check-out" : "Sélectionnez le check-in"}
+          </p>
+        </div>
+        <Calendar
+          mode="single"
+          selected={selectingCheckOut ? checkOut || undefined : checkIn || undefined}
+          onSelect={handleSelect}
+          disabled={(date) => date < new Date()}
+          modifiers={{
+            booked: checkIn ? { from: checkIn, to: checkOut || checkIn } : undefined,
+          }}
+          modifiersStyles={{
+            booked: { backgroundColor: "hsl(var(--primary) / 0.1)" },
+          }}
+          className="p-3 pointer-events-auto"
+        />
+        {checkIn && (
+          <div className="p-2 border-t border-border/50 flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                onChange(null, null);
+                setSelectingCheckOut(false);
+              }}
+            >
+              Effacer
+            </Button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // Chip Button Component
 const ChipButton = ({
   children,
@@ -468,102 +561,20 @@ const ACCESSIBILITY_OPTIONS: { id: string; label: string; icon: React.ElementTyp
   { id: "Animaux acceptés", label: "Animaux", icon: Dog },
 ];
 
-// Helper to calculate nights between two dates
-const calculateNights = (checkIn: Date | null, checkOut: Date | null): number => {
-  if (!checkIn || !checkOut) return 0;
-  return Math.max(0, differenceInDays(checkOut, checkIn));
-};
-
-// Dates display/edit component
-function DatesSection({
-  departureDate,
-  returnDate,
-  hasFlightDates,
-  destinations,
-  activeDestinationIndex,
-}: {
-  departureDate: Date | null;
-  returnDate: Date | null;
-  hasFlightDates: boolean;
-  destinations: { city: string; checkIn?: Date; checkOut?: Date }[];
-  activeDestinationIndex: number;
-}) {
-  const nights = calculateNights(departureDate, returnDate);
-  
-  // If we have flight dates, show them in read-only mode
-  if (hasFlightDates && departureDate && returnDate) {
-    return (
-      <div className="flex items-center gap-2 p-2.5 rounded-xl border border-border/40 bg-muted/20">
-        <CalendarDays className="h-4 w-4 text-primary shrink-0" />
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium">
-            {format(departureDate, "d MMM", { locale: fr })} - {format(returnDate, "d MMM", { locale: fr })}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            {nights} nuit{nights > 1 ? "s" : ""}
-          </div>
-        </div>
-        <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-          depuis vols
-        </span>
-      </div>
-    );
-  }
-
-  // Multi-destination with dates per city
-  if (destinations.length > 1) {
-    const activeCity = destinations[activeDestinationIndex];
-    return (
-      <div className="flex items-center gap-2 p-2.5 rounded-xl border border-border/40 bg-muted/20">
-        <CalendarDays className="h-4 w-4 text-primary shrink-0" />
-        <div className="flex-1 min-w-0">
-          <div className="text-xs text-muted-foreground mb-1">{activeCity?.city}</div>
-          {activeCity?.checkIn && activeCity?.checkOut ? (
-            <>
-              <div className="text-sm font-medium">
-                {format(activeCity.checkIn, "d MMM", { locale: fr })} - {format(activeCity.checkOut, "d MMM", { locale: fr })}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {calculateNights(activeCity.checkIn, activeCity.checkOut)} nuit{calculateNights(activeCity.checkIn, activeCity.checkOut) > 1 ? "s" : ""}
-              </div>
-            </>
-          ) : (
-            <div className="text-xs text-muted-foreground">Dates non définies</div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // No dates available - show placeholder
-  return (
-    <div className="flex items-center gap-2 p-2.5 rounded-xl border border-dashed border-border/40 bg-muted/10">
-      <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-      <div className="flex-1 min-w-0">
-        <div className="text-xs text-muted-foreground">
-          Dates de séjour non définies
-        </div>
-        <div className="text-[10px] text-muted-foreground/70">
-          Remplissez les dates dans l'onglet Vols
-        </div>
-      </div>
-    </div>
-  );
-}
-
 const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
   const { 
     memory: travelMemory, 
     updateTravelers,
-    addDestination,
-    setActiveDestination, 
-    getActiveDestination,
   } = useTravelMemory();
   
   const { memory: flightMemory } = useFlightMemory();
   
   const {
     memory,
+    getActiveAccommodation,
+    setActiveAccommodation,
+    addAccommodation,
+    removeAccommodation,
     setBudgetPreset,
     setCustomBudget,
     toggleType,
@@ -573,51 +584,53 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
     setCustomRooms,
     toggleAutoRooms,
     updateAdvancedFilters,
+    setDates,
+    setDestination,
   } = useAccommodationMemory();
 
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
-  const [customMin, setCustomMin] = useState(memory.priceMin.toString());
-  const [customMax, setCustomMax] = useState(memory.priceMax.toString());
   const [isSearching, setIsSearching] = useState(false);
-  const [localDestination, setLocalDestination] = useState("");
 
-  const activeDestination = getActiveDestination();
-  const hasMultipleDestinations = travelMemory.destinations.length > 1;
+  const activeAccommodation = getActiveAccommodation();
+  const hasMultipleAccommodations = memory.accommodations.length > 1;
   const rooms = memory.useAutoRooms ? getSuggestedRooms() : memory.customRooms;
-  
-  // Check if we have flight dates
-  const hasFlightDates = Boolean(flightMemory.departureDate && flightMemory.returnDate);
 
-  // Sync local destination with active destination
+  // Local state for custom budget inputs
+  const [customMin, setCustomMin] = useState(activeAccommodation?.priceMin.toString() || "80");
+  const [customMax, setCustomMax] = useState(activeAccommodation?.priceMax.toString() || "180");
+
+  // Sync custom budget inputs when active accommodation changes
   useEffect(() => {
-    if (activeDestination) {
-      setLocalDestination(activeDestination.city);
+    if (activeAccommodation) {
+      setCustomMin(activeAccommodation.priceMin.toString());
+      setCustomMax(activeAccommodation.priceMax.toString());
     }
-  }, [activeDestination]);
-
-  // Handle destination change from chips
-  const handleDestinationChipClick = (index: number) => {
-    setActiveDestination(index);
-    const dest = travelMemory.destinations[index];
-    if (dest && onMapMove) {
-      onMapMove([dest.lng, dest.lat], 12);
-    }
-  };
+  }, [activeAccommodation]);
 
   // Handle destination selection from autocomplete
   const handleLocationSelect = (location: LocationResult) => {
     if (location.lat && location.lng) {
-      addDestination({
-        city: location.name,
-        country: location.country_name || "",
-        countryCode: location.country_code || "",
-        lat: location.lat,
-        lng: location.lng,
-      });
+      setDestination(
+        location.name,
+        location.country_name || "",
+        location.country_code || "",
+        location.lat,
+        location.lng
+      );
       if (onMapMove) {
         onMapMove([location.lng, location.lat], 12);
       }
     }
+  };
+
+  // Handle adding new accommodation
+  const handleAddAccommodation = () => {
+    addAccommodation();
+  };
+
+  // Handle removing accommodation
+  const handleRemoveAccommodation = (id: string) => {
+    removeAccommodation(id);
   };
 
   // Handle travelers change - syncs with TravelMemory (transversal)
@@ -642,22 +655,29 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
 
   // Handle meal plan toggle
   const handleMealPlanToggle = (mealId: MealPlan) => {
+    if (!activeAccommodation) return;
     updateAdvancedFilters({
-      mealPlan: memory.advancedFilters.mealPlan === mealId ? null : mealId,
+      mealPlan: activeAccommodation.advancedFilters.mealPlan === mealId ? null : mealId,
     });
   };
 
   // Handle array toggle for views/services/accessibility
   const handleArrayToggle = (field: "views" | "services" | "accessibility", value: string) => {
-    const current = memory.advancedFilters[field];
+    if (!activeAccommodation) return;
+    const current = activeAccommodation.advancedFilters[field];
     const updated = current.includes(value)
       ? current.filter(v => v !== value)
       : [...current, value];
     updateAdvancedFilters({ [field]: updated });
   };
 
+  // Handle dates change
+  const handleDatesChange = (checkIn: Date | null, checkOut: Date | null) => {
+    setDates(checkIn, checkOut);
+  };
+
   // Check if ready to search
-  const canSearch = travelMemory.destinations.length > 0 || localDestination.length > 0;
+  const canSearch = activeAccommodation && activeAccommodation.city.length > 0;
 
   // Handle search
   const handleSearch = async () => {
@@ -668,67 +688,94 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
     setIsSearching(false);
   };
 
+  if (!activeAccommodation) return null;
+
   return (
     <div className="space-y-4">
-      {/* Destination + Travelers row */}
+      {/* Accommodations list (tabs) */}
       <div className="space-y-2">
-        {/* Destination chips if multi-destination from flights */}
-        {hasMultipleDestinations && (
-          <div className="flex gap-1.5 flex-wrap mb-2">
-            {travelMemory.destinations.map((dest, index) => (
-              <button
-                key={dest.id}
-                onClick={() => handleDestinationChipClick(index)}
-                className={cn(
-                  "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1",
-                  index === travelMemory.activeDestinationIndex
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border/30"
-                )}
-              >
-                <MapPin className="h-3 w-3" />
-                {dest.city}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Destination input (manual entry) */}
-        <div className="flex items-center gap-2 p-2.5 rounded-xl border border-border/40 bg-muted/20">
-          <DestinationInput
-            value={localDestination}
-            onChange={setLocalDestination}
-            placeholder={activeDestination ? activeDestination.city : "Où allez-vous ?"}
-            onLocationSelect={handleLocationSelect}
-          />
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-muted-foreground">Hébergements</span>
+          <button
+            onClick={handleAddAccommodation}
+            className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Ajouter
+          </button>
         </div>
-
-        {/* Travelers + Rooms row */}
-        <div className="flex gap-2 flex-wrap">
-          <TravelersSelector
-            adults={travelMemory.travelers.adults}
-            children={travelMemory.travelers.children}
-            childrenAges={travelMemory.travelers.childrenAges}
-            onChange={handleTravelersChange}
-          />
-          <RoomsSelector
-            rooms={rooms}
-            travelers={travelMemory.travelers}
-            useAuto={memory.useAutoRooms}
-            onChange={setCustomRooms}
-            onToggleAuto={toggleAutoRooms}
-          />
+        
+        {/* Accommodation tabs */}
+        <div className="flex gap-1.5 flex-wrap">
+          {memory.accommodations.map((acc, index) => (
+            <button
+              key={acc.id}
+              onClick={() => setActiveAccommodation(index)}
+              className={cn(
+                "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 group",
+                index === memory.activeAccommodationIndex
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border/30"
+              )}
+            >
+              <Hotel className="h-3 w-3" />
+              <span className="max-w-24 truncate">
+                {acc.city || `Hébergement ${index + 1}`}
+              </span>
+              {hasMultipleAccommodations && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveAccommodation(acc.id);
+                  }}
+                  className={cn(
+                    "h-4 w-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity",
+                    index === memory.activeAccommodationIndex
+                      ? "hover:bg-primary-foreground/20"
+                      : "hover:bg-destructive/20"
+                  )}
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Dates Section - shows flight dates if available */}
-      <DatesSection
-        departureDate={flightMemory.departureDate}
-        returnDate={flightMemory.returnDate}
-        hasFlightDates={hasFlightDates}
-        destinations={travelMemory.destinations.map(d => ({ city: d.city }))}
-        activeDestinationIndex={travelMemory.activeDestinationIndex}
+      {/* Destination input */}
+      <div className="flex items-center gap-2 p-2.5 rounded-xl border border-border/40 bg-muted/20">
+        <DestinationInput
+          value={activeAccommodation.city}
+          onChange={(value) => setDestination(value, activeAccommodation.country, activeAccommodation.countryCode)}
+          placeholder="Où allez-vous ?"
+          onLocationSelect={handleLocationSelect}
+        />
+      </div>
+
+      {/* Dates selector */}
+      <DateRangeSelector
+        checkIn={activeAccommodation.checkIn}
+        checkOut={activeAccommodation.checkOut}
+        onChange={handleDatesChange}
       />
+
+      {/* Travelers + Rooms row */}
+      <div className="flex gap-2 flex-wrap">
+        <TravelersSelector
+          adults={travelMemory.travelers.adults}
+          children={travelMemory.travelers.children}
+          childrenAges={travelMemory.travelers.childrenAges}
+          onChange={handleTravelersChange}
+        />
+        <RoomsSelector
+          rooms={rooms}
+          travelers={travelMemory.travelers}
+          useAuto={memory.useAutoRooms}
+          onChange={setCustomRooms}
+          onToggleAuto={toggleAutoRooms}
+        />
+      </div>
 
       {/* Budget per night - compact */}
       <div className="space-y-2">
@@ -743,7 +790,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
               onClick={() => handleBudgetPreset(preset)}
               className={cn(
                 "flex-1 py-2 rounded-lg text-xs font-medium transition-all",
-                memory.budgetPreset === preset
+                activeAccommodation.budgetPreset === preset
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border/30"
               )}
@@ -783,7 +830,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
             <ChipButton
               key={type.id}
               icon={type.icon}
-              selected={memory.types.includes(type.id)}
+              selected={activeAccommodation.types.includes(type.id)}
               onClick={() => toggleType(type.id)}
               compact
             >
@@ -803,7 +850,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
               onClick={() => setMinRating(option.value)}
               className={cn(
                 "flex-1 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1",
-                memory.minRating === option.value
+                activeAccommodation.minRating === option.value
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border/30"
               )}
@@ -823,7 +870,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
             <ChipButton
               key={amenity.id}
               icon={amenity.icon}
-              selected={memory.amenities.includes(amenity.id)}
+              selected={activeAccommodation.amenities.includes(amenity.id)}
               onClick={() => toggleAmenity(amenity.id)}
               compact
             >
@@ -850,7 +897,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
                 <ChipButton
                   key={meal.id}
                   icon={meal.icon}
-                  selected={memory.advancedFilters.mealPlan === meal.id}
+                  selected={activeAccommodation.advancedFilters.mealPlan === meal.id}
                   onClick={() => handleMealPlanToggle(meal.id)}
                   compact
                 >
@@ -868,7 +915,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
                 <ChipButton
                   key={view.id}
                   icon={view.icon}
-                  selected={memory.advancedFilters.views.includes(view.id)}
+                  selected={activeAccommodation.advancedFilters.views.includes(view.id)}
                   onClick={() => handleArrayToggle("views", view.id)}
                   compact
                 >
@@ -886,7 +933,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
                 <ChipButton
                   key={service.id}
                   icon={service.icon}
-                  selected={memory.advancedFilters.services.includes(service.id)}
+                  selected={activeAccommodation.advancedFilters.services.includes(service.id)}
                   onClick={() => handleArrayToggle("services", service.id)}
                   compact
                 >
@@ -904,7 +951,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
                 <ChipButton
                   key={access.id}
                   icon={access.icon}
-                  selected={memory.advancedFilters.accessibility.includes(access.id)}
+                  selected={activeAccommodation.advancedFilters.accessibility.includes(access.id)}
                   onClick={() => handleArrayToggle("accessibility", access.id)}
                   compact
                 >
