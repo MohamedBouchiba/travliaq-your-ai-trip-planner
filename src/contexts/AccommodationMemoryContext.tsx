@@ -124,6 +124,9 @@ interface AccommodationMemoryContextValue {
   // Reset
   resetMemory: () => void;
 
+  // Batch update (for sync operations that need atomic updates)
+  updateMemoryBatch: (updater: (prev: AccommodationMemory) => AccommodationMemory) => void;
+
   // Computed values
   isReadyToSearch: boolean;
   getRoomsSummary: () => string;
@@ -515,6 +518,11 @@ export function AccommodationMemoryProvider({ children }: { children: ReactNode 
     } catch {}
   }, []);
 
+  // Batch update for sync operations
+  const updateMemoryBatch = useCallback((updater: (prev: AccommodationMemory) => AccommodationMemory) => {
+    setMemory(updater);
+  }, []);
+
   // Computed values
   const isReadyToSearch = useMemo(() => {
     const active = getActiveAccommodation();
@@ -567,6 +575,7 @@ export function AccommodationMemoryProvider({ children }: { children: ReactNode 
     setDates,
     setDestination,
     resetMemory,
+    updateMemoryBatch,
     isReadyToSearch,
     getRoomsSummary,
     getTotalNights,

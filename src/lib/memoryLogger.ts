@@ -222,15 +222,15 @@ export function logAutoPropagation(
   memoryType: MemoryType,
   field: string,
   value: any,
-  protected: boolean
+  isProtected: boolean
 ): void {
   if (!loggingEnabled) return;
 
-  const action = protected ? 'AUTO_PROPAGATION_BLOCKED' : 'AUTO_PROPAGATION';
+  const action = isProtected ? 'AUTO_PROPAGATION_BLOCKED' : 'AUTO_PROPAGATION';
   const changes = {
     field,
     value,
-    protected,
+    isProtected,
   };
 
   logMemoryChange(memoryType, action, changes, field);

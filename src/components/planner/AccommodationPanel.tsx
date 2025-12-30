@@ -587,6 +587,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
     updateAdvancedFilters,
     setDates,
     setDestination,
+    updateMemoryBatch,
   } = useAccommodationMemory();
 
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
@@ -703,7 +704,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
 
       // CRITICAL FIX: Perform a single atomic update instead of multiple async calls
       // This prevents race conditions where memory.accommodations is stale
-      setMemory(prev => {
+      updateMemoryBatch(prev => {
         // 1. Remove obsolete accommodations (using fresh state)
         let newAccommodations = prev.accommodations.filter(
           a => !accommodationIdsToRemove.has(a.id)
