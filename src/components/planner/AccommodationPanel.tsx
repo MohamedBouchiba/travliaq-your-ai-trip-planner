@@ -14,8 +14,9 @@ import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useLocationAutocomplete, LocationResult } from "@/hooks/useLocationAutocomplete";
-import { differenceInDays } from "date-fns";
-import { DateRangePicker } from "@/components/DateRangePicker";
+import { differenceInDays, format } from "date-fns";
+import { fr } from "date-fns/locale";
+import RangeCalendar from "@/components/RangeCalendar";
 import type { DateRange } from "react-day-picker";
 
 interface AccommodationPanelProps {
@@ -380,7 +381,7 @@ function RoomsSelector({
   );
 }
 
-// Compact date range using shared DateRangePicker
+// Compact date range with inline style matching destination input
 function CompactDateRange({
   checkIn,
   checkOut,
@@ -391,31 +392,68 @@ function CompactDateRange({
   onChange: (checkIn: Date | null, checkOut: Date | null) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-
   const nights = checkIn && checkOut ? differenceInDays(checkOut, checkIn) : 0;
 
   const handleRangeChange = (range: DateRange | undefined) => {
     onChange(range?.from || null, range?.to || null);
+    // Auto-close when complete range selected
+    if (range?.from && range.to && range.from.getTime() !== range.to.getTime()) {
+      setTimeout(() => setIsOpen(false), 300);
+    }
   };
 
   const value: DateRange | undefined = checkIn ? { from: checkIn, to: checkOut || undefined } : undefined;
 
+  const formatDateCompact = (date: Date) => {
+    return format(date, "dd MMM", { locale: fr });
+  };
+
   return (
-    <div className="flex-1 min-w-0">
-      <DateRangePicker
-        value={value}
-        onChange={handleRangeChange}
-        disabled={(date) => date < new Date()}
-        open={isOpen}
-        onOpenChange={setIsOpen}
-        className="h-10 text-xs border-0 bg-transparent shadow-none px-0"
-      />
-      {checkIn && checkOut && nights > 0 && (
-        <div className="text-[10px] text-muted-foreground mt-0.5 pl-7">
-          {nights} nuit{nights > 1 ? "s" : ""}
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <button className="flex items-center gap-2 text-sm min-w-0">
+          <CalendarDays className="h-4 w-4 text-primary shrink-0" />
+          {checkIn && checkOut ? (
+            <span className="truncate text-foreground">
+              {formatDateCompact(checkIn)} → {formatDateCompact(checkOut)}
+              <span className="text-muted-foreground ml-1">({nights}n)</span>
+            </span>
+          ) : checkIn ? (
+            <span className="truncate text-foreground">
+              {formatDateCompact(checkIn)} → <span className="text-muted-foreground">Retour ?</span>
+            </span>
+          ) : (
+            <span className="text-muted-foreground truncate">Dates du séjour</span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="end" side="bottom" sideOffset={8}>
+        {/* Header with close button */}
+        <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-border/50">
+          <span className="text-sm font-medium">
+            {!checkIn && "Sélectionnez vos dates"}
+            {checkIn && !checkOut && "Choisissez la date de départ"}
+            {checkIn && checkOut && `${nights} nuit${nights > 1 ? "s" : ""} sélectionnée${nights > 1 ? "s" : ""}`}
+          </span>
+          <button
+            onClick={() => setIsOpen(false)}
+            className="h-6 w-6 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
+          >
+            <X className="h-4 w-4 text-muted-foreground" />
+          </button>
         </div>
-      )}
-    </div>
+        <div className="p-3">
+          <RangeCalendar
+            value={value}
+            onChange={handleRangeChange}
+            disabled={(date) => date < new Date()}
+            locale={fr}
+            weekStartsOn={1}
+            className="pointer-events-auto"
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -554,9 +592,18 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
     }
   }, [activeAccommodation]);
 
-  // Handle destination selection from autocomplete
+  // Track if user is typing vs selected from autocomplete
+  const [destinationInput, setDestinationInput] = useState(activeAccommodation?.city || "");
+  
+  // Sync input when switching accommodations
+  useEffect(() => {
+    setDestinationInput(activeAccommodation?.city || "");
+  }, [activeAccommodation?.id, activeAccommodation?.city]);
+
+  // Handle destination selection from autocomplete - ONLY here we update the real city
   const handleLocationSelect = (location: LocationResult) => {
     if (location.lat && location.lng) {
+      setDestinationInput(location.name);
       setDestination(
         location.name,
         location.country_name || "",
@@ -568,6 +615,11 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
         onMapMove([location.lng, location.lat], 12);
       }
     }
+  };
+  
+  // Handle input change - only updates local state, not the real destination
+  const handleDestinationInputChange = (value: string) => {
+    setDestinationInput(value);
   };
 
   // Handle adding new accommodation
@@ -682,17 +734,19 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
         </div>
       )}
 
-      {/* Destination + Dates on same row */}
-      <div className="flex items-start gap-2 p-2.5 rounded-xl border border-border/40 bg-muted/20">
+      {/* Destination + Dates on same row - clean design */}
+      <div className="flex items-center gap-3 p-3 rounded-xl border border-border/40 bg-card/50">
         {/* Destination */}
-        <div className="flex-1 min-w-0 border-r border-border/30 pr-2">
+        <div className="flex-1 min-w-0">
           <DestinationInput
-            value={activeAccommodation.city}
-            onChange={(value) => setDestination(value, activeAccommodation.country, activeAccommodation.countryCode)}
+            value={destinationInput}
+            onChange={handleDestinationInputChange}
             placeholder="Où allez-vous ?"
             onLocationSelect={handleLocationSelect}
           />
         </div>
+        {/* Separator */}
+        <div className="w-px h-6 bg-border/50" />
         {/* Dates */}
         <CompactDateRange
           checkIn={activeAccommodation.checkIn}
