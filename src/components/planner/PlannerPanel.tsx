@@ -700,13 +700,47 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
         // Resolve all airports for cities that don't have IATA codes
         const legSuggestions = await Promise.all(
           validLegs.map(async ({ leg, index }) => {
-            const fromCityName = leg.fromLocation?.name || leg.from?.split(",")[0]?.trim() || "";
-            const toCityName = leg.toLocation?.name || leg.to?.split(",")[0]?.trim() || "";
+            // Check if already has IATA code in the string (airport already selected)
+            const fromExistingIata = leg.from?.match(/\(([A-Z]{3})\)/)?.[1];
+            const toExistingIata = leg.to?.match(/\(([A-Z]{3})\)/)?.[1];
             
-            // Get airports for both origin and destination
+            // Extract city name properly - if it's an airport, use the location city or extract from name
+            const fromCityName = fromExistingIata 
+              ? (leg.fromLocation?.type === "airport" ? leg.fromLocation.country_name : leg.from?.split("(")[0]?.trim() || "")
+              : leg.fromLocation?.name || leg.from?.split(",")[0]?.trim() || "";
+            const toCityName = toExistingIata
+              ? (leg.toLocation?.type === "airport" ? leg.toLocation.country_name : leg.to?.split("(")[0]?.trim() || "")
+              : leg.toLocation?.name || leg.to?.split(",")[0]?.trim() || "";
+            
+            // Get airports for locations that don't already have IATA codes
             const [fromAirports, toAirports] = await Promise.all([
-              findNearestAirports(fromCityName, 3, leg.fromLocation?.country_code),
-              findNearestAirports(toCityName, 3, leg.toLocation?.country_code),
+              // If already has IATA, create fake result with that airport
+              fromExistingIata 
+                ? Promise.resolve({ 
+                    airports: [{ 
+                      iata: fromExistingIata, 
+                      name: leg.from?.split("(")[0]?.trim() || fromExistingIata,
+                      city_name: fromCityName,
+                      country_code: leg.fromLocation?.country_code || "",
+                      lat: leg.fromLocation?.lat || 0,
+                      lon: leg.fromLocation?.lng || 0,
+                      distance_km: 0
+                    }] 
+                  })
+                : findNearestAirports(fromCityName, 3, leg.fromLocation?.country_code),
+              toExistingIata
+                ? Promise.resolve({ 
+                    airports: [{ 
+                      iata: toExistingIata, 
+                      name: leg.to?.split("(")[0]?.trim() || toExistingIata,
+                      city_name: toCityName,
+                      country_code: leg.toLocation?.country_code || "",
+                      lat: leg.toLocation?.lat || 0,
+                      lon: leg.toLocation?.lng || 0,
+                      distance_km: 0
+                    }] 
+                  })
+                : findNearestAirports(toCityName, 3, leg.toLocation?.country_code),
             ]);
             
             // If we have airports, create suggestion data
@@ -714,12 +748,12 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
               return {
                 legIndex: index,
                 from: {
-                  city: fromCityName,
+                  city: fromCityName || fromAirports.airports[0].city_name || fromExistingIata || "",
                   suggestedAirport: fromAirports.airports[0],
                   alternativeAirports: fromAirports.airports.slice(1),
                 },
                 to: {
-                  city: toCityName,
+                  city: toCityName || toAirports.airports[0].city_name || toExistingIata || "",
                   suggestedAirport: toAirports.airports[0],
                   alternativeAirports: toAirports.airports.slice(1),
                 },
