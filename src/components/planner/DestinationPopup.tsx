@@ -20,11 +20,12 @@ const DestinationPopup = ({
 }: DestinationPopupProps) => {
   if (!isOpen || !position) return null;
 
-  // Position popup so its arrow points exactly to the clicked geographic point
+  // Position popup so its arrow tip matches the clicked geographic point
+  // The popup is translated up by 100%, and the arrow extends 8px below the card.
+  // So we shift the anchor up by 8px so the arrow tip lands exactly on the point.
   const popupStyle = {
     left: position.x,
-    // We anchor the popup bottom to the map point (small gap so the arrow is visible)
-    top: position.y - 10,
+    top: position.y - 8,
   };
 
   return (
@@ -40,6 +41,15 @@ const DestinationPopup = ({
             onClick={onClose}
           />
           
+          {/* Anchor dot exactly on the clicked point (helps disambiguate close cities) */}
+          <div
+            className="fixed z-[58] pointer-events-none"
+            style={{ left: position.x, top: position.y, transform: "translate(-50%, -50%)" }}
+            aria-hidden="true"
+          >
+            <div className="h-2.5 w-2.5 rounded-full bg-primary shadow-[0_0_0_6px_hsl(var(--primary)_/_0.18)]" />
+          </div>
+
           {/* Popup - anchored to the pin position */}
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 10 }}
@@ -90,14 +100,14 @@ const DestinationPopup = ({
               </div>
             </div>
 
-            {/* Arrow pointing down to the pin */}
-            <div 
+            {/* Arrow pointing down to the clicked point */}
+            <div
               className="absolute left-1/2 -translate-x-1/2 bottom-[-8px] w-0 h-0"
               style={{
                 borderLeft: "8px solid transparent",
                 borderRight: "8px solid transparent",
                 borderTop: "8px solid hsl(var(--card))",
-                filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.1))",
+                filter: "drop-shadow(0 2px 2px hsl(var(--foreground) / 0.12))",
               }}
             />
           </motion.div>
