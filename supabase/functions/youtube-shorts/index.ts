@@ -33,25 +33,19 @@ interface YouTubeSearchResponse {
 
 // Keywords that MUST be excluded - not travel related
 const EXCLUDE_KEYWORDS = [
-  // Entertainment
   "emperor", "empire", "comic", "comics", "movie", "film", "trailer", "game", "gaming",
   "song", "music", "album", "band", "anime", "cartoon", "byzantine", "roman emperor",
   "review", "unboxing", "reaction", "podcast", "interview", "news", "breaking",
   "meme", "funny", "prank", "challenge", "asmr",
-  // Airport/Aviation (we want the CITY not airport)
   "airport", "aéroport", "terminal", "runway", "landing", "takeoff", "atterrissage",
   "décollage", "plane spotting", "aviation", "flight review", "lounge review",
   "business class", "first class", "economy class",
-  // Sports
   "world cup", "fifa", "football match", "soccer", "basketball", "f1", "formula 1",
   "grand prix", "race", "stadium tour",
-  // Politics/News
   "politics", "election", "war", "conflict", "protest",
-  // Real estate/Business
   "real estate", "property", "investment", "crypto", "trading",
 ];
 
-// Keywords that indicate GOOD travel content
 const TRAVEL_POSITIVE_KEYWORDS = [
   "things to do", "que faire", "what to do", "must see", "must visit",
   "top 10", "top 5", "best places", "hidden gems", "travel guide",
@@ -61,13 +55,70 @@ const TRAVEL_POSITIVE_KEYWORDS = [
   "neighbourhood", "neighborhood", "quartier", "district",
 ];
 
-// Check if video is travel-related
+// Cache TTL: 24 hours in seconds
+const CACHE_TTL = 60 * 60 * 24;
+
+// Redis cache helpers using Upstash REST API
+async function getFromCache(key: string): Promise<YouTubeVideo[] | null> {
+  const redisUrl = Deno.env.get("UPSTASH_REDIS_REST_URL");
+  const redisToken = Deno.env.get("UPSTASH_REDIS_REST_TOKEN");
+  
+  if (!redisUrl || !redisToken) {
+    console.log("[youtube-shorts] Redis not configured, skipping cache");
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${redisUrl}/get/${encodeURIComponent(key)}`, {
+      headers: { Authorization: `Bearer ${redisToken}` },
+    });
+    
+    if (!response.ok) {
+      console.log(`[youtube-shorts] Cache miss or error for key: ${key}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    if (data.result) {
+      console.log(`[youtube-shorts] Cache HIT for key: ${key}`);
+      return JSON.parse(data.result);
+    }
+    
+    console.log(`[youtube-shorts] Cache miss for key: ${key}`);
+    return null;
+  } catch (error) {
+    console.error("[youtube-shorts] Redis GET error:", error);
+    return null;
+  }
+}
+
+async function setInCache(key: string, value: YouTubeVideo[]): Promise<void> {
+  const redisUrl = Deno.env.get("UPSTASH_REDIS_REST_URL");
+  const redisToken = Deno.env.get("UPSTASH_REDIS_REST_TOKEN");
+  
+  if (!redisUrl || !redisToken) {
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `${redisUrl}/set/${encodeURIComponent(key)}/${encodeURIComponent(JSON.stringify(value))}/ex/${CACHE_TTL}`,
+      { headers: { Authorization: `Bearer ${redisToken}` } }
+    );
+    
+    if (response.ok) {
+      console.log(`[youtube-shorts] Cached ${value.length} videos for key: ${key} (TTL: ${CACHE_TTL}s)`);
+    }
+  } catch (error) {
+    console.error("[youtube-shorts] Redis SET error:", error);
+  }
+}
+
 function isTravelContent(video: YouTubeVideo): boolean {
   const titleLower = video.title.toLowerCase();
   const descLower = video.description.toLowerCase();
   const combined = `${titleLower} ${descLower}`;
   
-  // EXCLUDE: Check for bad keywords
   for (const keyword of EXCLUDE_KEYWORDS) {
     if (combined.includes(keyword.toLowerCase())) {
       console.log(`[youtube-shorts] Excluding "${video.title}" - contains "${keyword}"`);
@@ -75,7 +126,6 @@ function isTravelContent(video: YouTubeVideo): boolean {
     }
   }
   
-  // PREFER: Check for travel-positive keywords (bonus but not required)
   let hasPositiveKeyword = false;
   for (const keyword of TRAVEL_POSITIVE_KEYWORDS) {
     if (combined.includes(keyword.toLowerCase())) {
@@ -91,14 +141,11 @@ function isTravelContent(video: YouTubeVideo): boolean {
   return true;
 }
 
-// Search YouTube with travel-focused query
 async function searchYouTube(apiKey: string, city: string, country?: string): Promise<YouTubeVideo[]> {
-  // Build a travel-focused search query
-  // Using "things to do in [city]" which is the most common travel search
   const locationQuery = country ? `${city} ${country}` : city;
   const searchQuery = `things to do in ${locationQuery} travel #shorts`;
   
-  console.log(`[youtube-shorts] Searching: "${searchQuery}"`);
+  console.log(`[youtube-shorts] Searching YouTube: "${searchQuery}"`);
   
   const searchParams = new URLSearchParams({
     part: "snippet",
@@ -116,9 +163,7 @@ async function searchYouTube(apiKey: string, city: string, country?: string): Pr
 
   try {
     const response = await fetch(searchUrl, {
-      headers: {
-        "Referer": "https://cinbnmlfpffmyjmkwbco.supabase.co",
-      },
+      headers: { "Referer": "https://cinbnmlfpffmyjmkwbco.supabase.co" },
     });
 
     if (!response.ok) {
@@ -140,7 +185,6 @@ async function searchYouTube(apiKey: string, city: string, country?: string): Pr
       publishedAt: item.snippet.publishedAt,
     }));
 
-    // Filter for travel content only, take top 6
     const travelVideos = videos.filter(v => isTravelContent(v)).slice(0, 6);
     
     console.log(`[youtube-shorts] Found ${videos.length} total, ${travelVideos.length} travel videos for ${city}`);
@@ -178,7 +222,29 @@ serve(async (req) => {
 
     console.log(`[youtube-shorts] Request for: ${city}${country ? `, ${country}` : ""}`);
 
+    // Build cache key
+    const cacheKey = `yt:shorts:${city.toLowerCase().replace(/\s+/g, "_")}${country ? `:${country.toLowerCase().replace(/\s+/g, "_")}` : ""}`;
+
+    // Try cache first
+    const cachedVideos = await getFromCache(cacheKey);
+    if (cachedVideos) {
+      return new Response(
+        JSON.stringify({
+          city,
+          country,
+          videos: cachedVideos,
+          count: cachedVideos.length,
+          cached: true,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Fetch from YouTube API
     const videos = await searchYouTube(apiKey, city, country);
+
+    // Cache the result (even if empty to avoid repeated calls)
+    await setInCache(cacheKey, videos);
 
     return new Response(
       JSON.stringify({
@@ -186,11 +252,9 @@ serve(async (req) => {
         country,
         videos,
         count: videos.length,
+        cached: false,
       }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
   } catch (error) {
