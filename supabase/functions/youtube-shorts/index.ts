@@ -13,6 +13,7 @@ interface YouTubeVideo {
   channelTitle: string;
   publishedAt: string;
   category: string;
+  categoryEmoji: string;
 }
 
 interface YouTubeSearchResponse {
@@ -32,19 +33,21 @@ interface YouTubeSearchResponse {
   }[];
 }
 
+// Search categories for better variety
+const SEARCH_CATEGORIES = [
+  { query: "things to do", label: "À découvrir", emoji: "🎯" },
+  { query: "best food street food", label: "Gastronomie", emoji: "🍜" },
+  { query: "hidden gems secret spots", label: "Pépites cachées", emoji: "💎" },
+  { query: "walking tour", label: "Balade", emoji: "🚶" },
+];
+
 // Keywords to exclude non-travel content
 const EXCLUDE_KEYWORDS = [
   "emperor", "empire", "comic", "comics", "movie", "film", "game", "gaming",
   "song", "music", "album", "band", "anime", "cartoon", "byzantine", "roman emperor",
   "airport", "aéroport", "terminal", "runway", "landing", "takeoff", "atterrissage",
-  "décollage", "plane spotting", "aviation", "flight review",
-];
-
-// Keywords that indicate good travel content
-const TRAVEL_INDICATORS = [
-  "visit", "things to do", "travel guide", "tourist", "tourism", "explore",
-  "walking tour", "street food", "hidden gems", "must see", "best places",
-  "visite", "à voir", "que faire", "incontournable", "découvrir", "voyage",
+  "décollage", "plane spotting", "aviation", "flight review", "review", "unboxing",
+  "reaction", "podcast", "interview", "news", "breaking",
 ];
 
 // Filter for travel content and exclude bad content
@@ -64,6 +67,42 @@ function isAcceptable(video: YouTubeVideo): boolean {
   return true;
 }
 
+// Detect category from video content
+function detectCategory(video: { title: string; description: string }): { label: string; emoji: string } {
+  const combined = `${video.title} ${video.description}`.toLowerCase();
+  
+  if (combined.includes("food") || combined.includes("eat") || combined.includes("restaurant") || 
+      combined.includes("cuisine") || combined.includes("street food") || combined.includes("manger")) {
+    return { label: "Gastronomie", emoji: "🍜" };
+  }
+  if (combined.includes("hidden") || combined.includes("secret") || combined.includes("local") ||
+      combined.includes("caché") || combined.includes("pépite")) {
+    return { label: "Pépites cachées", emoji: "💎" };
+  }
+  if (combined.includes("walk") || combined.includes("tour") || combined.includes("balade") ||
+      combined.includes("visite")) {
+    return { label: "Balade", emoji: "🚶" };
+  }
+  if (combined.includes("beach") || combined.includes("nature") || combined.includes("park") ||
+      combined.includes("plage") || combined.includes("montagne")) {
+    return { label: "Nature", emoji: "🌴" };
+  }
+  if (combined.includes("nightlife") || combined.includes("bar") || combined.includes("club") ||
+      combined.includes("night") || combined.includes("nuit")) {
+    return { label: "Vie nocturne", emoji: "🌙" };
+  }
+  if (combined.includes("museum") || combined.includes("history") || combined.includes("culture") ||
+      combined.includes("musée") || combined.includes("histoire")) {
+    return { label: "Culture", emoji: "🏛️" };
+  }
+  if (combined.includes("shop") || combined.includes("market") || combined.includes("marché") ||
+      combined.includes("souk") || combined.includes("bazaar")) {
+    return { label: "Shopping", emoji: "🛍️" };
+  }
+  
+  return { label: "À découvrir", emoji: "🎯" };
+}
+
 // Single optimized search - only 1 API call per city
 async function searchYouTube(apiKey: string, city: string): Promise<YouTubeVideo[]> {
   // Query focused on travel/tourism content, NOT airports
@@ -74,7 +113,7 @@ async function searchYouTube(apiKey: string, city: string): Promise<YouTubeVideo
     q: searchQuery,
     type: "video",
     videoDuration: "short",
-    maxResults: "8", // Get 8, filter down to 4
+    maxResults: "12", // Get more to have variety after filtering
     order: "viewCount", // Sort by views - most popular first
     safeSearch: "moderate",
     key: apiKey,
@@ -97,20 +136,28 @@ async function searchYouTube(apiKey: string, city: string): Promise<YouTubeVideo
 
     const data: YouTubeSearchResponse = await response.json();
 
-    const videos = (data.items || []).map((item) => ({
-      id: item.id.videoId,
-      title: item.snippet.title,
-      description: item.snippet.description,
-      thumbnail: item.snippet.thumbnails.high?.url ||
-                 item.snippet.thumbnails.medium?.url ||
-                 item.snippet.thumbnails.default?.url || "",
-      channelTitle: item.snippet.channelTitle,
-      publishedAt: item.snippet.publishedAt,
-      category: "travel",
-    }));
+    const videos = (data.items || []).map((item) => {
+      const detected = detectCategory({ 
+        title: item.snippet.title, 
+        description: item.snippet.description 
+      });
+      
+      return {
+        id: item.id.videoId,
+        title: item.snippet.title,
+        description: item.snippet.description,
+        thumbnail: item.snippet.thumbnails.high?.url ||
+                   item.snippet.thumbnails.medium?.url ||
+                   item.snippet.thumbnails.default?.url || "",
+        channelTitle: item.snippet.channelTitle,
+        publishedAt: item.snippet.publishedAt,
+        category: detected.label,
+        categoryEmoji: detected.emoji,
+      };
+    });
 
-    // Filter and take only top 4
-    const acceptable = videos.filter(v => isAcceptable(v)).slice(0, 4);
+    // Filter and take only top 6
+    const acceptable = videos.filter(v => isAcceptable(v)).slice(0, 6);
     
     console.log(`[youtube-shorts] Found ${videos.length}, returning ${acceptable.length} (sorted by views)`);
     

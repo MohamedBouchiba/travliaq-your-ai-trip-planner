@@ -12,6 +12,7 @@ interface YouTubeVideo {
   channelTitle: string;
   publishedAt: string;
   category?: string;
+  categoryEmoji?: string;
 }
 
 interface YouTubeShortsPanelProps {
@@ -201,7 +202,7 @@ const YouTubeShortsPanel = ({ city, countryName, isOpen, onClose }: YouTubeShort
           ref={containerRef}
         >
           {/* Header */}
-          <header className="absolute top-0 left-0 right-0 z-30 flex items-center gap-2 p-3 bg-gradient-to-b from-background/90 to-transparent">
+          <header className="absolute top-0 left-0 right-0 z-30 flex items-center gap-2 p-3 bg-gradient-to-b from-background/95 to-transparent">
             <button
               onClick={() => {
                 if (mode === "player") setMode("list");
@@ -214,8 +215,12 @@ const YouTubeShortsPanel = ({ city, countryName, isOpen, onClose }: YouTubeShort
             </button>
 
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-foreground truncate">{city}</p>
-              {countryName && <p className="text-xs text-muted-foreground truncate">{countryName}</p>}
+              <p className="text-base font-semibold text-foreground truncate">
+                {videos.length > 0 ? `${videos.length} choses à faire` : city}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">
+                {countryName ? `${city}, ${countryName}` : city}
+              </p>
             </div>
 
             <button
@@ -287,20 +292,34 @@ const YouTubeShortsPanel = ({ city, countryName, isOpen, onClose }: YouTubeShort
                       <button
                         key={v.id}
                         onClick={() => openPlayerAt(idx)}
-                        className="group w-full text-left rounded-xl border border-border bg-card hover:bg-muted/30 transition-colors overflow-hidden"
+                        className="group w-full text-left rounded-xl border border-border bg-card hover:bg-muted/30 hover:border-primary/30 transition-all overflow-hidden"
                       >
                         <div className="flex gap-3 p-3">
-                          <div className="h-16 w-12 rounded-lg bg-muted overflow-hidden flex-shrink-0">
+                          {/* Thumbnail with number overlay */}
+                          <div className="relative h-20 w-14 rounded-lg bg-muted overflow-hidden flex-shrink-0">
                             <img
                               src={v.thumbnail}
                               alt={`Aperçu vidéo ${city}`}
                               loading="lazy"
-                              className="h-full w-full object-cover"
+                              className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
                             />
+                            {/* Number badge */}
+                            <div className="absolute top-1 left-1 h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center shadow-md">
+                              {idx + 1}
+                            </div>
+                            {/* Play overlay on hover */}
+                            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <div className="h-8 w-8 rounded-full bg-white/90 flex items-center justify-center">
+                                <div className="w-0 h-0 border-t-[6px] border-t-transparent border-l-[10px] border-l-primary border-b-[6px] border-b-transparent ml-0.5" />
+                              </div>
+                            </div>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-foreground line-clamp-2">{v.title}</p>
-                            <p className="text-xs text-muted-foreground truncate mt-1">{v.category ? v.category : "Vidéo"}</p>
+                          <div className="min-w-0 flex-1 flex flex-col justify-center">
+                            <p className="text-sm font-medium text-foreground line-clamp-2 leading-tight">{v.title}</p>
+                            <div className="flex items-center gap-1.5 mt-1.5">
+                              <span className="text-sm">{v.categoryEmoji || "🎯"}</span>
+                              <span className="text-xs text-muted-foreground">{v.category || "À découvrir"}</span>
+                            </div>
                           </div>
                         </div>
                       </button>
