@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef } from "react";
+import { useCallback, useState, useRef, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import PlannerMap, { DestinationClickEvent } from "@/components/planner/PlannerMap";
@@ -41,8 +41,18 @@ export interface UserLocation {
   city: string;
 }
 
+const ACTIVE_TAB_KEY = "travliaq_planner_active_tab";
+
 const TravelPlanner = () => {
-  const [activeTab, setActiveTab] = useState<TabType>("flights");
+  // Restore last active tab from localStorage or default to flights
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    if (typeof window === "undefined") return "flights";
+    const saved = localStorage.getItem(ACTIVE_TAB_KEY);
+    if (saved && ["flights", "activities", "stays", "preferences"].includes(saved)) {
+      return saved as TabType;
+    }
+    return "flights";
+  });
   const [selectedPin, setSelectedPin] = useState<MapPin | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>([0, 20]); // Globe view
   const [mapZoom, setMapZoom] = useState(1.5); // Zoom out to see globe
@@ -55,6 +65,11 @@ const TravelPlanner = () => {
   const [triggerFlightSearch, setTriggerFlightSearch] = useState(false);
   const searchMessageSentRef = useRef(false);
   const chatRef = useRef<PlannerChatRef>(null);
+
+  // Persist active tab changes
+  useEffect(() => {
+    localStorage.setItem(ACTIVE_TAB_KEY, activeTab);
+  }, [activeTab]);
 
   // Destination popup state
   const [destinationPopup, setDestinationPopup] = useState<{
@@ -209,9 +224,8 @@ const TravelPlanner = () => {
                 animateToUserLocation={!initialAnimationDone}
                 onAnimationComplete={() => {
                   setInitialAnimationDone(true);
-                  // Open the flights panel after the animation to show user's location
+                  // Open panel with the restored/active tab (don't force flights)
                   setIsPanelVisible(true);
-                  setActiveTab("flights");
                 }}
                 isPanelOpen={isPanelVisible}
                 userLocation={initialAnimationDone ? userLocation : null}
