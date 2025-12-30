@@ -782,33 +782,33 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
             />
           </div>
           
-          {/* Budget compact */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground shrink-0">Budget/nuit</span>
-            <div className="flex gap-1 flex-1">
+          {/* Budget - sur 2 lignes */}
+          <div className="space-y-2">
+            <span className="text-xs text-muted-foreground">Budget par nuit</span>
+            <div className="flex gap-1.5">
               {(["eco", "comfort", "premium"] as BudgetPreset[]).map((preset) => (
                 <button
                   key={preset}
                   onClick={() => handleBudgetPreset(preset)}
                   className={cn(
-                    "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all",
+                    "flex-1 py-2 rounded-lg text-xs font-medium transition-all",
                     activeAccommodation.budgetPreset === preset
                       ? "bg-primary text-primary-foreground"
-                      : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                      : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border/30"
                   )}
                 >
                   {BUDGET_PRESETS[preset].label}
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
               <Input
                 type="number"
                 value={customMin}
                 onChange={(e) => setCustomMin(e.target.value)}
                 onBlur={handleCustomBudgetBlur}
                 placeholder="Min"
-                className="text-center text-xs h-7 w-14"
+                className="text-center text-xs h-8 flex-1"
               />
               <span className="text-muted-foreground text-xs">-</span>
               <Input
@@ -817,7 +817,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
                 onChange={(e) => setCustomMax(e.target.value)}
                 onBlur={handleCustomBudgetBlur}
                 placeholder="Max"
-                className="text-center text-xs h-7 w-14"
+                className="text-center text-xs h-8 flex-1"
               />
               <span className="text-muted-foreground text-xs">€</span>
             </div>
