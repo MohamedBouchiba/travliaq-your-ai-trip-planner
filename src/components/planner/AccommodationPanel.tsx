@@ -660,6 +660,12 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
       
       if (destinationInfos.length === 0) return;
       
+      // First, remove default empty accommodations (no city set)
+      const emptyAccommodations = memory.accommodations.filter(a => !a.city);
+      emptyAccommodations.forEach(acc => {
+        removeAccommodation(acc.id);
+      });
+      
       destinationInfos.forEach((dest) => {
         const existingIndex = memory.accommodations.findIndex(
           a => a.city?.toLowerCase() === dest.city.toLowerCase()
@@ -673,7 +679,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
               checkOut: dest.checkOut || existing.checkOut,
             });
           }
-        } else if (destinationInfos.length > 1) {
+        } else {
           addAccommodation({
             city: dest.city,
             country: dest.country,
@@ -739,7 +745,8 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
     flightMemory.returnDate, 
     memory.accommodations, 
     addAccommodation, 
-    updateAccommodation
+    updateAccommodation,
+    removeAccommodation
   ]);
 
   // Handle destination selection from autocomplete - ONLY here we update the real city
