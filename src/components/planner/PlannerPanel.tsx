@@ -98,7 +98,7 @@ const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVis
         )}
         <div className="flex-1 overflow-y-auto themed-scroll p-4 max-h-[calc(100vh-8rem)]">
           <div style={{ display: activeTab === "flights" ? "block" : "none" }}>
-            <FlightsPanel onMapMove={onMapMove} onFlightRoutesChange={onFlightRoutesChange} flightFormData={flightFormData} onFlightFormDataConsumed={onFlightFormDataConsumed} onCountrySelected={onCountrySelected} onAskAirportChoice={onAskAirportChoice} onAskDualAirportChoice={onAskDualAirportChoice} selectedAirport={selectedAirport} onSelectedAirportConsumed={onSelectedAirportConsumed} onUserLocationDetected={onUserLocationDetected} onSearchReady={onSearchReady} triggerSearch={triggerSearch} onSearchTriggered={onSearchTriggered} />
+            <FlightsPanel onMapMove={onMapMove} onFlightRoutesChange={onFlightRoutesChange} flightFormData={flightFormData} onFlightFormDataConsumed={onFlightFormDataConsumed} onCountrySelected={onCountrySelected} onAskAirportChoice={onAskAirportChoice} onAskDualAirportChoice={onAskDualAirportChoice} onAskAirportConfirmation={onAskAirportConfirmation} selectedAirport={selectedAirport} onSelectedAirportConsumed={onSelectedAirportConsumed} onUserLocationDetected={onUserLocationDetected} onSearchReady={onSearchReady} triggerSearch={triggerSearch} onSearchTriggered={onSearchTriggered} confirmedMultiAirports={confirmedMultiAirports} onConfirmedMultiAirportsConsumed={onConfirmedMultiAirportsConsumed} />
           </div>
           <div style={{ display: activeTab === "activities" ? "block" : "none" }}>
             <ActivitiesPanel />
@@ -166,7 +166,7 @@ interface FlightOptions {
 }
 
 // Flights Panel
-const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed, onCountrySelected, onAskAirportChoice, onAskDualAirportChoice, selectedAirport, onSelectedAirportConsumed, onUserLocationDetected, onSearchReady, triggerSearch, onSearchTriggered }: { 
+const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFlightFormDataConsumed, onCountrySelected, onAskAirportChoice, onAskDualAirportChoice, onAskAirportConfirmation, selectedAirport, onSelectedAirportConsumed, onUserLocationDetected, onSearchReady, triggerSearch, onSearchTriggered, confirmedMultiAirports, onConfirmedMultiAirportsConsumed }: { 
   onMapMove: (center: [number, number], zoom: number) => void;
   onFlightRoutesChange?: (routes: FlightRoutePoint[]) => void;
   flightFormData?: FlightFormData | null;
@@ -174,12 +174,15 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
   onCountrySelected?: (event: CountrySelectionEvent) => void;
   onAskAirportChoice?: (choice: AirportChoice) => void;
   onAskDualAirportChoice?: (choices: DualAirportChoice) => void;
+  onAskAirportConfirmation?: (data: AirportConfirmationData) => void;
   selectedAirport?: SelectedAirport | null;
   onSelectedAirportConsumed?: () => void;
   onUserLocationDetected?: (location: UserLocation) => void;
   onSearchReady?: (from: string, to: string) => void;
   triggerSearch?: boolean;
   onSearchTriggered?: () => void;
+  confirmedMultiAirports?: ConfirmedAirports | null;
+  onConfirmedMultiAirportsConsumed?: () => void;
 }) => {
   // Access flight memory for synchronization
   const { memory, updateMemory } = useFlightMemory();
@@ -678,10 +681,9 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     return null;
   };
 
-  // Handle search button click - check for countries/cities/airports first
-  // For multi-destination, searches ALL legs in parallel
+  // Handle search button click - resolve airports and ask for confirmation in chat
   const handleSearchClick = async () => {
-    // For multi-destination, search all valid legs in parallel
+    // For multi-destination, collect all airport suggestions and ask for confirmation
     if (tripType === "multi") {
       // Find all complete legs
       const validLegs = legs.map((leg, idx) => ({
@@ -692,127 +694,63 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
 
       if (validLegs.length === 0) return;
 
-      setIsMultiSearching(true);
-      setIsSearchingFlights(true);
       setIsSearchingAirports(true);
 
       try {
-        // First, resolve all airports for cities that don't have IATA codes
-        const resolvedLegs = await Promise.all(
+        // Resolve all airports for cities that don't have IATA codes
+        const legSuggestions = await Promise.all(
           validLegs.map(async ({ leg, index }) => {
-            const [fromResolved, toResolved] = await Promise.all([
-              resolveAirportCode(leg.from, leg.fromLocation),
-              resolveAirportCode(leg.to, leg.toLocation),
+            const fromCityName = leg.fromLocation?.name || leg.from?.split(",")[0]?.trim() || "";
+            const toCityName = leg.toLocation?.name || leg.to?.split(",")[0]?.trim() || "";
+            
+            // Get airports for both origin and destination
+            const [fromAirports, toAirports] = await Promise.all([
+              findNearestAirports(fromCityName, 3, leg.fromLocation?.country_code),
+              findNearestAirports(toCityName, 3, leg.toLocation?.country_code),
             ]);
             
-            // Update leg display if we found airports
-            if (fromResolved && leg.from !== fromResolved.displayName) {
-              setLegs(prev => prev.map((l, i) => 
-                i === index ? { ...l, from: fromResolved.displayName } : l
-              ));
+            // If we have airports, create suggestion data
+            if (fromAirports?.airports?.length && toAirports?.airports?.length) {
+              return {
+                legIndex: index,
+                from: {
+                  city: fromCityName,
+                  suggestedAirport: fromAirports.airports[0],
+                  alternativeAirports: fromAirports.airports.slice(1),
+                },
+                to: {
+                  city: toCityName,
+                  suggestedAirport: toAirports.airports[0],
+                  alternativeAirports: toAirports.airports.slice(1),
+                },
+                date: leg.date,
+              };
             }
-            if (toResolved && leg.to !== toResolved.displayName) {
-              setLegs(prev => prev.map((l, i) => 
-                i === index ? { ...l, to: toResolved.displayName } : l
-              ));
-            }
-            
-            return {
-              leg,
-              index,
-              fromIata: fromResolved?.iata || "",
-              toIata: toResolved?.iata || "",
-              fromDisplay: fromResolved?.displayName || leg.from,
-              toDisplay: toResolved?.displayName || leg.to,
-            };
+            return null;
           })
         );
-        
+
         setIsSearchingAirports(false);
         
-        // Filter out legs without valid IATA codes
-        const searchableLegs = resolvedLegs.filter(l => l.fromIata && l.toIata);
+        // Filter out null results
+        const validSuggestions = legSuggestions.filter((s): s is NonNullable<typeof s> => s !== null);
         
-        if (searchableLegs.length === 0) {
-          console.warn("[FlightsPanel] No valid airport codes found");
-          setIsMultiSearching(false);
-          setIsSearchingFlights(false);
+        if (validSuggestions.length === 0) {
+          console.warn("[FlightsPanel] No valid airport suggestions found");
           return;
         }
 
-        // Search all legs in parallel
-        const searchPromises = searchableLegs.map(async ({ leg, index, fromIata, toIata }) => {
-          const adults = passengers.filter(p => p.type === "adult").length;
-          const children = passengers.filter(p => p.type === "child").length;
-          const cabinClassMap = { economy: "ECONOMY", business: "BUSINESS", first: "FIRST" };
-
-          const requestBody = {
-            origin: fromIata,
-            destination: toIata,
-            departureDate: leg.date ? leg.date.toISOString().split('T')[0] : undefined,
-            adults,
-            children,
-            cabinClass: cabinClassMap[travelClass],
-            currency: "EUR",
-            languageCode: "fr",
-            countryCode: "FR",
-          };
-
-          console.log(`[FlightsPanel] Searching leg ${index + 1}:`, requestBody);
-
-          try {
-            const response = await fetch(
-              "https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/flight-search",
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(requestBody),
-              }
-            );
-
-            if (!response.ok) {
-              throw new Error(`API error: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log(`[FlightsPanel] Leg ${index + 1}: received ${data.count} flights`);
-            
-            return {
-              index,
-              flights: data.flights && data.flights.length > 0 
-                ? data.flights 
-                : generateMockFlights(leg.from || "", leg.to || ""),
-            };
-          } catch (error) {
-            console.error(`[FlightsPanel] Leg ${index + 1} search error:`, error);
-            return {
-              index,
-              flights: generateMockFlights(leg.from || "", leg.to || ""),
-            };
-          }
-        });
-
-        const results = await Promise.all(searchPromises);
+        // Ask for confirmation in chat
+        onAskAirportConfirmation?.({ legs: validSuggestions });
         
-        // Store all results
-        const resultsMap: Record<number, FlightOffer[]> = {};
-        results.forEach(r => {
-          resultsMap[r.index] = r.flights;
-        });
-        setAllLegResults(resultsMap);
-        
-        // Show results for first valid leg
-        setViewingLegIndex(searchableLegs[0].index);
-        setFlightResults(resultsMap[searchableLegs[0].index] || []);
-      } finally {
-        setIsMultiSearching(false);
-        setIsSearchingFlights(false);
+      } catch (error) {
+        console.error("[FlightsPanel] Error resolving airports:", error);
         setIsSearchingAirports(false);
       }
       return;
     }
 
-    // For simple trips (roundtrip/oneway), original logic
+    // For simple trips (roundtrip/oneway), same logic but with confirmation widget
     const targetLeg = legs[0];
     if (!targetLeg?.from?.trim() || !targetLeg?.to?.trim() || !targetLeg?.date) return;
     
@@ -861,66 +799,185 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
         }
       }
       
-      // Check if "from" is a city (no IATA code in parentheses)
+      // Check if both already have IATA codes
       const fromHasAirport = /\([A-Z]{3}\)/.test(targetLeg.from);
       const toHasAirport = /\([A-Z]{3}\)/.test(targetLeg.to);
       
-      let updatedFrom = targetLeg.from;
-      let updatedTo = targetLeg.to;
+      // If both already have airport codes, search directly
+      if (fromHasAirport && toHasAirport) {
+        setIsSearchingAirports(false);
+        performFlightSearch(targetLeg.from, targetLeg.to, 0);
+        return;
+      }
       
-      let fromChoice: AirportChoice | undefined;
-      let toChoice: AirportChoice | undefined;
-      
+      // Otherwise, get airports and ask for confirmation
       const fromCityName = targetLeg.fromLocation?.name || targetLeg.from.split(",")[0].trim();
       const toCityName = targetLeg.toLocation?.name || targetLeg.to.split(",")[0].trim();
       
-      const [fromResult, toResult] = await Promise.all([
-        !fromHasAirport ? getAirportsForCity(fromCityName) : null,
-        !toHasAirport ? getAirportsForCity(toCityName) : null,
+      const [fromAirports, toAirports] = await Promise.all([
+        !fromHasAirport ? findNearestAirports(fromCityName, 3, targetLeg.fromLocation?.country_code) : null,
+        !toHasAirport ? findNearestAirports(toCityName, 3, targetLeg.toLocation?.country_code) : null,
       ]);
       
-      if (fromResult) {
-        if (fromResult.airports.length === 1) {
-          const airport = fromResult.airports[0];
-          updatedFrom = `${airport.name} (${airport.iata})`;
-          setLegs((prev) => prev.map((leg, idx) => 
-            idx === 0 ? { ...leg, from: updatedFrom } : leg
-          ));
-        } else if (fromResult.airports.length > 1) {
-          fromChoice = { field: "from", cityName: fromResult.cityName, airports: fromResult.airports };
-        }
-      }
+      // Build suggestion for single trip
+      const fromData = fromAirports?.airports?.length 
+        ? { city: fromCityName, suggestedAirport: fromAirports.airports[0], alternativeAirports: fromAirports.airports.slice(1) }
+        : null;
+      const toData = toAirports?.airports?.length 
+        ? { city: toCityName, suggestedAirport: toAirports.airports[0], alternativeAirports: toAirports.airports.slice(1) }
+        : null;
       
-      if (toResult) {
-        if (toResult.airports.length === 1) {
-          const airport = toResult.airports[0];
-          updatedTo = `${airport.name} (${airport.iata})`;
-          setLegs((prev) => prev.map((leg, idx) => 
-            idx === 0 ? { ...leg, to: updatedTo } : leg
-          ));
-        } else if (toResult.airports.length > 1) {
-          toChoice = { field: "to", cityName: toResult.cityName, airports: toResult.airports };
-        }
-      }
+      // If we found airports, check if there are multiple choices
+      const fromHasMultiple = (fromAirports?.airports?.length || 0) > 1;
+      const toHasMultiple = (toAirports?.airports?.length || 0) > 1;
       
-      if (fromChoice && toChoice) {
-        onAskDualAirportChoice?.({ from: fromChoice, to: toChoice });
-        return;
-      }
-      if (fromChoice) {
-        onAskAirportChoice?.(fromChoice);
-        return;
-      }
-      if (toChoice) {
-        onAskAirportChoice?.(toChoice);
+      if (fromData && toData && (fromHasMultiple || toHasMultiple)) {
+        // Show confirmation widget with dropdowns
+        onAskAirportConfirmation?.({
+          legs: [{
+            legIndex: 0,
+            from: fromData,
+            to: toData,
+            date: targetLeg.date,
+          }],
+        });
+        setIsSearchingAirports(false);
         return;
       }
       
+      // If only one airport each, auto-select and search
+      let updatedFrom = targetLeg.from;
+      let updatedTo = targetLeg.to;
+      
+      if (fromData) {
+        const airport = fromData.suggestedAirport;
+        updatedFrom = `${airport.name} (${airport.iata})`;
+        setLegs((prev) => prev.map((leg, idx) => 
+          idx === 0 ? { ...leg, from: updatedFrom } : leg
+        ));
+      }
+      
+      if (toData) {
+        const airport = toData.suggestedAirport;
+        updatedTo = `${airport.name} (${airport.iata})`;
+        setLegs((prev) => prev.map((leg, idx) => 
+          idx === 0 ? { ...leg, to: updatedTo } : leg
+        ));
+      }
+      
+      setIsSearchingAirports(false);
       performFlightSearch(updatedFrom, updatedTo, 0);
-    } finally {
+    } catch (error) {
+      console.error("[FlightsPanel] Error in handleSearchClick:", error);
       setIsSearchingAirports(false);
     }
   };
+
+  // Handle confirmed airports from chat widget - execute the actual search
+  useEffect(() => {
+    if (!confirmedMultiAirports) return;
+    
+    const executeSearch = async () => {
+      setIsMultiSearching(true);
+      setIsSearchingFlights(true);
+      
+      try {
+        // For multi-destination
+        if (tripType === "multi" && confirmedMultiAirports.legs.length > 1) {
+          // Update legs display with confirmed airports
+          confirmedMultiAirports.legs.forEach(confirmed => {
+            setLegs(prev => prev.map((leg, idx) => 
+              idx === confirmed.legIndex 
+                ? { ...leg, from: confirmed.fromDisplay, to: confirmed.toDisplay }
+                : leg
+            ));
+          });
+          
+          // Search all legs in parallel
+          const searchPromises = confirmedMultiAirports.legs.map(async (confirmed) => {
+            const adults = passengers.filter(p => p.type === "adult").length;
+            const children = passengers.filter(p => p.type === "child").length;
+            const cabinClassMap = { economy: "ECONOMY", business: "BUSINESS", first: "FIRST" };
+
+            const requestBody = {
+              origin: confirmed.fromIata,
+              destination: confirmed.toIata,
+              departureDate: confirmed.date ? confirmed.date.toISOString().split('T')[0] : undefined,
+              adults,
+              children,
+              cabinClass: cabinClassMap[travelClass],
+              currency: "EUR",
+              languageCode: "fr",
+              countryCode: "FR",
+            };
+
+            console.log(`[FlightsPanel] Searching confirmed leg ${confirmed.legIndex + 1}:`, requestBody);
+
+            try {
+              const response = await fetch(
+                "https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/flight-search",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(requestBody),
+                }
+              );
+
+              if (!response.ok) {
+                throw new Error(`API error: ${response.status}`);
+              }
+
+              const data = await response.json();
+              console.log(`[FlightsPanel] Confirmed leg ${confirmed.legIndex + 1}: received ${data.count} flights`);
+              
+              return {
+                index: confirmed.legIndex,
+                flights: data.flights && data.flights.length > 0 
+                  ? data.flights 
+                  : generateMockFlights(confirmed.fromDisplay, confirmed.toDisplay),
+              };
+            } catch (error) {
+              console.error(`[FlightsPanel] Confirmed leg ${confirmed.legIndex + 1} search error:`, error);
+              return {
+                index: confirmed.legIndex,
+                flights: generateMockFlights(confirmed.fromDisplay, confirmed.toDisplay),
+              };
+            }
+          });
+
+          const results = await Promise.all(searchPromises);
+          
+          // Store all results
+          const resultsMap: Record<number, FlightOffer[]> = {};
+          results.forEach(r => {
+            resultsMap[r.index] = r.flights;
+          });
+          setAllLegResults(resultsMap);
+          
+          // Show results for first leg
+          const firstIndex = confirmedMultiAirports.legs[0].legIndex;
+          setViewingLegIndex(firstIndex);
+          setFlightResults(resultsMap[firstIndex] || []);
+          
+        } else {
+          // For simple trips with confirmed airports
+          const confirmed = confirmedMultiAirports.legs[0];
+          if (confirmed) {
+            setLegs(prev => prev.map((leg, idx) => 
+              idx === 0 ? { ...leg, from: confirmed.fromDisplay, to: confirmed.toDisplay } : leg
+            ));
+            performFlightSearch(confirmed.fromDisplay, confirmed.toDisplay, 0);
+          }
+        }
+      } finally {
+        setIsMultiSearching(false);
+        setIsSearchingFlights(false);
+      }
+    };
+    
+    executeSearch();
+    onConfirmedMultiAirportsConsumed?.();
+  }, [confirmedMultiAirports]);
 
   // Perform the actual flight search via edge function (for simple trips only)
   const performFlightSearch = async (from: string, to: string, legIndex: number = 0) => {
