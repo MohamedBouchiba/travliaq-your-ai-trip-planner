@@ -216,11 +216,11 @@ const YouTubeShortsPanel = ({ city, countryName, isOpen, onClose }: YouTubeShort
 
             <div className="min-w-0 flex-1">
               <p className="text-base font-semibold text-foreground truncate">
-                {videos.length > 0 ? `${videos.length} choses à faire` : city}
+                {videos.length > 0 ? `${videos.length} choses à faire à ${city}` : `Découvrir ${city}`}
               </p>
-              <p className="text-xs text-muted-foreground truncate">
-                {countryName ? `${city}, ${countryName}` : city}
-              </p>
+              {countryName && (
+                <p className="text-xs text-muted-foreground truncate">{countryName}</p>
+              )}
             </div>
 
             <button

@@ -4,7 +4,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import "@/styles/mapbox-overrides.css";
 import type { TabType, MapPin } from "@/pages/TravelPlanner";
 import type { FlightRoutePoint } from "./PlannerPanel";
-import { useFlightMemory } from "@/contexts/FlightMemoryContext";
+import { useFlightMemory, type MemoryRoutePoint } from "@/contexts/FlightMemoryContext";
 
 // Destination click event for popup
 export interface DestinationClickEvent {
@@ -569,7 +569,10 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     if (memoryPoints.length === 0) return;
 
     // Helper to extract city name from various formats
-    const extractCityName = (label: string): string => {
+    const extractCityName = (label: string, cityFromMemory?: string): string => {
+      // Prefer the city from memory if available
+      if (cityFromMemory) return cityFromMemory;
+      
       // Common airport name patterns to strip:
       // "Charles de Gaulle (CDG)" -> look for city in memory
       // "Paris Charles de Gaulle" -> "Paris"
@@ -585,7 +588,9 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         " Charles de Gaulle", " Orly", " Schiphol", " Heathrow",
         " Gatwick", " Stansted", " Luton", " Beauvais",
         " Kastrup", " Zaventem", " El Prat", " Barajas",
-        " Fiumicino", " Marco Polo", " Malpensa", " Linate"
+        " Fiumicino", " Marco Polo", " Malpensa", " Linate",
+        " Ben Gurion", " Sky Harbor", " O'Hare", " JFK",
+        " LaGuardia", " Newark", " Pearson", " Trudeau"
       ];
       
       for (const suffix of airportSuffixes) {
@@ -602,6 +607,12 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       }
       
       return cityName || label;
+    };
+
+    // Helper to get the best city name for a point
+    const getBestCityName = (point: MemoryRoutePoint): string => {
+      // Priority: 1. city from memory, 2. extracted from label
+      return point.city || extractCityName(point.label, point.city);
     };
 
 
@@ -701,7 +712,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
             overflow: hidden;
             text-overflow: ellipsis;
             backdrop-filter: blur(4px);
-          ">${point.city || extractCityName(point.label)}</div>
+          ">${getBestCityName(point)}</div>
         </div>
         <style>
           @keyframes pinDrop {
@@ -741,8 +752,8 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
             y: rect.top,
           };
 
-          // Use city from memory if available, otherwise extract from label
-          const cityName = point.city || extractCityName(point.label);
+          // Use best city name for YouTube search
+          const cityName = getBestCityName(point);
 
           onDestinationClick({
             cityName,
