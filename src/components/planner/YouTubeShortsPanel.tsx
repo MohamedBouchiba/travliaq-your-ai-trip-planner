@@ -54,7 +54,7 @@ const YouTubeShortsPanel = ({ city, countryName, isOpen, onClose }: YouTubeShort
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke("youtube-shorts", {
-        body: { city },
+        body: { city, country: countryName },
       });
 
       if (fnError) {
@@ -72,7 +72,7 @@ const YouTubeShortsPanel = ({ city, countryName, isOpen, onClose }: YouTubeShort
     } finally {
       setLoading(false);
     }
-  }, [city]);
+  }, [city, countryName]);
 
   useEffect(() => {
     if (isOpen && city) fetchShorts();
@@ -216,7 +216,7 @@ const YouTubeShortsPanel = ({ city, countryName, isOpen, onClose }: YouTubeShort
 
             <div className="min-w-0 flex-1">
               <p className="text-base font-semibold text-foreground truncate">
-                {videos.length > 0 ? `${videos.length} choses à faire à ${city}` : `Découvrir ${city}`}
+                À faire à {city}
               </p>
               {countryName && (
                 <p className="text-xs text-muted-foreground truncate">{countryName}</p>
@@ -316,10 +316,7 @@ const YouTubeShortsPanel = ({ city, countryName, isOpen, onClose }: YouTubeShort
                           </div>
                           <div className="min-w-0 flex-1 flex flex-col justify-center">
                             <p className="text-sm font-medium text-foreground line-clamp-2 leading-tight">{v.title}</p>
-                            <div className="flex items-center gap-1.5 mt-1.5">
-                              <span className="text-sm">{v.categoryEmoji || "🎯"}</span>
-                              <span className="text-xs text-muted-foreground">{v.category || "À découvrir"}</span>
-                            </div>
+                            <p className="text-xs text-muted-foreground mt-1 truncate">{v.channelTitle}</p>
                           </div>
                         </div>
                       </button>
