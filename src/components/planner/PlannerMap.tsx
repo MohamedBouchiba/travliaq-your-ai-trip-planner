@@ -552,9 +552,29 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     });
   }, [activeTab, mapLoaded, selectedPinId, onPinClick, getPinsForTab]);
 
+  // Ref to track if routes have been drawn (persists across tab changes)
+  const routesDrawnRef = useRef(false);
+  const lastRouteSignatureRef = useRef<string>("");
+
   // Draw route markers from FlightMemory (most up-to-date source)
+  // This should NOT re-run on activeTab changes - routes persist across all tabs
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
+
+    const memoryPoints = getRoutePoints();
+    
+    // Create a signature to detect real changes vs. just re-renders
+    const routeSignature = JSON.stringify(memoryPoints.map(p => ({
+      lat: p.lat.toFixed(4),
+      lng: p.lng.toFixed(4),
+      type: p.type,
+    })));
+    
+    // Skip if routes haven't changed (prevents redraw on tab switch)
+    if (routeSignature === lastRouteSignatureRef.current && routesDrawnRef.current) {
+      return;
+    }
+    lastRouteSignatureRef.current = routeSignature;
 
     // Clear previous memory markers
     memoryMarkersRef.current.forEach((marker) => marker.remove());
@@ -577,7 +597,11 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       map.current.removeSource(memorySourceId);
     }
 
-    const memoryPoints = getRoutePoints();
+    // Mark routes as not drawn if no points
+    if (memoryPoints.length === 0) {
+      routesDrawnRef.current = false;
+      return;
+    }
     
     if (memoryPoints.length === 0) return;
 
@@ -956,12 +980,16 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         padding: { top: 100, bottom: 100, left: 450, right: 50 },
         maxZoom: 6,
       });
+      
+      // Mark routes as drawn
+      routesDrawnRef.current = true;
     } else if (memoryPoints.length === 1) {
       // Fly to single point
       map.current.flyTo({
         center: [memoryPoints[0].lng, memoryPoints[0].lat],
         zoom: 5,
       });
+      routesDrawnRef.current = true;
     }
   }, [getRoutePoints, mapLoaded, onDestinationClick]);
 

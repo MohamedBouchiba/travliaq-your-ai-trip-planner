@@ -631,12 +631,22 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
     if (flightMemory.tripType === "multi") {
       const legs = flightMemory.legs;
       
-      // Build destination info from legs
+      // Get first departure city to detect "return home" legs
+      const firstDepartureCity = legs[0]?.departure?.city?.toLowerCase();
+      
+      // Build destination info from legs, filtering out "return home" destinations
       const destinationInfos = legs
-        .filter((leg) => leg.arrival?.city && leg.arrival?.lat && leg.arrival?.lng)
-        .map((leg, i) => {
+        .filter((leg) => {
+          if (!leg.arrival?.city || !leg.arrival?.lat || !leg.arrival?.lng) return false;
+          // Skip if arrival city is the same as the first departure city (returning home)
+          if (firstDepartureCity && leg.arrival.city.toLowerCase() === firstDepartureCity) return false;
+          return true;
+        })
+        .map((leg, i, filteredLegs) => {
           const arrivalDate = leg.date;
-          const nextLeg = legs[i + 1];
+          // Find the next leg's date for checkout
+          const legIndex = legs.findIndex(l => l === leg);
+          const nextLeg = legs[legIndex + 1];
           const departureDate = nextLeg?.date || null;
           
           return {
