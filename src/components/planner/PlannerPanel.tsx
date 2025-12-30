@@ -644,6 +644,37 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     }
   };
 
+  // Helper to get IATA code from location or find nearest airport
+  const resolveAirportCode = async (
+    value: string | undefined,
+    location: LocationResult | undefined
+  ): Promise<{ iata: string; displayName: string } | null> => {
+    if (!value?.trim()) return null;
+    
+    // If already has IATA code in the string, use it
+    const existingIata = value.match(/\(([A-Z]{3})\)/)?.[1];
+    if (existingIata) {
+      return { iata: existingIata, displayName: value };
+    }
+    
+    // If location is an airport with IATA, use it
+    if (location?.type === "airport" && location.iata) {
+      return { iata: location.iata, displayName: `${location.name} (${location.iata})` };
+    }
+    
+    // Otherwise, find nearest airport for the city
+    const cityName = location?.name || value.split(",")[0]?.trim();
+    const countryCode = location?.country_code;
+    
+    const result = await findNearestAirports(cityName, 1, countryCode);
+    if (result?.airports?.[0]) {
+      const airport = result.airports[0];
+      return { iata: airport.iata, displayName: `${airport.name} (${airport.iata})` };
+    }
+    
+    return null;
+  };
+
   // Handle search button click - check for countries/cities/airports first
   // For multi-destination, searches ALL legs in parallel
   const handleSearchClick = async () => {
@@ -660,20 +691,61 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
 
       setIsMultiSearching(true);
       setIsSearchingFlights(true);
+      setIsSearchingAirports(true);
 
       try {
+        // First, resolve all airports for cities that don't have IATA codes
+        const resolvedLegs = await Promise.all(
+          validLegs.map(async ({ leg, index }) => {
+            const [fromResolved, toResolved] = await Promise.all([
+              resolveAirportCode(leg.from, leg.fromLocation),
+              resolveAirportCode(leg.to, leg.toLocation),
+            ]);
+            
+            // Update leg display if we found airports
+            if (fromResolved && leg.from !== fromResolved.displayName) {
+              setLegs(prev => prev.map((l, i) => 
+                i === index ? { ...l, from: fromResolved.displayName } : l
+              ));
+            }
+            if (toResolved && leg.to !== toResolved.displayName) {
+              setLegs(prev => prev.map((l, i) => 
+                i === index ? { ...l, to: toResolved.displayName } : l
+              ));
+            }
+            
+            return {
+              leg,
+              index,
+              fromIata: fromResolved?.iata || "",
+              toIata: toResolved?.iata || "",
+              fromDisplay: fromResolved?.displayName || leg.from,
+              toDisplay: toResolved?.displayName || leg.to,
+            };
+          })
+        );
+        
+        setIsSearchingAirports(false);
+        
+        // Filter out legs without valid IATA codes
+        const searchableLegs = resolvedLegs.filter(l => l.fromIata && l.toIata);
+        
+        if (searchableLegs.length === 0) {
+          console.warn("[FlightsPanel] No valid airport codes found");
+          setIsMultiSearching(false);
+          setIsSearchingFlights(false);
+          return;
+        }
+
         // Search all legs in parallel
-        const searchPromises = validLegs.map(async ({ leg, index }) => {
-          const fromCode = leg.from?.match(/\(([A-Z]{3})\)/)?.[1] || leg.from?.substring(0, 3).toUpperCase() || "";
-          const toCode = leg.to?.match(/\(([A-Z]{3})\)/)?.[1] || leg.to?.substring(0, 3).toUpperCase() || "";
-          
+        const searchPromises = searchableLegs.map(async ({ leg, index, fromIata, toIata }) => {
           const adults = passengers.filter(p => p.type === "adult").length;
           const children = passengers.filter(p => p.type === "child").length;
           const cabinClassMap = { economy: "ECONOMY", business: "BUSINESS", first: "FIRST" };
 
           const requestBody = {
-            origin: fromCode,
-            destination: toCode,
+            origin: fromIata,
+            destination: toIata,
             departureDate: leg.date ? leg.date.toISOString().split('T')[0] : undefined,
             adults,
             children,
@@ -727,11 +799,12 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
         setAllLegResults(resultsMap);
         
         // Show results for first valid leg
-        setViewingLegIndex(validLegs[0].index);
-        setFlightResults(resultsMap[validLegs[0].index] || []);
+        setViewingLegIndex(searchableLegs[0].index);
+        setFlightResults(resultsMap[searchableLegs[0].index] || []);
       } finally {
         setIsMultiSearching(false);
         setIsSearchingFlights(false);
+        setIsSearchingAirports(false);
       }
       return;
     }
@@ -1163,112 +1236,107 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
 
   // Show results view if we have results
   if (flightResults !== null || isSearchingFlights || Object.keys(allLegResults).length > 0) {
-    // For multi-destination, use the viewing leg; otherwise use first leg
-    const resultLeg = tripType === "multi" ? legs[viewingLegIndex] : legs[0];
-    const fromCode = resultLeg?.from?.match(/\(([A-Z]{3})\)/)?.[1] || resultLeg?.from?.split(",")[0]?.trim() || "?";
-    const toCode = resultLeg?.to?.match(/\(([A-Z]{3})\)/)?.[1] || resultLeg?.to?.split(",")[0]?.trim() || "?";
-    
     // Get valid leg indices for dropdown
     const validLegIndices = Object.keys(allLegResults).map(Number).sort((a, b) => a - b);
     
+    // For multi-destination, use the viewing leg; otherwise use first leg
+    const resultLeg = tripType === "multi" ? legs[viewingLegIndex] : legs[0];
+    
+    // Extract IATA codes for display
+    const getIataCode = (value: string | undefined) => {
+      if (!value) return "?";
+      const match = value.match(/\(([A-Z]{3})\)/);
+      return match ? match[1] : value.split(",")[0]?.trim()?.substring(0, 3)?.toUpperCase() || "?";
+    };
+    
     return (
       <div className="space-y-4">
-        {/* Back button */}
-        <button
-          onClick={() => {
-            setFlightResults(null);
-            setAllLegResults({});
-            setSelectedFlights({});
-          }}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Modifier la recherche
-        </button>
-        
-        {/* Multi-destination: Dropdown to select which leg results to view */}
-        {tripType === "multi" && validLegIndices.length > 1 && (
-          <div className="space-y-2">
-            <span className="text-xs font-medium text-foreground">Sélectionner le segment à afficher</span>
-            <select
-              value={viewingLegIndex}
-              onChange={(e) => {
-                const newIdx = Number(e.target.value);
-                setViewingLegIndex(newIdx);
-                setFlightResults(allLegResults[newIdx] || []);
-              }}
-              className="w-full px-3 py-2.5 rounded-xl text-sm bg-background border border-border/50 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-            >
+        {/* Header with back button and segment selector */}
+        <div className="flex items-center justify-between gap-3">
+          <button
+            onClick={() => {
+              setFlightResults(null);
+              setAllLegResults({});
+              setSelectedFlights({});
+            }}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Modifier
+          </button>
+          
+          {/* Multi-destination: Compact segment tabs */}
+          {tripType === "multi" && validLegIndices.length > 1 ? (
+            <div className="flex items-center gap-1 flex-1 justify-end overflow-x-auto">
               {validLegIndices.map(idx => {
                 const leg = legs[idx];
-                const legFromCode = leg?.from?.match(/\(([A-Z]{3})\)/)?.[1] || leg?.from?.split(",")[0]?.trim() || "?";
-                const legToCode = leg?.to?.match(/\(([A-Z]{3})\)/)?.[1] || leg?.to?.split(",")[0]?.trim() || "?";
+                const fromIata = getIataCode(leg?.from);
+                const toIata = getIataCode(leg?.to);
+                const isActive = viewingLegIndex === idx;
                 const isSelected = selectedFlights[idx] !== undefined;
+                
                 return (
-                  <option key={idx} value={idx}>
-                    Vol {idx + 1}: {legFromCode} → {legToCode} {isSelected ? "✓" : ""}
-                  </option>
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setViewingLegIndex(idx);
+                      setFlightResults(allLegResults[idx] || []);
+                    }}
+                    className={cn(
+                      "flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-medium transition-all whitespace-nowrap",
+                      isActive
+                        ? "bg-primary text-primary-foreground"
+                        : isSelected
+                          ? "bg-green-500/10 text-green-700 border border-green-500/30"
+                          : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    <span>{fromIata}</span>
+                    <Plane className="h-2.5 w-2.5 rotate-90" />
+                    <span>{toIata}</span>
+                    {isSelected && !isActive && <span className="text-green-600">✓</span>}
+                  </button>
                 );
               })}
-            </select>
-          </div>
-        )}
-        
-        {/* Route summary with selection status */}
-        <div className="p-3 rounded-xl bg-muted/30 border border-border/30">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm">
-              {tripType === "multi" && (
-                <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
-                  Vol {viewingLegIndex + 1}/{validLegIndices.length}
-                </span>
-              )}
-              <span className="font-medium">{fromCode}</span>
-              <Plane className="h-3 w-3 rotate-90 text-muted-foreground" />
-              <span className="font-medium">{toCode}</span>
             </div>
-            {tripType === "multi" && selectedFlights[viewingLegIndex] && (
-              <span className="text-xs text-green-600 font-medium">Sélectionné</span>
-            )}
-          </div>
+          ) : (
+            /* Simple trip: show route directly */
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <span>{getIataCode(resultLeg?.from)}</span>
+              <Plane className="h-3 w-3 rotate-90 text-primary" />
+              <span>{getIataCode(resultLeg?.to)}</span>
+              {tripType === "roundtrip" && (
+                <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground ml-1">A/R</span>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Multi-destination: Recap of all selected flights */}
+        {/* Multi-destination: Recap of selected flights */}
         {tripType === "multi" && Object.keys(selectedFlights).length > 0 && (
-          <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/30 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-green-700">Vols sélectionnés</span>
-              <span className="text-xs text-muted-foreground">
-                {Object.keys(selectedFlights).length}/{validLegIndices.length}
+          <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/30">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-green-700 dark:text-green-400">
+                {Object.keys(selectedFlights).length}/{validLegIndices.length} vols sélectionnés
+              </span>
+              <span className="text-sm font-bold text-green-700 dark:text-green-400">
+                {getTotalSelectedPrice().toFixed(0)} €
               </span>
             </div>
-            <div className="space-y-1">
-              {Object.entries(selectedFlights).map(([idx, flight]) => {
-                const leg = legs[Number(idx)];
-                const legFromCode = leg?.from?.match(/\(([A-Z]{3})\)/)?.[1] || "?";
-                const legToCode = leg?.to?.match(/\(([A-Z]{3})\)/)?.[1] || "?";
-                return (
-                  <div key={idx} className="flex items-center justify-between text-xs">
-                    <span>{legFromCode} → {legToCode}</span>
-                    <span className="font-medium">{(flight.price * passengers.length).toFixed(0)} €</span>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="pt-2 border-t border-green-500/20 flex items-center justify-between">
-              <span className="text-sm font-semibold text-green-700">Total</span>
-              <span className="text-sm font-bold text-green-700">{getTotalSelectedPrice().toFixed(0)} €</span>
-            </div>
+            {allFlightsSelected && (
+              <button className="w-full py-2 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition-colors">
+                Réserver l'itinéraire complet
+              </button>
+            )}
           </div>
         )}
         
-        {/* Results */}
+        {/* Results - no duplicate header */}
         <FlightResults 
           flights={flightResults || []} 
           isLoading={isSearchingFlights || isMultiSearching}
           onSelect={handleFlightSelect}
           travelers={passengers.length}
-          routeLabel={`${fromCode} → ${toCode}`}
           tripType={tripType === "multi" ? "oneway" : tripType}
         />
       </div>
