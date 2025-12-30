@@ -233,20 +233,101 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     noEveningFlights: false,
   });
 
+  // Helpers to convert FlightMemory → widget legs
+  const memoryLegsToWidgetLegs = (memLegs: typeof memory.legs): FlightLeg[] => {
+    return memLegs.map((leg) => ({
+      id: leg.id,
+      from: leg.departure?.airport
+        ? `${leg.departure.airport} (${leg.departure.iata})`
+        : leg.departure?.city || "",
+      to: leg.arrival?.airport
+        ? `${leg.arrival.airport} (${leg.arrival.iata})`
+        : leg.arrival?.city || "",
+      date: leg.date || undefined,
+      fromLocation: leg.departure
+        ? {
+            id: leg.departure.iata || leg.departure.city || "departure",
+            name: leg.departure.airport || leg.departure.city || "",
+            type: leg.departure.iata ? "airport" : "city",
+            country_code: leg.departure.countryCode || "",
+            country_name: leg.departure.country || "",
+            iata: leg.departure.iata,
+            lat: leg.departure.lat || 0,
+            lng: leg.departure.lng || 0,
+            display_name: leg.departure.iata
+              ? `${leg.departure.airport || leg.departure.city} (${leg.departure.iata})`
+              : leg.departure.city || "",
+          }
+        : undefined,
+      toLocation: leg.arrival
+        ? {
+            id: leg.arrival.iata || leg.arrival.city || "arrival",
+            name: leg.arrival.airport || leg.arrival.city || "",
+            type: leg.arrival.iata ? "airport" : "city",
+            country_code: leg.arrival.countryCode || "",
+            country_name: leg.arrival.country || "",
+            iata: leg.arrival.iata,
+            lat: leg.arrival.lat || 0,
+            lng: leg.arrival.lng || 0,
+            display_name: leg.arrival.iata
+              ? `${leg.arrival.airport || leg.arrival.city} (${leg.arrival.iata})`
+              : leg.arrival.city || "",
+          }
+        : undefined,
+    }));
+  };
+
   // Sync tripType with memory when changing
   const setTripType = (newType: "roundtrip" | "oneway" | "multi") => {
     setTripTypeLocal(newType);
     updateMemory({ tripType: newType });
   };
-  
-  // Sync with memory when it changes externally
+
+  const prevTripTypeRef = useRef<typeof memory.tripType>(memory.tripType);
+
+  // Sync with memory when it changes externally + rehydrate legs on trip type switch
   useEffect(() => {
+    const prevTripType = prevTripTypeRef.current;
     if (memory.tripType !== tripType) {
       setTripTypeLocal(memory.tripType);
     }
-  }, [memory.tripType]);
 
-  // Apply flight form data from chat AI
+    // Only rehydrate legs when the trip type actually changed
+    if (prevTripType !== memory.tripType) {
+      if (memory.tripType === "multi") {
+        // Restore full multi legs from memory (this is what was missing)
+        if (memory.legs.length > 0) {
+          setLegs(memoryLegsToWidgetLegs(memory.legs));
+        } else {
+          // Empty multi: keep 2 placeholders
+          setLegs([
+            { id: crypto.randomUUID(), from: "", to: "", date: undefined },
+            { id: crypto.randomUUID(), from: "", to: "", date: undefined },
+          ]);
+        }
+      } else {
+        // Restore single-leg UI from memory
+        const fromDisplay = memory.departure?.airport
+          ? `${memory.departure.airport} (${memory.departure.iata})`
+          : memory.departure?.city || "";
+        const toDisplay = memory.arrival?.airport
+          ? `${memory.arrival.airport} (${memory.arrival.iata})`
+          : memory.arrival?.city || "";
+
+        setLegs([
+          {
+            id: crypto.randomUUID(),
+            from: fromDisplay,
+            to: toDisplay,
+            date: memory.departureDate || undefined,
+            returnDate: memory.tripType === "roundtrip" ? memory.returnDate || undefined : undefined,
+          },
+        ]);
+      }
+
+      prevTripTypeRef.current = memory.tripType;
+    }
+  }, [memory.tripType, memory.legs, memory.departure, memory.arrival, memory.departureDate, memory.returnDate, tripType]);
   useEffect(() => {
     if (!flightFormData) return;
 
@@ -957,43 +1038,8 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
 
   // Reset legs when trip type changes
   const handleTripTypeChange = (newType: "roundtrip" | "oneway" | "multi") => {
+    // Source of truth is FlightMemory; legs UI will be rehydrated by the effect above.
     setTripType(newType);
-    
-    // Update memory with new trip type
-    updateMemory({ tripType: newType });
-    
-    if (newType === "multi") {
-      // When switching TO multi, preserve existing data and create 2 legs
-      const currentLeg = legs[0];
-      const firstLeg: FlightLeg = {
-        id: crypto.randomUUID(),
-        from: currentLeg?.from || "",
-        to: currentLeg?.to || "",
-        date: currentLeg?.date,
-        fromLocation: currentLeg?.fromLocation,
-        toLocation: currentLeg?.toLocation,
-      };
-      // Second leg starts from where first leg ends
-      const secondLeg: FlightLeg = {
-        id: crypto.randomUUID(),
-        from: currentLeg?.to || "",
-        to: "",
-        date: undefined,
-        fromLocation: currentLeg?.toLocation,
-      };
-      setLegs([firstLeg, secondLeg]);
-    } else if (legs.length > 1) {
-      // Reset to single leg when switching from multi to other types
-      setLegs([{ 
-        id: crypto.randomUUID(), 
-        from: legs[0]?.from || "", 
-        to: legs[0]?.to || "", 
-        date: legs[0]?.date, 
-        returnDate: legs[0]?.returnDate,
-        fromLocation: legs[0]?.fromLocation,
-        toLocation: legs[0]?.toLocation,
-      }]);
-    }
   };
 
   // Show results view if we have results
