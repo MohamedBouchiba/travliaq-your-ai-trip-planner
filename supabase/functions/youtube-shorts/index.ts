@@ -55,8 +55,8 @@ const TRAVEL_POSITIVE_KEYWORDS = [
   "neighbourhood", "neighborhood", "quartier", "district",
 ];
 
-// Cache TTL: 24 hours in seconds
-const CACHE_TTL = 60 * 60 * 24;
+// Cache TTL: 3 weeks in seconds
+const CACHE_TTL = 60 * 60 * 24 * 21;
 
 // Redis cache helpers using Upstash REST API
 async function getFromCache(key: string): Promise<YouTubeVideo[] | null> {
