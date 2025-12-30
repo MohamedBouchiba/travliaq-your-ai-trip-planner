@@ -41,15 +41,6 @@ const DestinationPopup = ({
             onClick={onClose}
           />
           
-          {/* Anchor dot exactly on the clicked point (helps disambiguate close cities) */}
-          <div
-            className="fixed z-[58] pointer-events-none"
-            style={{ left: position.x, top: position.y, transform: "translate(-50%, -50%)" }}
-            aria-hidden="true"
-          >
-            <div className="h-2.5 w-2.5 rounded-full bg-primary shadow-[0_0_0_6px_hsl(var(--primary)_/_0.18)]" />
-          </div>
-
           {/* Popup - anchored to the pin position */}
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 10 }}
