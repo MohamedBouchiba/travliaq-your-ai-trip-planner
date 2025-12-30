@@ -162,13 +162,16 @@ function TravelersSelector({
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <button className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors border border-border/30 text-sm">
+        <button 
+          type="button"
+          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors border border-border/30 text-sm"
+        >
           <Users className="h-4 w-4 text-primary" />
           <span className="truncate">{summary}</span>
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-3" align="start">
+      <PopoverContent className="w-64 p-3" align="start" onInteractOutside={(e) => e.preventDefault()}>
         <div className="space-y-3">
           {/* Adults */}
           <div className="flex items-center justify-between">
