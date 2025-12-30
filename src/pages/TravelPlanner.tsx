@@ -10,6 +10,8 @@ import DestinationPopup from "@/components/planner/DestinationPopup";
 import YouTubeShortsPanel from "@/components/planner/YouTubeShortsPanel";
 import type { Airport } from "@/hooks/useNearestAirports";
 import { FlightMemoryProvider } from "@/contexts/FlightMemoryContext";
+import { TravelMemoryProvider } from "@/contexts/TravelMemoryContext";
+import { AccommodationMemoryProvider } from "@/contexts/AccommodationMemoryContext";
 
 export type TabType = "flights" | "activities" | "stays" | "preferences";
 
@@ -137,8 +139,10 @@ const TravelPlanner = () => {
   }, [destinationPopup]);
 
   return (
-    <FlightMemoryProvider>
-      <Helmet>
+    <TravelMemoryProvider>
+      <FlightMemoryProvider>
+        <AccommodationMemoryProvider>
+          <Helmet>
         <title>Planificateur | Travliaq</title>
         <meta
           name="description"
@@ -275,8 +279,10 @@ const TravelPlanner = () => {
             </main>
           </ResizablePanel>
         </ResizablePanelGroup>
-      </div>
-    </FlightMemoryProvider>
+          </div>
+        </AccommodationMemoryProvider>
+      </FlightMemoryProvider>
+    </TravelMemoryProvider>
   );
 };
 

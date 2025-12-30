@@ -95,6 +95,57 @@ const flightExtractionTool = {
   }
 };
 
+// Tool definition for extracting accommodation intent from user message
+const accommodationExtractionTool = {
+  type: "function",
+  function: {
+    name: "update_accommodation_widget",
+    description: "Extract accommodation preferences from user message. Use when user mentions hotels, stays, lodging, or accommodation details.",
+    parameters: {
+      type: "object",
+      properties: {
+        budgetPreset: {
+          type: "string",
+          enum: ["eco", "comfort", "premium"],
+          description: "Budget level: 'pas cher/économique'=eco, 'confortable/bien'=comfort, 'luxe/haut de gamme'=premium"
+        },
+        priceMin: {
+          type: "number",
+          description: "Minimum price per night if explicitly mentioned"
+        },
+        priceMax: {
+          type: "number",
+          description: "Maximum price per night if explicitly mentioned: '100€ max', 'moins de 150€'"
+        },
+        types: {
+          type: "array",
+          items: { type: "string", enum: ["hotel", "apartment", "villa", "hostel", "guesthouse"] },
+          description: "Accommodation types: 'hôtel', 'appartement/appart', 'villa', 'auberge', 'maison d'hôtes'"
+        },
+        minRating: {
+          type: "number",
+          description: "Minimum rating (1-10 scale): 'bien noté'=8, 'très bien noté'=9"
+        },
+        amenities: {
+          type: "array",
+          items: { type: "string", enum: ["wifi", "parking", "breakfast", "ac", "pool", "kitchen"] },
+          description: "Essential amenities: 'wifi', 'parking', 'petit-déjeuner/petit-déj', 'climatisation/clim', 'piscine', 'cuisine'"
+        },
+        mealPlan: {
+          type: "string",
+          enum: ["breakfast", "half", "full", "all-inclusive"],
+          description: "Meal plan: 'petit-déj inclus'=breakfast, 'demi-pension'=half, 'pension complète'=full, 'all-inclusive'=all-inclusive"
+        },
+        needsAccommodationWidget: {
+          type: "boolean",
+          description: "Set TRUE when user asks about accommodation/hotel without specifics, to show the accommodation panel"
+        }
+      },
+      required: []
+    }
+  }
+};
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -275,7 +326,7 @@ Réponse: "Tokyo en solo, super aventure ! 🗼 Quand veux-tu partir ?"
         ],
         temperature: 0.7,
         max_tokens: 500,
-        tools: [flightExtractionTool],
+        tools: [flightExtractionTool, accommodationExtractionTool],
         tool_choice: "auto",
         stream: false, // First call is never streamed to handle tools
       }),
@@ -296,8 +347,9 @@ Réponse: "Tokyo en solo, super aventure ! 🗼 Quand veux-tu partir ?"
     const choice = data.choices?.[0];
     let content = choice?.message?.content || "";
     let flightData = null;
+    let accommodationData = null;
 
-    // Check if the model called the flight extraction tool
+    // Check if the model called any extraction tools
     if (choice?.message?.tool_calls) {
       for (const toolCall of choice.message.tool_calls) {
         if (toolCall.function?.name === "update_flight_widget") {
@@ -316,6 +368,25 @@ Réponse: "Tokyo en solo, super aventure ! 🗼 Quand veux-tu partir ?"
             }
           } catch (e) {
             console.error("Failed to parse flight data:", e);
+          }
+        }
+        
+        if (toolCall.function?.name === "update_accommodation_widget") {
+          try {
+            accommodationData = JSON.parse(toolCall.function.arguments);
+            console.log("Accommodation data extracted:", accommodationData);
+            
+            // Filter out empty values
+            accommodationData = Object.fromEntries(
+              Object.entries(accommodationData).filter(([_, v]) => v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0))
+            );
+            
+            // Only return accommodationData if it has actual content
+            if (Object.keys(accommodationData).length === 0) {
+              accommodationData = null;
+            }
+          } catch (e) {
+            console.error("Failed to parse accommodation data:", e);
           }
         }
       }
@@ -475,9 +546,9 @@ Réponse: "Tokyo en solo, super aventure ! 🗼 Quand veux-tu partir ?"
       content = "Désolé, je n'ai pas pu générer de réponse.";
     }
 
-    console.log("Final response - content:", content, "flightData:", flightData);
+    console.log("Final response - content:", content, "flightData:", flightData, "accommodationData:", accommodationData);
 
-    return new Response(JSON.stringify({ content, flightData }), {
+    return new Response(JSON.stringify({ content, flightData, accommodationData }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

@@ -10,6 +10,7 @@ import { findNearestAirports, Airport } from "@/hooks/useNearestAirports";
 import type { AirportChoice, DualAirportChoice } from "./PlannerChat";
 import FlightResults, { FlightOffer, generateMockFlights } from "./FlightResults";
 import { useFlightMemory, type AirportInfo } from "@/contexts/FlightMemoryContext";
+import AccommodationPanel from "./AccommodationPanel";
 
 export interface FlightRoutePoint {
   city: string;
@@ -95,7 +96,7 @@ const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVis
         <div className="flex-1 overflow-y-auto themed-scroll p-4 max-h-[calc(100vh-8rem)]">
           {activeTab === "flights" && <FlightsPanel onMapMove={onMapMove} onFlightRoutesChange={onFlightRoutesChange} flightFormData={flightFormData} onFlightFormDataConsumed={onFlightFormDataConsumed} onCountrySelected={onCountrySelected} onAskAirportChoice={onAskAirportChoice} onAskDualAirportChoice={onAskDualAirportChoice} selectedAirport={selectedAirport} onSelectedAirportConsumed={onSelectedAirportConsumed} onUserLocationDetected={onUserLocationDetected} onSearchReady={onSearchReady} triggerSearch={triggerSearch} onSearchTriggered={onSearchTriggered} />}
           {activeTab === "activities" && <ActivitiesPanel />}
-          {activeTab === "stays" && <StaysPanel />}
+          {activeTab === "stays" && <AccommodationPanel onMapMove={onMapMove} />}
           {activeTab === "preferences" && <PreferencesPanel />}
         </div>
       </div>
@@ -1395,125 +1396,7 @@ const ActivitiesPanel = () => {
   );
 };
 
-// Stays Panel
-const StaysPanel = () => {
-  const [priceRange, setPriceRange] = useState([50, 250]);
-  const [rating, setRating] = useState<number | null>(4);
-  const [selectedTypes, setSelectedTypes] = useState<string[]>(["hotel"]);
-  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
-
-  const stayTypes = [
-    { id: "hotel", label: "Hôtel", icon: Building2 },
-    { id: "apartment", label: "Appartement", icon: Building2 },
-    { id: "hostel", label: "Auberge", icon: Building2 },
-  ];
-
-  const amenities = [
-    { id: "wifi", label: "WiFi", icon: Wifi },
-    { id: "parking", label: "Parking", icon: Car },
-    { id: "breakfast", label: "Petit-déj", icon: Coffee },
-    { id: "ac", label: "Clim", icon: Wind },
-  ];
-
-  const toggleType = (id: string) => {
-    setSelectedTypes((prev) =>
-      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
-    );
-  };
-
-  const toggleAmenity = (id: string) => {
-    setSelectedAmenities((prev) =>
-      prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
-    );
-  };
-
-  return (
-    <div className="space-y-5">
-      {/* Price Range */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <SectionHeader icon={Building2} title="Budget / nuit" />
-          <span className="text-xs text-primary font-medium">
-            {priceRange[0]}€ - {priceRange[1]}€
-          </span>
-        </div>
-        <div className="px-1">
-          <Slider
-            value={priceRange}
-            onValueChange={setPriceRange}
-            max={500}
-            step={25}
-            className="w-full"
-          />
-        </div>
-      </div>
-
-      {/* Rating */}
-      <div>
-        <SectionHeader icon={Star} title="Note minimum" />
-        <div className="flex gap-1.5">
-          {[3, 3.5, 4, 4.5].map((r) => (
-            <button
-              key={r}
-              onClick={() => setRating(rating === r ? null : r)}
-              className={cn(
-                "flex-1 py-2 rounded-xl text-xs font-medium transition-all flex items-center justify-center gap-1",
-                rating === r
-                  ? "bg-primary/10 text-primary border border-primary/30"
-                  : "bg-muted/30 text-muted-foreground border border-border/30 hover:bg-muted/50"
-              )}
-            >
-              <Star className={cn("h-3 w-3", rating === r ? "fill-primary" : "")} />
-              {r}+
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Type */}
-      <div>
-        <SectionHeader icon={Building2} title="Type" />
-        <div className="flex gap-1.5 flex-wrap">
-          {stayTypes.map((type) => (
-            <ChipButton
-              key={type.id}
-              selected={selectedTypes.includes(type.id)}
-              onClick={() => toggleType(type.id)}
-            >
-              {type.label}
-            </ChipButton>
-          ))}
-        </div>
-      </div>
-
-      {/* Amenities */}
-      <div>
-        <SectionHeader icon={Sparkles} title="Équipements" />
-        <div className="grid grid-cols-2 gap-2">
-          {amenities.map((amenity) => {
-            const Icon = amenity.icon;
-            const isSelected = selectedAmenities.includes(amenity.id);
-            return (
-              <button
-                key={amenity.id}
-                onClick={() => toggleAmenity(amenity.id)}
-                className={cn(
-                  "p-2.5 rounded-xl text-xs font-medium transition-all flex items-center gap-2",
-                  isSelected
-                    ? "bg-primary/10 text-primary border border-primary/30"
-                    : "bg-muted/30 text-muted-foreground border border-border/30 hover:bg-muted/50"
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {amenity.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-};
+// Note: StaysPanel has been replaced by AccommodationPanel component
 
 // Preferences Panel
 const PreferencesPanel = () => {
