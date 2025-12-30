@@ -43,6 +43,8 @@ export interface AccommodationEntry {
   // Dates (independent from flights)
   checkIn: Date | null;
   checkOut: Date | null;
+  // Flag to indicate if dates are synced from flights
+  syncedFromFlight?: boolean;
   // Budget (per night)
   budgetPreset: BudgetPreset;
   priceMin: number;

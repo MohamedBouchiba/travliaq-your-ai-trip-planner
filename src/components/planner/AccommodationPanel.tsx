@@ -3,7 +3,7 @@ import {
   Building2, Star, Wifi, Car, Coffee, Wind, MapPin, Users, ChevronDown, ChevronUp, 
   Search, Waves, BedDouble, Home, Hotel, Castle, Tent, Plus, Minus, X, CalendarDays,
   Dumbbell, Accessibility, Baby, Dog, Mountain, Building, Flower2, Bus,
-  ConciergeBell, Droplets, Utensils, ChefHat, Soup, House
+  ConciergeBell, Droplets, Utensils, ChefHat, Soup, House, Link2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTravelMemory } from "@/contexts/TravelMemoryContext";
@@ -393,10 +393,12 @@ function CompactDateRange({
   checkIn,
   checkOut,
   onChange,
+  isSyncedWithFlight = false,
 }: {
   checkIn: Date | null;
   checkOut: Date | null;
   onChange: (checkIn: Date | null, checkOut: Date | null) => void;
+  isSyncedWithFlight?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const nights = checkIn && checkOut ? differenceInDays(checkOut, checkIn) : 0;
@@ -418,16 +420,22 @@ function CompactDateRange({
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <button className="flex items-center gap-2 text-sm min-w-0">
+        <button className="flex items-center gap-2 text-sm min-w-0" title={isSyncedWithFlight ? "Dates synchronisées avec les vols" : undefined}>
           <CalendarDays className="h-4 w-4 text-primary shrink-0" />
           {checkIn && checkOut ? (
-            <span className="truncate text-foreground">
+            <span className="truncate text-foreground flex items-center gap-1">
               {formatDateCompact(checkIn)} → {formatDateCompact(checkOut)}
-              <span className="text-muted-foreground ml-1">({nights}n)</span>
+              <span className="text-muted-foreground">({nights}n)</span>
+              {isSyncedWithFlight && (
+                <Link2 className="h-3 w-3 text-primary/70" />
+              )}
             </span>
           ) : checkIn ? (
-            <span className="truncate text-foreground">
+            <span className="truncate text-foreground flex items-center gap-1">
               {formatDateCompact(checkIn)} → <span className="text-muted-foreground">Retour ?</span>
+              {isSyncedWithFlight && (
+                <Link2 className="h-3 w-3 text-primary/70" />
+              )}
             </span>
           ) : (
             <span className="text-muted-foreground truncate">Dates du séjour</span>
@@ -670,12 +678,32 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
       
       if (destinationInfos.length === 0) return;
       
-      // First, remove default empty accommodations (no city set)
-      const emptyAccommodations = memory.accommodations.filter(a => !a.city);
-      emptyAccommodations.forEach(acc => {
-        removeAccommodation(acc.id);
+      // Collect valid destination cities (not including first departure city)
+      const validCitiesSet = new Set(destinationInfos.map(d => d.city.toLowerCase()));
+      
+      // Find all accommodations that should be removed:
+      // 1. Empty accommodations (no city set)
+      // 2. Accommodations matching the first departure city (return home - user lives there)
+      // 3. Accommodations for cities not in the valid destinations list
+      const accommodationIdsToRemove = memory.accommodations
+        .filter(a => {
+          // Remove empty accommodations
+          if (!a.city) return true;
+          const cityLower = a.city.toLowerCase();
+          // Remove accommodations matching first departure city (return home)
+          if (firstDepartureCity && cityLower === firstDepartureCity) return true;
+          // Remove accommodations not in valid destinations
+          if (!validCitiesSet.has(cityLower)) return true;
+          return false;
+        })
+        .map(a => a.id);
+      
+      // Remove in batch (collect IDs first)
+      accommodationIdsToRemove.forEach(id => {
+        removeAccommodation(id);
       });
       
+      // Add/update valid destinations
       destinationInfos.forEach((dest) => {
         const existingIndex = memory.accommodations.findIndex(
           a => a.city?.toLowerCase() === dest.city.toLowerCase()
@@ -683,11 +711,15 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
         
         if (existingIndex >= 0) {
           const existing = memory.accommodations[existingIndex];
-          if (dest.checkIn || dest.checkOut) {
-            updateAccommodation(existing.id, {
-              checkIn: dest.checkIn || existing.checkIn,
-              checkOut: dest.checkOut || existing.checkOut,
-            });
+          // Only update if not being removed
+          if (!accommodationIdsToRemove.includes(existing.id)) {
+            if (dest.checkIn || dest.checkOut) {
+              updateAccommodation(existing.id, {
+                checkIn: dest.checkIn || existing.checkIn,
+                checkOut: dest.checkOut || existing.checkOut,
+                syncedFromFlight: true,
+              });
+            }
           }
         } else {
           addAccommodation({
@@ -698,6 +730,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
             lng: dest.lng,
             checkIn: dest.checkIn,
             checkOut: dest.checkOut,
+            syncedFromFlight: true,
           });
         }
       });
@@ -911,6 +944,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
             checkIn={activeAccommodation.checkIn}
             checkOut={activeAccommodation.checkOut}
             onChange={handleDatesChange}
+            isSyncedWithFlight={activeAccommodation.syncedFromFlight}
           />
         </div>
         
