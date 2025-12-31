@@ -34,9 +34,8 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
 
   const handleJoyrideCallback = (data: CallBackProps) => {
     const { status } = data;
-    const finishedStatuses = [STATUS.FINISHED, STATUS.SKIPPED];
 
-    if (finishedStatuses.includes(status)) {
+    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
       setRunTour(false);
       localStorage.setItem(STORAGE_KEY, "true");
       onComplete?.();

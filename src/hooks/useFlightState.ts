@@ -1,6 +1,13 @@
 import { useState, useRef, useCallback } from "react";
 import { usePlannerEvent } from "@/lib/eventBus";
-import type { FlightFormData, SelectedAirport, ConfirmedAirports } from "@/pages/TravelPlanner";
+import type { FlightFormData, ConfirmedAirports } from "@/types/flight";
+import type { Airport } from "@/hooks/useNearestAirports";
+
+// Selected airport info to pass to FlightsPanel
+export interface SelectedAirport {
+  field: "from" | "to";
+  airport: Airport;
+}
 
 /**
  * Hook to manage flight-related state
