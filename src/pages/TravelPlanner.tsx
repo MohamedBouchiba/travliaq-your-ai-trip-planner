@@ -67,6 +67,7 @@ const TravelPlanner = () => {
     mapZoom,
     setMapZoom,
     initialAnimationDone,
+    setInitialAnimationDone,
     handleAnimationComplete,
   } = useMapState();
 

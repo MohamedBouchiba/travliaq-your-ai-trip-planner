@@ -561,18 +561,21 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
   const lastRouteSignatureRef = useRef<string>("");
 
   // Draw route markers from FlightMemory (most up-to-date source)
-  // This should NOT re-run on activeTab changes - routes persist across all tabs
+  // Only show on flights tab - hide on other tabs
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
 
     const memoryPoints = getRoutePoints();
     
     // Create a signature to detect real changes vs. just re-renders
-    const routeSignature = JSON.stringify(memoryPoints.map(p => ({
-      lat: p.lat.toFixed(4),
-      lng: p.lng.toFixed(4),
-      type: p.type,
-    })));
+    const routeSignature = JSON.stringify({
+      points: memoryPoints.map(p => ({
+        lat: p.lat.toFixed(4),
+        lng: p.lng.toFixed(4),
+        type: p.type,
+      })),
+      activeTab, // Include activeTab in signature to trigger update on tab change
+    });
     
     // Skip if routes haven't changed (prevents redraw on tab switch)
     if (routeSignature === lastRouteSignatureRef.current && routesDrawnRef.current) {
@@ -603,6 +606,12 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
 
     // Mark routes as not drawn if no points
     if (memoryPoints.length === 0) {
+      routesDrawnRef.current = false;
+      return;
+    }
+    
+    // DON'T show flight routes on stays tab - only show accommodation markers
+    if (activeTab === "stays") {
       routesDrawnRef.current = false;
       return;
     }
@@ -997,7 +1006,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       });
       routesDrawnRef.current = true;
     }
-  }, [getRoutePoints, mapLoaded, onDestinationClick]);
+  }, [getRoutePoints, mapLoaded, onDestinationClick, activeTab]);
 
   // Clean up legacy route markers on mount (no longer used - memory is the single source of truth)
   useEffect(() => {

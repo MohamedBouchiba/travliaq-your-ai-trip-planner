@@ -13,7 +13,6 @@ import { CheckCircle2, XCircle, AlertCircle, Info, Loader2 } from "lucide-react"
 export const toastSuccess = (message: string, description?: string) => {
   sonnerToast.success(message, {
     description,
-    icon: CheckCircle2,
     duration: 4000,
   });
 };
@@ -25,7 +24,6 @@ export const toastSuccess = (message: string, description?: string) => {
 export const toastError = (message: string, description?: string) => {
   sonnerToast.error(message, {
     description,
-    icon: XCircle,
     duration: 6000, // Longer duration for errors
   });
 };
@@ -37,7 +35,6 @@ export const toastError = (message: string, description?: string) => {
 export const toastWarning = (message: string, description?: string) => {
   sonnerToast.warning(message, {
     description,
-    icon: AlertCircle,
     duration: 5000,
   });
 };
@@ -49,7 +46,6 @@ export const toastWarning = (message: string, description?: string) => {
 export const toastInfo = (message: string, description?: string) => {
   sonnerToast.info(message, {
     description,
-    icon: Info,
     duration: 4000,
   });
 };
@@ -63,7 +59,6 @@ export const toastInfo = (message: string, description?: string) => {
 export const toastLoading = (message: string, description?: string) => {
   return sonnerToast.loading(message, {
     description,
-    icon: Loader2,
   });
 };
 
