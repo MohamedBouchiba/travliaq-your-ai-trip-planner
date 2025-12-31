@@ -249,88 +249,63 @@ export const bookingMachine = createMachine(
   },
   {
     actions: {
-      setTripType: assign({
-        tripType: (_, event) => {
-          if (event.type === "SET_TRIP_TYPE") return event.tripType;
-          return "roundtrip";
-        },
+      setTripType: assign(({ event }) => {
+        if (event.type === "SET_TRIP_TYPE") return { tripType: event.tripType };
+        return {};
       }),
-      setDeparture: assign({
-        departure: (_, event) => {
-          if (event.type === "SET_DEPARTURE") return event.value;
-          return null;
-        },
+      setDeparture: assign(({ event }) => {
+        if (event.type === "SET_DEPARTURE") return { departure: event.value };
+        return {};
       }),
-      setArrival: assign({
-        arrival: (_, event) => {
-          if (event.type === "SET_ARRIVAL") return event.value;
-          return null;
-        },
+      setArrival: assign(({ event }) => {
+        if (event.type === "SET_ARRIVAL") return { arrival: event.value };
+        return {};
       }),
-      setDepartureDate: assign({
-        departureDate: (_, event) => {
-          if (event.type === "SET_DEPARTURE_DATE") return event.date;
-          return null;
-        },
+      setDepartureDate: assign(({ event }) => {
+        if (event.type === "SET_DEPARTURE_DATE") return { departureDate: event.date };
+        return {};
       }),
-      setReturnDate: assign({
-        returnDate: (_, event) => {
-          if (event.type === "SET_RETURN_DATE") return event.date;
-          return null;
-        },
+      setReturnDate: assign(({ event }) => {
+        if (event.type === "SET_RETURN_DATE") return { returnDate: event.date };
+        return {};
       }),
-      setPassengers: assign({
-        passengers: (_, event) => {
-          if (event.type === "SET_PASSENGERS") return event.passengers;
-          return { adults: 1, children: 0, infants: 0 };
-        },
+      setPassengers: assign(({ event }) => {
+        if (event.type === "SET_PASSENGERS") return { passengers: event.passengers };
+        return {};
       }),
-      confirmAirports: assign({
-        confirmedAirports: (_, event) => {
-          if (event.type === "CONFIRM_AIRPORTS") return event.airports;
-          return null;
-        },
+      confirmAirports: assign(({ event }) => {
+        if (event.type === "CONFIRM_AIRPORTS") return { confirmedAirports: event.airports };
+        return {};
       }),
-      setFlightResults: assign({
-        flightResults: (_, event) => {
-          if (event.type === "SEARCH_FLIGHTS_SUCCESS") return event.results;
-          return [];
-        },
-        error: () => null,
+      setFlightResults: assign(({ event }) => {
+        if (event.type === "SEARCH_FLIGHTS_SUCCESS") return { flightResults: event.results, error: null };
+        return {};
       }),
-      setAccommodationResults: assign({
-        accommodationResults: (_, event) => {
-          if (event.type === "SEARCH_ACCOMMODATIONS_SUCCESS") return event.results;
-          return [];
-        },
+      setAccommodationResults: assign(({ event }) => {
+        if (event.type === "SEARCH_ACCOMMODATIONS_SUCCESS") return { accommodationResults: event.results };
+        return {};
       }),
-      setError: assign({
-        error: (_, event) => {
-          if (event.type === "SEARCH_FLIGHTS_ERROR") return event.error;
-          return null;
-        },
+      setError: assign(({ event }) => {
+        if (event.type === "SEARCH_FLIGHTS_ERROR") return { error: event.error };
+        return {};
       }),
-      selectFlight: assign({
-        currentStep: (ctx) => ctx.currentStep + 1,
-      }),
-      selectAccommodation: assign({
-        currentStep: (ctx) => ctx.currentStep + 1,
-      }),
-      reset: assign({
-        tripType: () => "roundtrip" as const,
-        departure: () => null,
-        arrival: () => null,
-        departureDate: () => null,
-        returnDate: () => null,
-        legs: () => [],
-        passengers: () => ({ adults: 1, children: 0, infants: 0 }),
-        accommodations: () => [],
-        currentStep: () => 0,
-        confirmedAirports: () => null,
-        flightResults: () => [],
-        accommodationResults: () => [],
-        error: () => null,
-      }),
+      selectFlight: assign(({ context }) => ({ currentStep: context.currentStep + 1 })),
+      selectAccommodation: assign(({ context }) => ({ currentStep: context.currentStep + 1 })),
+      reset: assign(() => ({
+        tripType: "roundtrip" as const,
+        departure: null,
+        arrival: null,
+        departureDate: null,
+        returnDate: null,
+        legs: [],
+        passengers: { adults: 1, children: 0, infants: 0 },
+        accommodations: [],
+        currentStep: 0,
+        confirmedAirports: null,
+        flightResults: [],
+        accommodationResults: [],
+        error: null,
+      })),
     },
   }
 );
