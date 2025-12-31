@@ -8,24 +8,44 @@ interface OnboardingTourProps {
   forceShow?: boolean;
   /** Callback when tour ends */
   onComplete?: () => void;
+  /** Callback to control panel visibility */
+  onPanelVisibilityChange?: (visible: boolean) => void;
+  /** Callback to trigger animation after onboarding */
+  onRequestAnimation?: () => void;
 }
 
 const STORAGE_KEY = "travliaq_onboarding_completed";
 
-// Map step indices to required tabs
-const STEP_TAB_MAP: Record<number, TabType> = {
-  4: "flights",     // Flights panel step
-  5: "stays",       // Stays panel step  
-  6: "activities",  // Activities panel step
-  7: "preferences", // Preferences panel step
+// Step configuration with tab and panel requirements
+interface StepConfig {
+  tab?: TabType;
+  panelOpen?: boolean;
+}
+
+const STEP_CONFIG: Record<number, StepConfig> = {
+  0: { panelOpen: false },  // Welcome - no panel
+  1: { panelOpen: false },  // Chat panel - no widget panel
+  2: { panelOpen: false },  // Map - no widget panel
+  3: { panelOpen: false },  // Tabs bar explanation - no widget yet
+  4: { tab: "flights", panelOpen: true },     // Flights panel
+  5: { tab: "stays", panelOpen: true },       // Stays panel  
+  6: { tab: "activities", panelOpen: true },  // Activities panel
+  7: { tab: "preferences", panelOpen: true }, // Preferences panel
+  8: { panelOpen: false },  // Final step - close panel
 };
 
 /**
  * Onboarding tour for the Planner page.
  * Shows only once for new users (tracked in localStorage).
- * Automatically opens the correct tab when focusing on a panel.
+ * Automatically opens the correct tab and panel when focusing on a widget.
+ * Blocks initial animations until onboarding is complete.
  */
-export default function OnboardingTour({ forceShow = false, onComplete }: OnboardingTourProps) {
+export default function OnboardingTour({ 
+  forceShow = false, 
+  onComplete,
+  onPanelVisibilityChange,
+  onRequestAnimation,
+}: OnboardingTourProps) {
   const [runTour, setRunTour] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
 
@@ -33,24 +53,40 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
   useEffect(() => {
     if (forceShow) {
       setRunTour(true);
+      // Close panel at start
+      onPanelVisibilityChange?.(false);
       return;
     }
 
     const hasSeenTour = localStorage.getItem(STORAGE_KEY) === "true";
     if (!hasSeenTour) {
       // Wait a bit for the page to fully load
-      const timer = setTimeout(() => setRunTour(true), 1500);
+      const timer = setTimeout(() => {
+        setRunTour(true);
+        // Close panel at start of onboarding
+        onPanelVisibilityChange?.(false);
+      }, 800);
       return () => clearTimeout(timer);
     }
-  }, [forceShow]);
+  }, [forceShow, onPanelVisibilityChange]);
 
-  // Open the correct tab when step changes
-  const openTabForStep = useCallback((index: number) => {
-    const requiredTab = STEP_TAB_MAP[index];
-    if (requiredTab) {
-      eventBus.emit("tab:change", { tab: requiredTab });
+  // Configure step: open tab and panel as needed
+  const configureStep = useCallback((index: number) => {
+    const config = STEP_CONFIG[index];
+    if (!config) return;
+
+    // Handle panel visibility
+    if (config.panelOpen !== undefined) {
+      onPanelVisibilityChange?.(config.panelOpen);
     }
-  }, []);
+
+    // Handle tab change (after panel is ready)
+    if (config.tab) {
+      setTimeout(() => {
+        eventBus.emit("tab:change", { tab: config.tab! });
+      }, 100);
+    }
+  }, [onPanelVisibilityChange]);
 
   const handleJoyrideCallback = (data: CallBackProps) => {
     const { status, action, index, type } = data;
@@ -60,7 +96,7 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
       // Navigate to next/previous step
       const nextIndex = action === ACTIONS.PREV ? index - 1 : index + 1;
       setStepIndex(nextIndex);
-      openTabForStep(nextIndex);
+      configureStep(nextIndex);
     }
 
     // Handle tour completion
@@ -69,8 +105,18 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
       setRunTour(false);
       setStepIndex(0);
       localStorage.setItem(STORAGE_KEY, "true");
+      
+      // Close panel first
+      onPanelVisibilityChange?.(false);
+      
       // Return to flights tab
       eventBus.emit("tab:change", { tab: "flights" });
+      
+      // Trigger animation and geolocation after a short delay
+      setTimeout(() => {
+        onRequestAnimation?.();
+      }, 300);
+      
       onComplete?.();
     }
   };
@@ -122,7 +168,7 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
       title: "Vos Outils de Planification 🛠️",
       content: (
         <div className="space-y-2">
-          <p>Passez d'un onglet à l'autre pour configurer chaque aspect de votre voyage.</p>
+          <p>Utilisez ces onglets pour configurer chaque aspect de votre voyage.</p>
           <p className="text-muted-foreground text-sm">
             Vols → Hébergements → Activités → Préférences. Tout est synchronisé automatiquement !
           </p>
@@ -131,11 +177,11 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
     },
     {
       target: '[data-tour="flights-panel"]',
-      placement: "auto",
+      placement: "right",
       title: "1. Recherche de Vols ✈️",
       content: (
         <div className="space-y-2">
-          <p>Commencez par configurer vos vols.</p>
+          <p>Configurez vos vols ici.</p>
           <p className="text-muted-foreground text-sm">
             Multi-destinations, classes de voyage, bagages... Les dates et destinations se synchronisent avec vos hébergements.
           </p>
@@ -143,8 +189,8 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
       ),
     },
     {
-      target: '[data-tour="stays-panel"]',
-      placement: "auto",
+      target: '[data-tour="flights-panel"]',
+      placement: "right",
       title: "2. Hébergements 🏨",
       content: (
         <div className="space-y-2">
@@ -156,8 +202,8 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
       ),
     },
     {
-      target: '[data-tour="activities-panel"]',
-      placement: "auto",
+      target: '[data-tour="flights-panel"]',
+      placement: "right",
       title: "3. Activités 🎭",
       content: (
         <div className="space-y-2">
@@ -169,8 +215,8 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
       ),
     },
     {
-      target: '[data-tour="preferences-panel"]',
-      placement: "auto",
+      target: '[data-tour="flights-panel"]',
+      placement: "right",
       title: "4. Préférences Globales ⚙️",
       content: (
         <div className="space-y-2">

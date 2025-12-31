@@ -49,6 +49,11 @@ export interface UserLocation {
 }
 
 const TravelPlanner = () => {
+  // Track if onboarding is complete to allow animations
+  const [onboardingComplete, setOnboardingComplete] = useState(() => {
+    return localStorage.getItem("travliaq_onboarding_completed") === "true";
+  });
+
   // Custom hooks for state management
   const {
     activeTab,
@@ -95,6 +100,17 @@ const TravelPlanner = () => {
   } = useDestinationPopup(setIsPanelVisible);
 
   const { chatRef, userLocation, searchMessageSentRef, setUserLocation } = useChatIntegration();
+  
+  // Callback when onboarding ends - trigger animation
+  const handleOnboardingComplete = useCallback(() => {
+    setOnboardingComplete(true);
+  }, []);
+
+  // Callback to start animation after onboarding
+  const handleRequestAnimation = useCallback(() => {
+    // Reset animation state to trigger the fly-to-user animation
+    setInitialAnimationDone(false);
+  }, [setInitialAnimationDone]);
 
   // Remaining local state
   const [flightRoutes, setFlightRoutes] = useState<FlightRoutePoint[]>([]);
@@ -159,7 +175,7 @@ const TravelPlanner = () => {
                   onPinClick={handlePinClick}
                   selectedPinId={selectedPin?.id}
                   flightRoutes={flightRoutes}
-                  animateToUserLocation={!initialAnimationDone}
+                  animateToUserLocation={onboardingComplete && !initialAnimationDone}
                   onAnimationComplete={() => {
                     setInitialAnimationDone(true);
                     // Open panel with the restored/active tab (don't force flights)
@@ -172,9 +188,7 @@ const TravelPlanner = () => {
               </PlannerErrorBoundary>
 
               {/* Overlay tabs */}
-              <div data-tour="tabs-bar">
-                <PlannerTopBar activeTab={activeTab} onTabChange={handleTabChange} />
-              </div>
+              <PlannerTopBar activeTab={activeTab} onTabChange={handleTabChange} />
 
               {/* YouTube Shorts Panel (takes over the regular panel) */}
               {youtubePanel ? (
@@ -243,7 +257,11 @@ const TravelPlanner = () => {
         </ResizablePanelGroup>
 
         {/* Onboarding Tour */}
-        <OnboardingTour />
+        <OnboardingTour 
+          onPanelVisibilityChange={setIsPanelVisible}
+          onComplete={handleOnboardingComplete}
+          onRequestAnimation={handleRequestAnimation}
+        />
           </div>
         </AccommodationMemoryProvider>
       </FlightMemoryProvider>
