@@ -10,11 +10,12 @@ interface PlannerTopBarProps {
   onTabChange: (tab: TabType) => void;
 }
 
-const tabs: { id: TabType; icon: React.ElementType }[] = [
-  { id: "flights", icon: Plane },
-  { id: "activities", icon: Compass },
-  { id: "stays", icon: Bed },
-  { id: "preferences", icon: SlidersHorizontal },
+// Order: Flights → Stays → Activities → Preferences
+const tabs: { id: TabType; icon: React.ElementType; label: string; emoji: string }[] = [
+  { id: "flights", icon: Plane, label: "Vols", emoji: "✈️" },
+  { id: "stays", icon: Bed, label: "Hébergements", emoji: "🏨" },
+  { id: "activities", icon: Compass, label: "Activités", emoji: "🎭" },
+  { id: "preferences", icon: SlidersHorizontal, label: "Préférences", emoji: "⚙️" },
 ];
 
 export default function PlannerTopBar({ activeTab, onTabChange }: PlannerTopBarProps) {
@@ -31,10 +32,14 @@ export default function PlannerTopBar({ activeTab, onTabChange }: PlannerTopBarP
   }, [activeTab]);
 
   usePlannerEvent("tab:flash", handleFlash);
+  
   return (
-    <div className="absolute top-0 left-0 right-0 z-20 h-12 bg-background/80 backdrop-blur-md border-b border-border/50 flex items-center justify-between px-4">
-      {/* Tab icons - left side */}
-      <div className="flex items-center gap-1">
+    <div 
+      className="absolute top-0 left-0 right-0 z-20 h-12 bg-background/80 backdrop-blur-md border-b border-border/50 flex items-center justify-between px-4"
+      data-tour="tabs-bar"
+    >
+      {/* Tab buttons - left side */}
+      <nav className="flex items-center gap-1" aria-label="Navigation des onglets">
         {tabs.map((t) => {
           const Icon = t.icon;
           const isActive = activeTab === t.id;
@@ -44,23 +49,26 @@ export default function PlannerTopBar({ activeTab, onTabChange }: PlannerTopBarP
             <button
               key={t.id}
               onClick={() => onTabChange(t.id)}
+              data-tour={`${t.id}-tab`}
               className={cn(
-                "h-8 w-8 rounded-lg flex items-center justify-center transition-all relative",
+                "relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all duration-200",
                 isActive
-                  ? "bg-primary/20 text-primary"
+                  ? "bg-primary text-primary-foreground shadow-md"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                isFlashing && "animate-flash"
+                isFlashing && "animate-pulse ring-2 ring-primary ring-offset-2"
               )}
-              aria-label={t.id}
+              aria-label={t.label}
+              aria-current={isActive ? "page" : undefined}
             >
-              <Icon className="h-4 w-4" />
+              <span className="text-base">{t.emoji}</span>
+              <span className="hidden sm:inline">{t.label}</span>
               {isFlashing && (
-                <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-primary animate-ping" />
+                <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-primary animate-ping" />
               )}
             </button>
           );
         })}
-      </div>
+      </nav>
 
       {/* Logo - right side */}
       <img src={logo} alt="Travliaq" className="h-6 w-auto opacity-80" />
