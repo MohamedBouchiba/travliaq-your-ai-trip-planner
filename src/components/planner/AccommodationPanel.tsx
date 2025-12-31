@@ -974,7 +974,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
   if (!activeAccommodation) return null;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-tour="stays-panel">
       {/* Accommodation tabs + Add button - always visible */}
       <div className="flex gap-1.5 flex-wrap items-center">
         {memory.accommodations.map((acc, index) => (

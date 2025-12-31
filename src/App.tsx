@@ -7,6 +7,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { HelmetProvider } from "react-helmet-async";
 import { lazy, Suspense } from "react";
 import { usePageTracking } from "@/hooks/usePageTracking";
+import { ActivityMemoryProvider } from "@/contexts/ActivityMemoryContext";
+import { PreferenceMemoryProvider } from "@/contexts/PreferenceMemoryContext";
 
 const SentryTest = lazy(() => import("./pages/SentryTest"));
 const Index = lazy(() => import("./pages/Index"));
@@ -65,13 +67,17 @@ const App = () => (
   <HelmetProvider>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AppContent />
-          </BrowserRouter>
-        </TooltipProvider>
+        <PreferenceMemoryProvider>
+          <ActivityMemoryProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <AppContent />
+              </BrowserRouter>
+            </TooltipProvider>
+          </ActivityMemoryProvider>
+        </PreferenceMemoryProvider>
       </AuthProvider>
     </QueryClientProvider>
   </HelmetProvider>

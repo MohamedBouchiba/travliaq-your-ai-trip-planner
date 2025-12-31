@@ -11,6 +11,8 @@ import { findNearestAirports, type Airport } from "@/hooks/useNearestAirports";
 import { useFlightMemory, type AirportInfo, type MissingField } from "@/contexts/FlightMemoryContext";
 import { useTravelMemory } from "@/contexts/TravelMemoryContext";
 import { useAccommodationMemory, type AccommodationEntry } from "@/contexts/AccommodationMemoryContext";
+import { useActivityMemory, type ActivityEntry } from "@/contexts/ActivityMemoryContext";
+import { usePreferenceMemory, type TripPreferences } from "@/contexts/PreferenceMemoryContext";
 import { format, addMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameDay, isSameMonth, isBefore, startOfDay } from "date-fns";
 import { fr } from "date-fns/locale";
 import { eventBus, emitTabChange, emitTabAndZoom } from "@/lib/eventBus";
@@ -75,6 +77,9 @@ export interface PlannerChatRef {
   offerFlightSearch: (from: string, to: string) => void;
   handleAccommodationUpdate: (city: string, updates: Partial<AccommodationEntry>) => boolean;
   askAirportConfirmation: (data: AirportConfirmationData) => void;
+  handleActivityUpdate: (city: string, updates: Partial<ActivityEntry>) => boolean;
+  handleAddActivityForCity: (city: string, activity: Partial<ActivityEntry>) => string | null;
+  handlePreferencesDetection: (detectedPrefs: Partial<TripPreferences>) => void;
 }
 
 // City coordinates for map actions
@@ -1292,6 +1297,19 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>((_prop
   const { getSerializedState: getFlightMemory } = useFlightMemory();
   const { getSerializedState: getAccommodationMemory } = useAccommodationMemory();
   const { getSerializedState: getTravelMemory } = useTravelMemory();
+  const {
+    addActivity,
+    updateActivity,
+    getActivitiesByCity,
+    getSerializedState: getActivityMemory,
+  } = useActivityMemory();
+  const {
+    updatePreferences,
+    toggleInterest,
+    setPace,
+    setComfortLevel,
+    getSerializedState: getPreferenceMemory,
+  } = usePreferenceMemory();
 
   // Chat sessions hook for multi-conversation management
   const {
@@ -2208,8 +2226,21 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>((_prop
 
     // Include memory context in the request
     const memoryContext = getMemorySummary();
-    const contextMessage = memoryContext 
-      ? `[CONTEXTE MÉMOIRE] ${memoryContext}\n[CHAMPS MANQUANTS] ${missingFields.map(getMissingFieldLabel).join(", ") || "Aucun - prêt à chercher"}`
+
+    // Build activity and preference context
+    const activityMemoryState = getActivityMemory();
+    const preferenceMemoryState = getPreferenceMemory();
+
+    const activityContext = activityMemoryState && typeof activityMemoryState.totalActivities === 'number' && activityMemoryState.totalActivities > 0
+      ? `\n[ACTIVITÉS] ${activityMemoryState.totalActivities} activité(s) planifiée(s)`
+      : "";
+
+    const preferenceContext = preferenceMemoryState
+      ? `\n[PRÉFÉRENCES] Rythme: ${preferenceMemoryState.pace}, Style: ${preferenceMemoryState.travelStyle}, Confort: ${preferenceMemoryState.comfortLabel}, Intérêts: ${Array.isArray(preferenceMemoryState.interests) ? (preferenceMemoryState.interests as string[]).join(", ") : ""}`
+      : "";
+
+    const contextMessage = memoryContext
+      ? `[CONTEXTE MÉMOIRE] ${memoryContext}${activityContext}${preferenceContext}\n[CHAMPS MANQUANTS] ${missingFields.map(getMissingFieldLabel).join(", ") || "Aucun - prêt à chercher"}`
       : "";
 
     const response = await fetch(
@@ -2424,6 +2455,92 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>((_prop
           },
         },
       ]);
+    },
+
+    handleActivityUpdate: (city: string, updates: Partial<ActivityEntry>): boolean => {
+      const activities = getActivitiesByCity(city);
+
+      if (activities.length === 0) {
+        console.warn(`[PlannerChat] No activities found for city: ${city}`);
+        toastError(
+          "Aucune activité",
+          `Aucune activité trouvée pour ${city}`
+        );
+        return false;
+      }
+
+      // Update all activities for this city
+      activities.forEach(activity => {
+        updateActivity(activity.id, updates);
+      });
+
+      console.log(`[PlannerChat] Updated ${activities.length} activity(ies) for ${city}:`, updates);
+
+      toastSuccess(
+        "Activité mise à jour",
+        `${activities.length} activité(s) pour ${city} modifiée(s)`
+      );
+      return true;
+    },
+
+    handleAddActivityForCity: (city: string, activity: Partial<ActivityEntry>): string | null => {
+      // Find destination by city
+      const destination = accomMemory.accommodations.find(
+        a => a.city?.toLowerCase().trim() === city.toLowerCase().trim()
+      );
+
+      if (!destination) {
+        console.warn(`[PlannerChat] No destination found for city: ${city}`);
+        toastError(
+          "Destination introuvable",
+          `Aucune destination trouvée pour ${city}`
+        );
+        return null;
+      }
+
+      const id = addActivity({
+        destinationId: destination.id,
+        city: destination.city || city,
+        country: destination.country || "",
+        ...activity,
+      });
+
+      console.log(`[PlannerChat] Added activity for ${city}:`, activity);
+
+      toastSuccess(
+        "Activité ajoutée",
+        `Nouvelle activité pour ${city}`
+      );
+      return id;
+    },
+
+    handlePreferencesDetection: (detectedPrefs: Partial<TripPreferences>): void => {
+      updatePreferences({
+        ...detectedPrefs,
+        detectedFromChat: true,
+      });
+
+      // Build summary of detected preferences
+      const summary: string[] = [];
+      if (detectedPrefs.pace) summary.push(`rythme ${detectedPrefs.pace}`);
+      if (detectedPrefs.interests && detectedPrefs.interests.length > 0) {
+        summary.push(`centres d'intérêt: ${detectedPrefs.interests.join(", ")}`);
+      }
+      if (detectedPrefs.travelStyle) summary.push(`style ${detectedPrefs.travelStyle}`);
+      if (detectedPrefs.comfortLevel !== undefined) {
+        const comfortLabel = detectedPrefs.comfortLevel < 25 ? "économique" :
+                             detectedPrefs.comfortLevel < 50 ? "confort" :
+                             detectedPrefs.comfortLevel < 75 ? "premium" : "luxe";
+        summary.push(`niveau ${comfortLabel}`);
+      }
+
+      if (summary.length > 0) {
+        console.log(`[PlannerChat] Detected preferences:`, detectedPrefs);
+        toastSuccess(
+          "Préférences détectées",
+          `L'IA a détecté: ${summary.join(", ")}. Modifiez-les dans l'onglet Préférences.`
+        );
+      }
     },
   }));
 

@@ -111,6 +111,45 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
       ),
     },
     {
+      target: '[data-tour="stays-panel"]',
+      placement: "auto",
+      title: "Hébergements 🏨",
+      content: (
+        <div className="space-y-2">
+          <p>Trouvez l'hébergement parfait pour chaque destination.</p>
+          <p className="text-muted-foreground text-sm">
+            Les dates et destinations sont synchronisées automatiquement avec vos vols !
+          </p>
+        </div>
+      ),
+    },
+    {
+      target: '[data-tour="activities-panel"]',
+      placement: "auto",
+      title: "Activités 🎭",
+      content: (
+        <div className="space-y-2">
+          <p>Planifiez vos activités et visites par destination.</p>
+          <p className="text-muted-foreground text-sm">
+            Filtrez par type, durée et budget pour personnaliser votre voyage.
+          </p>
+        </div>
+      ),
+    },
+    {
+      target: '[data-tour="preferences-panel"]',
+      placement: "auto",
+      title: "Préférences de Voyage 🎨",
+      content: (
+        <div className="space-y-2">
+          <p>Définissez vos préférences globales de voyage.</p>
+          <p className="text-muted-foreground text-sm">
+            Rythme, budget, centres d'intérêt... pour une expérience sur mesure.
+          </p>
+        </div>
+      ),
+    },
+    {
       target: "body",
       placement: "center",
       title: "C'est parti ! 🚀",

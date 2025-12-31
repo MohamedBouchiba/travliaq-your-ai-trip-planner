@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useMemo, ReactNode, useEffect } from "react";
 import { useTravelMemory } from "./TravelMemoryContext";
 import { useFlightMemory } from "./FlightMemoryContext";
+import { usePreferenceMemory } from "./PreferenceMemoryContext";
 import { migrateAccommodationMemory } from "@/lib/memoryMigration";
 import { toastSuccess } from "@/lib/toast";
 
@@ -248,6 +249,9 @@ export function AccommodationMemoryProvider({ children }: { children: ReactNode 
   // Access flight memory for trip type changes
   const { memory: flightMemory } = useFlightMemory();
 
+  // Access preferences for budget synchronization
+  const { memory: { preferences } } = usePreferenceMemory();
+
   // Hydrate on mount (memory already loaded in useState initializer)
   useEffect(() => {
     setIsHydrated(true);
@@ -284,6 +288,35 @@ export function AccommodationMemoryProvider({ children }: { children: ReactNode 
     }
     // When switching to multi, let the auto-sync mechanism in AccommodationPanel handle it
   }, [flightMemory.tripType, isHydrated]);
+
+  // Sync preferences comfort level to budget defaults
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    const { comfortLevel } = preferences;
+
+    // Map comfort level to budget preset
+    const budgetPreset: BudgetPreset =
+      comfortLevel < 25 ? "eco" :
+      comfortLevel < 50 ? "comfort" :
+      comfortLevel < 75 ? "premium" : "luxury";
+
+    const budgetPresets: Record<BudgetPreset, { min: number; max: number }> = {
+      eco: { min: 0, max: 80 },
+      comfort: { min: 80, max: 180 },
+      premium: { min: 180, max: 350 },
+      luxury: { min: 350, max: 1000 },
+    };
+
+    const { min, max } = budgetPresets[budgetPreset];
+
+    setMemory(prev => ({
+      ...prev,
+      defaultBudgetPreset: budgetPreset,
+      defaultPriceMin: min,
+      defaultPriceMax: max,
+    }));
+  }, [preferences.comfortLevel, isHydrated]);
 
   // Get active accommodation
   const getActiveAccommodation = useCallback((): AccommodationEntry | null => {
