@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, useMemo, ReactNode, u
 import { useTravelMemory } from "./TravelMemoryContext";
 import { useFlightMemory } from "./FlightMemoryContext";
 import { migrateAccommodationMemory } from "@/lib/memoryMigration";
+import { toastSuccess } from "@/lib/toast";
 
 const STORAGE_KEY = "travliaq_accommodation_memory";
 
@@ -300,6 +301,15 @@ export function AccommodationMemoryProvider({ children }: { children: ReactNode 
         priceMax: prev.defaultPriceMax,
         ...entry,
       };
+
+      // Show success toast for manual additions (has city name)
+      if (entry?.city) {
+        toastSuccess(
+          "Hébergement ajouté",
+          `${entry.city} a été ajouté à votre voyage`
+        );
+      }
+
       return {
         ...prev,
         accommodations: [...prev.accommodations, newAccommodation],
@@ -311,7 +321,18 @@ export function AccommodationMemoryProvider({ children }: { children: ReactNode 
   // Remove accommodation
   const removeAccommodation = useCallback((id: string) => {
     setMemory(prev => {
+      // Find the accommodation to get its city name before removing
+      const removedAccommodation = prev.accommodations.find(a => a.id === id);
       const newAccommodations = prev.accommodations.filter(a => a.id !== id);
+
+      // Show toast if we're removing a named accommodation
+      if (removedAccommodation?.city) {
+        toastSuccess(
+          "Hébergement supprimé",
+          `${removedAccommodation.city} a été retiré de votre voyage`
+        );
+      }
+
       // Ensure at least one accommodation exists
       if (newAccommodations.length === 0) {
         return {

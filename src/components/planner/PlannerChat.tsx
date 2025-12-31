@@ -6,93 +6,42 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/logo-travliaq.png";
 import ReactMarkdown from "react-markdown";
-import type { CountrySelectionEvent } from "./PlannerPanel";
+import type { CountrySelectionEvent } from "@/types/flight";
 import { findNearestAirports, type Airport } from "@/hooks/useNearestAirports";
 import { useFlightMemory, type AirportInfo, type MissingField } from "@/contexts/FlightMemoryContext";
 import { useTravelMemory } from "@/contexts/TravelMemoryContext";
 import { useAccommodationMemory, type AccommodationEntry } from "@/contexts/AccommodationMemoryContext";
 import { format, addMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameDay, isSameMonth, isBefore, startOfDay } from "date-fns";
 import { fr } from "date-fns/locale";
+import { eventBus, emitTabChange, emitTabAndZoom } from "@/lib/eventBus";
+import { toastSuccess, toastError } from "@/lib/toast";
 
-export type ChatQuickAction =
-  | { type: "tab"; tab: "flights" | "activities" | "stays" | "preferences" }
-  | { type: "zoom"; center: [number, number]; zoom: number }
-  | { type: "tabAndZoom"; tab: "flights" | "activities" | "stays" | "preferences"; center: [number, number]; zoom: number }
-  | { type: "updateFlight"; flightData: FlightFormData }
-  | { type: "selectAirport"; field: "from" | "to"; airport: Airport }
-  | { type: "triggerFlightSearch" }
-  | { type: "triggerMultiFlightSearch"; confirmedAirports: ConfirmedAirports };
+// Import unified types from centralized location
+import type {
+  ChatQuickAction,
+  FlightFormData,
+  AirportChoice,
+  DualAirportChoice,
+  WidgetType,
+  CityChoice,
+  CitySelectionData,
+  AirportLegSuggestion,
+  AirportConfirmationData,
+  ConfirmedAirports,
+} from "@/types/flight";
 
-export interface FlightFormData {
-  from?: string;
-  fromCountryCode?: string;
-  fromCountryName?: string;
-  to?: string;
-  toCountryCode?: string;
-  toCountryName?: string;
-  departureDate?: string;
-  returnDate?: string;
-  passengers?: number;
-  adults?: number;
-  children?: number;
-  infants?: number;
-  needsTravelersWidget?: boolean;
-  needsDateWidget?: boolean;
-  needsCitySelection?: boolean;
-  tripDuration?: string;
-  preferredMonth?: string;
-  budgetHint?: string;
-  tripType?: "roundtrip" | "oneway" | "multi";
-}
-
-// Airport selection for chat buttons
-export interface AirportChoice {
-  field: "from" | "to";
-  cityName: string;
-  airports: Airport[];
-}
-
-// Dual airport selection (both departure and destination in one message)
-export interface DualAirportChoice {
-  from?: AirportChoice;
-  to?: AirportChoice;
-}
-
-// Widget types for inline interactions
-type WidgetType = "datePicker" | "returnDatePicker" | "dateRangePicker" | "travelersSelector" | "tripTypeConfirm" | "citySelector" | "travelersConfirmBeforeSearch" | "airportConfirmation";
-
-// City choice for country selection
-export interface CityChoice {
-  name: string;
-  description: string;
-  population?: number;
-}
-
-export interface CitySelectionData {
-  countryCode: string;
-  countryName: string;
-  cities: CityChoice[];
-}
-
-// Airport confirmation for multi-destination
-export interface AirportLegSuggestion {
-  legIndex: number;
-  from: {
-    city: string;
-    suggestedAirport: Airport;
-    alternativeAirports: Airport[];
-  };
-  to: {
-    city: string;
-    suggestedAirport: Airport;
-    alternativeAirports: Airport[];
-  };
-  date?: Date;
-}
-
-export interface AirportConfirmationData {
-  legs: AirportLegSuggestion[];
-}
+// Re-export types for external consumers
+export type {
+  ChatQuickAction,
+  FlightFormData,
+  AirportChoice,
+  DualAirportChoice,
+  CityChoice,
+  CitySelectionData,
+  AirportLegSuggestion,
+  AirportConfirmationData,
+  ConfirmedAirports,
+};
 
 interface ChatMessage {
   id: string;
@@ -114,20 +63,9 @@ interface ChatMessage {
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface PlannerChatProps {
-  onAction: (action: ChatQuickAction) => void;
-}
-
-// Confirmed airports returned from the widget
-export interface ConfirmedAirports {
-  legs: Array<{
-    legIndex: number;
-    fromIata: string;
-    fromDisplay: string;
-    toIata: string;
-    toDisplay: string;
-    date?: Date;
-  }>;
+  // Props intentionally empty - using event bus for communication
 }
 
 export interface PlannerChatRef {
@@ -178,8 +116,8 @@ function getCityCoords(cityName: string): [number, number] | null {
 
 function parseAction(content: string): { cleanContent: string; action: ChatQuickAction | null } {
   const actionMatch = content.match(/<action>(.*?)<\/action>/s);
-  let cleanContent = content.replace(/<action>.*?<\/action>/gs, "").trim();
-  
+  const cleanContent = content.replace(/<action>.*?<\/action>/gs, "").trim();
+
   if (!actionMatch) return { cleanContent, action: null };
 
   try {
@@ -1349,7 +1287,7 @@ function getMissingFieldLabel(field: MissingField): string {
   }
 }
 
-const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onAction }, ref) => {
+const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>((_props, ref) => {
   // Access memory contexts for persistence
   const { getSerializedState: getFlightMemory } = useFlightMemory();
   const { getSerializedState: getAccommodationMemory } = useAccommodationMemory();
@@ -1641,7 +1579,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
     ]);
 
     // Notify parent to update the flight form
-    onAction({ type: "selectAirport", field, airport });
+    eventBus.emit("flight:selectAirport", { field, airport });
   };
 
   // Handle date selection from widget
@@ -1826,7 +1764,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       pendingSearchAfterTravelersRef.current = true;
     } else {
       // Travelers already configured, proceed with search
-      onAction({ type: "triggerFlightSearch" });
+      eventBus.emit("flight:triggerSearch");
     }
   };
 
@@ -1838,7 +1776,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       )
     );
     pendingSearchAfterTravelersRef.current = false;
-    onAction({ type: "triggerFlightSearch" });
+    eventBus.emit("flight:triggerSearch");
   };
 
   // Handle edit travelers before search
@@ -2447,12 +2385,22 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
       const accommodation = findAccommodationByCity(city);
       if (!accommodation) {
         console.warn(`[PlannerChat] No accommodation found for city: ${city}`);
+        toastError(
+          "Hébergement introuvable",
+          `Aucun hébergement trouvé pour ${city}`
+        );
         return false;
       }
 
       // Update the accommodation with the provided changes
       updateAccommodation(accommodation.id, updates);
       console.log(`[PlannerChat] Updated accommodation for ${city}:`, updates);
+
+      // Show success toast
+      toastSuccess(
+        "Hébergement mis à jour",
+        `Les préférences pour ${city} ont été modifiées`
+      );
       return true;
     },
 
@@ -2603,17 +2551,24 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
         if (destCity) {
           const coords = getCityCoords(destCity.toLowerCase().split(",")[0].trim());
           if (coords) {
-            onAction({ type: "tabAndZoom", tab: "flights", center: coords, zoom: 8 });
+            emitTabAndZoom("flights", coords, 8);
           } else {
-            onAction({ type: "tab", tab: "flights" });
+            emitTabChange("flights");
           }
         } else {
-          onAction({ type: "tab", tab: "flights" });
+          emitTabChange("flights");
         }
 
-        onAction({ type: "updateFlight", flightData });
+        eventBus.emit("flight:updateFormData", flightData);
       } else if (action) {
-        onAction(action);
+        // Dispatch action to event bus
+        if (action.type === "tab") {
+          emitTabChange(action.tab);
+        } else if (action.type === "zoom") {
+          eventBus.emit("map:zoom", { center: action.center, zoom: action.zoom });
+        } else if (action.type === "tabAndZoom") {
+          emitTabAndZoom(action.tab, action.center, action.zoom);
+        }
       }
 
       // Determine widget to show - ONLY ONE at a time, with priority order:
@@ -2879,7 +2834,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ onA
                     data={m.widgetData.airportConfirmation}
                     onConfirm={(confirmed) => {
                       // Trigger multi-destination search with confirmed airports
-                      onAction({ type: "triggerMultiFlightSearch", confirmedAirports: confirmed });
+                      eventBus.emit("flight:confirmedAirports", confirmed);
                     }}
                   />
                 )}

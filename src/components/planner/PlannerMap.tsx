@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, memo } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "@/styles/mapbox-overrides.css";
 import type { TabType, MapPin } from "@/pages/TravelPlanner";
 import type { FlightRoutePoint } from "./PlannerPanel";
 import { useFlightMemory, type MemoryRoutePoint } from "@/contexts/FlightMemoryContext";
+import { useAccommodationMemory } from "@/contexts/AccommodationMemoryContext";
 
 // Destination click event for popup
 export interface DestinationClickEvent {
@@ -297,6 +298,9 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
 
   // Get route points from flight memory
   const { getRoutePoints } = useFlightMemory();
+  
+  // Get accommodation entries for markers
+  const { memory: accommodationMemory } = useAccommodationMemory();
 
   // Get pins based on active tab - returns empty by default (no pins shown initially)
   const getPinsForTab = useCallback((tab: TabType): MapPin[] => {
@@ -1021,6 +1025,112 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     }
   }, [mapLoaded]);
 
+  // Display accommodation markers when stays tab is active
+  const accommodationMarkersRef = useRef<mapboxgl.Marker[]>([]);
+  
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    
+    // Clear existing accommodation markers
+    accommodationMarkersRef.current.forEach((marker) => marker.remove());
+    accommodationMarkersRef.current = [];
+    
+    // Only show on stays tab
+    if (activeTab !== "stays") return;
+    
+    // Get accommodations with valid coordinates
+    const accommodations = accommodationMemory.accommodations.filter(
+      (acc) => acc.lat && acc.lng
+    );
+    
+    if (accommodations.length === 0) return;
+    
+    accommodations.forEach((acc, index) => {
+      if (!acc.lat || !acc.lng) return;
+      
+      // Create marker element
+      const el = document.createElement("div");
+      el.className = "accommodation-marker";
+      el.innerHTML = `
+        <div style="
+          width: 42px;
+          height: 52px;
+          position: relative;
+          cursor: pointer;
+          filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25));
+          animation: markerBounce 0.4s ease-out forwards;
+          animation-delay: ${index * 0.1}s;
+          opacity: 0;
+          transform: translateY(-10px);
+        ">
+          <div style="
+            width: 40px;
+            height: 40px;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            background: linear-gradient(135deg, hsl(280, 70%, 55%) 0%, hsl(280, 70%, 40%) 100%);
+            border: 3px solid white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 -2px 4px rgba(0,0,0,0.15);
+          ">
+            <span style="
+              transform: rotate(45deg);
+              font-size: 18px;
+              filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2));
+            ">🏨</span>
+          </div>
+          <div style="
+            position: absolute;
+            top: -24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            white-space: nowrap;
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          ">${acc.city}</div>
+        </div>
+        <style>
+          @keyframes markerBounce {
+            0% { opacity: 0; transform: translateY(-10px); }
+            60% { opacity: 1; transform: translateY(3px); }
+            100% { opacity: 1; transform: translateY(0); }
+          }
+        </style>
+      `;
+      
+      // Add hover effects
+      const pinEl = el.querySelector("div") as HTMLElement;
+      pinEl?.addEventListener("mouseenter", () => {
+        pinEl.style.filter = "drop-shadow(0 6px 12px rgba(0,0,0,0.35))";
+        pinEl.style.transform = "translateY(-2px) scale(1.05)";
+      });
+      pinEl?.addEventListener("mouseleave", () => {
+        pinEl.style.filter = "drop-shadow(0 4px 8px rgba(0,0,0,0.25))";
+        pinEl.style.transform = "translateY(0) scale(1)";
+      });
+      
+      const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
+        .setLngLat([acc.lng, acc.lat])
+        .addTo(map.current!);
+      
+      accommodationMarkersRef.current.push(marker);
+    });
+    
+    return () => {
+      accommodationMarkersRef.current.forEach((marker) => marker.remove());
+      accommodationMarkersRef.current = [];
+    };
+  }, [activeTab, mapLoaded, accommodationMemory.accommodations]);
+
   // Update map center/zoom with fast animation
   useEffect(() => {
     if (!map.current) return;
@@ -1037,4 +1147,4 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
   );
 };
 
-export default PlannerMap;
+export default memo(PlannerMap);

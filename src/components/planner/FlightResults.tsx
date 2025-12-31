@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Plane, ChevronDown, ChevronUp, Luggage, Star, Zap, Moon, Clock, Leaf, Info, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FixedSizeList as List } from "react-window";
 
 // Flight segment with enriched data
 export interface FlightSegment {
@@ -592,7 +593,33 @@ const FlightResults = ({ flights, isLoading, onSelect, travelers = 1, tripType =
 
   // Get count text
   const countText = `${flights.length} vol${flights.length > 1 ? "s" : ""} trouvé${flights.length > 1 ? "s" : ""}`;
-  
+
+  // Use virtualization for long lists (10+ items) to improve performance
+  const useVirtualization = flights.length >= 10;
+
+  // Memoize flight card renderer for virtualized list
+  const Row = useMemo(() => {
+    return ({ index, style }: { index: number; style: React.CSSProperties }) => {
+      const flight = flights[index];
+      return (
+        <div style={style}>
+          <div className="px-1 pb-3">
+            <FlightCard
+              key={flight.id}
+              flight={flight}
+              onSelect={onSelect}
+              isExpanded={expandedId === flight.id}
+              onToggleExpand={() => setExpandedId(expandedId === flight.id ? null : flight.id)}
+              isRevealed={revealedIds.has(flight.id)}
+              travelers={travelers}
+              isFirst={index === 0}
+            />
+          </div>
+        </div>
+      );
+    };
+  }, [flights, onSelect, expandedId, revealedIds, travelers]);
+
   return (
     <div className="space-y-3">
       {/* Compact results header */}
@@ -607,19 +634,35 @@ const FlightResults = ({ flights, isLoading, onSelect, travelers = 1, tripType =
           </p>
         )}
       </div>
-      
-      {flights.map((flight, index) => (
-        <FlightCard
-          key={flight.id}
-          flight={flight}
-          onSelect={onSelect}
-          isExpanded={expandedId === flight.id}
-          onToggleExpand={() => setExpandedId(expandedId === flight.id ? null : flight.id)}
-          isRevealed={revealedIds.has(flight.id)}
-          travelers={travelers}
-          isFirst={index === 0}
-        />
-      ))}
+
+      {useVirtualization ? (
+        /* Virtualized list for 10+ flights - significant performance improvement */
+        <List
+          height={600}
+          itemCount={flights.length}
+          itemSize={280}
+          width="100%"
+          className="themed-scroll"
+        >
+          {Row}
+        </List>
+      ) : (
+        /* Regular rendering for small lists - preserves animations */
+        <>
+          {flights.map((flight, index) => (
+            <FlightCard
+              key={flight.id}
+              flight={flight}
+              onSelect={onSelect}
+              isExpanded={expandedId === flight.id}
+              onToggleExpand={() => setExpandedId(expandedId === flight.id ? null : flight.id)}
+              isRevealed={revealedIds.has(flight.id)}
+              travelers={travelers}
+              isFirst={index === 0}
+            />
+          ))}
+        </>
+      )}
     </div>
   );
 };

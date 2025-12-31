@@ -1,11 +1,12 @@
-import { useState, useRef, useEffect } from "react";
-import { 
-  Building2, Star, Wifi, Car, Coffee, Wind, MapPin, Users, ChevronDown, ChevronUp, 
+import { useState, useRef, useEffect, memo } from "react";
+import {
+  Building2, Star, Wifi, Car, Coffee, Wind, MapPin, Users, ChevronDown, ChevronUp,
   Search, Waves, BedDouble, Home, Hotel, Castle, Tent, Plus, Minus, X, CalendarDays,
   Dumbbell, Accessibility, Baby, Dog, Mountain, Building, Flower2, Bus,
   ConciergeBell, Droplets, Utensils, ChefHat, Soup, House, Link2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toastInfo } from "@/lib/toast";
 import { useTravelMemory } from "@/contexts/TravelMemoryContext";
 import { useAccommodationMemory, BUDGET_PRESETS, type BudgetPreset, type AccommodationType, type EssentialAmenity, type RoomConfig, type MealPlan } from "@/contexts/AccommodationMemoryContext";
 import { useFlightMemory } from "@/contexts/FlightMemoryContext";
@@ -18,6 +19,7 @@ import { differenceInDays, format } from "date-fns";
 import { fr } from "date-fns/locale";
 import RangeCalendar from "@/components/RangeCalendar";
 import type { DateRange } from "react-day-picker";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
 interface AccommodationPanelProps {
   onMapMove?: (center: [number, number], zoom: number) => void;
@@ -427,14 +429,33 @@ function CompactDateRange({
               {formatDateCompact(checkIn)} → {formatDateCompact(checkOut)}
               <span className="text-muted-foreground">({nights}n)</span>
               {isSyncedWithFlight && (
-                <Link2 className="h-3 w-3 text-primary/70" />
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link2 className="h-3 w-3 text-primary/70 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      <p>Dates synchronisées avec vos vols</p>
+                      <p className="text-muted-foreground">Modifiez-les librement si nécessaire</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </span>
           ) : checkIn ? (
             <span className="truncate text-foreground flex items-center gap-1">
               {formatDateCompact(checkIn)} → <span className="text-muted-foreground">Retour ?</span>
               {isSyncedWithFlight && (
-                <Link2 className="h-3 w-3 text-primary/70" />
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link2 className="h-3 w-3 text-primary/70 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      <p>Date d'arrivée synchronisée avec le vol</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </span>
           ) : (
@@ -612,9 +633,6 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
   // Track if user is typing vs selected from autocomplete
   const [destinationInput, setDestinationInput] = useState(activeAccommodation?.city || "");
 
-  // Sync notification state
-  const [syncNotification, setSyncNotification] = useState<string | null>(null);
-  
   // Store onMapMove in a ref to avoid infinite loops
   const onMapMoveRef = useRef(onMapMove);
   onMapMoveRef.current = onMapMove;
@@ -798,10 +816,10 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
       ).length;
 
       if (changedCount > 0) {
-        setSyncNotification(
-          `Hébergements synchronisés avec vos ${destinationInfos.length} destination${destinationInfos.length > 1 ? 's' : ''}`
+        toastInfo(
+          "Hébergements synchronisés",
+          `${destinationInfos.length} destination${destinationInfos.length > 1 ? 's' : ''} mise${destinationInfos.length > 1 ? 's' : ''} à jour depuis vos vols`
         );
-        setTimeout(() => setSyncNotification(null), 5000);
       }
     } else {
       // For round-trip and one-way: sync dates from departure/return
@@ -957,20 +975,6 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
 
   return (
     <div className="space-y-3">
-      {/* Sync notification banner */}
-      {syncNotification && (
-        <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg px-3 py-2 flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300 animate-in fade-in slide-in-from-top-2 duration-300">
-          <Link2 className="h-4 w-4 flex-shrink-0" />
-          <span className="flex-1">{syncNotification}</span>
-          <button
-            onClick={() => setSyncNotification(null)}
-            className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-200"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
       {/* Accommodation tabs + Add button - always visible */}
       <div className="flex gap-1.5 flex-wrap items-center">
         {memory.accommodations.map((acc, index) => (
@@ -1277,4 +1281,4 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
   );
 };
 
-export default AccommodationPanel;
+export default memo(AccommodationPanel);

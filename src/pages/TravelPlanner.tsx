@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Helmet } from "react-helmet-async";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import PlannerMap, { DestinationClickEvent } from "@/components/planner/PlannerMap";
@@ -8,10 +8,16 @@ import PlannerChat, { FlightFormData, PlannerChatRef, AirportChoice, DualAirport
 import PlannerTopBar from "@/components/planner/PlannerTopBar";
 import DestinationPopup from "@/components/planner/DestinationPopup";
 import YouTubeShortsPanel from "@/components/planner/YouTubeShortsPanel";
+import OnboardingTour from "@/components/planner/OnboardingTour";
 import type { Airport } from "@/hooks/useNearestAirports";
 import { FlightMemoryProvider } from "@/contexts/FlightMemoryContext";
 import { TravelMemoryProvider } from "@/contexts/TravelMemoryContext";
 import { AccommodationMemoryProvider } from "@/contexts/AccommodationMemoryContext";
+import { usePlannerState } from "@/hooks/usePlannerState";
+import { useMapState } from "@/hooks/useMapState";
+import { useFlightState } from "@/hooks/useFlightState";
+import { useDestinationPopup } from "@/hooks/useDestinationPopup";
+import { useChatIntegration } from "@/hooks/useChatIntegration";
 
 export type TabType = "flights" | "activities" | "stays" | "preferences";
 
@@ -41,78 +47,58 @@ export interface UserLocation {
   city: string;
 }
 
-const ACTIVE_TAB_KEY = "travliaq_planner_active_tab";
-
 const TravelPlanner = () => {
-  // Restore last active tab from localStorage or default to flights
-  const [activeTab, setActiveTab] = useState<TabType>(() => {
-    if (typeof window === "undefined") return "flights";
-    const saved = localStorage.getItem(ACTIVE_TAB_KEY);
-    if (saved && ["flights", "activities", "stays", "preferences"].includes(saved)) {
-      return saved as TabType;
-    }
-    return "flights";
-  });
-  const [selectedPin, setSelectedPin] = useState<MapPin | null>(null);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([0, 20]); // Globe view
-  const [mapZoom, setMapZoom] = useState(1.5); // Zoom out to see globe
-  const [isPanelVisible, setIsPanelVisible] = useState(false); // No panel at start
+  // Custom hooks for state management
+  const {
+    activeTab,
+    setActiveTab,
+    isPanelVisible,
+    setIsPanelVisible,
+    selectedPin,
+    handleTabChange,
+    handlePinClick,
+    handleCloseCard,
+    handleAddToTrip,
+  } = usePlannerState();
+
+  const {
+    mapCenter,
+    setMapCenter,
+    mapZoom,
+    setMapZoom,
+    initialAnimationDone,
+    handleAnimationComplete,
+  } = useMapState();
+
+  const {
+    flightFormData,
+    setFlightFormData,
+    selectedAirport,
+    setSelectedAirport,
+    triggerFlightSearch,
+    setTriggerFlightSearch,
+    confirmedMultiAirports,
+    setConfirmedMultiAirports,
+  } = useFlightState(setActiveTab, setIsPanelVisible);
+
+  const {
+    destinationPopup,
+    setDestinationPopup,
+    youtubePanel,
+    setYoutubePanel,
+    handleDestinationClick,
+    handleOpenYouTube,
+    handleClosePopup,
+    handleCloseYouTube,
+  } = useDestinationPopup(setIsPanelVisible);
+
+  const { chatRef, userLocation, searchMessageSentRef, setUserLocation } = useChatIntegration();
+
+  // Remaining local state
   const [flightRoutes, setFlightRoutes] = useState<FlightRoutePoint[]>([]);
-  const [initialAnimationDone, setInitialAnimationDone] = useState(false);
-  const [flightFormData, setFlightFormData] = useState<FlightFormData | null>(null);
-  const [selectedAirport, setSelectedAirport] = useState<SelectedAirport | null>(null);
-  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
-  const [triggerFlightSearch, setTriggerFlightSearch] = useState(false);
-  const [confirmedMultiAirports, setConfirmedMultiAirports] = useState<ConfirmedAirports | null>(null);
-  const searchMessageSentRef = useRef(false);
-  const chatRef = useRef<PlannerChatRef>(null);
 
-  // Persist active tab changes
-  useEffect(() => {
-    localStorage.setItem(ACTIVE_TAB_KEY, activeTab);
-  }, [activeTab]);
-
-  // Destination popup state
-  const [destinationPopup, setDestinationPopup] = useState<{
-    cityName: string;
-    countryName?: string;
-    position: { x: number; y: number };
-  } | null>(null);
-
-  // YouTube panel state
-  const [youtubePanel, setYoutubePanel] = useState<{
-    city: string;
-    countryName?: string;
-  } | null>(null);
-
-  const handleTabChange = useCallback((tab: TabType) => {
-    // Toggle: if clicking on the same tab and panel is visible, close it
-    if (tab === activeTab && isPanelVisible) {
-      setIsPanelVisible(false);
-    } else {
-      setActiveTab(tab);
-      setSelectedPin(null);
-      setIsPanelVisible(true);
-    }
-  }, [activeTab, isPanelVisible]);
-
-  const handlePinClick = useCallback((pin: MapPin) => {
-    setSelectedPin(pin);
-  }, []);
-
-  const handleCloseCard = useCallback(() => {
-    setSelectedPin(null);
-  }, []);
-
-  const handleAddToTrip = useCallback((pin: MapPin) => {
-    console.log("Added to trip:", pin);
-    setSelectedPin(null);
-  }, []);
-
+  // Panel-related handlers (chat integration)
   const handleCountrySelected = useCallback((event: CountrySelectionEvent) => {
-    // Trigger the chat to ask about city in this country
-    // Note: We allow re-triggering for the same country if user wants to change their selection
-    // The chat component has its own dedup logic for immediate duplicates
     chatRef.current?.injectSystemMessage(event);
   }, []);
 
@@ -129,34 +115,11 @@ const TravelPlanner = () => {
   }, []);
 
   const handleSearchReady = useCallback((from: string, to: string) => {
-    // Use ref to prevent duplicate messages (immediate check, no race condition)
     if (!searchMessageSentRef.current) {
       searchMessageSentRef.current = true;
       chatRef.current?.offerFlightSearch(from, to);
     }
   }, []);
-
-  // Handle destination marker click
-  const handleDestinationClick = useCallback((event: DestinationClickEvent) => {
-    setDestinationPopup({
-      cityName: event.cityName,
-      countryName: event.countryName,
-      position: event.screenPosition,
-    });
-  }, []);
-
-  // Open YouTube panel from popup
-  const handleOpenYouTube = useCallback(() => {
-    if (destinationPopup) {
-      setYoutubePanel({
-        city: destinationPopup.cityName,
-        countryName: destinationPopup.countryName,
-      });
-      window.dispatchEvent(new Event("destination-popup-close"));
-      setDestinationPopup(null);
-      setIsPanelVisible(true);
-    }
-  }, [destinationPopup]);
 
   return (
     <TravelMemoryProvider>
@@ -175,48 +138,9 @@ const TravelPlanner = () => {
         <ResizablePanelGroup direction="horizontal" className="h-full">
           {/* Left: Chat - resizable */}
           <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
-            <PlannerChat
-              ref={chatRef}
-              onAction={(action) => {
-                if (action.type === "tab") {
-                  setActiveTab(action.tab);
-                  setIsPanelVisible(true);
-                }
-                if (action.type === "zoom") {
-                  setMapCenter(action.center);
-                  setMapZoom(action.zoom);
-                }
-                if (action.type === "tabAndZoom") {
-                  setActiveTab(action.tab);
-                  setMapCenter(action.center);
-                  setMapZoom(action.zoom);
-                  setIsPanelVisible(true);
-                }
-                if (action.type === "updateFlight") {
-                  setFlightFormData(action.flightData);
-                  setIsPanelVisible(true);
-                  // Reset search message flag for new search
-                  searchMessageSentRef.current = false;
-                }
-                if (action.type === "selectAirport") {
-                  // Pass selected airport to the panel
-                  setSelectedAirport({ field: action.field, airport: action.airport });
-                }
-                if (action.type === "triggerFlightSearch") {
-                  // Open the flights panel and trigger search
-                  setActiveTab("flights");
-                  setIsPanelVisible(true);
-                  setTriggerFlightSearch(true);
-                }
-                if (action.type === "triggerMultiFlightSearch") {
-                  // Open the flights panel and trigger multi-destination search with confirmed airports
-                  setActiveTab("flights");
-                  setIsPanelVisible(true);
-                  setConfirmedMultiAirports(action.confirmedAirports);
-                }
-                setSelectedPin(null);
-              }}
-            />
+            <div data-tour="chat-panel" className="h-full">
+              <PlannerChat ref={chatRef} />
+            </div>
           </ResizablePanel>
 
           {/* Resize handle */}
@@ -224,7 +148,7 @@ const TravelPlanner = () => {
 
           {/* Right: Map workspace - resizable */}
           <ResizablePanel defaultSize={65} minSize={40}>
-            <main className="relative h-full overflow-hidden pt-12">
+            <main className="relative h-full overflow-hidden pt-12" data-tour="map-area">
               <PlannerMap
                 activeTab={activeTab}
                 center={mapCenter}
@@ -244,7 +168,9 @@ const TravelPlanner = () => {
               />
 
               {/* Overlay tabs */}
-              <PlannerTopBar activeTab={activeTab} onTabChange={handleTabChange} />
+              <div data-tour="tabs-bar">
+                <PlannerTopBar activeTab={activeTab} onTabChange={handleTabChange} />
+              </div>
 
               {/* YouTube Shorts Panel (takes over the regular panel) */}
               {youtubePanel ? (
@@ -260,31 +186,33 @@ const TravelPlanner = () => {
                 </aside>
               ) : (
                 /* Regular Overlay panel */
-                <PlannerPanel
-                  activeTab={activeTab}
-                  layout="overlay"
-                  isVisible={isPanelVisible}
-                  onClose={() => setIsPanelVisible(false)}
-                  onMapMove={(center, zoom) => {
-                    setMapCenter(center);
-                    setMapZoom(zoom);
-                  }}
-                  onFlightRoutesChange={setFlightRoutes}
-                  flightFormData={flightFormData}
-                  onFlightFormDataConsumed={() => setFlightFormData(null)}
-                  onCountrySelected={handleCountrySelected}
-                  onAskAirportChoice={handleAskAirportChoice}
-                  onAskDualAirportChoice={handleAskDualAirportChoice}
-                  onAskAirportConfirmation={handleAskAirportConfirmation}
-                  selectedAirport={selectedAirport}
-                  onSelectedAirportConsumed={() => setSelectedAirport(null)}
-                  onUserLocationDetected={setUserLocation}
-                  onSearchReady={handleSearchReady}
-                  triggerSearch={triggerFlightSearch}
-                  onSearchTriggered={() => setTriggerFlightSearch(false)}
-                  confirmedMultiAirports={confirmedMultiAirports}
-                  onConfirmedMultiAirportsConsumed={() => setConfirmedMultiAirports(null)}
-                />
+                <div data-tour="flights-panel">
+                  <PlannerPanel
+                    activeTab={activeTab}
+                    layout="overlay"
+                    isVisible={isPanelVisible}
+                    onClose={() => setIsPanelVisible(false)}
+                    onMapMove={(center, zoom) => {
+                      setMapCenter(center);
+                      setMapZoom(zoom);
+                    }}
+                    onFlightRoutesChange={setFlightRoutes}
+                    flightFormData={flightFormData}
+                    onFlightFormDataConsumed={() => setFlightFormData(null)}
+                    onCountrySelected={handleCountrySelected}
+                    onAskAirportChoice={handleAskAirportChoice}
+                    onAskDualAirportChoice={handleAskDualAirportChoice}
+                    onAskAirportConfirmation={handleAskAirportConfirmation}
+                    selectedAirport={selectedAirport}
+                    onSelectedAirportConsumed={() => setSelectedAirport(null)}
+                    onUserLocationDetected={setUserLocation}
+                    onSearchReady={handleSearchReady}
+                    triggerSearch={triggerFlightSearch}
+                    onSearchTriggered={() => setTriggerFlightSearch(false)}
+                    confirmedMultiAirports={confirmedMultiAirports}
+                    onConfirmedMultiAirportsConsumed={() => setConfirmedMultiAirports(null)}
+                  />
+                </div>
               )}
 
               {/* Destination popup on map marker click */}
@@ -307,6 +235,9 @@ const TravelPlanner = () => {
             </main>
           </ResizablePanel>
         </ResizablePanelGroup>
+
+        {/* Onboarding Tour */}
+        <OnboardingTour />
           </div>
         </AccommodationMemoryProvider>
       </FlightMemoryProvider>

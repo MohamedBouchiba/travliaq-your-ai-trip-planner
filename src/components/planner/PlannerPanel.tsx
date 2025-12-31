@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, lazy, Suspense } from "react";
 import { Calendar as CalendarIcon, Users, Plane, MapPin, Building2, Star, Clock, Wifi, Car, Coffee, Wind, X, Heart, Utensils, TreePine, Palette, Waves, Dumbbell, Sparkles, Loader2, Search, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TabType, SelectedAirport } from "@/pages/TravelPlanner";
@@ -7,36 +7,28 @@ import PlannerCalendar from "./PlannerCalendar";
 import FlightRouteBuilder, { FlightLeg } from "./FlightRouteBuilder";
 import type { LocationResult } from "@/hooks/useLocationAutocomplete";
 import { findNearestAirports, Airport } from "@/hooks/useNearestAirports";
-import type { AirportChoice, DualAirportChoice, AirportConfirmationData, ConfirmedAirports } from "./PlannerChat";
 import FlightResults, { FlightOffer, generateMockFlights } from "./FlightResults";
 import { useFlightMemory, type AirportInfo } from "@/contexts/FlightMemoryContext";
-import AccommodationPanel from "./AccommodationPanel";
 
-export interface FlightRoutePoint {
-  city: string;
-  lat: number;
-  lng: number;
-}
+// Lazy load panels for code splitting
+const AccommodationPanel = lazy(() => import("./AccommodationPanel"));
+const ActivitiesPanel = lazy(() => import("./ActivitiesPanel"));
+const PreferencesPanel = lazy(() => import("./PreferencesPanel"));
 
-export interface FlightFormData {
-  from?: string;
-  to?: string;
-  departureDate?: string;
-  returnDate?: string;
-  passengers?: number;
-  tripType?: "roundtrip" | "oneway" | "multi";
-}
+// Import unified types from centralized location
+import type {
+  FlightFormData,
+  FlightRoutePoint,
+  AirportChoice,
+  DualAirportChoice,
+  AirportConfirmationData,
+  ConfirmedAirports,
+  CountrySelectionEvent,
+  UserLocation,
+} from "@/types/flight";
 
-export interface CountrySelectionEvent {
-  field: "from" | "to";
-  country: LocationResult;
-}
-
-export interface UserLocation {
-  lat: number;
-  lng: number;
-  city: string;
-}
+// Re-export for backward compatibility
+export type { FlightRoutePoint, CountrySelectionEvent };
 
 interface PlannerPanelProps {
   activeTab: TabType;
@@ -101,13 +93,19 @@ const PlannerPanel = ({ activeTab, onMapMove, layout = "sidebar", onClose, isVis
             <FlightsPanel onMapMove={onMapMove} onFlightRoutesChange={onFlightRoutesChange} flightFormData={flightFormData} onFlightFormDataConsumed={onFlightFormDataConsumed} onCountrySelected={onCountrySelected} onAskAirportChoice={onAskAirportChoice} onAskDualAirportChoice={onAskDualAirportChoice} onAskAirportConfirmation={onAskAirportConfirmation} selectedAirport={selectedAirport} onSelectedAirportConsumed={onSelectedAirportConsumed} onUserLocationDetected={onUserLocationDetected} onSearchReady={onSearchReady} triggerSearch={triggerSearch} onSearchTriggered={onSearchTriggered} confirmedMultiAirports={confirmedMultiAirports} onConfirmedMultiAirportsConsumed={onConfirmedMultiAirportsConsumed} />
           </div>
           <div style={{ display: activeTab === "activities" ? "block" : "none" }}>
-            <ActivitiesPanel />
+            <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>}>
+              <ActivitiesPanel />
+            </Suspense>
           </div>
           <div style={{ display: activeTab === "stays" ? "block" : "none" }}>
-            <AccommodationPanel onMapMove={onMapMove} />
+            <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>}>
+              <AccommodationPanel onMapMove={onMapMove} />
+            </Suspense>
           </div>
           <div style={{ display: activeTab === "preferences" ? "block" : "none" }}>
-            <PreferencesPanel />
+            <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>}>
+              <PreferencesPanel />
+            </Suspense>
           </div>
         </div>
       </div>
@@ -1324,14 +1322,18 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
   };
 
   // Check if all multi-destination flights are selected
-  const allFlightsSelected = tripType === "multi" && 
+  const allFlightsSelected = tripType === "multi" &&
     Object.keys(allLegResults).length > 0 &&
     Object.keys(allLegResults).every(idx => selectedFlights[Number(idx)]);
 
+  // Memoize sorted leg indices to avoid recalculation on every render
+  const validLegIndices = useMemo(
+    () => Object.keys(allLegResults).map(Number).sort((a, b) => a - b),
+    [allLegResults]
+  );
+
   // Show results view if we have results
   if (flightResults !== null || isSearchingFlights || Object.keys(allLegResults).length > 0) {
-    // Get valid leg indices for dropdown
-    const validLegIndices = Object.keys(allLegResults).map(Number).sort((a, b) => a - b);
     
     // For multi-destination, use the viewing leg; otherwise use first leg
     const resultLeg = tripType === "multi" ? legs[viewingLegIndex] : legs[0];
@@ -1742,257 +1744,5 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
   );
 };
 
-// Activities Panel
-const ActivitiesPanel = () => {
-  const [budgetRange, setBudgetRange] = useState([0, 150]);
-  const [selectedTypes, setSelectedTypes] = useState<string[]>(["culture"]);
-  const [selectedDuration, setSelectedDuration] = useState<string | null>(null);
-
-  const types = [
-    { id: "culture", label: "Culture", icon: Palette },
-    { id: "outdoor", label: "Nature", icon: TreePine },
-    { id: "food", label: "Gastronomie", icon: Utensils },
-    { id: "wellness", label: "Bien-être", icon: Sparkles },
-  ];
-
-  const toggleType = (id: string) => {
-    setSelectedTypes((prev) =>
-      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
-    );
-  };
-
-  const suggestions = [
-    { title: "Tour Eiffel", duration: "2h", price: 28, rating: 4.8, image: "🗼" },
-    { title: "Croisière Seine", duration: "1h30", price: 15, rating: 4.6, image: "🚢" },
-    { title: "Montmartre", duration: "3h", price: 0, rating: 4.7, image: "🎨" },
-  ];
-
-  return (
-    <div className="space-y-5">
-      {/* Types */}
-      <div>
-        <SectionHeader icon={MapPin} title="Type d'activité" />
-        <div className="grid grid-cols-2 gap-2">
-          {types.map((type) => {
-            const Icon = type.icon;
-            const isSelected = selectedTypes.includes(type.id);
-            return (
-              <button
-                key={type.id}
-                onClick={() => toggleType(type.id)}
-                className={cn(
-                  "p-3 rounded-xl text-xs font-medium transition-all flex items-center gap-2",
-                  isSelected
-                    ? "bg-primary/10 text-primary border border-primary/30"
-                    : "bg-muted/30 text-muted-foreground border border-border/30 hover:bg-muted/50"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {type.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Duration */}
-      <div>
-        <SectionHeader icon={Clock} title="Durée" />
-        <div className="flex gap-1.5">
-          {[
-            { id: "short", label: "< 2h" },
-            { id: "medium", label: "2-4h" },
-            { id: "long", label: "> 4h" },
-          ].map((d) => (
-            <ChipButton
-              key={d.id}
-              selected={selectedDuration === d.id}
-              onClick={() => setSelectedDuration(selectedDuration === d.id ? null : d.id)}
-            >
-              {d.label}
-            </ChipButton>
-          ))}
-        </div>
-      </div>
-
-      {/* Budget */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <SectionHeader icon={Star} title="Budget" />
-          <span className="text-xs text-primary font-medium">
-            {budgetRange[0]}€ - {budgetRange[1]}€
-          </span>
-        </div>
-        <div className="px-1">
-          <Slider
-            value={budgetRange}
-            onValueChange={setBudgetRange}
-            max={200}
-            step={10}
-            className="w-full"
-          />
-        </div>
-      </div>
-
-      {/* Suggestions */}
-      <div className="pt-3 border-t border-border/30">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Suggestions</span>
-        <div className="mt-3 space-y-2">
-          {suggestions.map((item) => (
-            <div
-              key={item.title}
-              className="p-3 rounded-xl bg-muted/20 hover:bg-muted/40 transition-colors cursor-pointer border border-border/20 group"
-            >
-              <div className="flex items-start gap-3">
-                <span className="text-2xl">{item.image}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm text-foreground">{item.title}</div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-muted-foreground">{item.duration}</span>
-                    <span className="text-xs text-muted-foreground">•</span>
-                    <span className="text-xs font-medium text-primary">
-                      {item.price === 0 ? "Gratuit" : `${item.price}€`}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                  {item.rating}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Note: StaysPanel has been replaced by AccommodationPanel component
-
-// Preferences Panel
-const PreferencesPanel = () => {
-  const [pace, setPace] = useState<"relaxed" | "moderate" | "intense">("moderate");
-  const [budgetLevel, setBudgetLevel] = useState(50);
-  const [selectedInterests, setSelectedInterests] = useState<string[]>(["culture", "food"]);
-  const [travelStyle, setTravelStyle] = useState<string>("couple");
-
-  const interests = [
-    { id: "culture", label: "Culture", icon: Palette },
-    { id: "nature", label: "Nature", icon: TreePine },
-    { id: "food", label: "Gastronomie", icon: Utensils },
-    { id: "beach", label: "Plage", icon: Waves },
-    { id: "wellness", label: "Bien-être", icon: Heart },
-    { id: "sport", label: "Sport", icon: Dumbbell },
-  ];
-
-  const toggleInterest = (id: string) => {
-    setSelectedInterests((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  };
-
-  return (
-    <div className="space-y-5">
-      {/* Pace */}
-      <div>
-        <SectionHeader icon={Clock} title="Rythme de voyage" />
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            { id: "relaxed", label: "Détente", emoji: "🧘" },
-            { id: "moderate", label: "Modéré", emoji: "🚶" },
-            { id: "intense", label: "Intensif", emoji: "🏃" },
-          ].map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setPace(p.id as typeof pace)}
-              className={cn(
-                "py-3 rounded-xl text-xs font-medium transition-all flex flex-col items-center gap-1.5",
-                pace === p.id
-                  ? "bg-primary/10 text-primary border border-primary/30"
-                  : "bg-muted/30 text-muted-foreground border border-border/30 hover:bg-muted/50"
-              )}
-            >
-              <span className="text-lg">{p.emoji}</span>
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Budget Sensitivity */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <SectionHeader icon={Star} title="Niveau de confort" />
-          <span className="text-xs text-muted-foreground">
-            {budgetLevel < 33 ? "Économique" : budgetLevel < 66 ? "Confort" : "Premium"}
-          </span>
-        </div>
-        <div className="px-1">
-          <Slider
-            value={[budgetLevel]}
-            onValueChange={([v]) => setBudgetLevel(v)}
-            max={100}
-            step={1}
-            className="w-full"
-          />
-        </div>
-      </div>
-
-      {/* Interests */}
-      <div>
-        <SectionHeader icon={Heart} title="Centres d'intérêt" />
-        <div className="grid grid-cols-3 gap-2">
-          {interests.map((interest) => {
-            const Icon = interest.icon;
-            const isSelected = selectedInterests.includes(interest.id);
-            return (
-              <button
-                key={interest.id}
-                onClick={() => toggleInterest(interest.id)}
-                className={cn(
-                  "py-2.5 rounded-xl text-xs font-medium transition-all flex flex-col items-center gap-1.5",
-                  isSelected
-                    ? "bg-primary/10 text-primary border border-primary/30"
-                    : "bg-muted/30 text-muted-foreground border border-border/30 hover:bg-muted/50"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {interest.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Travel Style */}
-      <div>
-        <SectionHeader icon={Users} title="Style de voyage" />
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { id: "solo", label: "Solo", emoji: "🧑" },
-            { id: "couple", label: "Couple", emoji: "💑" },
-            { id: "family", label: "Famille", emoji: "👨‍👩‍👧" },
-            { id: "friends", label: "Amis", emoji: "👯" },
-          ].map((style) => (
-            <button
-              key={style.id}
-              onClick={() => setTravelStyle(style.id)}
-              className={cn(
-                "py-3 rounded-xl text-xs font-medium transition-all flex items-center justify-center gap-2",
-                travelStyle === style.id
-                  ? "bg-primary/10 text-primary border border-primary/30"
-                  : "bg-muted/30 text-muted-foreground border border-border/30 hover:bg-muted/50"
-              )}
-            >
-              <span>{style.emoji}</span>
-              {style.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export default PlannerPanel;
