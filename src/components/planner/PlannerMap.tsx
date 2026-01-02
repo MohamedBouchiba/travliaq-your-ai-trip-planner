@@ -6,6 +6,8 @@ import type { TabType, MapPin } from "@/pages/TravelPlanner";
 import type { FlightRoutePoint } from "./PlannerPanel";
 import { useFlightMemory, type MemoryRoutePoint } from "@/contexts/FlightMemoryContext";
 import { useAccommodationMemory } from "@/contexts/AccommodationMemoryContext";
+import { useActivityMemory, TravliaqActivity } from "@/contexts/ActivityMemoryContext";
+import { usePlannerEvent } from "@/lib/eventBus";
 
 // Destination click event for popup
 export interface DestinationClickEvent {
@@ -1139,6 +1141,210 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       accommodationMarkersRef.current = [];
     };
   }, [activeTab, mapLoaded, accommodationMemory.accommodations]);
+
+  // =========================================================================
+  // ACTIVITIES MARKERS
+  // =========================================================================
+  
+  const { memory: activityMemory, saveActivity, unsaveActivity, isActivitySaved } = useActivityMemory();
+  const activityMarkersRef = useRef<mapboxgl.Marker[]>([]);
+  const activityPopupRef = useRef<mapboxgl.Popup | null>(null);
+  const [apiActivities, setApiActivities] = useState<TravliaqActivity[]>([]);
+  const [activeActivityCity, setActiveActivityCity] = useState<{ city: string; lat?: number; lng?: number } | null>(null);
+  
+  // Listen for activity search events from ActivitiesPanel
+  usePlannerEvent("activities:search", useCallback((data) => {
+    // Find city coordinates
+    const acc = accommodationMemory.accommodations.find(a => a.id === data.destinationId);
+    if (acc?.lat && acc?.lng) {
+      setActiveActivityCity({ city: data.city, lat: acc.lat, lng: acc.lng });
+    } else {
+      // Try to find in cityCoordinates
+      const coords = cityCoordinates[data.city.toLowerCase()];
+      if (coords) {
+        setActiveActivityCity({ city: data.city, lat: coords.lat, lng: coords.lng });
+      }
+    }
+  }, [accommodationMemory.accommodations]));
+  
+  // Listen for activity results
+  usePlannerEvent("activities:resultsReady", useCallback((data) => {
+    setApiActivities(data.activities as TravliaqActivity[]);
+  }, []));
+  
+  // Zoom to city when activities tab is active and a city is selected
+  useEffect(() => {
+    if (!map.current || !mapLoaded || activeTab !== "activities") return;
+    
+    if (activeActivityCity?.lat && activeActivityCity?.lng) {
+      map.current.flyTo({
+        center: [activeActivityCity.lng, activeActivityCity.lat],
+        zoom: 12,
+        duration: 1000,
+      });
+    }
+  }, [activeTab, mapLoaded, activeActivityCity]);
+  
+  // Display activity markers on map
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    
+    // Clear existing activity markers and popup
+    activityMarkersRef.current.forEach((marker) => marker.remove());
+    activityMarkersRef.current = [];
+    if (activityPopupRef.current) {
+      activityPopupRef.current.remove();
+      activityPopupRef.current = null;
+    }
+    
+    // Only show on activities tab
+    if (activeTab !== "activities") return;
+    
+    // For now, show saved activities as markers (API activities would need coords)
+    const savedActivities = activityMemory.savedActivities.filter(a => a.lat && a.lng);
+    
+    savedActivities.forEach((activity, index) => {
+      if (!activity.lat || !activity.lng) return;
+      
+      const el = document.createElement("div");
+      el.className = "activity-marker";
+      el.innerHTML = `
+        <div style="
+          width: 38px;
+          height: 48px;
+          position: relative;
+          cursor: pointer;
+          filter: drop-shadow(0 3px 6px rgba(0,0,0,0.25));
+          animation: activityBounce 0.4s ease-out forwards;
+          animation-delay: ${index * 0.08}s;
+          opacity: 0;
+          transform: translateY(-8px);
+        ">
+          <div style="
+            width: 36px;
+            height: 36px;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            background: linear-gradient(135deg, hsl(25, 95%, 53%) 0%, hsl(25, 95%, 40%) 100%);
+            border: 2px solid white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">
+            <span style="
+              transform: rotate(45deg);
+              font-size: 16px;
+            ">🎯</span>
+          </div>
+          <div style="
+            position: absolute;
+            top: -22px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 9px;
+            font-weight: 600;
+            white-space: nowrap;
+            max-width: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          ">${activity.fromPrice}€</span>
+        </div>
+        <style>
+          @keyframes activityBounce {
+            0% { opacity: 0; transform: translateY(-8px); }
+            60% { opacity: 1; transform: translateY(2px); }
+            100% { opacity: 1; transform: translateY(0); }
+          }
+        </style>
+      `;
+      
+      // Click handler to show popup
+      el.addEventListener("click", () => {
+        // Remove existing popup
+        if (activityPopupRef.current) {
+          activityPopupRef.current.remove();
+        }
+        
+        // Create popup content
+        const popupContent = document.createElement("div");
+        popupContent.innerHTML = `
+          <div style="width: 260px; font-family: system-ui, -apple-system, sans-serif;">
+            ${activity.imageUrl ? `
+              <img 
+                src="${activity.imageUrl}" 
+                alt="${activity.title}"
+                style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px 8px 0 0;"
+              />
+            ` : ''}
+            <div style="padding: 12px;">
+              <h3 style="font-size: 14px; font-weight: 600; margin: 0 0 8px; line-height: 1.3;">
+                ${activity.title}
+              </h3>
+              <div style="display: flex; align-items: center; gap: 12px; font-size: 12px; color: #666; margin-bottom: 8px;">
+                ${activity.rating ? `
+                  <span style="display: flex; align-items: center; gap: 4px;">
+                    ⭐ ${activity.rating.toFixed(1)}
+                  </span>
+                ` : ''}
+                <span>${activity.durationFormatted}</span>
+              </div>
+              <div style="font-size: 16px; font-weight: 700; color: hsl(221.2, 83.2%, 53.3%);">
+                ${activity.fromPrice}€
+              </div>
+              ${activity.bookingUrl ? `
+                <a 
+                  href="${activity.bookingUrl}" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style="
+                    display: block;
+                    margin-top: 10px;
+                    padding: 8px;
+                    background: hsl(221.2, 83.2%, 53.3%);
+                    color: white;
+                    text-align: center;
+                    border-radius: 6px;
+                    text-decoration: none;
+                    font-size: 12px;
+                    font-weight: 500;
+                  "
+                >Réserver</a>
+              ` : ''}
+            </div>
+          </div>
+        `;
+        
+        activityPopupRef.current = new mapboxgl.Popup({
+          closeButton: true,
+          closeOnClick: false,
+          maxWidth: "280px",
+          offset: [0, -40],
+        })
+          .setLngLat([activity.lng!, activity.lat!])
+          .setDOMContent(popupContent)
+          .addTo(map.current!);
+      });
+      
+      const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
+        .setLngLat([activity.lng, activity.lat])
+        .addTo(map.current!);
+      
+      activityMarkersRef.current.push(marker);
+    });
+    
+    return () => {
+      activityMarkersRef.current.forEach((marker) => marker.remove());
+      activityMarkersRef.current = [];
+      if (activityPopupRef.current) {
+        activityPopupRef.current.remove();
+        activityPopupRef.current = null;
+      }
+    };
+  }, [activeTab, mapLoaded, activityMemory.savedActivities]);
 
   // Update map center/zoom with fast animation
   useEffect(() => {

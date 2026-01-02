@@ -52,6 +52,19 @@ export type PlannerEvents = {
   "accommodation:update": { city: string; updates: Partial<AccommodationEntry> };
   "accommodation:syncWithFlights": void;
   
+  // Activities-related
+  "activities:search": { 
+    city: string; 
+    countryCode: string; 
+    checkIn: Date | null; 
+    checkOut: Date | null;
+    destinationId: string;
+  };
+  "activities:resultsReady": { 
+    activities: unknown[]; 
+    destinationId: string;
+  };
+  
   // Chat interactions
   "chat:injectMessage": { role: "assistant" | "system"; text: string };
   "chat:offerFlightSearch": { from: string; to: string };
