@@ -47,6 +47,7 @@ interface CityEntry {
   checkOut: Date | null;
   lat?: number;
   lng?: number;
+  isInherited?: boolean; // true if from accommodations, false if locally added
 }
 
 // ============================================================================
@@ -241,6 +242,7 @@ function CompactDateRange({
 const ActivitiesPanel = () => {
   const {
     state: activityState,
+    allDestinations, // Computed: inherited from accommodations + local
     loadRecommendations,
     addActivityFromSearch,
     removeActivity,
@@ -248,8 +250,8 @@ const ActivitiesPanel = () => {
     getActivitiesByDestination,
     updateFilters,
     getTotalBudget,
-    addDestination,
-    removeDestination,
+    addLocalDestination,
+    removeLocalDestination,
   } = useActivityMemory();
 
   // UI State
@@ -272,9 +274,9 @@ const ActivitiesPanel = () => {
   const [newCityCheckIn, setNewCityCheckIn] = useState<Date | null>(null);
   const [newCityCheckOut, setNewCityCheckOut] = useState<Date | null>(null);
 
-  // Use destinations from ActivityMemory (independent from accommodation)
+  // Use allDestinations (inherited from accommodations + locally added)
   const cities = useMemo<CityEntry[]>(() => {
-    return activityState.destinations
+    return allDestinations
       .filter((dest) => dest.city && dest.city.length > 0)
       .map((dest) => ({
         id: dest.id,
@@ -284,8 +286,9 @@ const ActivitiesPanel = () => {
         checkOut: dest.checkOut,
         lat: dest.lat,
         lng: dest.lng,
+        isInherited: dest.isInherited,
       }));
-  }, [activityState.destinations]);
+  }, [allDestinations]);
 
   // Active city
   const activeCity = cities[activeCityIndex] || null;
@@ -410,15 +413,15 @@ const ActivitiesPanel = () => {
     setNewCityCheckOut(null);
   }, []);
 
-  // Handle confirm adding city - adds to ActivityMemory destinations directly
+  // Handle confirm adding city - adds as LOCAL destination (not affecting accommodations)
   const handleConfirmAddCity = useCallback(() => {
     if (!newCityData?.city) {
       toast.error("Veuillez sélectionner une ville");
       return;
     }
 
-    // Add destination to ActivityMemory (independent from accommodation)
-    addDestination({
+    // Add as LOCAL destination (only in Activities, not affecting Accommodations)
+    addLocalDestination({
       city: newCityData.city,
       countryCode: newCityData.countryCode,
       checkIn: newCityCheckIn,
@@ -443,7 +446,7 @@ const ActivitiesPanel = () => {
         zoom: 12,
       });
     }
-  }, [newCityData, newCityCheckIn, newCityCheckOut, addDestination]);
+  }, [newCityData, newCityCheckIn, newCityCheckOut, addLocalDestination]);
 
   // Handle location select for new city
   const handleNewCityLocationSelect = useCallback((location: LocationResult) => {
@@ -455,20 +458,30 @@ const ActivitiesPanel = () => {
     });
   }, []);
 
-  // Handle remove city - removes from ActivityMemory destinations
+  // Handle remove city - only local destinations can be removed
   const handleRemoveCity = useCallback((cityId: string) => {
-    if (cities.length <= 1) {
+    const city = cities.find((c) => c.id === cityId);
+    if (!city) return;
+    
+    // Check if it's an inherited destination
+    if (city.isInherited) {
+      toast.error("Cette destination provient des hébergements. Modifiez-la dans l'onglet Hébergements.");
+      return;
+    }
+    
+    if (cities.filter((c) => !c.isInherited).length <= 0 && cities.length <= 1) {
       toast.error("Vous devez avoir au moins une destination");
       return;
     }
-    removeDestination(cityId);
+    
+    removeLocalDestination(cityId);
     toast.success("Destination retirée");
 
     // If we removed the active city, switch to first city
     if (activeCityIndex >= cities.length - 1) {
       setActiveCityIndex(Math.max(0, cities.length - 2));
     }
-  }, [cities.length, activeCityIndex, removeDestination]);
+  }, [cities, activeCityIndex, removeLocalDestination]);
 
   // Back to filters
   const handleBackToFilters = useCallback(() => {

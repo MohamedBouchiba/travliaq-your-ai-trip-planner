@@ -304,7 +304,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
   const { memory: accommodationMemory } = useAccommodationMemory();
 
   // Get activity entries for markers
-  const { state: activityState } = useActivityMemory();
+  const { state: activityState, allDestinations: activityAllDestinations } = useActivityMemory();
 
   // Get pins based on active tab
   const getPinsForTab = useCallback((tab: TabType): MapPin[] => {
@@ -1197,8 +1197,8 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     // Only show on activities tab
     if (activeTab !== "activities") return;
     
-    // Get activity destinations with valid coordinates
-    const destinations = activityState.destinations.filter(
+    // Get activity destinations with valid coordinates from allDestinations
+    const destinations = activityAllDestinations.filter(
       (dest) => dest.lat && dest.lng
     );
     
@@ -1288,7 +1288,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       activityDestinationMarkersRef.current.forEach((marker) => marker.remove());
       activityDestinationMarkersRef.current = [];
     };
-  }, [activeTab, mapLoaded, activityState.destinations]);
+  }, [activeTab, mapLoaded, activityAllDestinations]);
 
   // Update map center/zoom with fast animation
   useEffect(() => {

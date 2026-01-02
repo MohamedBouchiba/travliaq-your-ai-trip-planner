@@ -40,7 +40,8 @@ export interface ActivitySearchState {
   error: string | null;
 }
 
-// Destination for activities (independent from accommodation)
+// Destination for activities
+// Activities inherit from accommodations but can have additional destinations
 export interface ActivityDestination {
   id: string;
   city: string;
@@ -49,6 +50,7 @@ export interface ActivityDestination {
   checkOut: Date | null;
   lat?: number;
   lng?: number;
+  isInherited?: boolean; // true if inherited from accommodation, false if added locally
 }
 
 // ActivityFilters is now imported from @/types/activity
@@ -57,8 +59,8 @@ export interface ActivityMemory {
   // Planned activities
   activities: ActivityEntry[];
 
-  // Own destinations (independent from accommodation)
-  destinations: ActivityDestination[];
+  // Local destinations (added specifically in Activities panel, NOT inherited)
+  localDestinations: ActivityDestination[];
 
   // Search state
   search: ActivitySearchState;
@@ -77,6 +79,9 @@ export interface ActivityMemory {
 interface ActivityMemoryContextValue {
   state: ActivityMemory;
 
+  // Computed destinations: accommodations + local (inherited logic)
+  allDestinations: ActivityDestination[];
+
   // Search operations
   searchActivities: (params: ActivitySearchParams) => Promise<void>;
   loadMoreResults: () => Promise<void>;
@@ -91,11 +96,10 @@ interface ActivityMemoryContextValue {
   updateActivity: (id: string, updates: Partial<ActivityEntry>) => void;
   removeActivity: (id: string) => void;
 
-  // Destination operations (independent from accommodation)
-  addDestination: (destination: Omit<ActivityDestination, 'id'>) => string;
-  removeDestination: (id: string) => void;
-  updateDestination: (id: string, updates: Partial<ActivityDestination>) => void;
-  syncDestinationsFromFlights: (destinations: ActivityDestination[]) => void;
+  // Local destination operations (only for locally added destinations)
+  addLocalDestination: (destination: Omit<ActivityDestination, 'id' | 'isInherited'>) => string;
+  removeLocalDestination: (id: string) => void;
+  updateLocalDestination: (id: string, updates: Partial<ActivityDestination>) => void;
 
   // Selection
   selectActivity: (id: string | null) => void;
@@ -124,7 +128,7 @@ const STORAGE_KEY = "travliaq_activity_memory_v2";
 
 const defaultMemory: ActivityMemory = {
   activities: [],
-  destinations: [],
+  localDestinations: [], // Only locally added destinations
   search: {
     isSearching: false,
     searchResults: [],
@@ -152,7 +156,7 @@ function serializeMemory(memory: ActivityMemory): string {
       date: a.date?.toISOString() || null,
       addedAt: a.addedAt.toISOString(),
     })),
-    destinations: memory.destinations.map((d) => ({
+    localDestinations: memory.localDestinations.map((d) => ({
       ...d,
       checkIn: d.checkIn?.toISOString() || null,
       checkOut: d.checkOut?.toISOString() || null,
@@ -170,10 +174,11 @@ function deserializeMemory(json: string): Partial<ActivityMemory> | null {
         date: a.date ? new Date(a.date) : null,
         addedAt: new Date(a.addedAt),
       })),
-      destinations: (parsed.destinations || []).map((d: any) => ({
+      localDestinations: (parsed.localDestinations || parsed.destinations || []).map((d: any) => ({
         ...d,
         checkIn: d.checkIn ? new Date(d.checkIn) : null,
         checkOut: d.checkOut ? new Date(d.checkOut) : null,
+        isInherited: false, // Local destinations are never inherited
       })),
       activeFilters: parsed.activeFilters || defaultMemory.activeFilters,
     };
@@ -230,7 +235,7 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.warn("[ActivityMemory] Failed to save:", error);
     }
-  }, [state.activities, state.destinations, state.activeFilters, isHydrated]);
+  }, [state.activities, state.localDestinations, state.activeFilters, isHydrated]);
 
   // Sync preferences to filter defaults
   useEffect(() => {
@@ -253,11 +258,41 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
     }));
   }, [preferences.comfortLevel, isHydrated]);
 
-  // Cleanup activities when destinations are removed (use own destinations, not accommodations)
+  // ============================================================================
+  // COMPUTED: All destinations = inherited from accommodations + local
+  // This is the INHERITANCE logic: Activities inherit from Accommodations
+  // ============================================================================
+  
+  const allDestinations = useMemo<ActivityDestination[]>(() => {
+    // 1. Get inherited destinations from accommodations
+    const inheritedDestinations: ActivityDestination[] = accommodations
+      .filter((acc) => acc.city && acc.city.length > 0)
+      .map((acc) => ({
+        id: acc.id,
+        city: acc.city,
+        countryCode: acc.countryCode || "",
+        checkIn: acc.checkIn,
+        checkOut: acc.checkOut,
+        lat: acc.lat,
+        lng: acc.lng,
+        isInherited: true,
+      }));
+
+    // 2. Get local destinations (added only in Activities panel)
+    const localDests = state.localDestinations.map((d) => ({
+      ...d,
+      isInherited: false,
+    }));
+
+    // 3. Combine: inherited first, then local
+    return [...inheritedDestinations, ...localDests];
+  }, [accommodations, state.localDestinations]);
+
+  // Cleanup activities when their destination no longer exists
   useEffect(() => {
     if (!isHydrated) return;
 
-    const validDestinationIds = new Set(state.destinations.map((d) => d.id));
+    const validDestinationIds = new Set(allDestinations.map((d) => d.id));
     const activitiesToRemove = state.activities.filter(
       (a) => !validDestinationIds.has(a.destinationId)
     );
@@ -274,7 +309,7 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
         `${activitiesToRemove.length} activité${activitiesToRemove.length > 1 ? 's supprimée' : ' supprimée'} (destination retirée)`
       );
     }
-  }, [state.destinations, isHydrated]);
+  }, [allDestinations, isHydrated]);
 
   // ============================================================================
   // SEARCH OPERATIONS
@@ -388,8 +423,8 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
   // ============================================================================
 
   const loadRecommendations = useCallback(async (destinationId: string) => {
-    // Use own destinations instead of accommodations
-    const destination = state.destinations.find((d) => d.id === destinationId);
+    // Use allDestinations (inherited + local)
+    const destination = allDestinations.find((d) => d.id === destinationId);
     if (!destination) return;
 
     setState((prev) => ({ ...prev, isLoadingRecommendations: true }));
@@ -437,15 +472,15 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
       setState((prev) => ({ ...prev, isLoadingRecommendations: false }));
       toast.error('Erreur lors du chargement des recommandations');
     }
-  }, [state.destinations, preferences, state.activities]);
+  }, [allDestinations, preferences, state.activities]);
 
   // ============================================================================
   // CRUD OPERATIONS
   // ============================================================================
 
   const addActivityFromSearch = useCallback((viatorActivity: ViatorActivity, destinationId: string) => {
-    // Use own destinations instead of accommodations
-    const destination = state.destinations.find((d) => d.id === destinationId);
+    // Use allDestinations (inherited + local)
+    const destination = allDestinations.find((d) => d.id === destinationId);
 
     if (!destination) {
       toast.error('Destination introuvable');
@@ -488,7 +523,7 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
     eventBus.emit('tab:flash', { tab: 'activities' });
 
     toast.success(`${viatorActivity.title} ajouté au planning`);
-  }, [state.destinations]);
+  }, [allDestinations]);
 
   const addManualActivity = useCallback((activity: Partial<ActivityEntry>): string => {
     const id = crypto.randomUUID();
@@ -555,53 +590,50 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
   }, [state.activities]);
 
   // ============================================================================
-  // DESTINATION OPERATIONS (independent from accommodation)
+  // LOCAL DESTINATION OPERATIONS (only for locally added destinations)
+  // These do NOT affect accommodations - one-way inheritance
   // ============================================================================
 
-  const addDestination = useCallback((destination: Omit<ActivityDestination, 'id'>): string => {
+  const addLocalDestination = useCallback((destination: Omit<ActivityDestination, 'id' | 'isInherited'>): string => {
     const id = crypto.randomUUID();
     const newDestination: ActivityDestination = {
       ...destination,
       id,
+      isInherited: false,
     };
 
     setState((prev) => ({
       ...prev,
-      destinations: [...prev.destinations, newDestination],
+      localDestinations: [...prev.localDestinations, newDestination],
     }));
 
     return id;
   }, []);
 
-  const removeDestination = useCallback((id: string) => {
+  const removeLocalDestination = useCallback((id: string) => {
+    // Check if it's a local destination (not inherited)
+    const localDest = state.localDestinations.find((d) => d.id === id);
+    if (!localDest) {
+      // It's an inherited destination - cannot remove from here
+      toast.error("Cette destination provient des hébergements. Modifiez-la dans l'onglet Hébergements.");
+      return;
+    }
+
     setState((prev) => ({
       ...prev,
-      destinations: prev.destinations.filter((d) => d.id !== id),
+      localDestinations: prev.localDestinations.filter((d) => d.id !== id),
       // Also remove activities for this destination
       activities: prev.activities.filter((a) => a.destinationId !== id),
     }));
-  }, []);
+  }, [state.localDestinations]);
 
-  const updateDestination = useCallback((id: string, updates: Partial<ActivityDestination>) => {
+  const updateLocalDestination = useCallback((id: string, updates: Partial<ActivityDestination>) => {
     setState((prev) => ({
       ...prev,
-      destinations: prev.destinations.map((d) =>
+      localDestinations: prev.localDestinations.map((d) =>
         d.id === id ? { ...d, ...updates } : d
       ),
     }));
-  }, []);
-
-  // Sync destinations from flights (called when flight routes change)
-  const syncDestinationsFromFlights = useCallback((flightDestinations: ActivityDestination[]) => {
-    setState((prev) => {
-      // Keep manually added destinations (those not synced from flights)
-      // For now, we just set the destinations from flights
-      // This is called when flights are confirmed
-      return {
-        ...prev,
-        destinations: flightDestinations,
-      };
-    });
   }, []);
 
   // ============================================================================
@@ -689,6 +721,7 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ActivityMemoryContextValue>(
     () => ({
       state,
+      allDestinations, // Computed: accommodations + local
       searchActivities,
       loadMoreResults,
       clearSearch,
@@ -697,10 +730,9 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
       addManualActivity,
       updateActivity,
       removeActivity,
-      addDestination,
-      removeDestination,
-      updateDestination,
-      syncDestinationsFromFlights,
+      addLocalDestination,
+      removeLocalDestination,
+      updateLocalDestination,
       selectActivity,
       getSelectedActivity,
       updateFilters,
@@ -712,6 +744,7 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
     }),
     [
       state,
+      allDestinations,
       searchActivities,
       loadMoreResults,
       clearSearch,
@@ -720,10 +753,9 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
       addManualActivity,
       updateActivity,
       removeActivity,
-      addDestination,
-      removeDestination,
-      updateDestination,
-      syncDestinationsFromFlights,
+      addLocalDestination,
+      removeLocalDestination,
+      updateLocalDestination,
       selectActivity,
       getSelectedActivity,
       updateFilters,
