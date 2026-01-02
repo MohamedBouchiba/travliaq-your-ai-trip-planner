@@ -340,15 +340,20 @@ const ActivitiesPanel = () => {
         throw new Error(error.message || "Erreur lors de la recherche");
       }
 
-      if (data?.activities) {
-        setSearchResults(data.activities);
+      // API returns: { success, results: { activities, total, page, limit } }
+      const activities = data?.results?.activities || data?.activities || [];
+      
+      if (activities.length > 0) {
+        setSearchResults(activities);
         setCurrentView("results");
+        console.log(`[Activities] Found ${activities.length} activities for ${activeCity.city}`);
       } else {
         setSearchResults([]);
         setCurrentView("results");
+        console.log(`[Activities] No activities found for ${activeCity.city}`);
       }
     } catch (error: any) {
-      console.error("Search error:", error);
+      console.error("[Activities] Search error:", error);
       setSearchError(error.message || "Erreur lors de la recherche");
       setCurrentView("results");
     } finally {
