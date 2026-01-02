@@ -1260,21 +1260,40 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     }
   }, [accommodationMemory.accommodations, mapLoaded]));
   
-  // Listen for activity results
+  // Listen for activity results and assign pseudo-coordinates around city center
   usePlannerEvent("activities:resultsReady", useCallback((data) => {
-    setApiActivities(data.activities as TravliaqActivity[]);
+    const activities = data.activities as TravliaqActivity[];
     
-    // If coordinates provided, zoom there
-    if (data.lat && data.lng && map.current && mapLoaded) {
+    // Assign pseudo-coordinates around the city center for display
+    const cityLat = data.lat || 48.8566;
+    const cityLng = data.lng || 2.3522;
+    
+    const activitiesWithCoords = activities.map((activity, index) => {
+      // Distribute activities in a spiral pattern around city center
+      const angle = (index * 137.5) * (Math.PI / 180); // Golden angle
+      const radius = 0.003 + (index * 0.0008); // Increasing radius
+      
+      return {
+        ...activity,
+        _displayLat: cityLat + radius * Math.cos(angle),
+        _displayLng: cityLng + radius * Math.sin(angle),
+      };
+    });
+    
+    setApiActivities(activitiesWithCoords);
+    setActiveActivityCity({ city: data.city, lat: cityLat, lng: cityLng });
+    
+    // Zoom to city
+    if (map.current && mapLoaded) {
       map.current.flyTo({
-        center: [data.lng, data.lat],
-        zoom: 12,
+        center: [cityLng, cityLat],
+        zoom: 13,
         duration: 1000,
       });
     }
   }, [mapLoaded]));
   
-  // Display activity markers on map
+  // Display activity markers on map (both API results and saved)
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
     
@@ -1289,58 +1308,72 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     // Only show on activities tab
     if (activeTab !== "activities") return;
     
-    // For now, show saved activities as markers (API activities would need coords)
-    const savedActivities = activityMemory.savedActivities.filter(a => a.lat && a.lng);
-    
-    savedActivities.forEach((activity, index) => {
-      if (!activity.lat || !activity.lng) return;
-      
+    // Helper to create activity marker
+    const createActivityMarker = (
+      lat: number,
+      lng: number,
+      activity: {
+        id: string;
+        title: string;
+        price: number;
+        originalPrice?: number;
+        imageUrl?: string;
+        rating?: number;
+        duration?: string;
+        bookingUrl?: string;
+        isSaved?: boolean;
+      },
+      index: number
+    ) => {
       const el = document.createElement("div");
       el.className = "activity-marker";
+      
+      const isRealDiscount = activity.originalPrice && activity.originalPrice > activity.price;
+      const isSaved = activity.isSaved || isActivitySaved(activity.id);
+      
       el.innerHTML = `
         <div style="
-          width: 38px;
-          height: 48px;
+          width: 42px;
+          height: 52px;
           position: relative;
           cursor: pointer;
           filter: drop-shadow(0 3px 6px rgba(0,0,0,0.25));
           animation: activityBounce 0.4s ease-out forwards;
-          animation-delay: ${index * 0.08}s;
+          animation-delay: ${index * 0.05}s;
           opacity: 0;
           transform: translateY(-8px);
         ">
           <div style="
-            width: 36px;
-            height: 36px;
+            width: 40px;
+            height: 40px;
             border-radius: 50% 50% 50% 0;
             transform: rotate(-45deg);
-            background: linear-gradient(135deg, hsl(25, 95%, 53%) 0%, hsl(25, 95%, 40%) 100%);
-            border: 2px solid white;
+            background: linear-gradient(135deg, ${isSaved ? 'hsl(142, 76%, 36%)' : 'hsl(25, 95%, 53%)'} 0%, ${isSaved ? 'hsl(142, 76%, 26%)' : 'hsl(25, 95%, 40%)'} 100%);
+            border: 3px solid white;
             display: flex;
             align-items: center;
             justify-content: center;
+            box-shadow: inset 0 -2px 4px rgba(0,0,0,0.1);
           ">
             <span style="
               transform: rotate(45deg);
               font-size: 16px;
-            ">🎯</span>
+            ">${isSaved ? '✓' : '🎭'}</span>
           </div>
           <div style="
             position: absolute;
-            top: -22px;
+            top: -24px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0,0,0,0.85);
+            background: ${isRealDiscount ? 'linear-gradient(135deg, hsl(0, 84%, 60%), hsl(0, 84%, 50%))' : 'rgba(0,0,0,0.85)'};
             color: white;
-            padding: 2px 6px;
-            border-radius: 8px;
-            font-size: 9px;
-            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 700;
             white-space: nowrap;
-            max-width: 100px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          ">${activity.fromPrice}€</span>
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+          ">${activity.price}€${isRealDiscount ? ' 🔥' : ''}</div>
         </div>
         <style>
           @keyframes activityBounce {
@@ -1351,38 +1384,58 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         </style>
       `;
       
+      // Hover effect
+      const pinEl = el.querySelector("div") as HTMLElement;
+      pinEl?.addEventListener("mouseenter", () => {
+        pinEl.style.filter = "drop-shadow(0 5px 10px rgba(0,0,0,0.35))";
+        pinEl.style.transform = "translateY(-3px) scale(1.08)";
+      });
+      pinEl?.addEventListener("mouseleave", () => {
+        pinEl.style.filter = "drop-shadow(0 3px 6px rgba(0,0,0,0.25))";
+        pinEl.style.transform = "translateY(0) scale(1)";
+      });
+      
       // Click handler to show popup
       el.addEventListener("click", () => {
-        // Remove existing popup
         if (activityPopupRef.current) {
           activityPopupRef.current.remove();
         }
         
-        // Create popup content
         const popupContent = document.createElement("div");
         popupContent.innerHTML = `
-          <div style="width: 260px; font-family: system-ui, -apple-system, sans-serif;">
+          <div style="width: 280px; font-family: system-ui, -apple-system, sans-serif;">
             ${activity.imageUrl ? `
               <img 
                 src="${activity.imageUrl}" 
                 alt="${activity.title}"
-                style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px 8px 0 0;"
+                style="width: 100%; height: 140px; object-fit: cover; border-radius: 8px 8px 0 0;"
+                onerror="this.style.display='none'"
               />
             ` : ''}
-            <div style="padding: 12px;">
-              <h3 style="font-size: 14px; font-weight: 600; margin: 0 0 8px; line-height: 1.3;">
+            <div style="padding: 14px;">
+              <h3 style="font-size: 15px; font-weight: 600; margin: 0 0 10px; line-height: 1.4; color: #1a1a1a;">
                 ${activity.title}
               </h3>
-              <div style="display: flex; align-items: center; gap: 12px; font-size: 12px; color: #666; margin-bottom: 8px;">
+              <div style="display: flex; align-items: center; gap: 12px; font-size: 12px; color: #666; margin-bottom: 10px;">
                 ${activity.rating ? `
-                  <span style="display: flex; align-items: center; gap: 4px;">
+                  <span style="display: flex; align-items: center; gap: 4px; font-weight: 500;">
                     ⭐ ${activity.rating.toFixed(1)}
                   </span>
                 ` : ''}
-                <span>${activity.durationFormatted}</span>
+                ${activity.duration ? `<span>⏱ ${activity.duration}</span>` : ''}
               </div>
-              <div style="font-size: 16px; font-weight: 700; color: hsl(221.2, 83.2%, 53.3%);">
-                ${activity.fromPrice}€
+              <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px;">
+                <span style="font-size: 20px; font-weight: 700; color: hsl(221.2, 83.2%, 53.3%);">
+                  ${activity.price}€
+                </span>
+                ${isRealDiscount ? `
+                  <span style="font-size: 13px; color: #999; text-decoration: line-through;">
+                    ${activity.originalPrice}€
+                  </span>
+                  <span style="font-size: 11px; color: hsl(0, 84%, 50%); font-weight: 600;">
+                    -${Math.round((1 - activity.price / activity.originalPrice!) * 100)}%
+                  </span>
+                ` : ''}
               </div>
               ${activity.bookingUrl ? `
                 <a 
@@ -1391,17 +1444,17 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
                   rel="noopener noreferrer"
                   style="
                     display: block;
-                    margin-top: 10px;
-                    padding: 8px;
-                    background: hsl(221.2, 83.2%, 53.3%);
+                    padding: 10px;
+                    background: linear-gradient(135deg, hsl(221.2, 83.2%, 53.3%), hsl(221.2, 83.2%, 43.3%));
                     color: white;
                     text-align: center;
-                    border-radius: 6px;
+                    border-radius: 8px;
                     text-decoration: none;
-                    font-size: 12px;
-                    font-weight: 500;
+                    font-size: 13px;
+                    font-weight: 600;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
                   "
-                >Réserver</a>
+                >🎫 Réserver maintenant</a>
               ` : ''}
             </div>
           </div>
@@ -1410,19 +1463,60 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         activityPopupRef.current = new mapboxgl.Popup({
           closeButton: true,
           closeOnClick: false,
-          maxWidth: "280px",
-          offset: [0, -40],
+          maxWidth: "300px",
+          offset: [0, -45],
         })
-          .setLngLat([activity.lng!, activity.lat!])
+          .setLngLat([lng, lat])
           .setDOMContent(popupContent)
           .addTo(map.current!);
       });
       
       const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
-        .setLngLat([activity.lng, activity.lat])
+        .setLngLat([lng, lat])
         .addTo(map.current!);
       
       activityMarkersRef.current.push(marker);
+    };
+    
+    // 1. Display API activities with pseudo-coordinates
+    apiActivities.forEach((activity, index) => {
+      const lat = (activity as any)._displayLat;
+      const lng = (activity as any)._displayLng;
+      
+      if (!lat || !lng) return;
+      
+      const coverImage = activity.images?.find(img => img.is_cover) || activity.images?.[0];
+      
+      createActivityMarker(lat, lng, {
+        id: activity.id,
+        title: activity.title,
+        price: activity.pricing.from_price,
+        originalPrice: activity.pricing.original_price,
+        imageUrl: coverImage?.variants?.medium || coverImage?.url,
+        rating: activity.rating?.average,
+        duration: activity.duration?.formatted,
+        bookingUrl: activity.booking_url,
+        isSaved: isActivitySaved(activity.id),
+      }, index);
+    });
+    
+    // 2. Also display saved activities that have coordinates (and aren't already shown from API)
+    const savedActivitiesWithCoords = activityMemory.savedActivities.filter(a => 
+      a.lat && a.lng && !apiActivities.some(api => api.id === a.viatorId)
+    );
+    
+    savedActivitiesWithCoords.forEach((activity, index) => {
+      createActivityMarker(activity.lat!, activity.lng!, {
+        id: activity.viatorId || activity.id,
+        title: activity.title,
+        price: activity.fromPrice,
+        originalPrice: activity.originalPrice,
+        imageUrl: activity.imageUrl,
+        rating: activity.rating || undefined,
+        duration: activity.durationFormatted,
+        bookingUrl: activity.bookingUrl,
+        isSaved: true,
+      }, apiActivities.length + index);
     });
     
     return () => {
@@ -1433,7 +1527,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         activityPopupRef.current = null;
       }
     };
-  }, [activeTab, mapLoaded, activityMemory.savedActivities]);
+  }, [activeTab, mapLoaded, apiActivities, activityMemory.savedActivities, isActivitySaved]);
 
   // Update map center/zoom with fast animation
   useEffect(() => {
