@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useActivityMemory } from "@/contexts/ActivityMemoryContext";
+import { useTravelMemory } from "@/contexts/TravelMemoryContext";
 import { useLocationAutocomplete, type LocationResult } from "@/hooks/useLocationAutocomplete";
 
 import { ActivityCard } from "./ActivityCard";
@@ -253,6 +254,13 @@ const ActivitiesPanel = () => {
     addLocalDestination,
     removeLocalDestination,
   } = useActivityMemory();
+
+  // Get travelers from travel context
+  const { memory: travelMemory } = useTravelMemory();
+  const travelers = useMemo(() => ({
+    adults: travelMemory.travelers.adults,
+    children: travelMemory.travelers.children,
+  }), [travelMemory.travelers.adults, travelMemory.travelers.children]);
 
   // UI State
   const [currentView, setCurrentView] = useState<ViewType>("filters");
@@ -677,6 +685,7 @@ const ActivitiesPanel = () => {
                   filters={activityState.activeFilters}
                   onFiltersChange={updateFilters}
                   compact={false}
+                  travelers={travelers}
                 />
               </div>
 

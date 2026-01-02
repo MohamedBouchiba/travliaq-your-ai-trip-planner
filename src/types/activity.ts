@@ -221,6 +221,16 @@ export interface CategoryWithEmoji {
 }
 
 /**
+ * Time of day options for activities
+ */
+export type TimeOfDay = 'morning' | 'afternoon' | 'evening';
+
+/**
+ * Duration range options for activities
+ */
+export type DurationRange = 'under1h' | '1to4h' | 'over4h' | 'fullDay' | 'multiDay';
+
+/**
  * Activity Filters interface
  */
 export interface ActivityFilters {
@@ -228,4 +238,6 @@ export interface ActivityFilters {
   priceRange: [number, number];
   ratingMin: number;
   durationMax?: number; // in minutes
+  timeOfDay: TimeOfDay[];
+  durationRange: DurationRange[];
 }

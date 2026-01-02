@@ -1,18 +1,21 @@
 /**
  * Activity Filters Component
  *
- * Professional filtering UI for activity search
+ * Professional filtering UI for activity search with advanced filters
  */
 
-import { Filter, X, Star, DollarSign, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { Filter, X, Star, DollarSign, Sparkles, Clock, Sun, SlidersHorizontal, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ActivityFilters as ActivityFiltersType, CategoryWithEmoji } from "@/types/activity";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import type { ActivityFilters as ActivityFiltersType, CategoryWithEmoji, TimeOfDay, DurationRange } from "@/types/activity";
 
 export interface ActivityFiltersProps {
   filters: ActivityFiltersType;
   onFiltersChange: (filters: Partial<ActivityFiltersType>) => void;
   className?: string;
   compact?: boolean;
+  travelers?: { adults: number; children: number }; // From accommodation
 }
 
 const RATING_OPTIONS = [
@@ -39,12 +42,30 @@ const DEFAULT_CATEGORIES: CategoryWithEmoji[] = [
   { id: 6, label: "Sports", emoji: "⚽", keyword: "sport" },
 ];
 
+// Time of day options
+const TIME_OF_DAY_OPTIONS: { id: TimeOfDay; label: string; hours: string }[] = [
+  { id: "morning", label: "Matin", hours: "8h-12h" },
+  { id: "afternoon", label: "Après-midi", hours: "12h-17h" },
+  { id: "evening", label: "Soirée", hours: "17h-00h" },
+];
+
+// Duration range options
+const DURATION_RANGE_OPTIONS: { id: DurationRange; label: string }[] = [
+  { id: "under1h", label: "< 1h" },
+  { id: "1to4h", label: "1-4h" },
+  { id: "over4h", label: "> 4h" },
+  { id: "fullDay", label: "1 journée" },
+  { id: "multiDay", label: "Plusieurs jours" },
+];
+
 export const ActivityFilters = ({ 
   filters, 
   onFiltersChange, 
   className, 
-  compact = false 
+  compact = false,
+  travelers
 }: ActivityFiltersProps) => {
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const categories = DEFAULT_CATEGORIES;
 
   const handleCategoryToggle = (keyword: string) => {
@@ -71,12 +92,32 @@ export const ActivityFilters = ({
     onFiltersChange({ ratingMin: rating });
   };
 
+  const handleTimeOfDayToggle = (timeId: TimeOfDay) => {
+    const currentTimes = filters.timeOfDay || [];
+    const newTimes = currentTimes.includes(timeId)
+      ? currentTimes.filter((t) => t !== timeId)
+      : [...currentTimes, timeId];
+
+    onFiltersChange({ timeOfDay: newTimes });
+  };
+
+  const handleDurationRangeToggle = (durationId: DurationRange) => {
+    const currentDurations = filters.durationRange || [];
+    const newDurations = currentDurations.includes(durationId)
+      ? currentDurations.filter((d) => d !== durationId)
+      : [...currentDurations, durationId];
+
+    onFiltersChange({ durationRange: newDurations });
+  };
+
   const handleClearFilters = () => {
     onFiltersChange({
       categories: [],
       priceRange: [0, 500],
       ratingMin: 0,
       durationMax: undefined,
+      timeOfDay: [],
+      durationRange: [],
     });
   };
 
@@ -84,7 +125,12 @@ export const ActivityFilters = ({
     (filters.categories?.length || 0) > 0,
     filters.priceRange && (filters.priceRange[0] > 0 || filters.priceRange[1] < 500),
     (filters.ratingMin || 0) > 0,
+    (filters.timeOfDay?.length || 0) > 0,
+    (filters.durationRange?.length || 0) > 0,
   ].filter(Boolean).length;
+
+  // Calculate total travelers from accommodation
+  const totalTravelers = travelers ? travelers.adults + travelers.children : null;
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -111,14 +157,27 @@ export const ActivityFilters = ({
         )}
       </div>
 
-      {/* Categories */}
+      {/* Travelers info (from accommodation) */}
+      {totalTravelers !== null && (
+        <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-muted/30 border border-border/30">
+          <Users className="h-4 w-4 text-primary" />
+          <span className="text-sm text-foreground">
+            <span className="font-medium">{totalTravelers}</span> voyageur{totalTravelers > 1 ? "s" : ""}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            ({travelers!.adults} adulte{travelers!.adults > 1 ? "s" : ""}{travelers!.children > 0 ? `, ${travelers!.children} enfant${travelers!.children > 1 ? "s" : ""}` : ""})
+          </span>
+        </div>
+      )}
+
+      {/* Categories - 3 columns, compact */}
       {!compact && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
             <span className="text-xs font-medium text-foreground">Catégories</span>
           </div>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-3 gap-1">
             {categories.map((category) => {
               const isSelected = filters.categories?.includes(category.keyword) || false;
               return (
@@ -126,14 +185,14 @@ export const ActivityFilters = ({
                   key={category.id}
                   onClick={() => handleCategoryToggle(category.keyword)}
                   className={cn(
-                    "px-2.5 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all border",
+                    "px-2 py-1.5 rounded-lg text-[11px] font-medium flex items-center gap-1 transition-all border",
                     isSelected
                       ? "bg-primary/10 text-primary border-primary/30"
                       : "bg-muted/30 text-muted-foreground border-border/30 hover:bg-muted/50"
                   )}
                 >
-                  <span className="text-sm">{category.emoji}</span>
-                  <span>{category.label}</span>
+                  <span className="text-xs">{category.emoji}</span>
+                  <span className="truncate">{category.label}</span>
                 </button>
               );
             })}
@@ -147,7 +206,7 @@ export const ActivityFilters = ({
           <DollarSign className="h-3.5 w-3.5 text-primary" />
           <span className="text-xs font-medium text-foreground">Budget / activité</span>
         </div>
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-4 gap-1">
           {BUDGET_RANGES.map((range) => {
             const isSelected = filters.priceRange[0] === range.min && filters.priceRange[1] === range.max;
             return (
@@ -155,7 +214,7 @@ export const ActivityFilters = ({
                 key={range.id}
                 onClick={() => handleBudgetSelect(range)}
                 className={cn(
-                  "px-2 py-1.5 rounded-lg text-xs font-medium transition-all border text-center",
+                  "px-1.5 py-1.5 rounded-lg text-[11px] font-medium transition-all border text-center",
                   isSelected
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-muted/30 text-muted-foreground border-border/30 hover:bg-muted/50"
@@ -174,7 +233,7 @@ export const ActivityFilters = ({
           <Star className="h-3.5 w-3.5 text-primary" />
           <span className="text-xs font-medium text-foreground">Note minimum</span>
         </div>
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-4 gap-1">
           {RATING_OPTIONS.map((option) => {
             const isSelected = (filters.ratingMin || 0) === option.value;
             return (
@@ -182,7 +241,7 @@ export const ActivityFilters = ({
                 key={option.value}
                 onClick={() => handleRatingChange(option.value)}
                 className={cn(
-                  "px-2 py-1.5 rounded-lg text-xs font-medium transition-all border text-center flex items-center justify-center gap-0.5",
+                  "px-1.5 py-1.5 rounded-lg text-[11px] font-medium transition-all border text-center flex items-center justify-center gap-0.5",
                   isSelected
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-muted/30 text-muted-foreground border-border/30 hover:bg-muted/50"
@@ -195,6 +254,83 @@ export const ActivityFilters = ({
           })}
         </div>
       </div>
+
+      {/* Advanced Filters Collapsible */}
+      <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
+        <CollapsibleTrigger asChild>
+          <button className="flex items-center gap-2 w-full py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            <span>Filtres avancés</span>
+            <span className={cn(
+              "ml-auto transition-transform",
+              isAdvancedOpen && "rotate-180"
+            )}>
+              ▼
+            </span>
+            {((filters.timeOfDay?.length || 0) + (filters.durationRange?.length || 0)) > 0 && (
+              <span className="px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded-full">
+                {(filters.timeOfDay?.length || 0) + (filters.durationRange?.length || 0)}
+              </span>
+            )}
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-4 pt-2">
+          {/* Time of Day */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Sun className="h-3.5 w-3.5 text-primary" />
+              <span className="text-xs font-medium text-foreground">Moment de la journée</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              {TIME_OF_DAY_OPTIONS.map((option) => {
+                const isSelected = filters.timeOfDay?.includes(option.id) || false;
+                return (
+                  <button
+                    key={option.id}
+                    onClick={() => handleTimeOfDayToggle(option.id)}
+                    className={cn(
+                      "px-2 py-2 rounded-lg text-[11px] font-medium flex flex-col items-center gap-0.5 transition-all border",
+                      isSelected
+                        ? "bg-primary/10 text-primary border-primary/30"
+                        : "bg-muted/30 text-muted-foreground border-border/30 hover:bg-muted/50"
+                    )}
+                  >
+                    <span>{option.label}</span>
+                    <span className="text-[9px] opacity-70">{option.hours}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Duration */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5 text-primary" />
+              <span className="text-xs font-medium text-foreground">Durée de l'activité</span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {DURATION_RANGE_OPTIONS.map((option) => {
+                const isSelected = filters.durationRange?.includes(option.id) || false;
+                return (
+                  <button
+                    key={option.id}
+                    onClick={() => handleDurationRangeToggle(option.id)}
+                    className={cn(
+                      "px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all border",
+                      isSelected
+                        ? "bg-primary/10 text-primary border-primary/30"
+                        : "bg-muted/30 text-muted-foreground border-border/30 hover:bg-muted/50"
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 };

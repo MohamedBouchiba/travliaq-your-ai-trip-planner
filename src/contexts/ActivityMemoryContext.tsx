@@ -146,6 +146,8 @@ const defaultMemory: ActivityMemory = {
     priceRange: [0, 500],
     ratingMin: 0,
     durationMax: 480, // 8 hours
+    timeOfDay: [],
+    durationRange: [],
   },
 };
 

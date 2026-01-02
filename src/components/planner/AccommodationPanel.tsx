@@ -173,7 +173,7 @@ function TravelersSelector({
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-3" align="start" onInteractOutside={(e) => e.preventDefault()}>
+      <PopoverContent className="w-64 p-3" align="start">
         <div className="space-y-3">
           {/* Adults */}
           <div className="flex items-center justify-between">
@@ -305,7 +305,6 @@ function RoomsSelector({
       <PopoverContent 
         className="w-72 p-3" 
         align="start"
-        onInteractOutside={(e) => e.preventDefault()}
       >
         <div className="space-y-3">
           {/* Auto toggle */}
