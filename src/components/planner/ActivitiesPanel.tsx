@@ -12,14 +12,14 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
 import { 
-  Search, Sparkles, Loader2, Plus, MapPin, Hotel,
-  ChevronLeft, AlertCircle, Link2, CalendarDays
+  Search, Sparkles, Loader2, Plus, Hotel, X,
+  ChevronLeft, AlertCircle, CalendarDays, Compass
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useActivityMemory } from "@/contexts/ActivityMemoryContext";
 import { useAccommodationMemory } from "@/contexts/AccommodationMemoryContext";
-import { useFlightMemory } from "@/contexts/FlightMemoryContext";
+
 import { ActivityCard } from "./ActivityCard";
 import { ActivityFilters } from "./ActivityFilters";
 import { ActivityDetailModal } from "./ActivityDetailModal";
@@ -104,7 +104,6 @@ const ActivitiesPanel = () => {
   } = useActivityMemory();
 
   const { memory: accommodationMemory } = useAccommodationMemory();
-  const { memory: flightMemory } = useFlightMemory();
 
   // UI State
   const [currentView, setCurrentView] = useState<ViewType>("filters");
@@ -280,7 +279,7 @@ const ActivitiesPanel = () => {
       {/* No Cities Message */}
       {cities.length === 0 && (
         <EmptyState
-          icon={MapPin}
+          icon={Compass}
           title="Aucune destination"
           description="Ajoutez d'abord une destination dans l'onglet Hébergements"
           action={
@@ -297,7 +296,7 @@ const ActivitiesPanel = () => {
         />
       )}
 
-      {/* City Tabs - EXACTLY like AccommodationPanel */}
+      {/* City Tabs - Like AccommodationPanel with delete button */}
       {cities.length > 0 && (
         <div className="flex gap-1.5 flex-wrap items-center">
           {cities.map((city, index) => (
@@ -311,50 +310,59 @@ const ActivitiesPanel = () => {
                   : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border/30"
               )}
             >
-              <MapPin className="h-3 w-3" />
+              <Compass className="h-3 w-3" />
               <span
                 className="max-w-24 truncate"
                 title={`${city.city}${city.countryCode ? `, ${city.countryCode}` : ""}`}
               >
                 {city.city}
               </span>
+              {/* Delete button - visible on hover like AccommodationPanel */}
+              {cities.length > 1 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toast.info("Pour supprimer cette ville, allez dans Hébergements");
+                  }}
+                  className={cn(
+                    "h-4 w-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity",
+                    index === activeCityIndex
+                      ? "hover:bg-primary-foreground/20"
+                      : "hover:bg-destructive/20"
+                  )}
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              )}
             </button>
           ))}
           
-          {/* Add button or sync indicator */}
-          {flightMemory.tripType !== "multi" ? (
-            <button
-              onClick={handleAddCityClick}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-primary hover:text-primary/80 transition-colors rounded-lg border border-dashed border-primary/30 hover:border-primary/50"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              <span>Ajouter</span>
-            </button>
-          ) : (
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted-foreground/70 rounded-lg border border-dashed border-border/30">
-              <Link2 className="h-3 w-3" />
-              <span>Synchronisé avec vos vols</span>
-            </div>
-          )}
+          {/* Add button - always visible */}
+          <button
+            onClick={handleAddCityClick}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-primary hover:text-primary/80 transition-colors rounded-lg border border-dashed border-primary/30 hover:border-primary/50"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>Ajouter</span>
+          </button>
         </div>
       )}
 
-      {/* City Details Card (like AccommodationPanel) */}
+      {/* City Details Card */}
       {activeCity && (
         <div className="rounded-xl border border-border/40 bg-card/50 overflow-hidden">
           {/* City info line */}
-          <div className="flex items-center gap-2.5 p-2.5 border-b border-border/30">
+          <div className="flex items-center gap-2.5 p-2.5">
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <MapPin className="h-4 w-4 text-primary shrink-0" />
+              <Compass className="h-4 w-4 text-primary shrink-0" />
               <span className="text-sm font-medium truncate">{activeCity.city}</span>
             </div>
             <div className="w-px h-6 bg-border/40" />
             <div className="flex items-center gap-2 text-sm">
               <CalendarDays className="h-4 w-4 text-primary shrink-0" />
               {activeCity.checkIn && activeCity.checkOut ? (
-                <span className="text-foreground flex items-center gap-1">
+                <span className="text-foreground">
                   {formatDateRange(activeCity.checkIn, activeCity.checkOut)}
-                  <Link2 className="h-3 w-3 text-primary/70" />
                 </span>
               ) : (
                 <span className="text-muted-foreground">Dates à définir</span>
