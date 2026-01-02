@@ -973,6 +973,49 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
 
   if (!activeAccommodation) return null;
 
+  // State for inline add form
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newCitySearch, setNewCitySearch] = useState("");
+  const [newCityDates, setNewCityDates] = useState<{ checkIn: Date | null; checkOut: Date | null }>({ checkIn: null, checkOut: null });
+  const { data: newCityResults = [], isLoading: isSearchingNewCity } = useLocationAutocomplete(newCitySearch, newCitySearch.length >= 3, ["city"]);
+
+  const handleAddNewCity = (location: LocationResult) => {
+    if (location.lat && location.lng) {
+      // Add new accommodation with the selected city
+      addAccommodation();
+      // Get the newly added accommodation (last one)
+      setTimeout(() => {
+        const newIndex = memory.accommodations.length;
+        setActiveAccommodation(newIndex);
+        setDestination(
+          location.name,
+          location.country_name || "",
+          location.country_code || "",
+          location.lat!,
+          location.lng!
+        );
+        if (newCityDates.checkIn) {
+          setDates(newCityDates.checkIn, newCityDates.checkOut);
+        }
+        if (onMapMove && location.lat && location.lng) {
+          onMapMove([location.lng, location.lat], 12);
+        }
+      }, 50);
+      
+      // Reset form
+      setNewCitySearch("");
+      setNewCityDates({ checkIn: null, checkOut: null });
+      setShowAddForm(false);
+      toastInfo("Destination ajoutée", `${location.name} a été ajouté à vos hébergements`);
+    }
+  };
+
+  const handleCancelAddCity = () => {
+    setShowAddForm(false);
+    setNewCitySearch("");
+    setNewCityDates({ checkIn: null, checkOut: null });
+  };
+
   return (
     <div className="space-y-3" data-tour="stays-panel">
       {/* Accommodation tabs + Add button - always visible */}
@@ -980,7 +1023,13 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
         {memory.accommodations.map((acc, index) => (
           <button
             key={acc.id}
-            onClick={() => setActiveAccommodation(index)}
+            onClick={() => {
+              setActiveAccommodation(index);
+              // Zoom on city when clicking tab
+              if (acc.lat && acc.lng && onMapMove) {
+                onMapMove([acc.lng, acc.lat], 12);
+              }
+            }}
             className={cn(
               "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 group",
               index === memory.activeAccommodationIndex
@@ -1013,22 +1062,81 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
             )}
           </button>
         ))}
-        {/* Only show "Ajouter" button if NOT in multi-destination mode */}
-        {flightMemory.tripType !== "multi" ? (
+        {/* Small + button to add new destination */}
+        {flightMemory.tripType !== "multi" && !showAddForm && (
           <button
-            onClick={handleAddAccommodation}
-            className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-primary hover:text-primary/80 transition-colors rounded-lg border border-dashed border-primary/30 hover:border-primary/50"
+            onClick={() => setShowAddForm(true)}
+            className="h-7 w-7 rounded-lg flex items-center justify-center text-primary hover:bg-primary/10 transition-colors border border-dashed border-primary/30 hover:border-primary/50"
+            title="Ajouter une destination"
           >
             <Plus className="h-3.5 w-3.5" />
-            <span>Ajouter</span>
           </button>
-        ) : (
+        )}
+        {flightMemory.tripType === "multi" && (
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted-foreground/70 rounded-lg border border-dashed border-border/30">
             <Link2 className="h-3 w-3" />
             <span>Synchronisé avec vos vols</span>
           </div>
         )}
       </div>
+
+      {/* Inline add form */}
+      {showAddForm && (
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-primary">Ajouter une destination</span>
+            <button
+              onClick={handleCancelAddCity}
+              className="h-5 w-5 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
+            >
+              <X className="h-3 w-3 text-muted-foreground" />
+            </button>
+          </div>
+          
+          {/* City search */}
+          <Popover open={newCitySearch.length >= 3 && newCityResults.length > 0}>
+            <PopoverTrigger asChild>
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background border border-border/50">
+                <MapPin className="h-4 w-4 text-primary shrink-0" />
+                <input
+                  type="text"
+                  value={newCitySearch}
+                  onChange={(e) => setNewCitySearch(e.target.value)}
+                  placeholder="Rechercher une ville..."
+                  className="flex-1 min-w-0 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
+                  autoFocus
+                />
+                {isSearchingNewCity && (
+                  <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                )}
+              </div>
+            </PopoverTrigger>
+            <PopoverContent 
+              className="w-72 p-0 max-h-48 overflow-y-auto" 
+              align="start"
+              onOpenAutoFocus={(e) => e.preventDefault()}
+            >
+              <div className="py-1">
+                {newCityResults.slice(0, 6).map((location) => (
+                  <button
+                    key={`${location.type}-${location.id}`}
+                    onClick={() => handleAddNewCity(location)}
+                    className="w-full px-3 py-2 text-left hover:bg-muted/50 transition-colors flex items-center gap-2"
+                  >
+                    <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-medium truncate">{location.name}</div>
+                      <div className="text-[10px] text-muted-foreground truncate">
+                        {location.country_name}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      )}
 
       {/* BLOC 1: Essentiel - Destination, Dates, Voyageurs, Budget */}
       <div className="rounded-xl border border-border/40 bg-card/50 overflow-hidden">
