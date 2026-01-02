@@ -59,10 +59,26 @@ export type PlannerEvents = {
     checkIn: Date | null; 
     checkOut: Date | null;
     destinationId: string;
+    lat?: number;
+    lng?: number;
+    filters?: {
+      ratingMin: number;
+      budgetMin: number;
+      budgetMax: number;
+    };
   };
   "activities:resultsReady": { 
     activities: unknown[]; 
     destinationId: string;
+    city: string;
+    lat?: number;
+    lng?: number;
+  };
+  "activities:cityFocus": {
+    city: string;
+    countryCode: string;
+    lat?: number;
+    lng?: number;
   };
   
   // Chat interactions

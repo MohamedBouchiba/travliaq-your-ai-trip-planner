@@ -1152,38 +1152,83 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
   const [apiActivities, setApiActivities] = useState<TravliaqActivity[]>([]);
   const [activeActivityCity, setActiveActivityCity] = useState<{ city: string; lat?: number; lng?: number } | null>(null);
   
-  // Listen for activity search events from ActivitiesPanel
-  usePlannerEvent("activities:search", useCallback((data) => {
-    // Find city coordinates
-    const acc = accommodationMemory.accommodations.find(a => a.id === data.destinationId);
-    if (acc?.lat && acc?.lng) {
-      setActiveActivityCity({ city: data.city, lat: acc.lat, lng: acc.lng });
-    } else {
-      // Try to find in cityCoordinates
+  // Listen for city focus events (when user selects a city in ActivitiesPanel)
+  usePlannerEvent("activities:cityFocus", useCallback((data) => {
+    if (!map.current || !mapLoaded) return;
+    
+    // Use provided coordinates or fallback to cityCoordinates
+    let lat = data.lat;
+    let lng = data.lng;
+    
+    if (!lat || !lng) {
       const coords = cityCoordinates[data.city.toLowerCase()];
       if (coords) {
-        setActiveActivityCity({ city: data.city, lat: coords.lat, lng: coords.lng });
+        lat = coords.lat;
+        lng = coords.lng;
       }
     }
-  }, [accommodationMemory.accommodations]));
+    
+    if (lat && lng) {
+      setActiveActivityCity({ city: data.city, lat, lng });
+      
+      // Fly to city
+      map.current.flyTo({
+        center: [lng, lat],
+        zoom: 12,
+        duration: 1200,
+        essential: true,
+      });
+    }
+  }, [mapLoaded]));
+  
+  // Listen for activity search events from ActivitiesPanel
+  usePlannerEvent("activities:search", useCallback((data) => {
+    if (!map.current || !mapLoaded) return;
+    
+    // Use provided coords or find in accommodations or cityCoordinates
+    let lat = data.lat;
+    let lng = data.lng;
+    
+    if (!lat || !lng) {
+      const acc = accommodationMemory.accommodations.find(a => a.id === data.destinationId);
+      if (acc?.lat && acc?.lng) {
+        lat = acc.lat;
+        lng = acc.lng;
+      } else {
+        const coords = cityCoordinates[data.city.toLowerCase()];
+        if (coords) {
+          lat = coords.lat;
+          lng = coords.lng;
+        }
+      }
+    }
+    
+    if (lat && lng) {
+      setActiveActivityCity({ city: data.city, lat, lng });
+      
+      // Fly to city
+      map.current.flyTo({
+        center: [lng, lat],
+        zoom: 12,
+        duration: 1200,
+        essential: true,
+      });
+    }
+  }, [accommodationMemory.accommodations, mapLoaded]));
   
   // Listen for activity results
   usePlannerEvent("activities:resultsReady", useCallback((data) => {
     setApiActivities(data.activities as TravliaqActivity[]);
-  }, []));
-  
-  // Zoom to city when activities tab is active and a city is selected
-  useEffect(() => {
-    if (!map.current || !mapLoaded || activeTab !== "activities") return;
     
-    if (activeActivityCity?.lat && activeActivityCity?.lng) {
+    // If coordinates provided, zoom there
+    if (data.lat && data.lng && map.current && mapLoaded) {
       map.current.flyTo({
-        center: [activeActivityCity.lng, activeActivityCity.lat],
+        center: [data.lng, data.lat],
         zoom: 12,
         duration: 1000,
       });
     }
-  }, [activeTab, mapLoaded, activeActivityCity]);
+  }, [mapLoaded]));
   
   // Display activity markers on map
   useEffect(() => {
