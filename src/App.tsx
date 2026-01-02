@@ -7,8 +7,6 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { HelmetProvider } from "react-helmet-async";
 import { lazy, Suspense } from "react";
 import { usePageTracking } from "@/hooks/usePageTracking";
-import { ActivityMemoryProvider } from "@/contexts/ActivityMemoryContext";
-import { PreferenceMemoryProvider } from "@/contexts/PreferenceMemoryContext";
 
 const SentryTest = lazy(() => import("./pages/SentryTest"));
 const Index = lazy(() => import("./pages/Index"));
@@ -38,27 +36,27 @@ const AppContent = () => {
     <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>}>
       <Routes>
         <Route path="/" element={<Index />} />
-              <Route path="/v2" element={<IndexV2 />} />
-              <Route path="/cgv" element={<CGV />} />
-              <Route path="/questionnaire" element={<Questionnaire />} />
-              <Route path="/questionnaire-v2" element={<QuestionnaireV2 />} />
-              <Route path="/sentry-test" element={<SentryTest />} />
-              <Route path="/blog" element={<Blog />} />
-              <Route path="/blog/:slug" element={<BlogPost />} />
-              <Route path="/admin/blog" element={<AdminBlog />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/discover" element={<Discover />} />
-              <Route path="/recommendations" element={<TravelRecommendations />} />
-              <Route path="/recommendations/:code" element={<TravelRecommendations />} />
-              <Route path="/trip-details/:code" element={<TripDetails />} />
-              <Route path="/trip-details" element={<TripDetails />} />
-              <Route path="/booking" element={<Booking />} />
-              <Route path="/planner" element={<TravelPlanner />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+        <Route path="/v2" element={<IndexV2 />} />
+        <Route path="/cgv" element={<CGV />} />
+        <Route path="/questionnaire" element={<Questionnaire />} />
+        <Route path="/questionnaire-v2" element={<QuestionnaireV2 />} />
+        <Route path="/sentry-test" element={<SentryTest />} />
+        <Route path="/blog" element={<Blog />} />
+        <Route path="/blog/:slug" element={<BlogPost />} />
+        <Route path="/admin/blog" element={<AdminBlog />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/discover" element={<Discover />} />
+        <Route path="/recommendations" element={<TravelRecommendations />} />
+        <Route path="/recommendations/:code" element={<TravelRecommendations />} />
+        <Route path="/trip-details/:code" element={<TripDetails />} />
+        <Route path="/trip-details" element={<TripDetails />} />
+        <Route path="/booking" element={<Booking />} />
+        <Route path="/planner" element={<TravelPlanner />} />
+        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
     </Suspense>
   );
 };
@@ -67,17 +65,13 @@ const App = () => (
   <HelmetProvider>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <PreferenceMemoryProvider>
-          <ActivityMemoryProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <AppContent />
-              </BrowserRouter>
-            </TooltipProvider>
-          </ActivityMemoryProvider>
-        </PreferenceMemoryProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>
   </HelmetProvider>

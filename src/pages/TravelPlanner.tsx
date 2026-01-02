@@ -14,6 +14,8 @@ import type { Airport } from "@/hooks/useNearestAirports";
 import { FlightMemoryProvider } from "@/contexts/FlightMemoryContext";
 import { TravelMemoryProvider } from "@/contexts/TravelMemoryContext";
 import { AccommodationMemoryProvider } from "@/contexts/AccommodationMemoryContext";
+import { PreferenceMemoryProvider } from "@/contexts/PreferenceMemoryContext";
+import { ActivityMemoryProvider } from "@/contexts/ActivityMemoryContext";
 import { usePlannerState } from "@/hooks/usePlannerState";
 import { useMapState } from "@/hooks/useMapState";
 import { useFlightState } from "@/hooks/useFlightState";
@@ -141,130 +143,133 @@ const TravelPlanner = () => {
 
   return (
     <TravelMemoryProvider>
-      <FlightMemoryProvider>
-        <AccommodationMemoryProvider>
-          <Helmet>
-        <title>Planificateur | Travliaq</title>
-        <meta
-          name="description"
-          content="Planifiez votre voyage avec notre assistant intelligent. Comparez vols, activités et hébergements sur une carte interactive."
-        />
-        <link rel="canonical" href="/planner" />
-      </Helmet>
-
-      <div className="h-[100svh] w-full overflow-hidden bg-background">
-        <ResizablePanelGroup direction="horizontal" className="h-full">
-          {/* Left: Chat - resizable */}
-          <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
-            <div data-tour="chat-panel" className="h-full">
-              <PlannerChat ref={chatRef} />
-            </div>
-          </ResizablePanel>
-
-          {/* Resize handle */}
-          <ResizableHandle withHandle className="bg-border/50 hover:bg-primary/30 transition-colors" />
-
-          {/* Right: Map workspace - resizable */}
-          <ResizablePanel defaultSize={65} minSize={40}>
-            <main className="relative h-full overflow-hidden pt-12" data-tour="map-area">
-              <PlannerErrorBoundary componentName="PlannerMap">
-                <PlannerMap
-                  activeTab={activeTab}
-                  center={mapCenter}
-                  zoom={mapZoom}
-                  onPinClick={handlePinClick}
-                  selectedPinId={selectedPin?.id}
-                  flightRoutes={flightRoutes}
-                  animateToUserLocation={onboardingComplete && !initialAnimationDone}
-                  onAnimationComplete={() => {
-                    setInitialAnimationDone(true);
-                    // Open panel with the restored/active tab (don't force flights)
-                    setIsPanelVisible(true);
-                  }}
-                  isPanelOpen={isPanelVisible}
-                  userLocation={initialAnimationDone ? userLocation : null}
-                  onDestinationClick={handleDestinationClick}
+      <PreferenceMemoryProvider>
+        <FlightMemoryProvider>
+          <AccommodationMemoryProvider>
+            <ActivityMemoryProvider>
+              <Helmet>
+                <title>Planificateur | Travliaq</title>
+                <meta
+                  name="description"
+                  content="Planifiez votre voyage avec notre assistant intelligent. Comparez vols, activités et hébergements sur une carte interactive."
                 />
-              </PlannerErrorBoundary>
+                <link rel="canonical" href="/planner" />
+              </Helmet>
 
-              {/* Overlay tabs */}
-              <PlannerTopBar activeTab={activeTab} onTabChange={handleTabChange} />
+              <div className="h-[100svh] w-full overflow-hidden bg-background">
+                <ResizablePanelGroup direction="horizontal" className="h-full">
+                  {/* Left: Chat - resizable */}
+                  <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
+                    <div data-tour="chat-panel" className="h-full">
+                      <PlannerChat ref={chatRef} />
+                    </div>
+                  </ResizablePanel>
 
-              {/* YouTube Shorts Panel (takes over the regular panel) */}
-              {youtubePanel ? (
-                <aside className="pointer-events-none absolute top-16 left-4 bottom-4 w-[320px] sm:w-[360px] md:w-[400px] lg:w-[420px] xl:w-[480px] 2xl:w-[540px] z-10">
-                  <div className="pointer-events-auto h-full overflow-hidden rounded-2xl bg-card/95 backdrop-blur-xl border border-border/50 shadow-lg">
-                    <YouTubeShortsPanel
-                      city={youtubePanel.city}
-                      countryName={youtubePanel.countryName}
-                      isOpen={true}
-                      onClose={() => setYoutubePanel(null)}
-                    />
-                  </div>
-                </aside>
-              ) : (
-                /* Regular Overlay panel */
-                <div data-tour="flights-panel">
-                  <PlannerErrorBoundary componentName="PlannerPanel">
-                    <PlannerPanel
-                      activeTab={activeTab}
-                      layout="overlay"
-                      isVisible={isPanelVisible}
-                      onClose={() => setIsPanelVisible(false)}
-                      onMapMove={(center, zoom) => {
-                        setMapCenter(center);
-                        setMapZoom(zoom);
-                      }}
-                      onFlightRoutesChange={setFlightRoutes}
-                      flightFormData={flightFormData}
-                      onFlightFormDataConsumed={() => setFlightFormData(null)}
-                      onCountrySelected={handleCountrySelected}
-                      onAskAirportChoice={handleAskAirportChoice}
-                      onAskDualAirportChoice={handleAskDualAirportChoice}
-                      onAskAirportConfirmation={handleAskAirportConfirmation}
-                      selectedAirport={selectedAirport}
-                      onSelectedAirportConsumed={() => setSelectedAirport(null)}
-                      onUserLocationDetected={setUserLocation}
-                      onSearchReady={handleSearchReady}
-                      triggerSearch={triggerFlightSearch}
-                      onSearchTriggered={() => setTriggerFlightSearch(false)}
-                      confirmedMultiAirports={confirmedMultiAirports}
-                      onConfirmedMultiAirportsConsumed={() => setConfirmedMultiAirports(null)}
-                    />
-                  </PlannerErrorBoundary>
-                </div>
-              )}
+                  {/* Resize handle */}
+                  <ResizableHandle withHandle className="bg-border/50 hover:bg-primary/30 transition-colors" />
 
-              {/* Destination popup on map marker click */}
-              <DestinationPopup
-                cityName={destinationPopup?.cityName || ""}
-                countryName={destinationPopup?.countryName}
-                isOpen={!!destinationPopup}
-                onClose={() => {
-                  window.dispatchEvent(new Event("destination-popup-close"));
-                  setDestinationPopup(null);
-                }}
-                onDiscoverClick={handleOpenYouTube}
-                position={destinationPopup?.position}
-              />
+                  {/* Right: Map workspace - resizable */}
+                  <ResizablePanel defaultSize={65} minSize={40}>
+                    <main className="relative h-full overflow-hidden pt-12" data-tour="map-area">
+                      <PlannerErrorBoundary componentName="PlannerMap">
+                        <PlannerMap
+                          activeTab={activeTab}
+                          center={mapCenter}
+                          zoom={mapZoom}
+                          onPinClick={handlePinClick}
+                          selectedPinId={selectedPin?.id}
+                          flightRoutes={flightRoutes}
+                          animateToUserLocation={onboardingComplete && !initialAnimationDone}
+                          onAnimationComplete={() => {
+                            setInitialAnimationDone(true);
+                            setIsPanelVisible(true);
+                          }}
+                          isPanelOpen={isPanelVisible}
+                          userLocation={initialAnimationDone ? userLocation : null}
+                          onDestinationClick={handleDestinationClick}
+                        />
+                      </PlannerErrorBoundary>
 
-              {/* Floating card on map */}
-              {selectedPin && (
-                <PlannerCard pin={selectedPin} onClose={handleCloseCard} onAddToTrip={handleAddToTrip} />
-              )}
-            </main>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+                      {/* Overlay tabs */}
+                      <PlannerTopBar activeTab={activeTab} onTabChange={handleTabChange} />
 
-        {/* Onboarding Tour */}
-        <OnboardingTour 
-          onPanelVisibilityChange={setIsPanelVisible}
-          onComplete={handleOnboardingComplete}
-          onRequestAnimation={handleRequestAnimation}
-        />
-          </div>
-        </AccommodationMemoryProvider>
-      </FlightMemoryProvider>
+                      {/* YouTube Shorts Panel (takes over the regular panel) */}
+                      {youtubePanel ? (
+                        <aside className="pointer-events-none absolute top-16 left-4 bottom-4 w-[320px] sm:w-[360px] md:w-[400px] lg:w-[420px] xl:w-[480px] 2xl:w-[540px] z-10">
+                          <div className="pointer-events-auto h-full overflow-hidden rounded-2xl bg-card/95 backdrop-blur-xl border border-border/50 shadow-lg">
+                            <YouTubeShortsPanel
+                              city={youtubePanel.city}
+                              countryName={youtubePanel.countryName}
+                              isOpen={true}
+                              onClose={() => setYoutubePanel(null)}
+                            />
+                          </div>
+                        </aside>
+                      ) : (
+                        /* Regular Overlay panel */
+                        <div data-tour="flights-panel">
+                          <PlannerErrorBoundary componentName="PlannerPanel">
+                            <PlannerPanel
+                              activeTab={activeTab}
+                              layout="overlay"
+                              isVisible={isPanelVisible}
+                              onClose={() => setIsPanelVisible(false)}
+                              onMapMove={(center, zoom) => {
+                                setMapCenter(center);
+                                setMapZoom(zoom);
+                              }}
+                              onFlightRoutesChange={setFlightRoutes}
+                              flightFormData={flightFormData}
+                              onFlightFormDataConsumed={() => setFlightFormData(null)}
+                              onCountrySelected={handleCountrySelected}
+                              onAskAirportChoice={handleAskAirportChoice}
+                              onAskDualAirportChoice={handleAskDualAirportChoice}
+                              onAskAirportConfirmation={handleAskAirportConfirmation}
+                              selectedAirport={selectedAirport}
+                              onSelectedAirportConsumed={() => setSelectedAirport(null)}
+                              onUserLocationDetected={setUserLocation}
+                              onSearchReady={handleSearchReady}
+                              triggerSearch={triggerFlightSearch}
+                              onSearchTriggered={() => setTriggerFlightSearch(false)}
+                              confirmedMultiAirports={confirmedMultiAirports}
+                              onConfirmedMultiAirportsConsumed={() => setConfirmedMultiAirports(null)}
+                            />
+                          </PlannerErrorBoundary>
+                        </div>
+                      )}
+
+                      {/* Destination popup on map marker click */}
+                      <DestinationPopup
+                        cityName={destinationPopup?.cityName || ""}
+                        countryName={destinationPopup?.countryName}
+                        isOpen={!!destinationPopup}
+                        onClose={() => {
+                          window.dispatchEvent(new Event("destination-popup-close"));
+                          setDestinationPopup(null);
+                        }}
+                        onDiscoverClick={handleOpenYouTube}
+                        position={destinationPopup?.position}
+                      />
+
+                      {/* Floating card on map */}
+                      {selectedPin && (
+                        <PlannerCard pin={selectedPin} onClose={handleCloseCard} onAddToTrip={handleAddToTrip} />
+                      )}
+                    </main>
+                  </ResizablePanel>
+                </ResizablePanelGroup>
+
+                {/* Onboarding Tour */}
+                <OnboardingTour 
+                  onPanelVisibilityChange={setIsPanelVisible}
+                  onComplete={handleOnboardingComplete}
+                  onRequestAnimation={handleRequestAnimation}
+                />
+              </div>
+            </ActivityMemoryProvider>
+          </AccommodationMemoryProvider>
+        </FlightMemoryProvider>
+      </PreferenceMemoryProvider>
     </TravelMemoryProvider>
   );
 };
