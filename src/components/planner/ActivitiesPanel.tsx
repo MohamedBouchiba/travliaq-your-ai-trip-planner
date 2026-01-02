@@ -1,23 +1,22 @@
 /**
- * Activities Panel - Complete Refactor with improved UX
+ * Activities Panel - Matching AccommodationPanel UX
  *
  * Features:
- * - City management with add/remove/sync
+ * - City tabs like AccommodationPanel (with "+" button for adding)
+ * - Inline city input when adding (not popup)
  * - Two-view system: filters + results
- * - Activity cards with 2 columns
+ * - Activity cards in 2-column grid
  * - Detail modal on click
- * - Map integration with coordinates
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { 
-  Search, Sparkles, Calendar, Plane, Loader2, Plus, X, MapPin, 
-  ChevronLeft, Trash2, AlertCircle
+  Search, Sparkles, Loader2, Plus, X, MapPin, Hotel,
+  ChevronLeft, AlertCircle, Calendar
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useActivityMemory } from "@/contexts/ActivityMemoryContext";
 import { useAccommodationMemory } from "@/contexts/AccommodationMemoryContext";
 import { ActivityCard } from "./ActivityCard";
@@ -27,6 +26,7 @@ import { toast } from "sonner";
 import { eventBus } from "@/lib/eventBus";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
 import type { ActivitySearchParams, ViatorActivity, ActivityFilters as ActivityFiltersType } from "@/types/activity";
 
 // ============================================================================
@@ -39,8 +39,8 @@ interface CityEntry {
   id: string;
   city: string;
   countryCode: string;
-  startDate: string;
-  endDate?: string;
+  checkIn: Date | null;
+  checkOut: Date | null;
 }
 
 // ============================================================================
@@ -72,133 +72,6 @@ const EmptyState = ({
   </div>
 );
 
-// City chip component
-const CityChip = ({
-  city,
-  countryCode,
-  startDate,
-  endDate,
-  selected,
-  onClick,
-  onRemove,
-}: {
-  city: string;
-  countryCode: string;
-  startDate: string;
-  endDate?: string;
-  selected: boolean;
-  onClick: () => void;
-  onRemove: () => void;
-}) => {
-  const formatDateRange = () => {
-    try {
-      const start = new Date(startDate);
-      const formattedStart = format(start, "d MMM", { locale: fr });
-      if (endDate) {
-        const end = new Date(endDate);
-        const formattedEnd = format(end, "d MMM", { locale: fr });
-        return `${formattedStart} - ${formattedEnd}`;
-      }
-      return formattedStart;
-    } catch {
-      return "";
-    }
-  };
-
-  return (
-    <div
-      className={cn(
-        "group relative flex items-center gap-2 px-3 py-2 rounded-lg border transition-all cursor-pointer",
-        selected
-          ? "bg-primary text-primary-foreground border-primary"
-          : "bg-muted/30 text-muted-foreground border-border/30 hover:bg-muted/50"
-      )}
-      onClick={onClick}
-    >
-      <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
-      <div className="flex flex-col min-w-0">
-        <span className="text-xs font-medium truncate">
-          {city}{countryCode ? `, ${countryCode}` : ""}
-        </span>
-        <span className={cn("text-[10px]", selected ? "text-primary-foreground/70" : "text-muted-foreground/70")}>
-          {formatDateRange()}
-        </span>
-      </div>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onRemove();
-        }}
-        className={cn(
-          "ml-1 p-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity",
-          selected ? "hover:bg-primary-foreground/20" : "hover:bg-muted"
-        )}
-      >
-        <X className="h-3 w-3" />
-      </button>
-    </div>
-  );
-};
-
-// Add city popover
-const AddCityPopover = ({
-  onAdd,
-}: {
-  onAdd: (city: string, countryCode: string, date: string) => void;
-}) => {
-  const [open, setOpen] = useState(false);
-  const [city, setCity] = useState("");
-  const [countryCode, setCountryCode] = useState("");
-  const [date, setDate] = useState("");
-
-  const handleSubmit = () => {
-    if (!city || !date) {
-      toast.error("Veuillez remplir tous les champs");
-      return;
-    }
-    onAdd(city, countryCode, date);
-    setCity("");
-    setCountryCode("");
-    setDate("");
-    setOpen(false);
-  };
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button className="h-10 w-10 rounded-lg border border-dashed border-border/50 flex items-center justify-center hover:bg-muted/50 transition-colors">
-          <Plus className="h-4 w-4 text-muted-foreground" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-64 p-3 space-y-3" align="start">
-        <p className="text-xs font-medium text-foreground">Ajouter une ville</p>
-        <Input
-          placeholder="Ville (ex: Paris)"
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-          className="h-8 text-sm"
-        />
-        <Input
-          placeholder="Code pays (ex: FR)"
-          value={countryCode}
-          onChange={(e) => setCountryCode(e.target.value.toUpperCase())}
-          className="h-8 text-sm"
-          maxLength={2}
-        />
-        <Input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="h-8 text-sm"
-        />
-        <Button size="sm" className="w-full" onClick={handleSubmit}>
-          Ajouter
-        </Button>
-      </PopoverContent>
-    </Popover>
-  );
-};
-
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -222,98 +95,146 @@ const ActivitiesPanel = () => {
 
   // UI State
   const [currentView, setCurrentView] = useState<ViewType>("filters");
-  const [selectedCityId, setSelectedCityId] = useState<string | null>(null);
+  const [activeCityIndex, setActiveCityIndex] = useState(0);
   const [detailModalActivity, setDetailModalActivity] = useState<ViatorActivity | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<ViatorActivity[]>([]);
   
-  // Local cities state (derived from accommodations)
+  // Add city state
+  const [isAddingCity, setIsAddingCity] = useState(false);
+  const [newCityName, setNewCityName] = useState("");
+  const [newCityCountry, setNewCityCountry] = useState("");
+  const [newCityDate, setNewCityDate] = useState("");
+  const addCityInputRef = useRef<HTMLInputElement>(null);
+
+  // Derive cities from accommodations (like AccommodationPanel)
   const cities = useMemo<CityEntry[]>(() => {
-    return accommodationMemory.accommodations.map((acc) => ({
-      id: acc.id,
-      city: acc.city || "",
-      countryCode: acc.countryCode || "",
-      startDate: typeof acc.checkIn === "string" ? acc.checkIn : acc.checkIn?.toISOString().split("T")[0] || "",
-      endDate: typeof acc.checkOut === "string" ? acc.checkOut : acc.checkOut?.toISOString().split("T")[0] || undefined,
-    }));
+    return accommodationMemory.accommodations
+      .filter((acc) => acc.city && acc.city.length > 0)
+      .map((acc) => ({
+        id: acc.id,
+        city: acc.city,
+        countryCode: acc.countryCode || "",
+        checkIn: acc.checkIn,
+        checkOut: acc.checkOut,
+      }));
   }, [accommodationMemory.accommodations]);
 
-  // Auto-select first city
-  useEffect(() => {
-    if (!selectedCityId && cities.length > 0) {
-      setSelectedCityId(cities[0].id);
-    }
-  }, [selectedCityId, cities]);
-
-  // Current city
-  const currentCity = cities.find((c) => c.id === selectedCityId);
+  // Active city
+  const activeCity = cities[activeCityIndex] || null;
 
   // Get planned activities for current city
-  const plannedActivities = selectedCityId ? getActivitiesByDestination(selectedCityId) : [];
+  const plannedActivities = activeCity ? getActivitiesByDestination(activeCity.id) : [];
 
-  // Handle city selection change - emit map event
+  // Format date for display
+  const formatDateRange = (checkIn: Date | null, checkOut: Date | null) => {
+    if (!checkIn) return "";
+    const start = format(checkIn, "d MMM", { locale: fr });
+    if (checkOut) {
+      const end = format(checkOut, "d MMM", { locale: fr });
+      return `${start} - ${end}`;
+    }
+    return start;
+  };
+
+  // Focus city on map when switching
+  const prevCityIndexRef = useRef(activeCityIndex);
   useEffect(() => {
-    if (currentCity) {
+    if (prevCityIndexRef.current !== activeCityIndex && activeCity) {
+      prevCityIndexRef.current = activeCityIndex;
       eventBus.emit("activities:cityFocus", {
-        city: currentCity.city,
-        countryCode: currentCity.countryCode,
+        city: activeCity.city,
+        countryCode: activeCity.countryCode,
       });
     }
-  }, [currentCity]);
+  }, [activeCityIndex, activeCity]);
 
-  // Handle search
+  // Focus input when adding city
+  useEffect(() => {
+    if (isAddingCity && addCityInputRef.current) {
+      addCityInputRef.current.focus();
+    }
+  }, [isAddingCity]);
+
+  // Handle search using Supabase edge function
   const handleSearch = useCallback(async () => {
-    if (!currentCity) {
+    if (!activeCity) {
       toast.error("Veuillez sélectionner une ville");
       return;
     }
 
-    const params: ActivitySearchParams = {
-      city: currentCity.city,
-      countryCode: currentCity.countryCode,
-      startDate: currentCity.startDate || new Date().toISOString().split("T")[0],
-      endDate: currentCity.endDate,
-      categories: activityState.activeFilters.categories,
-      priceRange: {
-        min: activityState.activeFilters.priceRange[0],
-        max: activityState.activeFilters.priceRange[1],
-      },
-      ratingMin: activityState.activeFilters.ratingMin,
-      page: 1,
-      limit: 20,
-    };
+    setIsSearching(true);
+    setSearchError(null);
 
     try {
-      await searchActivities(params);
+      const requestBody = {
+        location: {
+          city: activeCity.city,
+          country_code: activeCity.countryCode,
+        },
+        dates: {
+          start: activeCity.checkIn?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0],
+          end: activeCity.checkOut?.toISOString().split("T")[0],
+        },
+        filters: {
+          categories: activityState.activeFilters.categories,
+          price_range: {
+            min: activityState.activeFilters.priceRange[0],
+            max: activityState.activeFilters.priceRange[1],
+          },
+          rating_min: activityState.activeFilters.ratingMin,
+        },
+        currency: "EUR",
+        language: "fr",
+        pagination: {
+          page: 1,
+          limit: 20,
+        },
+      };
+
+      const { data, error } = await supabase.functions.invoke("activities-search", {
+        body: requestBody,
+      });
+
+      if (error) {
+        throw new Error(error.message || "Erreur lors de la recherche");
+      }
+
+      if (data?.activities) {
+        setSearchResults(data.activities);
+        setCurrentView("results");
+      } else {
+        setSearchResults([]);
+        setCurrentView("results");
+      }
+    } catch (error: any) {
+      console.error("Search error:", error);
+      setSearchError(error.message || "Erreur lors de la recherche");
       setCurrentView("results");
-    } catch (error: any) {
-      toast.error(error.message || "Erreur lors de la recherche");
+    } finally {
+      setIsSearching(false);
     }
-  }, [currentCity, activityState.activeFilters, searchActivities]);
-
-  // Handle load more
-  const handleLoadMore = useCallback(async () => {
-    try {
-      await loadMoreResults();
-    } catch (error: any) {
-      toast.error(error.message || "Erreur lors du chargement");
-    }
-  }, [loadMoreResults]);
+  }, [activeCity, activityState.activeFilters]);
 
   // Handle add activity
   const handleAddActivity = useCallback(
     (viatorActivity: ViatorActivity) => {
-      if (!selectedCityId) {
+      if (!activeCity) {
         toast.error("Veuillez sélectionner une destination");
         return;
       }
-      addActivityFromSearch(viatorActivity, selectedCityId);
+      addActivityFromSearch(viatorActivity, activeCity.id);
+      toast.success("Activité ajoutée !");
     },
-    [selectedCityId, addActivityFromSearch]
+    [activeCity, addActivityFromSearch]
   );
 
   // Handle remove activity
   const handleRemoveActivity = useCallback(
     (activityId: string) => {
       removeActivity(activityId);
+      toast.success("Activité retirée");
     },
     [removeActivity]
   );
@@ -336,205 +257,301 @@ const ActivitiesPanel = () => {
     [selectActivity]
   );
 
-  // Handle add city - just show toast for now, proper sync would need chat integration
-  const handleAddCity = useCallback((city: string, countryCode: string, date: string) => {
-    // TODO: Integrate with chat to ask about sync
-    toast.success(`${city} ajoutée - synchronisez via le chat pour ajouter aux hébergements`);
-  }, []);
-
-  // Handle remove city
-  const handleRemoveCity = useCallback((cityId: string) => {
-    const city = cities.find((c) => c.id === cityId);
-    if (city) {
-      toast.info(`Pour supprimer ${city.city}, utilisez l'onglet hébergements`);
+  // Handle add city submission
+  const handleAddCity = useCallback(() => {
+    if (!newCityName.trim()) {
+      toast.error("Veuillez entrer un nom de ville");
+      return;
     }
-  }, [cities]);
+    // Notify user to add via accommodations tab
+    toast.info(`Pour ajouter ${newCityName}, utilisez l'onglet Hébergements`);
+    setIsAddingCity(false);
+    setNewCityName("");
+    setNewCityCountry("");
+    setNewCityDate("");
+  }, [newCityName]);
+
+  // Cancel add city
+  const handleCancelAddCity = useCallback(() => {
+    setIsAddingCity(false);
+    setNewCityName("");
+    setNewCityCountry("");
+    setNewCityDate("");
+  }, []);
 
   // Back to filters
   const handleBackToFilters = useCallback(() => {
     setCurrentView("filters");
+    setSearchResults([]);
+    setSearchError(null);
   }, []);
 
   // Load recommendations
   const handleLoadRecommendations = useCallback(() => {
-    if (selectedCityId) {
-      loadRecommendations(selectedCityId);
+    if (activeCity) {
+      loadRecommendations(activeCity.id);
       setCurrentView("results");
     }
-  }, [selectedCityId, loadRecommendations]);
+  }, [activeCity, loadRecommendations]);
 
   // ============================================================================
   // RENDER
   // ============================================================================
 
   return (
-    <div className="h-full flex flex-col" data-tour="activities-panel">
-      {/* No Destination Message */}
-      {cities.length === 0 && (
+    <div className="space-y-3" data-tour="activities-panel">
+      {/* No Cities Message */}
+      {cities.length === 0 && !isAddingCity && (
         <EmptyState
-          icon={Plane}
-          title="Aucune destination configurée"
-          description="Ajoutez d'abord une destination dans l'onglet vols pour découvrir des activités"
+          icon={MapPin}
+          title="Aucune destination"
+          description="Ajoutez d'abord une destination dans l'onglet Hébergements"
           action={
             <Button
-              onClick={() => eventBus.emit("tab:change", { tab: "flights" })}
+              onClick={() => eventBus.emit("tab:change", { tab: "stays" })}
               variant="outline"
               size="sm"
               className="gap-2"
             >
-              <Plane className="h-3.5 w-3.5" />
-              Aller aux vols
+              <Hotel className="h-3.5 w-3.5" />
+              Aller aux hébergements
             </Button>
           }
         />
       )}
 
-      {/* Main Content */}
-      {cities.length > 0 && (
-        <>
-          {/* City Selector */}
-          <div className="pb-3 border-b border-border/30">
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              {cities.map((city) => (
-                <CityChip
-                  key={city.id}
-                  city={city.city}
-                  countryCode={city.countryCode}
-                  startDate={city.startDate}
-                  endDate={city.endDate}
-                  selected={selectedCityId === city.id}
-                  onClick={() => setSelectedCityId(city.id)}
-                  onRemove={() => handleRemoveCity(city.id)}
-                />
-              ))}
-              <AddCityPopover onAdd={handleAddCity} />
-            </div>
-          </div>
+      {/* City Tabs - Like AccommodationPanel */}
+      {(cities.length > 0 || isAddingCity) && (
+        <div className="flex gap-1.5 flex-wrap items-center">
+          {cities.map((city, index) => (
+            <button
+              key={city.id}
+              onClick={() => setActiveCityIndex(index)}
+              className={cn(
+                "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 group",
+                index === activeCityIndex
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border/30"
+              )}
+            >
+              <MapPin className="h-3 w-3" />
+              <div className="flex flex-col items-start">
+                <span className="max-w-24 truncate" title={`${city.city}${city.countryCode ? `, ${city.countryCode}` : ""}`}>
+                  {city.city}{city.countryCode ? `, ${city.countryCode}` : ""}
+                </span>
+                {(city.checkIn || city.checkOut) && (
+                  <span className={cn(
+                    "text-[10px]",
+                    index === activeCityIndex ? "text-primary-foreground/70" : "text-muted-foreground/70"
+                  )}>
+                    {formatDateRange(city.checkIn, city.checkOut)}
+                  </span>
+                )}
+              </div>
+            </button>
+          ))}
 
-          {/* View Content */}
-          <div className="flex-1 overflow-y-auto py-3">
-            {/* FILTERS VIEW */}
-            {currentView === "filters" && (
-              <div className="space-y-4">
-                {/* Filters */}
+          {/* Add City Button / Input */}
+          {isAddingCity ? (
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-primary/30 bg-muted/30">
+              <input
+                ref={addCityInputRef}
+                type="text"
+                value={newCityName}
+                onChange={(e) => setNewCityName(e.target.value)}
+                placeholder="Ville..."
+                className="w-20 bg-transparent text-xs placeholder:text-muted-foreground focus:outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAddCity();
+                  if (e.key === "Escape") handleCancelAddCity();
+                }}
+              />
+              <input
+                type="text"
+                value={newCityCountry}
+                onChange={(e) => setNewCityCountry(e.target.value.toUpperCase())}
+                placeholder="FR"
+                className="w-8 bg-transparent text-xs placeholder:text-muted-foreground focus:outline-none text-center"
+                maxLength={2}
+              />
+              <input
+                type="date"
+                value={newCityDate}
+                onChange={(e) => setNewCityDate(e.target.value)}
+                className="w-28 bg-transparent text-xs focus:outline-none"
+              />
+              <button
+                onClick={handleAddCity}
+                className="p-0.5 rounded hover:bg-primary/20 text-primary"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={handleCancelAddCity}
+                className="p-0.5 rounded hover:bg-destructive/20 text-muted-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsAddingCity(true)}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-primary hover:text-primary/80 transition-colors rounded-lg border border-dashed border-primary/30 hover:border-primary/50"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Ajouter</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Main Content - Only show when we have an active city */}
+      {activeCity && (
+        <>
+          {/* FILTERS VIEW */}
+          {currentView === "filters" && (
+            <div className="space-y-4">
+              {/* Filters Card */}
+              <div className="rounded-xl border border-border/40 bg-card/50 p-3">
                 <ActivityFilters
                   filters={activityState.activeFilters}
                   onFiltersChange={updateFilters}
                   compact={false}
                 />
-
-                {/* Search Button */}
-                <Button
-                  onClick={handleSearch}
-                  disabled={!currentCity || activityState.search.isSearching}
-                  className="w-full gap-2"
-                  size="lg"
-                >
-                  {activityState.search.isSearching ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Recherche en cours...
-                    </>
-                  ) : (
-                    <>
-                      <Search className="h-4 w-4" />
-                      Rechercher des activités
-                    </>
-                  )}
-                </Button>
-
-                {/* Recommendations Button */}
-                <Button
-                  onClick={handleLoadRecommendations}
-                  variant="outline"
-                  disabled={!currentCity || activityState.isLoadingRecommendations}
-                  className="w-full gap-2"
-                >
-                  {activityState.isLoadingRecommendations ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Chargement...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4" />
-                      Suggestions IA
-                    </>
-                  )}
-                </Button>
-
-                {/* Planned Activities Preview */}
-                {plannedActivities.length > 0 && (
-                  <div className="space-y-2 pt-4 border-t border-border/30">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-medium text-foreground">
-                        Activités sélectionnées ({plannedActivities.length})
-                      </p>
-                      <p className="text-xs text-primary font-semibold">{getTotalBudget()}€</p>
-                    </div>
-                    <div className="space-y-2">
-                      {plannedActivities.slice(0, 3).map((activity) => (
-                        <ActivityCard
-                          key={activity.id}
-                          activity={activity}
-                          mode="planned"
-                          compact
-                          onRemove={() => handleRemoveActivity(activity.id)}
-                        />
-                      ))}
-                      {plannedActivities.length > 3 && (
-                        <p className="text-xs text-muted-foreground text-center">
-                          +{plannedActivities.length - 3} autres
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
-            )}
 
-            {/* RESULTS VIEW */}
-            {currentView === "results" && (
-              <div className="space-y-4">
-                {/* Back Button */}
-                <button
-                  onClick={handleBackToFilters}
-                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Retour aux filtres
-                </button>
-
-                {/* Error State */}
-                {activityState.search.error && (
-                  <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-destructive">Erreur de recherche</p>
-                      <p className="text-xs text-destructive/80 mt-1">{activityState.search.error}</p>
-                    </div>
-                  </div>
+              {/* Search Button */}
+              <Button
+                onClick={handleSearch}
+                disabled={!activeCity || isSearching}
+                className="w-full gap-2"
+                size="lg"
+              >
+                {isSearching ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Recherche en cours...
+                  </>
+                ) : (
+                  <>
+                    <Search className="h-4 w-4" />
+                    Rechercher des activités
+                  </>
                 )}
+              </Button>
 
-                {/* Results Header */}
-                {activityState.search.searchResults.length > 0 && (
+              {/* Recommendations Button */}
+              <Button
+                onClick={handleLoadRecommendations}
+                variant="outline"
+                disabled={!activeCity || activityState.isLoadingRecommendations}
+                className="w-full gap-2"
+              >
+                {activityState.isLoadingRecommendations ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Chargement...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Suggestions IA
+                  </>
+                )}
+              </Button>
+
+              {/* Planned Activities Preview */}
+              {plannedActivities.length > 0 && (
+                <div className="space-y-2 pt-4 border-t border-border/30">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">
-                      {activityState.search.totalResults} résultat{activityState.search.totalResults > 1 ? "s" : ""}
+                    <p className="text-xs font-medium text-foreground">
+                      Activités sélectionnées ({plannedActivities.length})
                     </p>
-                    <button
-                      onClick={clearSearch}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      Effacer
-                    </button>
+                    <p className="text-xs text-primary font-semibold">{getTotalBudget()}€</p>
                   </div>
-                )}
+                  <div className="space-y-2">
+                    {plannedActivities.slice(0, 3).map((activity) => (
+                      <ActivityCard
+                        key={activity.id}
+                        activity={activity}
+                        mode="planned"
+                        compact
+                        onRemove={() => handleRemoveActivity(activity.id)}
+                      />
+                    ))}
+                    {plannedActivities.length > 3 && (
+                      <p className="text-xs text-muted-foreground text-center">
+                        +{plannedActivities.length - 3} autres
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
-                {/* Results Grid - 2 columns */}
-                {activityState.search.searchResults.length > 0 && (
+          {/* RESULTS VIEW */}
+          {currentView === "results" && (
+            <div className="space-y-4">
+              {/* Back Button */}
+              <button
+                onClick={handleBackToFilters}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Retour aux filtres
+              </button>
+
+              {/* Error State */}
+              {searchError && (
+                <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-destructive">Erreur de recherche</p>
+                    <p className="text-xs text-destructive/80 mt-1">{searchError}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Results Header */}
+              {searchResults.length > 0 && (
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    {searchResults.length} résultat{searchResults.length > 1 ? "s" : ""}
+                  </p>
+                  <button
+                    onClick={handleBackToFilters}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Nouvelle recherche
+                  </button>
+                </div>
+              )}
+
+              {/* Results Grid - 2 columns */}
+              {searchResults.length > 0 && (
+                <div className="grid grid-cols-2 gap-3">
+                  {searchResults.map((activity) => (
+                    <ActivityCard
+                      key={activity.id}
+                      activity={activity}
+                      mode="search"
+                      onAdd={() => handleAddActivity(activity)}
+                      onClick={() => handleActivityClick(activity)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Recommendations */}
+              {activityState.recommendations.length > 0 && searchResults.length === 0 && !searchError && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <p className="text-sm font-medium text-foreground">Recommandations pour vous</p>
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
-                    {activityState.search.searchResults.map((activity) => (
+                    {activityState.recommendations.map((activity) => (
                       <ActivityCard
                         key={activity.id}
                         activity={activity}
@@ -544,68 +561,24 @@ const ActivitiesPanel = () => {
                       />
                     ))}
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Recommendations */}
-                {activityState.recommendations.length > 0 && activityState.search.searchResults.length === 0 && (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      <p className="text-sm font-medium text-foreground">Recommandations pour vous</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {activityState.recommendations.map((activity) => (
-                        <ActivityCard
-                          key={activity.id}
-                          activity={activity}
-                          mode="search"
-                          onAdd={() => handleAddActivity(activity)}
-                          onClick={() => handleActivityClick(activity)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Load More */}
-                {activityState.search.hasMore && (
-                  <Button
-                    onClick={handleLoadMore}
-                    disabled={activityState.search.isSearching}
-                    variant="outline"
-                    size="sm"
-                    className="w-full gap-2"
-                  >
-                    {activityState.search.isSearching ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Chargement...
-                      </>
-                    ) : (
-                      <>Voir plus</>
-                    )}
-                  </Button>
-                )}
-
-                {/* Empty State */}
-                {!activityState.search.isSearching &&
-                  activityState.search.searchResults.length === 0 &&
-                  activityState.recommendations.length === 0 &&
-                  !activityState.search.error && (
-                    <EmptyState
-                      icon={Search}
-                      title="Aucun résultat"
-                      description="Essayez de modifier vos filtres ou d'élargir votre recherche"
-                      action={
-                        <Button onClick={handleBackToFilters} variant="outline" size="sm">
-                          Modifier les filtres
-                        </Button>
-                      }
-                    />
-                  )}
-              </div>
-            )}
-          </div>
+              {/* Empty State */}
+              {!isSearching && searchResults.length === 0 && activityState.recommendations.length === 0 && !searchError && (
+                <EmptyState
+                  icon={Search}
+                  title="Aucun résultat"
+                  description="Essayez de modifier vos filtres ou d'élargir votre recherche"
+                  action={
+                    <Button onClick={handleBackToFilters} variant="outline" size="sm">
+                      Modifier les filtres
+                    </Button>
+                  }
+                />
+              )}
+            </div>
+          )}
         </>
       )}
 

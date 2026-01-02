@@ -72,31 +72,20 @@ const ChipButton = ({
   </button>
 );
 
+// Default categories (no API call needed)
+const DEFAULT_CATEGORIES: CategoryWithEmoji[] = [
+  { id: 1, label: "Culture", emoji: "🎨", keyword: "culture" },
+  { id: 2, label: "Gastronomie", emoji: "🍽️", keyword: "food" },
+  { id: 3, label: "Nature", emoji: "🌲", keyword: "nature" },
+  { id: 4, label: "Aventure", emoji: "🧗", keyword: "adventure" },
+  { id: 5, label: "Musées", emoji: "🏛️", keyword: "museums" },
+  { id: 6, label: "Sports", emoji: "⚽", keyword: "sport" },
+];
+
 export const ActivityFilters = ({ filters, onFiltersChange, className, compact = false }: ActivityFiltersProps) => {
-  const [categories, setCategories] = useState<CategoryWithEmoji[]>([]);
-  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
-
-  useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        setIsLoadingCategories(true);
-        const rootCategories = await activityService.getRootCategories("fr");
-        setCategories(rootCategories);
-      } catch (error) {
-        console.error("Error loading categories:", error);
-        setCategories([
-          { id: 1, label: "Culture", emoji: "🎨", keyword: "culture" },
-          { id: 2, label: "Gastronomie", emoji: "🍽️", keyword: "food" },
-          { id: 3, label: "Nature", emoji: "🌲", keyword: "nature" },
-          { id: 4, label: "Aventure", emoji: "🧗", keyword: "adventure" },
-        ]);
-      } finally {
-        setIsLoadingCategories(false);
-      }
-    };
-
-    loadCategories();
-  }, []);
+  // Use default categories (no API call to avoid CORS issues)
+  const categories = DEFAULT_CATEGORIES;
+  const isLoadingCategories = false;
 
   const handleCategoryToggle = (keyword: string) => {
     const currentCategories = filters.categories || [];

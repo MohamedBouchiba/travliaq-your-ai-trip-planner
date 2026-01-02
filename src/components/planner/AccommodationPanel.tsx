@@ -1053,7 +1053,8 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
         
         {/* Ligne 2: Voyageurs + Chambres + Budget */}
         <div className="p-2.5 space-y-2.5">
-          <div className="flex gap-2 flex-wrap">
+          {/* Voyageurs et chambres sur une seule ligne */}
+          <div className="flex items-center gap-2">
             <TravelersSelector
               adults={travelMemory.travelers.adults}
               children={travelMemory.travelers.children}
