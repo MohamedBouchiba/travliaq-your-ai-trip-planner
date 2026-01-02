@@ -6,8 +6,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { TravliaqActivity, ActivityEntry } from "@/contexts/ActivityMemoryContext";
 import { format } from "date-fns";
-
-const API_BASE_URL = "https://travliaq-api-production.up.railway.app";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface ActivitySearchParams {
   city: string;
@@ -55,12 +54,8 @@ export function useActivitiesSearch(): UseActivitiesSearchReturn {
     lastParamsRef.current = params;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/activities/search`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const { data, error: fnError } = await supabase.functions.invoke('activities-search', {
+        body: {
           location: {
             city: params.city,
             country_code: params.countryCode,
@@ -80,25 +75,12 @@ export function useActivitiesSearch(): UseActivitiesSearchReturn {
             page: params.page || 1,
             limit: params.limit || 20,
           },
-        }),
+        },
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        
-        switch (response.status) {
-          case 400:
-            throw new Error(`Paramètres invalides: ${errorData.detail || "Vérifiez votre requête"}`);
-          case 404:
-            throw new Error("Destination non trouvée. Vérifiez le nom de la ville.");
-          case 503:
-            throw new Error("Service temporairement indisponible.");
-          default:
-            throw new Error(`Erreur serveur (${response.status})`);
-        }
+      if (fnError) {
+        throw new Error(fnError.message || "Erreur lors de la recherche");
       }
-
-      const data = await response.json();
 
       if (!data.success) {
         throw new Error(data.message || "La recherche a échoué");
