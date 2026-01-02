@@ -1021,7 +1021,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
       {/* Accommodation tabs + Add button - always visible */}
       <div className="flex gap-1.5 flex-wrap items-center">
         {memory.accommodations.map((acc, index) => (
-          <button
+          <div
             key={acc.id}
             onClick={() => {
               setActiveAccommodation(index);
@@ -1031,7 +1031,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
               }
             }}
             className={cn(
-              "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 group",
+              "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 group cursor-pointer",
               index === memory.activeAccommodationIndex
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border/30"
@@ -1060,7 +1060,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
                 <X className="h-2.5 w-2.5" />
               </button>
             )}
-          </button>
+          </div>
         ))}
         {/* Small + button to add new destination */}
         {flightMemory.tripType !== "multi" && !showAddForm && (

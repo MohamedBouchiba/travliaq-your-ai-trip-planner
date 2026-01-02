@@ -19,7 +19,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useActivityMemory } from "@/contexts/ActivityMemoryContext";
-import { useAccommodationMemory } from "@/contexts/AccommodationMemoryContext";
 import { useLocationAutocomplete, type LocationResult } from "@/hooks/useLocationAutocomplete";
 
 import { ActivityCard } from "./ActivityCard";
@@ -249,9 +248,9 @@ const ActivitiesPanel = () => {
     getActivitiesByDestination,
     updateFilters,
     getTotalBudget,
+    addDestination,
+    removeDestination,
   } = useActivityMemory();
-
-  const { memory: accommodationMemory, addAccommodation, removeAccommodation, setActiveAccommodation } = useAccommodationMemory();
 
   // UI State
   const [currentView, setCurrentView] = useState<ViewType>("filters");
@@ -273,20 +272,20 @@ const ActivitiesPanel = () => {
   const [newCityCheckIn, setNewCityCheckIn] = useState<Date | null>(null);
   const [newCityCheckOut, setNewCityCheckOut] = useState<Date | null>(null);
 
-  // Derive cities from accommodations (like AccommodationPanel)
+  // Use destinations from ActivityMemory (independent from accommodation)
   const cities = useMemo<CityEntry[]>(() => {
-    return accommodationMemory.accommodations
-      .filter((acc) => acc.city && acc.city.length > 0)
-      .map((acc) => ({
-        id: acc.id,
-        city: acc.city,
-        countryCode: acc.countryCode || "",
-        checkIn: acc.checkIn,
-        checkOut: acc.checkOut,
-        lat: acc.lat,
-        lng: acc.lng,
+    return activityState.destinations
+      .filter((dest) => dest.city && dest.city.length > 0)
+      .map((dest) => ({
+        id: dest.id,
+        city: dest.city,
+        countryCode: dest.countryCode || "",
+        checkIn: dest.checkIn,
+        checkOut: dest.checkOut,
+        lat: dest.lat,
+        lng: dest.lng,
       }));
-  }, [accommodationMemory.accommodations]);
+  }, [activityState.destinations]);
 
   // Active city
   const activeCity = cities[activeCityIndex] || null;
@@ -411,28 +410,22 @@ const ActivitiesPanel = () => {
     setNewCityCheckOut(null);
   }, []);
 
-  // Handle confirm adding city
+  // Handle confirm adding city - adds to ActivityMemory destinations directly
   const handleConfirmAddCity = useCallback(() => {
     if (!newCityData?.city) {
       toast.error("Veuillez sélectionner une ville");
       return;
     }
 
-    // Add accommodation (which syncs with activities)
-    addAccommodation();
-    
-    // Get the new accommodation's index (last one)
-    const newIndex = accommodationMemory.accommodations.length;
-    
-    // We need to wait for the state to update, then update the accommodation
-    setTimeout(() => {
-      const lastAccommodation = accommodationMemory.accommodations[accommodationMemory.accommodations.length];
-      if (lastAccommodation) {
-        // The accommodation was added, now we can update it
-        // For now, we'll use a workaround by setting active and updating
-        setActiveAccommodation(newIndex);
-      }
-    }, 100);
+    // Add destination to ActivityMemory (independent from accommodation)
+    addDestination({
+      city: newCityData.city,
+      countryCode: newCityData.countryCode,
+      checkIn: newCityCheckIn,
+      checkOut: newCityCheckOut,
+      lat: newCityData.lat,
+      lng: newCityData.lng,
+    });
 
     // Reset state
     setIsAddingCity(false);
@@ -450,7 +443,7 @@ const ActivitiesPanel = () => {
         zoom: 12,
       });
     }
-  }, [newCityData, addAccommodation, accommodationMemory.accommodations, setActiveAccommodation]);
+  }, [newCityData, newCityCheckIn, newCityCheckOut, addDestination]);
 
   // Handle location select for new city
   const handleNewCityLocationSelect = useCallback((location: LocationResult) => {
@@ -462,15 +455,20 @@ const ActivitiesPanel = () => {
     });
   }, []);
 
-  // Handle remove city (remove from accommodations)
+  // Handle remove city - removes from ActivityMemory destinations
   const handleRemoveCity = useCallback((cityId: string) => {
     if (cities.length <= 1) {
       toast.error("Vous devez avoir au moins une destination");
       return;
     }
-    removeAccommodation(cityId);
+    removeDestination(cityId);
     toast.success("Destination retirée");
-  }, [cities.length, removeAccommodation]);
+
+    // If we removed the active city, switch to first city
+    if (activeCityIndex >= cities.length - 1) {
+      setActiveCityIndex(Math.max(0, cities.length - 2));
+    }
+  }, [cities.length, activeCityIndex, removeDestination]);
 
   // Back to filters
   const handleBackToFilters = useCallback(() => {
@@ -508,11 +506,11 @@ const ActivitiesPanel = () => {
       {/* City Tabs + Add button */}
       <div className="flex gap-1.5 flex-wrap items-center">
         {cities.map((city, index) => (
-          <button
+          <div
             key={city.id}
             onClick={() => handleCityClick(index)}
             className={cn(
-              "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 group",
+              "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 group cursor-pointer",
               index === activeCityIndex
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border/30"
@@ -542,7 +540,7 @@ const ActivitiesPanel = () => {
                 <X className="h-2.5 w-2.5" />
               </button>
             )}
-          </button>
+          </div>
         ))}
         
         {/* Add button - compact */}

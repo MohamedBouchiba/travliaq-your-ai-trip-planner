@@ -118,7 +118,7 @@ export const ActivityFilters = ({
             <Sparkles className="h-3.5 w-3.5 text-primary" />
             <span className="text-xs font-medium text-foreground">Catégories</span>
           </div>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-2 gap-1.5">
             {categories.map((category) => {
               const isSelected = filters.categories?.includes(category.keyword) || false;
               return (
@@ -126,14 +126,14 @@ export const ActivityFilters = ({
                   key={category.id}
                   onClick={() => handleCategoryToggle(category.keyword)}
                   className={cn(
-                    "px-2 py-1.5 rounded-lg text-xs font-medium flex items-center justify-center gap-1 transition-all border",
+                    "px-2.5 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all border",
                     isSelected
                       ? "bg-primary/10 text-primary border-primary/30"
                       : "bg-muted/30 text-muted-foreground border-border/30 hover:bg-muted/50"
                   )}
                 >
-                  <span>{category.emoji}</span>
-                  <span className="truncate">{category.label}</span>
+                  <span className="text-sm">{category.emoji}</span>
+                  <span>{category.label}</span>
                 </button>
               );
             })}
@@ -145,7 +145,7 @@ export const ActivityFilters = ({
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <DollarSign className="h-3.5 w-3.5 text-primary" />
-          <span className="text-xs font-medium text-foreground">Budget par personne</span>
+          <span className="text-xs font-medium text-foreground">Budget / activité</span>
         </div>
         <div className="grid grid-cols-4 gap-1.5">
           {BUDGET_RANGES.map((range) => {

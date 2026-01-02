@@ -1184,6 +1184,112 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     };
   }, [activeTab, mapLoaded, accommodationMemory.accommodations]);
 
+  // Display activity destination markers when activities tab is active
+  const activityDestinationMarkersRef = useRef<mapboxgl.Marker[]>([]);
+  
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    
+    // Clear existing activity destination markers
+    activityDestinationMarkersRef.current.forEach((marker) => marker.remove());
+    activityDestinationMarkersRef.current = [];
+    
+    // Only show on activities tab
+    if (activeTab !== "activities") return;
+    
+    // Get activity destinations with valid coordinates
+    const destinations = activityState.destinations.filter(
+      (dest) => dest.lat && dest.lng
+    );
+    
+    if (destinations.length === 0) return;
+    
+    destinations.forEach((dest, index) => {
+      if (!dest.lat || !dest.lng) return;
+      
+      // Create marker element - compass/activity theme
+      const el = document.createElement("div");
+      el.className = "activity-destination-marker";
+      el.innerHTML = `
+        <div style="
+          width: 42px;
+          height: 52px;
+          position: relative;
+          cursor: pointer;
+          filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25));
+          animation: markerBounce 0.4s ease-out forwards;
+          animation-delay: ${index * 0.1}s;
+          opacity: 0;
+          transform: translateY(-10px);
+        ">
+          <div style="
+            width: 40px;
+            height: 40px;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            background: linear-gradient(135deg, hsl(160, 84%, 39%) 0%, hsl(160, 84%, 28%) 100%);
+            border: 3px solid white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 -2px 4px rgba(0,0,0,0.15);
+          ">
+            <span style="
+              transform: rotate(45deg);
+              font-size: 18px;
+              filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2));
+            ">🧭</span>
+          </div>
+          <div style="
+            position: absolute;
+            top: -24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            white-space: nowrap;
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          ">${dest.city}</div>
+        </div>
+        <style>
+          @keyframes markerBounce {
+            0% { opacity: 0; transform: translateY(-10px); }
+            60% { opacity: 1; transform: translateY(3px); }
+            100% { opacity: 1; transform: translateY(0); }
+          }
+        </style>
+      `;
+      
+      // Add hover effects
+      const pinEl = el.querySelector("div") as HTMLElement;
+      pinEl?.addEventListener("mouseenter", () => {
+        pinEl.style.filter = "drop-shadow(0 6px 12px rgba(0,0,0,0.35))";
+        pinEl.style.transform = "translateY(-2px) scale(1.05)";
+      });
+      pinEl?.addEventListener("mouseleave", () => {
+        pinEl.style.filter = "drop-shadow(0 4px 8px rgba(0,0,0,0.25))";
+        pinEl.style.transform = "translateY(0) scale(1)";
+      });
+      
+      const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
+        .setLngLat([dest.lng, dest.lat])
+        .addTo(map.current!);
+      
+      activityDestinationMarkersRef.current.push(marker);
+    });
+    
+    return () => {
+      activityDestinationMarkersRef.current.forEach((marker) => marker.remove());
+      activityDestinationMarkersRef.current = [];
+    };
+  }, [activeTab, mapLoaded, activityState.destinations]);
+
   // Update map center/zoom with fast animation
   useEffect(() => {
     if (!map.current) return;
