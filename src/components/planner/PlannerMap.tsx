@@ -654,8 +654,8 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       return;
     }
     
-    // DON'T show flight routes on stays tab - only show accommodation markers
-    if (activeTab === "stays") {
+    // DON'T show flight routes on stays or activities tabs - only show location markers
+    if (activeTab === "stays" || activeTab === "activities") {
       routesDrawnRef.current = false;
       return;
     }

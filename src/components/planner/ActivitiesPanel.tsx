@@ -2,9 +2,9 @@
  * Activities Panel - Matching AccommodationPanel UX exactly
  *
  * Features:
- * - City tabs identical to AccommodationPanel (with "+" button)
+ * - City tabs like AccommodationPanel (with "+" button to add directly)
  * - Inline city input when adding (not popup)
- * - Zoom to city on map when switching tabs
+ * - Zoom to city on map when switching tabs (no flight routes shown)
  * - Two-view system: filters + results
  * - Activity cards in 2-column grid
  * - Detail modal on click
@@ -12,13 +12,15 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
 import { 
-  Search, Sparkles, Loader2, Plus, Hotel, X,
-  ChevronLeft, AlertCircle, CalendarDays, Compass
+  Search, Sparkles, Loader2, Plus, X,
+  ChevronLeft, AlertCircle, CalendarDays, Compass, MapPin
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useActivityMemory } from "@/contexts/ActivityMemoryContext";
 import { useAccommodationMemory } from "@/contexts/AccommodationMemoryContext";
+import { useLocationAutocomplete, type LocationResult } from "@/hooks/useLocationAutocomplete";
 
 import { ActivityCard } from "./ActivityCard";
 import { ActivityFilters } from "./ActivityFilters";
@@ -29,6 +31,8 @@ import { format, differenceInDays } from "date-fns";
 import { fr } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import type { ViatorActivity } from "@/types/activity";
+import RangeCalendar from "@/components/RangeCalendar";
+import type { DateRange } from "react-day-picker";
 
 // ============================================================================
 // TYPES
@@ -87,6 +91,150 @@ const formatDateRange = (checkIn: Date | null, checkOut: Date | null) => {
   return start;
 };
 
+// Destination input with autocomplete (cities only, 3 chars min)
+function DestinationInput({ 
+  value, 
+  onChange,
+  placeholder = "Ville ou destination",
+  onLocationSelect,
+}: { 
+  value: string; 
+  onChange: (value: string) => void;
+  placeholder?: string;
+  onLocationSelect?: (location: LocationResult) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const justSelectedRef = useRef(false);
+  const { data: locations = [], isLoading } = useLocationAutocomplete(search, isOpen && search.length >= 3, ["city"]);
+
+  useEffect(() => {
+    if (!justSelectedRef.current) {
+      setSearch(value);
+    }
+    justSelectedRef.current = false;
+  }, [value]);
+
+  const handleSelect = (location: LocationResult) => {
+    justSelectedRef.current = true;
+    setSearch(location.name);
+    onChange(location.name);
+    onLocationSelect?.(location);
+    setIsOpen(false);
+    inputRef.current?.blur();
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setSearch(newValue);
+    onChange(newValue);
+    if (!isOpen && newValue.length >= 3) {
+      setIsOpen(true);
+    }
+  };
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <div className="flex items-center gap-2 flex-1">
+          <MapPin className="h-4 w-4 text-primary shrink-0" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={search}
+            onChange={handleInputChange}
+            onFocus={() => search.length >= 3 && setIsOpen(true)}
+            placeholder={placeholder}
+            className="flex-1 min-w-0 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
+          />
+        </div>
+      </PopoverTrigger>
+      <PopoverContent 
+        className="w-72 p-0 max-h-60 overflow-y-auto" 
+        align="start"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        {isLoading ? (
+          <div className="p-3 text-xs text-muted-foreground text-center">Recherche...</div>
+        ) : locations.length === 0 ? (
+          <div className="p-3 text-xs text-muted-foreground text-center">
+            {search.length < 3 ? "Tapez au moins 3 caractères" : "Aucun résultat"}
+          </div>
+        ) : (
+          <div className="py-1">
+            {locations.slice(0, 8).map((location) => (
+              <button
+                key={`${location.type}-${location.id}`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleSelect(location)}
+                className="w-full px-3 py-2 text-left hover:bg-muted/50 transition-colors flex items-center gap-2"
+              >
+                <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-medium truncate">{location.name}</div>
+                  <div className="text-[10px] text-muted-foreground truncate">
+                    {location.country_name}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// Compact date range picker
+function CompactDateRange({
+  checkIn,
+  checkOut,
+  onChange,
+}: {
+  checkIn: Date | null;
+  checkOut: Date | null;
+  onChange: (checkIn: Date | null, checkOut: Date | null) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleRangeChange = (range: DateRange | undefined) => {
+    onChange(range?.from || null, range?.to || null);
+    if (range?.from && range.to && range.from.getTime() !== range.to.getTime()) {
+      setTimeout(() => setIsOpen(false), 300);
+    }
+  };
+
+  const value: DateRange | undefined = checkIn ? { from: checkIn, to: checkOut || undefined } : undefined;
+
+  const formatDateCompact = (date: Date) => {
+    return format(date, "dd MMM", { locale: fr });
+  };
+
+  const nights = checkIn && checkOut ? differenceInDays(checkOut, checkIn) : 0;
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <button className="flex items-center gap-2 text-sm min-w-0">
+          <CalendarDays className="h-4 w-4 text-primary shrink-0" />
+          {checkIn && checkOut ? (
+            <span className="truncate text-foreground">
+              {formatDateCompact(checkIn)} → {formatDateCompact(checkOut)}
+              <span className="text-muted-foreground ml-1">({nights}n)</span>
+            </span>
+          ) : (
+            <span className="text-muted-foreground">Dates</span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <RangeCalendar value={value} onChange={handleRangeChange} />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -103,7 +251,7 @@ const ActivitiesPanel = () => {
     getTotalBudget,
   } = useActivityMemory();
 
-  const { memory: accommodationMemory } = useAccommodationMemory();
+  const { memory: accommodationMemory, addAccommodation, removeAccommodation, setActiveAccommodation } = useAccommodationMemory();
 
   // UI State
   const [currentView, setCurrentView] = useState<ViewType>("filters");
@@ -112,6 +260,18 @@ const ActivitiesPanel = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<ViatorActivity[]>([]);
+  
+  // Adding city state
+  const [isAddingCity, setIsAddingCity] = useState(false);
+  const [newCityInput, setNewCityInput] = useState("");
+  const [newCityData, setNewCityData] = useState<{
+    city: string;
+    countryCode: string;
+    lat?: number;
+    lng?: number;
+  } | null>(null);
+  const [newCityCheckIn, setNewCityCheckIn] = useState<Date | null>(null);
+  const [newCityCheckOut, setNewCityCheckOut] = useState<Date | null>(null);
 
   // Derive cities from accommodations (like AccommodationPanel)
   const cities = useMemo<CityEntry[]>(() => {
@@ -233,15 +393,84 @@ const ActivitiesPanel = () => {
     [selectActivity]
   );
 
-  // Handle click to add city - redirect to Accommodation
-  const handleAddCityClick = useCallback(() => {
-    toast.info("Ajoutez une destination dans l'onglet Hébergements", {
-      action: {
-        label: "Aller",
-        onClick: () => eventBus.emit("tab:change", { tab: "stays" }),
-      },
+  // Handle click to start adding city
+  const handleStartAddCity = useCallback(() => {
+    setIsAddingCity(true);
+    setNewCityInput("");
+    setNewCityData(null);
+    setNewCityCheckIn(null);
+    setNewCityCheckOut(null);
+  }, []);
+
+  // Handle cancel adding city
+  const handleCancelAddCity = useCallback(() => {
+    setIsAddingCity(false);
+    setNewCityInput("");
+    setNewCityData(null);
+    setNewCityCheckIn(null);
+    setNewCityCheckOut(null);
+  }, []);
+
+  // Handle confirm adding city
+  const handleConfirmAddCity = useCallback(() => {
+    if (!newCityData?.city) {
+      toast.error("Veuillez sélectionner une ville");
+      return;
+    }
+
+    // Add accommodation (which syncs with activities)
+    addAccommodation();
+    
+    // Get the new accommodation's index (last one)
+    const newIndex = accommodationMemory.accommodations.length;
+    
+    // We need to wait for the state to update, then update the accommodation
+    setTimeout(() => {
+      const lastAccommodation = accommodationMemory.accommodations[accommodationMemory.accommodations.length];
+      if (lastAccommodation) {
+        // The accommodation was added, now we can update it
+        // For now, we'll use a workaround by setting active and updating
+        setActiveAccommodation(newIndex);
+      }
+    }, 100);
+
+    // Reset state
+    setIsAddingCity(false);
+    setNewCityInput("");
+    setNewCityData(null);
+    setNewCityCheckIn(null);
+    setNewCityCheckOut(null);
+    
+    toast.success(`${newCityData.city} ajoutée !`);
+    
+    // Zoom to new city
+    if (newCityData.lat && newCityData.lng) {
+      eventBus.emit("map:zoom", {
+        center: [newCityData.lng, newCityData.lat] as [number, number],
+        zoom: 12,
+      });
+    }
+  }, [newCityData, addAccommodation, accommodationMemory.accommodations, setActiveAccommodation]);
+
+  // Handle location select for new city
+  const handleNewCityLocationSelect = useCallback((location: LocationResult) => {
+    setNewCityData({
+      city: location.name,
+      countryCode: location.country_code || "",
+      lat: location.lat,
+      lng: location.lng,
     });
   }, []);
+
+  // Handle remove city (remove from accommodations)
+  const handleRemoveCity = useCallback((cityId: string) => {
+    if (cities.length <= 1) {
+      toast.error("Vous devez avoir au moins une destination");
+      return;
+    }
+    removeAccommodation(cityId);
+    toast.success("Destination retirée");
+  }, [cities.length, removeAccommodation]);
 
   // Back to filters
   const handleBackToFilters = useCallback(() => {
@@ -276,80 +505,128 @@ const ActivitiesPanel = () => {
 
   return (
     <div className="space-y-3" data-tour="activities-panel">
+      {/* City Tabs + Add button */}
+      <div className="flex gap-1.5 flex-wrap items-center">
+        {cities.map((city, index) => (
+          <button
+            key={city.id}
+            onClick={() => handleCityClick(index)}
+            className={cn(
+              "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 group",
+              index === activeCityIndex
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border/30"
+            )}
+          >
+            <Compass className="h-3 w-3" />
+            <span
+              className="max-w-24 truncate"
+              title={`${city.city}${city.countryCode ? `, ${city.countryCode}` : ""}`}
+            >
+              {city.city}
+            </span>
+            {/* Delete button - visible on hover */}
+            {cities.length > 1 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveCity(city.id);
+                }}
+                className={cn(
+                  "h-4 w-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity",
+                  index === activeCityIndex
+                    ? "hover:bg-primary-foreground/20"
+                    : "hover:bg-destructive/20"
+                )}
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            )}
+          </button>
+        ))}
+        
+        {/* Add button - compact */}
+        {!isAddingCity && (
+          <button
+            onClick={handleStartAddCity}
+            className="h-7 w-7 flex items-center justify-center rounded-lg text-primary hover:bg-primary/10 transition-colors border border-dashed border-primary/30 hover:border-primary/50"
+            title="Ajouter une destination"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Inline Add City Form */}
+      {isAddingCity && (
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-foreground">Nouvelle destination</span>
+            <button
+              onClick={handleCancelAddCity}
+              className="h-5 w-5 rounded-full flex items-center justify-center hover:bg-muted/50 transition-colors"
+            >
+              <X className="h-3 w-3 text-muted-foreground" />
+            </button>
+          </div>
+          
+          {/* City Input */}
+          <div className="rounded-lg border border-border/40 bg-card/50 p-2">
+            <DestinationInput
+              value={newCityInput}
+              onChange={setNewCityInput}
+              placeholder="Rechercher une ville..."
+              onLocationSelect={handleNewCityLocationSelect}
+            />
+          </div>
+          
+          {/* Dates */}
+          <div className="rounded-lg border border-border/40 bg-card/50 p-2">
+            <CompactDateRange
+              checkIn={newCityCheckIn}
+              checkOut={newCityCheckOut}
+              onChange={(checkIn, checkOut) => {
+                setNewCityCheckIn(checkIn);
+                setNewCityCheckOut(checkOut);
+              }}
+            />
+          </div>
+          
+          {/* Confirm Button */}
+          <Button
+            onClick={handleConfirmAddCity}
+            disabled={!newCityData?.city}
+            size="sm"
+            className="w-full"
+          >
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            Ajouter {newCityData?.city || "cette ville"}
+          </Button>
+        </div>
+      )}
+
       {/* No Cities Message */}
-      {cities.length === 0 && (
+      {cities.length === 0 && !isAddingCity && (
         <EmptyState
           icon={Compass}
           title="Aucune destination"
-          description="Ajoutez d'abord une destination dans l'onglet Hébergements"
+          description="Ajoutez une destination pour explorer les activités"
           action={
             <Button
-              onClick={() => eventBus.emit("tab:change", { tab: "stays" })}
+              onClick={handleStartAddCity}
               variant="outline"
               size="sm"
               className="gap-2"
             >
-              <Hotel className="h-3.5 w-3.5" />
-              Aller aux hébergements
+              <Plus className="h-3.5 w-3.5" />
+              Ajouter une destination
             </Button>
           }
         />
       )}
 
-      {/* City Tabs - Like AccommodationPanel with delete button */}
-      {cities.length > 0 && (
-        <div className="flex gap-1.5 flex-wrap items-center">
-          {cities.map((city, index) => (
-            <button
-              key={city.id}
-              onClick={() => handleCityClick(index)}
-              className={cn(
-                "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 group",
-                index === activeCityIndex
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border/30"
-              )}
-            >
-              <Compass className="h-3 w-3" />
-              <span
-                className="max-w-24 truncate"
-                title={`${city.city}${city.countryCode ? `, ${city.countryCode}` : ""}`}
-              >
-                {city.city}
-              </span>
-              {/* Delete button - visible on hover like AccommodationPanel */}
-              {cities.length > 1 && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toast.info("Pour supprimer cette ville, allez dans Hébergements");
-                  }}
-                  className={cn(
-                    "h-4 w-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity",
-                    index === activeCityIndex
-                      ? "hover:bg-primary-foreground/20"
-                      : "hover:bg-destructive/20"
-                  )}
-                >
-                  <X className="h-2.5 w-2.5" />
-                </button>
-              )}
-            </button>
-          ))}
-          
-          {/* Add button - always visible */}
-          <button
-            onClick={handleAddCityClick}
-            className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-primary hover:text-primary/80 transition-colors rounded-lg border border-dashed border-primary/30 hover:border-primary/50"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Ajouter</span>
-          </button>
-        </div>
-      )}
-
       {/* City Details Card */}
-      {activeCity && (
+      {activeCity && !isAddingCity && (
         <div className="rounded-xl border border-border/40 bg-card/50 overflow-hidden">
           {/* City info line */}
           <div className="flex items-center gap-2.5 p-2.5">
@@ -373,7 +650,7 @@ const ActivitiesPanel = () => {
       )}
 
       {/* Main Content - Only show when we have an active city */}
-      {activeCity && (
+      {activeCity && !isAddingCity && (
         <>
           {/* FILTERS VIEW */}
           {currentView === "filters" && (

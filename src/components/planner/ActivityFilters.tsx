@@ -1,14 +1,11 @@
 /**
  * Activity Filters Component
  *
- * Filtering UI for activity search
+ * Professional filtering UI for activity search
  */
 
-import { useState, useEffect, useCallback } from "react";
-import { Filter, X, Star, DollarSign, Clock, Sparkles } from "lucide-react";
+import { Filter, X, Star, DollarSign, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Slider } from "@/components/ui/slider";
-import { activityService } from "@/services/activities/activityService";
 import type { ActivityFilters as ActivityFiltersType, CategoryWithEmoji } from "@/types/activity";
 
 export interface ActivityFiltersProps {
@@ -32,46 +29,6 @@ const BUDGET_RANGES = [
   { id: "premium", label: "150€+", min: 150, max: 500 },
 ];
 
-const FilterSection = ({
-  icon: Icon,
-  title,
-  children,
-}: {
-  icon: React.ElementType;
-  title: string;
-  children: React.ReactNode;
-}) => (
-  <div className="space-y-2">
-    <div className="flex items-center gap-2">
-      <Icon className="h-3.5 w-3.5 text-primary" />
-      <span className="text-xs font-medium text-foreground">{title}</span>
-    </div>
-    {children}
-  </div>
-);
-
-const ChipButton = ({
-  selected,
-  onClick,
-  children,
-}: {
-  selected: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) => (
-  <button
-    onClick={onClick}
-    className={cn(
-      "px-2.5 py-1 rounded-full text-xs font-medium transition-all border",
-      selected
-        ? "bg-primary text-primary-foreground border-primary"
-        : "bg-muted/30 text-muted-foreground border-border/30 hover:bg-muted/50"
-    )}
-  >
-    {children}
-  </button>
-);
-
 // Default categories (no API call needed)
 const DEFAULT_CATEGORIES: CategoryWithEmoji[] = [
   { id: 1, label: "Culture", emoji: "🎨", keyword: "culture" },
@@ -82,10 +39,13 @@ const DEFAULT_CATEGORIES: CategoryWithEmoji[] = [
   { id: 6, label: "Sports", emoji: "⚽", keyword: "sport" },
 ];
 
-export const ActivityFilters = ({ filters, onFiltersChange, className, compact = false }: ActivityFiltersProps) => {
-  // Use default categories (no API call to avoid CORS issues)
+export const ActivityFilters = ({ 
+  filters, 
+  onFiltersChange, 
+  className, 
+  compact = false 
+}: ActivityFiltersProps) => {
   const categories = DEFAULT_CATEGORIES;
-  const isLoadingCategories = false;
 
   const handleCategoryToggle = (keyword: string) => {
     const currentCategories = filters.categories || [];
@@ -127,14 +87,14 @@ export const ActivityFilters = ({ filters, onFiltersChange, className, compact =
   ].filter(Boolean).length;
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("space-y-4", className)}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-primary" />
           <span className="text-sm font-medium text-foreground">Filtres</span>
           {activeCount > 0 && (
-            <span className="px-1.5 py-0.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full">
+            <span className="px-1.5 py-0.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[18px] text-center">
               {activeCount}
             </span>
           )}
@@ -151,74 +111,89 @@ export const ActivityFilters = ({ filters, onFiltersChange, className, compact =
         )}
       </div>
 
-      <div className="space-y-4">
-        {/* Categories */}
-        {!compact && (
-          <FilterSection icon={Sparkles} title="Catégories">
-            {isLoadingCategories ? (
-              <div className="flex gap-2">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="h-7 w-20 bg-muted/30 rounded-full animate-pulse" />
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {categories.slice(0, 6).map((category) => {
-                  const isSelected = filters.categories?.includes(category.keyword) || false;
-                  return (
-                    <button
-                      key={category.id}
-                      onClick={() => handleCategoryToggle(category.keyword)}
-                      className={cn(
-                        "px-2.5 py-1 rounded-full text-xs font-medium flex items-center gap-1 transition-all border",
-                        isSelected
-                          ? "bg-primary/10 text-primary border-primary/30"
-                          : "bg-muted/30 text-muted-foreground border-border/30 hover:bg-muted/50"
-                      )}
-                    >
-                      <span>{category.emoji}</span>
-                      <span>{category.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </FilterSection>
-        )}
-
-        {/* Budget - Clear chip buttons */}
-        <FilterSection icon={DollarSign} title="Budget par personne">
-          <div className="flex flex-wrap gap-1.5">
-            {BUDGET_RANGES.map((range) => {
-              const isSelected = filters.priceRange[0] === range.min && filters.priceRange[1] === range.max;
+      {/* Categories */}
+      {!compact && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-medium text-foreground">Catégories</span>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {categories.map((category) => {
+              const isSelected = filters.categories?.includes(category.keyword) || false;
               return (
-                <ChipButton
-                  key={range.id}
-                  selected={isSelected}
-                  onClick={() => handleBudgetSelect(range)}
+                <button
+                  key={category.id}
+                  onClick={() => handleCategoryToggle(category.keyword)}
+                  className={cn(
+                    "px-2 py-1.5 rounded-lg text-xs font-medium flex items-center justify-center gap-1 transition-all border",
+                    isSelected
+                      ? "bg-primary/10 text-primary border-primary/30"
+                      : "bg-muted/30 text-muted-foreground border-border/30 hover:bg-muted/50"
+                  )}
                 >
-                  {range.label}
-                </ChipButton>
+                  <span>{category.emoji}</span>
+                  <span className="truncate">{category.label}</span>
+                </button>
               );
             })}
           </div>
-        </FilterSection>
+        </div>
+      )}
 
-        {/* Rating */}
-        <FilterSection icon={Star} title="Note minimum">
-          <div className="flex flex-wrap gap-1.5">
-            {RATING_OPTIONS.map((option) => (
-              <ChipButton
-                key={option.value}
-                selected={(filters.ratingMin || 0) === option.value}
-                onClick={() => handleRatingChange(option.value)}
+      {/* Budget */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <DollarSign className="h-3.5 w-3.5 text-primary" />
+          <span className="text-xs font-medium text-foreground">Budget par personne</span>
+        </div>
+        <div className="grid grid-cols-4 gap-1.5">
+          {BUDGET_RANGES.map((range) => {
+            const isSelected = filters.priceRange[0] === range.min && filters.priceRange[1] === range.max;
+            return (
+              <button
+                key={range.id}
+                onClick={() => handleBudgetSelect(range)}
+                className={cn(
+                  "px-2 py-1.5 rounded-lg text-xs font-medium transition-all border text-center",
+                  isSelected
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-muted/30 text-muted-foreground border-border/30 hover:bg-muted/50"
+                )}
               >
-                {option.value > 0 && <Star className="h-3 w-3 fill-current inline mr-0.5" />}
+                {range.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Rating */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Star className="h-3.5 w-3.5 text-primary" />
+          <span className="text-xs font-medium text-foreground">Note minimum</span>
+        </div>
+        <div className="grid grid-cols-4 gap-1.5">
+          {RATING_OPTIONS.map((option) => {
+            const isSelected = (filters.ratingMin || 0) === option.value;
+            return (
+              <button
+                key={option.value}
+                onClick={() => handleRatingChange(option.value)}
+                className={cn(
+                  "px-2 py-1.5 rounded-lg text-xs font-medium transition-all border text-center flex items-center justify-center gap-0.5",
+                  isSelected
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-muted/30 text-muted-foreground border-border/30 hover:bg-muted/50"
+                )}
+              >
+                {option.value > 0 && <Star className="h-3 w-3 fill-current" />}
                 {option.label}
-              </ChipButton>
-            ))}
-          </div>
-        </FilterSection>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
