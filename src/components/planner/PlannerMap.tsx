@@ -6,6 +6,7 @@ import type { TabType, MapPin } from "@/pages/TravelPlanner";
 import type { FlightRoutePoint } from "./PlannerPanel";
 import { useFlightMemory, type MemoryRoutePoint } from "@/contexts/FlightMemoryContext";
 import { useAccommodationMemory } from "@/contexts/AccommodationMemoryContext";
+import { useActivityMemory } from "@/contexts/ActivityMemoryContext";
 
 // Destination click event for popup
 export interface DestinationClickEvent {
@@ -298,15 +299,58 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
 
   // Get route points from flight memory
   const { getRoutePoints } = useFlightMemory();
-  
+
   // Get accommodation entries for markers
   const { memory: accommodationMemory } = useAccommodationMemory();
 
-  // Get pins based on active tab - returns empty by default (no pins shown initially)
+  // Get activity entries for markers
+  const { state: activityState } = useActivityMemory();
+
+  // Get pins based on active tab
   const getPinsForTab = useCallback((tab: TabType): MapPin[] => {
-    // By default, show no pins at all - only show when explicitly triggered by user action
+    if (tab === "activities") {
+      // Convert planned activities to MapPin format
+      return activityState.activities.map((activity) => {
+        // Try to get coordinates from activity or fall back to city coordinates
+        let lat = 0;
+        let lng = 0;
+
+        if (activity.coordinates) {
+          lat = activity.coordinates.lat;
+          lng = activity.coordinates.lng;
+        } else if (activity.city) {
+          // Look up city coordinates
+          const cityKey = activity.city.toLowerCase();
+          const coords = cityCoordinates[cityKey];
+          if (coords) {
+            lat = coords.lat;
+            lng = coords.lng;
+          }
+        }
+
+        // Skip if we don't have valid coordinates
+        if (lat === 0 && lng === 0) return null;
+
+        const mapPin: MapPin = {
+          id: activity.id,
+          type: "activities",
+          lat,
+          lng,
+          title: activity.title,
+          subtitle: activity.categories?.[0] || "Activité",
+          rating: activity.rating?.average,
+          duration: activity.duration?.formatted,
+          price: activity.pricing?.from_price,
+          image: activity.images?.[0]?.variants?.small || activity.images?.[0]?.url,
+        };
+
+        return mapPin;
+      }).filter((pin): pin is MapPin => pin !== null);
+    }
+
+    // By default, show no pins for other tabs
     return [];
-  }, []);
+  }, [activityState.activities]);
 
   // Initialize map
   useEffect(() => {

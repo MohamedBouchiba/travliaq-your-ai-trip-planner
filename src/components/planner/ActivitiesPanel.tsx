@@ -1,430 +1,516 @@
 /**
- * Activities Panel - Complete rewrite with memory integration
- * Features: Multi-destination support, CRUD operations, localStorage persistence
+ * Activities Panel - Complete Refactor with Viator API Integration
+ *
+ * Features:
+ * - Tab-based navigation (Search, Recommendations, My Planning)
+ * - Real-time activity search with Viator API
+ * - AI-powered recommendations
+ * - Activity filtering and sorting
+ * - Multi-destination support
+ * - Planned activities management
  */
 
-import { useState, useEffect } from "react";
-import { MapPin, Clock, Star, Palette, TreePine, Utensils, Sparkles, Heart, ShoppingBag, Music, X, Plus, Plane } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Search, Sparkles, Calendar, Plane, Loader2, Grid3x3, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { useActivityMemory, ActivityEntry } from "@/contexts/ActivityMemoryContext";
+import { useActivityMemory } from "@/contexts/ActivityMemoryContext";
 import { useAccommodationMemory } from "@/contexts/AccommodationMemoryContext";
-import { toastSuccess, toastInfo } from "@/lib/toast";
+import { usePreferenceMemory } from "@/contexts/PreferenceMemoryContext";
+import { ActivityCard } from "./ActivityCard";
+import { ActivityFilters } from "./ActivityFilters";
+import { ActivitySearchBar } from "./ActivitySearchBar";
+import { ActivityDetailModal } from "./ActivityDetailModal";
+import { toast } from "sonner";
 import { eventBus } from "@/lib/eventBus";
+import type { ActivitySearchParams, ViatorActivity } from "@/types/activity";
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+type TabType = "search" | "recommendations" | "planning";
 
 // ============================================================================
 // HELPER COMPONENTS
 // ============================================================================
 
-const SectionHeader = ({ icon: Icon, title }: { icon: React.ElementType; title: string }) => (
-  <div className="flex items-center gap-2 mb-3">
-    <div className="h-6 w-6 rounded-lg bg-primary/10 flex items-center justify-center">
-      <Icon className="h-3.5 w-3.5 text-primary" />
-    </div>
-    <span className="text-sm font-medium text-foreground">{title}</span>
-  </div>
-);
-
-const ChipButton = ({
-  children,
-  selected,
-  onClick
+const TabButton = ({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+  badge,
 }: {
-  children: React.ReactNode;
-  selected: boolean;
+  active: boolean;
   onClick: () => void;
+  icon: React.ElementType;
+  label: string;
+  badge?: number;
 }) => (
   <button
     onClick={onClick}
     className={cn(
-      "px-3 py-1.5 rounded-full text-xs font-medium transition-all",
-      selected
-        ? "bg-primary/10 text-primary border border-primary/30"
-        : "bg-muted/30 text-muted-foreground border border-border/30 hover:bg-muted/50"
+      "flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-2",
+      active
+        ? "bg-primary text-primary-foreground shadow-sm"
+        : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
     )}
   >
-    {children}
+    <Icon className="h-3.5 w-3.5" />
+    <span>{label}</span>
+    {badge !== undefined && badge > 0 && (
+      <span
+        className={cn(
+          "px-1.5 py-0.5 rounded-full text-[10px] font-bold",
+          active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/10 text-primary"
+        )}
+      >
+        {badge}
+      </span>
+    )}
   </button>
 );
 
-// ============================================================================
-// ACTIVITY CARD COMPONENT
-// ============================================================================
-
-interface ActivityCardProps {
-  activity: ActivityEntry;
-  onUpdate: (updates: Partial<ActivityEntry>) => void;
-  onDelete: () => void;
-}
-
-const getCategoryEmoji = (category: ActivityEntry["category"]): string => {
-  const emojiMap = {
-    culture: "🎨",
-    outdoor: "🌲",
-    food: "🍽️",
-    wellness: "💆",
-    shopping: "🛍️",
-    nightlife: "🎵",
-  };
-  return emojiMap[category] || "🎭";
-};
-
-const getDurationLabel = (duration: ActivityEntry["duration"]): string => {
-  const labels = {
-    short: "< 2h",
-    medium: "2-4h",
-    long: "> 4h",
-  };
-  return labels[duration] || duration;
-};
-
-const ActivityCard = ({ activity, onUpdate, onDelete }: ActivityCardProps) => {
-  const [isEditing, setIsEditing] = useState(false);
-
-  return (
-    <div className="p-3 rounded-xl bg-muted/20 hover:bg-muted/40 border border-border/20 group transition-colors">
-      <div className="flex items-start gap-3">
-        {/* Category Icon */}
-        <span className="text-2xl">{getCategoryEmoji(activity.category)}</span>
-
-        <div className="flex-1 min-w-0">
-          {/* Title (editable) */}
-          {isEditing ? (
-            <input
-              value={activity.title}
-              onChange={(e) => onUpdate({ title: e.target.value })}
-              onBlur={() => setIsEditing(false)}
-              className="w-full text-sm font-medium bg-transparent border-none focus:outline-none focus:ring-0 text-foreground"
-              autoFocus
-            />
-          ) : (
-            <div
-              className="font-medium text-sm cursor-pointer hover:text-primary transition-colors"
-              onClick={() => setIsEditing(true)}
-            >
-              {activity.title}
-            </div>
-          )}
-
-          {/* Meta */}
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-xs text-muted-foreground">{getDurationLabel(activity.duration)}</span>
-            <span className="text-xs text-muted-foreground">•</span>
-            <span className="text-xs font-medium text-primary">
-              {activity.priceMin === activity.priceMax
-                ? `${activity.priceMin}€`
-                : `${activity.priceMin}-${activity.priceMax}€`}
-            </span>
-            {activity.rating && (
-              <>
-                <span className="text-xs text-muted-foreground">•</span>
-                <div className="flex items-center gap-1">
-                  <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                  <span className="text-xs text-muted-foreground">{activity.rating}</span>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Actions */}
-        <button
-          onClick={onDelete}
-          className="opacity-0 group-hover:opacity-100 p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-all"
-          title="Supprimer l'activité"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
+const EmptyState = ({
+  icon: Icon,
+  title,
+  description,
+  action,
+}: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+}) => (
+  <div className="py-12 text-center space-y-4">
+    <div className="flex justify-center">
+      <div className="h-16 w-16 rounded-full bg-muted/30 flex items-center justify-center">
+        <Icon className="h-8 w-8 text-muted-foreground/50" />
       </div>
     </div>
-  );
-};
+    <div className="space-y-1">
+      <p className="text-sm font-medium text-foreground">{title}</p>
+      <p className="text-xs text-muted-foreground max-w-xs mx-auto">{description}</p>
+    </div>
+    {action && <div className="pt-2">{action}</div>}
+  </div>
+);
 
 // ============================================================================
-// MAIN PANEL COMPONENT
+// MAIN COMPONENT
 // ============================================================================
 
 const ActivitiesPanel = () => {
-  const { memory: activityMemory, addActivity, updateActivity, removeActivity, getActivitiesByDestination } = useActivityMemory();
+  const {
+    state: activityState,
+    searchActivities,
+    loadMoreResults,
+    clearSearch,
+    loadRecommendations,
+    addActivityFromSearch,
+    updateActivity,
+    removeActivity,
+    selectActivity,
+    getActivitiesByDestination,
+    updateFilters,
+    getTotalBudget,
+  } = useActivityMemory();
+
   const { memory: accommodationMemory } = useAccommodationMemory();
+  const { memory: preferenceMemory } = usePreferenceMemory();
 
   // UI State
+  const [activeTab, setActiveTab] = useState<TabType>("search");
   const [selectedDestination, setSelectedDestination] = useState<string | null>(null);
-  const [filterCategory, setFilterCategory] = useState<string[]>([]);
-  const [filterDuration, setFilterDuration] = useState<string | null>(null);
-  const [filterBudget, setFilterBudget] = useState<[number, number]>([0, 200]);
+  const [showFilters, setShowFilters] = useState(true);
+  const [detailModalActivity, setDetailModalActivity] = useState<ViatorActivity | null>(null);
 
-  // Category definitions
-  const categories = [
-    { id: "culture", label: "Culture", icon: Palette },
-    { id: "outdoor", label: "Nature", icon: TreePine },
-    { id: "food", label: "Gastronomie", icon: Utensils },
-    { id: "wellness", label: "Bien-être", icon: Sparkles },
-    { id: "shopping", label: "Shopping", icon: ShoppingBag },
-    { id: "nightlife", label: "Soirées", icon: Music },
-  ];
-
-  const durations = [
-    { id: "short", label: "< 2h" },
-    { id: "medium", label: "2-4h" },
-    { id: "long", label: "> 4h" },
-  ];
-
-  // Auto-select first destination on mount
+  // Auto-select first destination
   useEffect(() => {
     if (!selectedDestination && accommodationMemory.accommodations.length > 0) {
       setSelectedDestination(accommodationMemory.accommodations[0].id);
     }
   }, [selectedDestination, accommodationMemory.accommodations]);
 
-  // Cleanup activities for removed destinations
-  useEffect(() => {
-    const validDestinationIds = new Set(
-      accommodationMemory.accommodations.map(a => a.id)
-    );
-
-    const activitiesToRemove = activityMemory.activities.filter(
-      activity => !validDestinationIds.has(activity.destinationId)
-    );
-
-    if (activitiesToRemove.length > 0) {
-      // Batch remove
-      activitiesToRemove.forEach(activity => {
-        removeActivity(activity.id);
-      });
-
-      toastInfo(
-        "Activités mises à jour",
-        `${activitiesToRemove.length} activité(s) supprimée(s) car destination supprimée`
-      );
-    }
-  }, [accommodationMemory.accommodations, activityMemory.activities, removeActivity]);
-
   // Get current destination
-  const currentDestination = accommodationMemory.accommodations.find(
-    a => a.id === selectedDestination
-  );
+  const currentDestination = accommodationMemory.accommodations.find((a) => a.id === selectedDestination);
 
   // Get activities for current destination
-  const currentActivities = selectedDestination
-    ? getActivitiesByDestination(selectedDestination)
-    : [];
+  const plannedActivities = selectedDestination ? getActivitiesByDestination(selectedDestination) : [];
 
-  // Apply filters
-  const filteredActivities = currentActivities.filter(activity => {
-    if (filterCategory.length > 0 && !filterCategory.includes(activity.category)) return false;
-    if (filterDuration && activity.duration !== filterDuration) return false;
-    if (activity.priceMax < filterBudget[0] || activity.priceMin > filterBudget[1]) return false;
-    return true;
-  });
+  // Handle search
+  const handleSearch = useCallback(
+    async (params: ActivitySearchParams) => {
+      try {
+        await searchActivities(params);
+      } catch (error: any) {
+        toast.error(error.message || "Erreur lors de la recherche");
+      }
+    },
+    [searchActivities]
+  );
 
-  // Handlers
-  const handleAddActivity = () => {
-    if (!currentDestination) {
-      toastInfo("Aucune destination", "Ajoutez d'abord une destination dans l'onglet vols");
-      return;
+  // Handle load more
+  const handleLoadMore = useCallback(async () => {
+    try {
+      await loadMoreResults();
+    } catch (error: any) {
+      toast.error(error.message || "Erreur lors du chargement");
     }
+  }, [loadMoreResults]);
 
-    addActivity({
-      destinationId: currentDestination.id,
-      city: currentDestination.city || "",
-      country: currentDestination.country || "",
-      title: "Nouvelle activité",
-      category: "culture",
-      duration: "medium",
-      syncedFromDestination: true,
-    });
+  // Handle add activity
+  const handleAddActivity = useCallback(
+    (viatorActivity: any) => {
+      if (!selectedDestination) {
+        toast.error("Veuillez sélectionner une destination");
+        return;
+      }
 
-    toastSuccess("Activité ajoutée", `Nouvelle activité pour ${currentDestination.city || "la destination"}`);
-  };
+      addActivityFromSearch(viatorActivity, selectedDestination);
+    },
+    [selectedDestination, addActivityFromSearch]
+  );
 
-  const handleDeleteActivity = (id: string) => {
-    removeActivity(id);
-    toastSuccess("Activité supprimée");
-  };
+  // Handle remove activity
+  const handleRemoveActivity = useCallback(
+    (activityId: string) => {
+      removeActivity(activityId);
+    },
+    [removeActivity]
+  );
 
-  const handleToggleCategory = (categoryId: string) => {
-    setFilterCategory(prev =>
-      prev.includes(categoryId)
-        ? prev.filter(c => c !== categoryId)
-        : [...prev, categoryId]
-    );
-  };
+  // Handle activity click
+  const handleActivityClick = useCallback(
+    (activity: ViatorActivity) => {
+      setDetailModalActivity(activity);
+      selectActivity(activity.id);
+    },
+    [selectActivity]
+  );
+
+  // Check if activity is in trip
+  const isActivityInTrip = useCallback(
+    (activityId: string) => {
+      return activityState.activities.some((a) => a.viatorId === activityId);
+    },
+    [activityState.activities]
+  );
+
+  // Load recommendations when switching to recommendations tab
+  useEffect(() => {
+    if (activeTab === "recommendations" && selectedDestination && activityState.recommendations.length === 0) {
+      loadRecommendations(selectedDestination);
+    }
+  }, [activeTab, selectedDestination, activityState.recommendations.length, loadRecommendations]);
+
+  // ============================================================================
+  // RENDER
+  // ============================================================================
 
   return (
-    <div className="space-y-5" data-tour="activities-panel">
-      {/* Destination Tabs (if multi-destination) */}
-      {accommodationMemory.accommodations.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          {accommodationMemory.accommodations.map(dest => (
-            <button
-              key={dest.id}
-              onClick={() => setSelectedDestination(dest.id)}
-              className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5",
-                selectedDestination === dest.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
-              )}
-            >
-              {dest.city || `Destination ${accommodationMemory.accommodations.indexOf(dest) + 1}`}
-              <span className="text-[10px] opacity-60">
-                ({getActivitiesByDestination(dest.id).length})
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* No destination message */}
+    <div className="h-full flex flex-col" data-tour="activities-panel">
+      {/* No Destination Message */}
       {accommodationMemory.accommodations.length === 0 && (
-        <div className="py-8 text-center space-y-4">
-          <span className="text-4xl mb-2 block">🗺️</span>
-          <div>
-            <p className="text-sm text-muted-foreground">
-              Aucune destination configurée
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Ajoutez d'abord une destination dans l'onglet vols
-            </p>
-          </div>
-          <Button
-            onClick={() => eventBus.emit("tab:change", { tab: "flights" })}
-            variant="outline"
-            size="sm"
-            className="mx-auto"
-          >
-            <Plane className="h-3.5 w-3.5 mr-2" />
-            Aller aux vols
-          </Button>
-        </div>
+        <EmptyState
+          icon={Plane}
+          title="Aucune destination configurée"
+          description="Ajoutez d'abord une destination dans l'onglet vols pour découvrir des activités"
+          action={
+            <Button
+              onClick={() => eventBus.emit("tab:change", { tab: "flights" })}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <Plane className="h-3.5 w-3.5" />
+              Aller aux vols
+            </Button>
+          }
+        />
       )}
 
-      {/* Filters Section */}
+      {/* Main Content */}
       {accommodationMemory.accommodations.length > 0 && (
         <>
-          {/* Category Filters */}
-          <div>
-            <SectionHeader icon={MapPin} title="Type d'activité" />
-            <div className="grid grid-cols-2 gap-2">
-              {categories.map(cat => {
-                const Icon = cat.icon;
-                const isSelected = filterCategory.includes(cat.id);
-                return (
+          {/* Destination Selector (if multi-destination) */}
+          {accommodationMemory.accommodations.length > 1 && (
+            <div className="pb-3 border-b border-border/30">
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {accommodationMemory.accommodations.map((dest) => (
                   <button
-                    key={cat.id}
-                    onClick={() => handleToggleCategory(cat.id)}
+                    key={dest.id}
+                    onClick={() => setSelectedDestination(dest.id)}
                     className={cn(
-                      "p-3 rounded-xl text-xs font-medium flex items-center gap-2 transition-all",
-                      isSelected
-                        ? "bg-primary/10 text-primary border border-primary/30"
-                        : "bg-muted/30 text-muted-foreground border border-border/30 hover:bg-muted/50"
+                      "px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5",
+                      selectedDestination === dest.id
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
                     )}
                   >
-                    <Icon className="h-4 w-4" />
-                    {cat.label}
+                    {dest.city || `Destination ${accommodationMemory.accommodations.indexOf(dest) + 1}`}
+                    <span className="text-[10px] opacity-60">({getActivitiesByDestination(dest.id).length})</span>
                   </button>
-                );
-              })}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Duration Filter */}
-          <div>
-            <SectionHeader icon={Clock} title="Durée" />
-            <div className="flex gap-1.5">
-              {durations.map(d => (
-                <ChipButton
-                  key={d.id}
-                  selected={filterDuration === d.id}
-                  onClick={() => setFilterDuration(filterDuration === d.id ? null : d.id)}
-                >
-                  {d.label}
-                </ChipButton>
-              ))}
-            </div>
-          </div>
-
-          {/* Budget Slider */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <SectionHeader icon={Star} title="Budget" />
-              <span className="text-xs text-primary font-medium">
-                {filterBudget[0]}€ - {filterBudget[1]}€
-              </span>
-            </div>
-            <Slider
-              value={filterBudget}
-              onValueChange={(value) => setFilterBudget(value as [number, number])}
-              max={200}
-              step={10}
+          {/* Tab Navigation */}
+          <div className="py-3 flex gap-2">
+            <TabButton
+              active={activeTab === "search"}
+              onClick={() => setActiveTab("search")}
+              icon={Search}
+              label="Recherche"
+            />
+            <TabButton
+              active={activeTab === "recommendations"}
+              onClick={() => setActiveTab("recommendations")}
+              icon={Sparkles}
+              label="Suggestions"
+              badge={activityState.recommendations.length}
+            />
+            <TabButton
+              active={activeTab === "planning"}
+              onClick={() => setActiveTab("planning")}
+              icon={Calendar}
+              label="Mon Planning"
+              badge={plannedActivities.length}
             />
           </div>
 
-          {/* Activities List */}
-          <div className="pt-3 border-t border-border/30">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-muted-foreground uppercase">
-                Activités ({filteredActivities.length})
-              </span>
-              <button
-                onClick={handleAddActivity}
-                className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1 transition-colors"
-              >
-                <Plus className="h-3 w-3" />
-                Ajouter
-              </button>
-            </div>
+          {/* Tab Content */}
+          <div className="flex-1 overflow-y-auto">
+            {/* SEARCH TAB */}
+            {activeTab === "search" && (
+              <div className="space-y-4">
+                {/* Search Bar */}
+                <ActivitySearchBar
+                  defaultCity={currentDestination?.city || ""}
+                  defaultCountryCode={currentDestination?.country || ""}
+                  defaultStartDate={currentDestination?.checkIn || ""}
+                  onSearch={handleSearch}
+                  isSearching={activityState.search.isSearching}
+                />
 
-            {filteredActivities.length === 0 ? (
-              <div className="py-8 text-center space-y-4">
-                <span className="text-4xl mb-2 block">🎭</span>
-                <p className="text-sm text-muted-foreground">
-                  {currentActivities.length === 0
-                    ? "Aucune activité planifiée"
-                    : "Aucune activité ne correspond aux filtres"}
-                </p>
-                {currentActivities.length === 0 && currentDestination && (
-                  <div className="flex flex-col gap-2 items-center">
-                    <Button
-                      onClick={() => {
-                        eventBus.emit("chat:injectMessage", {
-                          role: "assistant",
-                          text: `Je peux vous suggérer des activités incontournables à ${currentDestination.city}. Quels sont vos centres d'intérêt ? (culture, gastronomie, nature, sport...)`
-                        });
-                      }}
-                      variant="default"
-                      size="sm"
-                      className="gap-2"
-                    >
-                      <Sparkles className="h-3.5 w-3.5" />
-                      Suggérer des activités IA
-                    </Button>
-                    <button
-                      onClick={handleAddActivity}
-                      className="text-xs text-muted-foreground hover:text-foreground font-medium transition-colors"
-                    >
-                      + Ajouter manuellement
-                    </button>
+                {/* Filters */}
+                <ActivityFilters
+                  filters={activityState.activeFilters}
+                  onFiltersChange={updateFilters}
+                  compact={false}
+                />
+
+                {/* Search Results */}
+                {activityState.search.error && (
+                  <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-destructive">Erreur de recherche</p>
+                      <p className="text-xs text-destructive/80 mt-1">{activityState.search.error}</p>
+                    </div>
                   </div>
                 )}
+
+                {activityState.search.searchResults.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">
+                        {activityState.search.totalResults} activité{activityState.search.totalResults > 1 ? "s" : ""}{" "}
+                        trouvée{activityState.search.totalResults > 1 ? "s" : ""}
+                      </p>
+                      <button
+                        onClick={clearSearch}
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Effacer
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      {activityState.search.searchResults.map((activity) => (
+                        <ActivityCard
+                          key={activity.id}
+                          activity={activity}
+                          mode="search"
+                          onAdd={() => handleAddActivity(activity)}
+                          onClick={() => handleActivityClick(activity)}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Load More */}
+                    {activityState.search.hasMore && (
+                      <Button
+                        onClick={handleLoadMore}
+                        disabled={activityState.search.isLoadingMore}
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-2"
+                      >
+                        {activityState.search.isLoadingMore ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Chargement...
+                          </>
+                        ) : (
+                          <>Voir plus</>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {!activityState.search.isSearching &&
+                  activityState.search.searchResults.length === 0 &&
+                  !activityState.search.error && (
+                    <EmptyState
+                      icon={Search}
+                      title="Recherchez des activités"
+                      description="Découvrez des milliers d'activités, visites guidées et expériences uniques"
+                    />
+                  )}
               </div>
-            ) : (
-              <div className="space-y-2">
-                {filteredActivities.map(activity => (
-                  <ActivityCard
-                    key={activity.id}
-                    activity={activity}
-                    onUpdate={(updates) => updateActivity(activity.id, updates)}
-                    onDelete={() => handleDeleteActivity(activity.id)}
+            )}
+
+            {/* RECOMMENDATIONS TAB */}
+            {activeTab === "recommendations" && (
+              <div className="space-y-4">
+                {activityState.isLoadingRecommendations && (
+                  <div className="py-12 flex flex-col items-center gap-3">
+                    <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                    <p className="text-sm text-muted-foreground">Chargement des recommandations...</p>
+                  </div>
+                )}
+
+                {!activityState.isLoadingRecommendations && activityState.recommendations.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <p className="text-sm font-medium text-foreground">Recommandations pour vous</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      {activityState.recommendations.map((activity) => (
+                        <ActivityCard
+                          key={activity.id}
+                          activity={activity}
+                          mode="search"
+                          onAdd={() => handleAddActivity(activity)}
+                          onClick={() => handleActivityClick(activity)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!activityState.isLoadingRecommendations && activityState.recommendations.length === 0 && (
+                  <EmptyState
+                    icon={Sparkles}
+                    title="Aucune recommandation"
+                    description="Nous n'avons pas trouvé de recommandations personnalisées pour le moment"
+                    action={
+                      <Button
+                        onClick={() => selectedDestination && loadRecommendations(selectedDestination)}
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                      >
+                        <Sparkles className="h-3.5 w-3.5" />
+                        Recharger
+                      </Button>
+                    }
                   />
-                ))}
+                )}
+              </div>
+            )}
+
+            {/* PLANNING TAB */}
+            {activeTab === "planning" && (
+              <div className="space-y-4">
+                {plannedActivities.length > 0 && (
+                  <>
+                    {/* Budget Summary */}
+                    <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">Budget total activités</span>
+                        <span className="text-lg font-bold text-primary">{getTotalBudget()}€</span>
+                      </div>
+                    </div>
+
+                    {/* Planned Activities List */}
+                    <div className="space-y-3">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
+                        {plannedActivities.length} activité{plannedActivities.length > 1 ? "s" : ""} planifiée
+                        {plannedActivities.length > 1 ? "s" : ""}
+                      </p>
+
+                      <div className="grid grid-cols-1 gap-3">
+                        {plannedActivities.map((activity) => (
+                          <ActivityCard
+                            key={activity.id}
+                            activity={activity}
+                            mode="planned"
+                            onClick={() => {
+                              // For planned activities, we need to convert back to Viator format if available
+                              if (activity.viatorId) {
+                                // Find in search results or recommendations
+                                const viatorActivity =
+                                  activityState.search.searchResults.find((a) => a.id === activity.viatorId) ||
+                                  activityState.recommendations.find((a) => a.id === activity.viatorId);
+                                if (viatorActivity) {
+                                  handleActivityClick(viatorActivity);
+                                }
+                              }
+                            }}
+                            onRemove={() => handleRemoveActivity(activity.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {plannedActivities.length === 0 && (
+                  <EmptyState
+                    icon={Calendar}
+                    title="Aucune activité planifiée"
+                    description="Recherchez et ajoutez des activités à votre itinéraire"
+                    action={
+                      <div className="flex flex-col gap-2">
+                        <Button onClick={() => setActiveTab("search")} size="sm" className="gap-2">
+                          <Search className="h-3.5 w-3.5" />
+                          Rechercher des activités
+                        </Button>
+                        <Button
+                          onClick={() => setActiveTab("recommendations")}
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <Sparkles className="h-3.5 w-3.5" />
+                          Voir les suggestions
+                        </Button>
+                      </div>
+                    }
+                  />
+                )}
               </div>
             )}
           </div>
         </>
       )}
+
+      {/* Activity Detail Modal */}
+      <ActivityDetailModal
+        activity={detailModalActivity}
+        open={!!detailModalActivity}
+        onClose={() => setDetailModalActivity(null)}
+        onAdd={(activity) => handleAddActivity(activity)}
+        onRemove={(activityId) => handleRemoveActivity(activityId)}
+        isInTrip={detailModalActivity ? isActivityInTrip(detailModalActivity.id) : false}
+      />
     </div>
   );
 };
