@@ -1,107 +1,202 @@
 /**
- * Activity Memory Context
- * Manages activities planning state with localStorage persistence
- * Pattern: Similar to FlightMemory and AccommodationMemory for consistency
+ * Activity Memory Context - V2
+ * Manages activities planning state with Travliaq API integration
+ * Synchronized with AccommodationMemory for dates
  */
 
 import { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from "react";
 import { usePreferenceMemory } from "./PreferenceMemoryContext";
+import { useAccommodationMemory } from "./AccommodationMemoryContext";
 import { eventBus } from "@/lib/eventBus";
 
 // ============================================================================
 // TYPES & INTERFACES
 // ============================================================================
 
+// API Activity from Travliaq
+export interface TravliaqActivity {
+  id: string;
+  title: string;
+  description: string;
+  images: {
+    url: string;
+    is_cover: boolean;
+    variants: {
+      small?: string;
+      medium?: string;
+      large?: string;
+    };
+  }[];
+  pricing: {
+    from_price: number;
+    currency: string;
+    original_price?: number;
+    is_discounted: boolean;
+  };
+  rating: {
+    average: number;
+    count: number;
+  };
+  duration: {
+    minutes: number;
+    formatted: string;
+  };
+  categories: string[];
+  flags: string[];
+  booking_url: string;
+  confirmation_type: string;
+  location: {
+    destination: string;
+    country: string;
+  };
+  availability: string;
+}
+
 export interface ActivityEntry {
   id: string;
 
   // Liaison avec destination
-  destinationId: string; // ID de l'hébergement lié
+  destinationId: string;
   city: string;
   country: string;
+  countryCode: string;
 
-  // Données de l'activité
+  // API data (from Travliaq)
+  viatorId?: string;
   title: string;
-  category: "culture" | "outdoor" | "food" | "wellness" | "shopping" | "nightlife";
-  duration: "short" | "medium" | "long"; // < 2h, 2-4h, > 4h
+  description?: string;
+  imageUrl?: string;
+  imageVariants?: {
+    small?: string;
+    medium?: string;
+    large?: string;
+  };
 
-  // Timing
-  date: Date | null; // Date prévue pour l'activité
+  // Pricing
+  fromPrice: number;
+  currency: string;
+  originalPrice?: number;
+  isDiscounted: boolean;
+
+  // Rating
+  rating: number | null;
+  reviewCount: number;
+
+  // Duration
+  durationMinutes: number;
+  durationFormatted: string;
+
+  // Categories & flags
+  categories: string[];
+  flags: string[];
+
+  // Booking
+  bookingUrl?: string;
+  confirmationType?: string;
+
+  // Coordinates for map (if available)
+  lat?: number;
+  lng?: number;
+
+  // Dates (synced from accommodation)
+  searchStartDate: Date | null;
+  searchEndDate: Date | null;
+  plannedDate: Date | null;
   timeSlot: "morning" | "afternoon" | "evening" | "flexible" | null;
 
-  // Budget
-  priceMin: number;
-  priceMax: number;
-
-  // Métadonnées
-  rating: number | null; // 0-5
-  isBooked: boolean;
-  notes: string;
-
   // Sync flags
-  syncedFromDestination?: boolean; // Créé automatiquement depuis destination
-  userModified?: boolean; // User a modifié manuellement
+  syncedFromAccommodation: boolean;
+  userModifiedDates: boolean;
+  isSaved: boolean;
 }
 
 export interface ActivityMemory {
-  activities: ActivityEntry[];
-  activeActivityIndex: number;
+  // Saved activities (user's selection)
+  savedActivities: ActivityEntry[];
+  
+  // Search results cache per destination
+  searchCache: Record<string, {
+    activities: ActivityEntry[];
+    timestamp: number;
+    query: string;
+  }>;
 
-  // Préférences par défaut (appliquées aux nouvelles activités)
-  defaultCategories: string[]; // ["culture", "food"]
-  defaultDurationRange: string[]; // ["short", "medium"]
-  defaultBudgetRange: [number, number]; // [0, 150]
+  // Active destination for activities
+  activeDestinationId: string | null;
+
+  // Default filter preferences
+  defaultCategories: string[];
+  defaultBudgetRange: [number, number];
+  defaultRatingMin: number;
 }
 
 interface ActivityMemoryContextValue {
   memory: ActivityMemory;
 
-  // CRUD Activities
-  addActivity: (activity?: Partial<ActivityEntry>) => string; // Returns ID
-  removeActivity: (id: string) => void;
-  updateActivity: (id: string, updates: Partial<ActivityEntry>) => void;
+  // Saved Activities CRUD
+  saveActivity: (activity: TravliaqActivity, destinationId: string, destinationInfo: {
+    city: string;
+    country: string;
+    countryCode: string;
+    checkIn?: Date | null;
+    checkOut?: Date | null;
+  }) => void;
+  unsaveActivity: (id: string) => void;
+  updateSavedActivity: (id: string, updates: Partial<ActivityEntry>) => void;
+  getSavedActivitiesByDestination: (destinationId: string) => ActivityEntry[];
+  isActivitySaved: (viatorId: string) => boolean;
 
-  // Bulk operations
-  updateMemoryBatch: (updater: (prev: ActivityMemory) => ActivityMemory) => void;
+  // Search cache
+  setCachedSearch: (destinationId: string, activities: ActivityEntry[], query: string) => void;
+  getCachedSearch: (destinationId: string) => { activities: ActivityEntry[]; query: string } | null;
 
-  // Getters
-  getActiveActivity: () => ActivityEntry | null;
-  getActivitiesByDestination: (destinationId: string) => ActivityEntry[];
-  getActivitiesByCity: (city: string) => ActivityEntry[];
+  // Active destination
+  setActiveDestination: (id: string | null) => void;
 
-  // Setters
-  setActiveActivity: (id: string) => void;
+  // Preferences
   setDefaultCategories: (categories: string[]) => void;
   setDefaultBudgetRange: (range: [number, number]) => void;
+  setDefaultRatingMin: (rating: number) => void;
+
+  // Sync dates from accommodation
+  syncDatesFromAccommodation: (destinationId: string, checkIn: Date | null, checkOut: Date | null) => void;
 
   // Computed
-  totalActivitiesCount: number;
-  isReadyToSearch: boolean;
+  totalSavedCount: number;
 
-  // Serialization (pour chat AI context)
+  // Serialization
   getSerializedState: () => Record<string, unknown>;
+
+  // Legacy API (for backward compatibility with PlannerChat)
+  addActivity: (activity: Partial<ActivityEntry>) => string;
+  updateActivity: (id: string, updates: Partial<ActivityEntry>) => void;
+  removeActivity: (id: string) => void;
+  getActivitiesByCity: (city: string) => ActivityEntry[];
 }
 
 // ============================================================================
 // STORAGE
 // ============================================================================
 
-const STORAGE_KEY = "travliaq_activity_memory";
+const STORAGE_KEY = "travliaq_activity_memory_v2";
 
 const defaultMemory: ActivityMemory = {
-  activities: [],
-  activeActivityIndex: 0,
-  defaultCategories: ["culture", "food"],
-  defaultDurationRange: ["short", "medium"],
-  defaultBudgetRange: [0, 150],
+  savedActivities: [],
+  searchCache: {},
+  activeDestinationId: null,
+  defaultCategories: [],
+  defaultBudgetRange: [0, 200],
+  defaultRatingMin: 0,
 };
 
 function serializeMemory(memory: ActivityMemory): string {
   return JSON.stringify({
     ...memory,
-    activities: memory.activities.map(a => ({
+    savedActivities: memory.savedActivities.map(a => ({
       ...a,
-      date: a.date?.toISOString() || null,
+      searchStartDate: a.searchStartDate?.toISOString() || null,
+      searchEndDate: a.searchEndDate?.toISOString() || null,
+      plannedDate: a.plannedDate?.toISOString() || null,
     })),
   });
 }
@@ -110,10 +205,13 @@ function deserializeMemory(json: string): ActivityMemory | null {
   try {
     const parsed = JSON.parse(json);
     return {
+      ...defaultMemory,
       ...parsed,
-      activities: parsed.activities.map((a: any) => ({
+      savedActivities: (parsed.savedActivities || []).map((a: any) => ({
         ...a,
-        date: a.date ? new Date(a.date) : null,
+        searchStartDate: a.searchStartDate ? new Date(a.searchStartDate) : null,
+        searchEndDate: a.searchEndDate ? new Date(a.searchEndDate) : null,
+        plannedDate: a.plannedDate ? new Date(a.plannedDate) : null,
       })),
     };
   } catch (error) {
@@ -135,6 +233,56 @@ function loadFromStorage(): ActivityMemory {
     console.warn("[ActivityMemory] Failed to load from storage:", error);
   }
   return defaultMemory;
+}
+
+// ============================================================================
+// HELPER: Convert API activity to ActivityEntry
+// ============================================================================
+
+function apiToActivityEntry(
+  apiActivity: TravliaqActivity,
+  destinationId: string,
+  destinationInfo: {
+    city: string;
+    country: string;
+    countryCode: string;
+    checkIn?: Date | null;
+    checkOut?: Date | null;
+  }
+): ActivityEntry {
+  const coverImage = apiActivity.images.find(img => img.is_cover) || apiActivity.images[0];
+
+  return {
+    id: crypto.randomUUID(),
+    destinationId,
+    city: destinationInfo.city,
+    country: destinationInfo.country,
+    countryCode: destinationInfo.countryCode,
+    viatorId: apiActivity.id,
+    title: apiActivity.title,
+    description: apiActivity.description,
+    imageUrl: coverImage?.variants.medium || coverImage?.url,
+    imageVariants: coverImage?.variants,
+    fromPrice: apiActivity.pricing.from_price,
+    currency: apiActivity.pricing.currency,
+    originalPrice: apiActivity.pricing.original_price,
+    isDiscounted: apiActivity.pricing.is_discounted,
+    rating: apiActivity.rating.average,
+    reviewCount: apiActivity.rating.count,
+    durationMinutes: apiActivity.duration.minutes,
+    durationFormatted: apiActivity.duration.formatted,
+    categories: apiActivity.categories,
+    flags: apiActivity.flags,
+    bookingUrl: apiActivity.booking_url,
+    confirmationType: apiActivity.confirmation_type,
+    searchStartDate: destinationInfo.checkIn || null,
+    searchEndDate: destinationInfo.checkOut || null,
+    plannedDate: null,
+    timeSlot: null,
+    syncedFromAccommodation: !!(destinationInfo.checkIn || destinationInfo.checkOut),
+    userModifiedDates: false,
+    isSaved: true,
+  };
 }
 
 // ============================================================================
@@ -179,139 +327,111 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
       comfortLevel < 50 ? [20, 100] :
       comfortLevel < 75 ? [50, 200] : [100, 500];
 
-    // Map interests to default categories
-    const categoryMap: Record<string, string> = {
-      culture: "culture",
-      food: "food",
-      nature: "outdoor",
-      beach: "outdoor",
-      wellness: "wellness",
-      sport: "outdoor",
-    };
-
-    const defaultCategories = interests
-      .map(i => categoryMap[i])
-      .filter(Boolean);
-
     setMemory(prev => ({
       ...prev,
       defaultBudgetRange: budgetRange,
-      defaultCategories: defaultCategories.length > 0 ? defaultCategories : ["culture"],
+      defaultCategories: interests || [],
     }));
   }, [preferences, isHydrated]);
 
   // ============================================================================
-  // CRUD OPERATIONS
+  // SAVED ACTIVITIES OPERATIONS
   // ============================================================================
 
-  const addActivity = useCallback((activity?: Partial<ActivityEntry>): string => {
-    const id = crypto.randomUUID();
+  const saveActivity = useCallback((
+    apiActivity: TravliaqActivity,
+    destinationId: string,
+    destinationInfo: {
+      city: string;
+      country: string;
+      countryCode: string;
+      checkIn?: Date | null;
+      checkOut?: Date | null;
+    }
+  ) => {
+    setMemory(prev => {
+      // Check if already saved
+      if (prev.savedActivities.some(a => a.viatorId === apiActivity.id)) {
+        return prev;
+      }
 
-    setMemory(prev => ({
-      ...prev,
-      activities: [...prev.activities, {
-        id,
-        destinationId: activity?.destinationId || "",
-        city: activity?.city || "",
-        country: activity?.country || "",
-        title: activity?.title || "Nouvelle activité",
-        category: activity?.category || "culture",
-        duration: activity?.duration || "medium",
-        priceMin: activity?.priceMin ?? prev.defaultBudgetRange[0],
-        priceMax: activity?.priceMax ?? prev.defaultBudgetRange[1],
-        date: activity?.date || null,
-        timeSlot: activity?.timeSlot || "flexible",
-        rating: activity?.rating || null,
-        isBooked: activity?.isBooked || false,
-        notes: activity?.notes || "",
-        syncedFromDestination: activity?.syncedFromDestination || false,
-        userModified: activity?.userModified || false,
-      }],
-    }));
+      const entry = apiToActivityEntry(apiActivity, destinationId, destinationInfo);
 
-    // Flash the activities tab to indicate an update
+      return {
+        ...prev,
+        savedActivities: [...prev.savedActivities, entry],
+      };
+    });
+
     eventBus.emit("tab:flash", { tab: "activities" });
-
-    return id;
   }, []);
 
-  const removeActivity = useCallback((id: string) => {
+  const unsaveActivity = useCallback((id: string) => {
     setMemory(prev => ({
       ...prev,
-      activities: prev.activities.filter(a => a.id !== id),
-      // Adjust active index if needed
-      activeActivityIndex: prev.activeActivityIndex >= prev.activities.length - 1
-        ? Math.max(0, prev.activities.length - 2)
-        : prev.activeActivityIndex,
+      savedActivities: prev.savedActivities.filter(a => a.id !== id),
     }));
   }, []);
 
-  const updateActivity = useCallback((id: string, updates: Partial<ActivityEntry>) => {
+  const updateSavedActivity = useCallback((id: string, updates: Partial<ActivityEntry>) => {
     setMemory(prev => ({
       ...prev,
-      activities: prev.activities.map(a =>
-        a.id === id
-          ? { ...a, ...updates, userModified: true }
-          : a
+      savedActivities: prev.savedActivities.map(a =>
+        a.id === id ? { ...a, ...updates } : a
       ),
     }));
-
-    // Flash the activities tab to indicate an update
-    eventBus.emit("tab:flash", { tab: "activities" });
   }, []);
 
-  const updateMemoryBatch = useCallback((updater: (prev: ActivityMemory) => ActivityMemory) => {
-    setMemory(updater);
+  const getSavedActivitiesByDestination = useCallback((destinationId: string): ActivityEntry[] => {
+    return memory.savedActivities.filter(a => a.destinationId === destinationId);
+  }, [memory.savedActivities]);
+
+  const isActivitySaved = useCallback((viatorId: string): boolean => {
+    return memory.savedActivities.some(a => a.viatorId === viatorId);
+  }, [memory.savedActivities]);
+
+  // ============================================================================
+  // SEARCH CACHE
+  // ============================================================================
+
+  const setCachedSearch = useCallback((destinationId: string, activities: ActivityEntry[], query: string) => {
+    setMemory(prev => ({
+      ...prev,
+      searchCache: {
+        ...prev.searchCache,
+        [destinationId]: {
+          activities,
+          timestamp: Date.now(),
+          query,
+        },
+      },
+    }));
   }, []);
 
-  // ============================================================================
-  // GETTERS
-  // ============================================================================
+  const getCachedSearch = useCallback((destinationId: string): { activities: ActivityEntry[]; query: string } | null => {
+    const cache = memory.searchCache[destinationId];
+    if (!cache) return null;
 
-  const getActiveActivity = useCallback((): ActivityEntry | null => {
-    return memory.activities[memory.activeActivityIndex] || null;
-  }, [memory.activities, memory.activeActivityIndex]);
-
-  const getActivitiesByDestination = useCallback((destinationId: string): ActivityEntry[] => {
-    return memory.activities.filter(a => a.destinationId === destinationId);
-  }, [memory.activities]);
-
-  const getActivitiesByCity = useCallback((city: string): ActivityEntry[] => {
-    return memory.activities.filter(
-      a => a.city.toLowerCase() === city.toLowerCase()
-    );
-  }, [memory.activities]);
-
-  const getSerializedState = useCallback((): Record<string, unknown> => {
-    return {
-      totalActivities: memory.activities.length,
-      activitiesByCity: memory.activities.reduce((acc, activity) => {
-        if (!acc[activity.city]) {
-          acc[activity.city] = [];
-        }
-        acc[activity.city].push({
-          title: activity.title,
-          category: activity.category,
-          duration: activity.duration,
-          price: `${activity.priceMin}-${activity.priceMax}€`,
-        });
-        return acc;
-      }, {} as Record<string, any[]>),
-      defaultCategories: memory.defaultCategories,
-      defaultBudgetRange: memory.defaultBudgetRange,
-    };
-  }, [memory]);
-
-  // ============================================================================
-  // SETTERS
-  // ============================================================================
-
-  const setActiveActivity = useCallback((id: string) => {
-    const index = memory.activities.findIndex(a => a.id === id);
-    if (index >= 0) {
-      setMemory(prev => ({ ...prev, activeActivityIndex: index }));
+    // Cache valid for 1 hour
+    const ONE_HOUR = 60 * 60 * 1000;
+    if (Date.now() - cache.timestamp > ONE_HOUR) {
+      return null;
     }
-  }, [memory.activities]);
+
+    return { activities: cache.activities, query: cache.query };
+  }, [memory.searchCache]);
+
+  // ============================================================================
+  // ACTIVE DESTINATION
+  // ============================================================================
+
+  const setActiveDestination = useCallback((id: string | null) => {
+    setMemory(prev => ({ ...prev, activeDestinationId: id }));
+  }, []);
+
+  // ============================================================================
+  // PREFERENCES
+  // ============================================================================
 
   const setDefaultCategories = useCallback((categories: string[]) => {
     setMemory(prev => ({ ...prev, defaultCategories: categories }));
@@ -321,12 +441,115 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
     setMemory(prev => ({ ...prev, defaultBudgetRange: range }));
   }, []);
 
+  const setDefaultRatingMin = useCallback((rating: number) => {
+    setMemory(prev => ({ ...prev, defaultRatingMin: rating }));
+  }, []);
+
+  // ============================================================================
+  // DATE SYNCHRONIZATION
+  // ============================================================================
+
+  const syncDatesFromAccommodation = useCallback((
+    destinationId: string,
+    checkIn: Date | null,
+    checkOut: Date | null
+  ) => {
+    setMemory(prev => ({
+      ...prev,
+      savedActivities: prev.savedActivities.map(a => {
+        if (a.destinationId !== destinationId) return a;
+        if (a.userModifiedDates) return a; // User has override, don't sync
+
+        return {
+          ...a,
+          searchStartDate: checkIn,
+          searchEndDate: checkOut,
+          syncedFromAccommodation: true,
+        };
+      }),
+    }));
+  }, []);
+
+  // ============================================================================
+  // LEGACY API (backward compatibility with PlannerChat)
+  // ============================================================================
+
+  const addActivity = useCallback((activity: Partial<ActivityEntry>): string => {
+    const id = crypto.randomUUID();
+    
+    const newActivity: ActivityEntry = {
+      id,
+      destinationId: activity.destinationId || "",
+      city: activity.city || "",
+      country: activity.country || "",
+      countryCode: activity.countryCode || "",
+      title: activity.title || "Nouvelle activité",
+      description: activity.description,
+      fromPrice: activity.fromPrice ?? 0,
+      currency: activity.currency || "EUR",
+      isDiscounted: activity.isDiscounted || false,
+      rating: activity.rating ?? null,
+      reviewCount: activity.reviewCount ?? 0,
+      durationMinutes: activity.durationMinutes ?? 120,
+      durationFormatted: activity.durationFormatted || "2h",
+      categories: activity.categories || [],
+      flags: activity.flags || [],
+      searchStartDate: activity.searchStartDate || null,
+      searchEndDate: activity.searchEndDate || null,
+      plannedDate: activity.plannedDate || null,
+      timeSlot: activity.timeSlot || null,
+      syncedFromAccommodation: activity.syncedFromAccommodation || false,
+      userModifiedDates: activity.userModifiedDates || false,
+      isSaved: true,
+    };
+
+    setMemory(prev => ({
+      ...prev,
+      savedActivities: [...prev.savedActivities, newActivity],
+    }));
+
+    eventBus.emit("tab:flash", { tab: "activities" });
+    return id;
+  }, []);
+
+  const updateActivity = useCallback((id: string, updates: Partial<ActivityEntry>) => {
+    updateSavedActivity(id, updates);
+  }, [updateSavedActivity]);
+
+  const removeActivity = useCallback((id: string) => {
+    unsaveActivity(id);
+  }, [unsaveActivity]);
+
+  const getActivitiesByCity = useCallback((city: string): ActivityEntry[] => {
+    return memory.savedActivities.filter(
+      a => a.city.toLowerCase() === city.toLowerCase()
+    );
+  }, [memory.savedActivities]);
+
   // ============================================================================
   // COMPUTED VALUES
   // ============================================================================
 
-  const totalActivitiesCount = useMemo(() => memory.activities.length, [memory.activities]);
-  const isReadyToSearch = useMemo(() => memory.activities.length > 0, [memory.activities]);
+  const totalSavedCount = useMemo(() => memory.savedActivities.length, [memory.savedActivities]);
+
+  const getSerializedState = useCallback((): Record<string, unknown> => {
+    return {
+      totalSaved: memory.savedActivities.length,
+      savedByCity: memory.savedActivities.reduce((acc, activity) => {
+        if (!acc[activity.city]) {
+          acc[activity.city] = [];
+        }
+        acc[activity.city].push({
+          title: activity.title,
+          price: `${activity.fromPrice}€`,
+          duration: activity.durationFormatted,
+        });
+        return acc;
+      }, {} as Record<string, any[]>),
+      defaultCategories: memory.defaultCategories,
+      defaultBudgetRange: memory.defaultBudgetRange,
+    };
+  }, [memory]);
 
   // ============================================================================
   // CONTEXT VALUE
@@ -334,34 +557,45 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<ActivityMemoryContextValue>(() => ({
     memory,
-    addActivity,
-    removeActivity,
-    updateActivity,
-    updateMemoryBatch,
-    getActiveActivity,
-    getActivitiesByDestination,
-    getActivitiesByCity,
-    setActiveActivity,
+    saveActivity,
+    unsaveActivity,
+    updateSavedActivity,
+    getSavedActivitiesByDestination,
+    isActivitySaved,
+    setCachedSearch,
+    getCachedSearch,
+    setActiveDestination,
     setDefaultCategories,
     setDefaultBudgetRange,
-    totalActivitiesCount,
-    isReadyToSearch,
+    setDefaultRatingMin,
+    syncDatesFromAccommodation,
+    totalSavedCount,
     getSerializedState,
+    // Legacy API
+    addActivity,
+    updateActivity,
+    removeActivity,
+    getActivitiesByCity,
   }), [
     memory,
-    addActivity,
-    removeActivity,
-    updateActivity,
-    updateMemoryBatch,
-    getActiveActivity,
-    getActivitiesByDestination,
-    getActivitiesByCity,
-    setActiveActivity,
+    saveActivity,
+    unsaveActivity,
+    updateSavedActivity,
+    getSavedActivitiesByDestination,
+    isActivitySaved,
+    setCachedSearch,
+    getCachedSearch,
+    setActiveDestination,
     setDefaultCategories,
     setDefaultBudgetRange,
-    totalActivitiesCount,
-    isReadyToSearch,
+    setDefaultRatingMin,
+    syncDatesFromAccommodation,
+    totalSavedCount,
     getSerializedState,
+    addActivity,
+    updateActivity,
+    removeActivity,
+    getActivitiesByCity,
   ]);
 
   return (
