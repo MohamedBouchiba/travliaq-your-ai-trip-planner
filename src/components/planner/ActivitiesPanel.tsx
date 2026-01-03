@@ -382,17 +382,20 @@ const ActivitiesPanel = () => {
         throw new Error(error.message || "Erreur lors de la recherche");
       }
 
-      // API returns: { success, results: { activities, total, page, limit } }
-      const activities = data?.results?.activities || data?.activities || [];
-      
-      if (activities.length > 0) {
-        setSearchResults(activities);
+      // API V2: Separate pools - activities_list for panel, attractions for map
+      const activities = data?.results?.activities_list || data?.results?.activities || data?.activities || [];
+      const attractions = data?.results?.attractions || [];
+
+      if (activities.length > 0 || attractions.length > 0) {
+        setSearchResults(activities);  // Only activities in list (attractions shown on map as pins)
         setCurrentView("results");
-        console.log(`[Activities] Found ${activities.length} activities for ${activeCity.city}`);
+        console.log(
+          `[Activities] Found ${activities.length} activities + ${attractions.length} attractions for ${activeCity.city}`
+        );
       } else {
         setSearchResults([]);
         setCurrentView("results");
-        console.log(`[Activities] No activities found for ${activeCity.city}`);
+        console.log(`[Activities] No results found for ${activeCity.city}`);
       }
     } catch (error: any) {
       console.error("[Activities] Search error:", error);

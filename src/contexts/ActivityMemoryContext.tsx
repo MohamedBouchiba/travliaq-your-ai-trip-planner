@@ -32,12 +32,18 @@ export type { ActivityEntry, ViatorActivity, ActivityFilters } from "@/types/act
 
 export interface ActivitySearchState {
   isSearching: boolean;
-  searchResults: ViatorActivity[];
+  searchResults: ViatorActivity[];  // V1: Combined list (deprecated, kept for backward compat)
   totalResults: number;
   currentPage: number;
   hasMore: boolean;
   lastSearchParams: ActivitySearchParams | null;
   error: string | null;
+
+  // V2: Separate pools for UX refactor
+  attractions: ViatorActivity[];     // Top 15 attractions for map pins
+  activities: ViatorActivity[];      // Filtered activities for list display
+  totalAttractions: number;
+  totalActivities: number;
 }
 
 // Destination for activities
@@ -131,12 +137,18 @@ const defaultMemory: ActivityMemory = {
   localDestinations: [], // Only locally added destinations
   search: {
     isSearching: false,
-    searchResults: [],
+    searchResults: [],  // V1: deprecated
     totalResults: 0,
     currentPage: 1,
     hasMore: false,
     lastSearchParams: null,
     error: null,
+
+    // V2: Separate pools
+    attractions: [],
+    activities: [],
+    totalAttractions: 0,
+    totalActivities: 0,
   },
   recommendations: [],
   isLoadingRecommendations: false,
@@ -337,11 +349,18 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
           search: {
             ...prev.search,
             isSearching: false,
-            searchResults: cached.results.activities,
-            totalResults: cached.results.total_count,
+            // V1 fields
+            searchResults: cached.results.activities || [],
+            totalResults: cached.results.total_count || cached.results.total || 0,
             currentPage: params.page || 1,
-            hasMore: cached.results.has_more,
+            hasMore: cached.results.has_more || false,
             lastSearchParams: params,
+
+            // V2 fields
+            attractions: cached.results.attractions || [],
+            activities: cached.results.activities_list || cached.results.activities || [],
+            totalAttractions: cached.results.total_attractions || 0,
+            totalActivities: cached.results.total_activities || cached.results.total_count || 0,
           },
         }));
         return;
@@ -358,11 +377,18 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
         search: {
           ...prev.search,
           isSearching: false,
-          searchResults: response.results.activities,
-          totalResults: response.results.total_count,
+          // V1 fields (backward compat)
+          searchResults: response.results.activities || [],  // Fallback to old format
+          totalResults: response.results.total_count || response.results.total || 0,
           currentPage: params.page || 1,
-          hasMore: response.results.has_more,
+          hasMore: response.results.has_more || false,
           lastSearchParams: params,
+
+          // V2 fields (NEW - separate pools)
+          attractions: response.results.attractions || [],
+          activities: response.results.activities_list || response.results.activities || [],
+          totalAttractions: response.results.total_attractions || 0,
+          totalActivities: response.results.total_activities || response.results.total_count || 0,
         },
       }));
     } catch (error: any) {
@@ -398,9 +424,18 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
         search: {
           ...prev.search,
           isSearching: false,
-          searchResults: [...prev.search.searchResults, ...response.results.activities],
+          // V1 fields (append to existing)
+          searchResults: [...prev.search.searchResults, ...(response.results.activities || [])],
           currentPage: nextPage,
-          hasMore: response.results.has_more,
+          hasMore: response.results.has_more || false,
+
+          // V2 fields
+          // Attractions: Keep same top 15 (don't paginate)
+          attractions: response.results.attractions || prev.search.attractions,
+          // Activities: Append new page
+          activities: [...prev.search.activities, ...(response.results.activities_list || response.results.activities || [])],
+          totalAttractions: response.results.total_attractions || prev.search.totalAttractions,
+          totalActivities: response.results.total_activities || response.results.total_count || prev.search.totalActivities,
         },
       }));
     } catch (error: any) {

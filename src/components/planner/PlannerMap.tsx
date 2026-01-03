@@ -1290,11 +1290,135 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     };
   }, [activeTab, mapLoaded, activityAllDestinations]);
 
+  // Display attraction pins from search results (V2: separate from activities list)
+  const attractionPinsRef = useRef<mapboxgl.Marker[]>([]);
+
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    // Clear existing attraction pins
+    attractionPinsRef.current.forEach((marker) => marker.remove());
+    attractionPinsRef.current = [];
+
+    // Only show on activities tab
+    if (activeTab !== "activities") return;
+
+    // Get top 15 attractions from search results (V2)
+    const attractions = activityState.search.attractions || [];
+
+    if (attractions.length === 0) return;
+
+    attractions.forEach((attraction, idx) => {
+      const coords = attraction.location?.coordinates;
+      if (!coords?.lat || !coords?.lon) return;
+
+      // Create attraction pin - orange with landmark icon 🏛️
+      const el = document.createElement("div");
+      el.className = "attraction-pin";
+      el.innerHTML = `
+        <div style="
+          width: 44px;
+          height: 54px;
+          position: relative;
+          cursor: pointer;
+          filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25));
+          animation: pinDrop 0.4s ease-out ${idx * 0.08}s forwards;
+          opacity: 0;
+        ">
+          <div style="
+            width: 42px;
+            height: 42px;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            background: linear-gradient(135deg, hsl(25,95%,53%), hsl(25,95%,43%));
+            border: 3px solid white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 -2px 4px rgba(0,0,0,0.15);
+          ">
+            <span style="
+              transform: rotate(45deg);
+              font-size: 20px;
+              filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2));
+            ">🏛️</span>
+          </div>
+        </div>
+        <style>
+          @keyframes pinDrop {
+            0% { opacity: 0; transform: translateY(-20px); }
+            60% { opacity: 1; transform: translateY(5px); }
+            100% { opacity: 1; transform: translateY(0); }
+          }
+        </style>
+      `;
+
+      // Create hover tooltip (compact preview)
+      const tooltip = new mapboxgl.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        offset: [0, -50],
+        className: "attraction-tooltip",
+      });
+
+      const imageUrl = attraction.images?.[0]?.variants?.medium || attraction.images?.[0]?.url;
+      const rating = attraction.rating?.average || 0;
+
+      // Hover effects + tooltip
+      const pinEl = el.querySelector("div") as HTMLElement;
+      pinEl?.addEventListener("mouseenter", () => {
+        pinEl.style.filter = "drop-shadow(0 6px 12px rgba(255,87,34,0.45))";
+        pinEl.style.transform = "scale(1.08)";
+
+        // Show tooltip
+        tooltip.setHTML(`
+          <div class="bg-card border rounded-lg shadow-xl w-64 overflow-hidden">
+            ${imageUrl ? `<img src="${imageUrl}" class="w-full h-32 object-cover" alt="${attraction.title}" />` : ''}
+            <div class="p-3">
+              <h4 class="font-semibold text-sm line-clamp-2 mb-2">${attraction.title}</h4>
+              <div class="flex items-center gap-1">
+                <span class="text-amber-400">★</span>
+                <span class="text-xs font-medium">${rating.toFixed(1)}</span>
+                <span class="text-xs text-muted-foreground ml-1">(${attraction.rating?.count || 0} avis)</span>
+              </div>
+            </div>
+          </div>
+        `).setLngLat([coords.lon, coords.lat]).addTo(map.current!);
+      });
+
+      pinEl?.addEventListener("mouseleave", () => {
+        pinEl.style.filter = "drop-shadow(0 4px 8px rgba(0,0,0,0.25))";
+        pinEl.style.transform = "scale(1)";
+
+        // Hide tooltip
+        tooltip.remove();
+      });
+
+      // Click handler - emit event for detailed popup
+      pinEl?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        tooltip.remove(); // Remove hover tooltip
+        eventBus.emit("attraction:click", { attraction });
+      });
+
+      const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
+        .setLngLat([coords.lon, coords.lat])
+        .addTo(map.current!);
+
+      attractionPinsRef.current.push(marker);
+    });
+
+    return () => {
+      attractionPinsRef.current.forEach((marker) => marker.remove());
+      attractionPinsRef.current = [];
+    };
+  }, [activeTab, mapLoaded, activityState.search.attractions]);
+
   // Update map center/zoom with fast animation
   useEffect(() => {
     if (!map.current) return;
-    map.current.flyTo({ 
-      center: [center[0], center[1]], 
+    map.current.flyTo({
+      center: [center[0], center[1]],
       zoom,
       duration: 800, // Fast animation (was default ~2500ms)
       essential: true,
