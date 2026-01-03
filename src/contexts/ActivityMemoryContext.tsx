@@ -14,6 +14,7 @@ import { usePreferenceMemory } from "./PreferenceMemoryContext";
 import { useAccommodationMemory } from "./AccommodationMemoryContext";
 import { eventBus } from "@/lib/eventBus";
 import { activityService, recommendationService, activityCacheService } from "@/services/activities";
+import { travliaqClient } from "@/services/api/travliaqClient";
 import type {
   ActivityEntry,
   ViatorActivity,
@@ -90,6 +91,16 @@ interface ActivityMemoryContextValue {
 
   // Search operations
   searchActivities: (params: ActivitySearchParams) => Promise<void>;
+  searchActivitiesByBounds: (params: {
+    bounds: { north: number; south: number; east: number; west: number };
+    startDate: string;
+    endDate?: string;
+    categories?: string[];
+    priceRange?: { min?: number; max?: number };
+    ratingMin?: number;
+    currency?: string;
+    language?: string;
+  }) => Promise<{ attractions: ViatorActivity[]; activities: ViatorActivity[]; totalAttractions: number; totalActivities: number }>;
   loadMoreResults: () => Promise<void>;
   clearSearch: () => void;
 
@@ -455,6 +466,103 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  /**
+   * Search activities by map bounds (viewport search)
+   */
+  const searchActivitiesByBounds = useCallback(async (params: {
+    bounds: {
+      north: number;
+      south: number;
+      east: number;
+      west: number;
+    };
+    startDate: string;
+    endDate?: string;
+    categories?: string[];
+    priceRange?: { min?: number; max?: number };
+    ratingMin?: number;
+    currency?: string;
+    language?: string;
+  }) => {
+    setState((prev) => ({
+      ...prev,
+      search: {
+        ...prev.search,
+        isSearching: true,
+        error: null,
+      },
+    }));
+
+    try {
+      // Call API with bounds
+      const { data } = await travliaqClient.post<ActivitySearchResponse>(
+        '/api/v1/activities/search',
+        {
+          search_mode: 'both',
+          location: {
+            geo: {
+              bounds: params.bounds,
+            },
+          },
+          dates: {
+            start: params.startDate,
+            end: params.endDate,
+          },
+          filters: {
+            categories: params.categories,
+            price_range: params.priceRange,
+            rating_min: params.ratingMin,
+          },
+          currency: params.currency || 'EUR',
+          language: params.language || 'fr',
+          pagination: {
+            page: 1,
+            limit: 40,
+          },
+        }
+      );
+
+      setState((prev) => ({
+        ...prev,
+        search: {
+          ...prev.search,
+          isSearching: false,
+          // V1 fields (backward compat)
+          searchResults: data.results.activities || [],
+          totalResults: data.results.total_count || data.results.total || 0,
+          currentPage: 1,
+          hasMore: data.results.has_more || false,
+          lastSearchParams: null, // Bounds search doesn't use standard params
+
+          // V2 fields (NEW - separate pools)
+          attractions: data.results.attractions || [],
+          activities: data.results.activities_list || data.results.activities || [],
+          totalAttractions: data.results.total_attractions || 0,
+          totalActivities: data.results.total_activities || data.results.total_count || 0,
+        },
+      }));
+
+      return {
+        attractions: data.results.attractions || [],
+        activities: data.results.activities_list || data.results.activities || [],
+        totalAttractions: data.results.total_attractions || 0,
+        totalActivities: data.results.total_activities || data.results.total_count || 0,
+      };
+    } catch (error: any) {
+      setState((prev) => ({
+        ...prev,
+        search: {
+          ...prev.search,
+          isSearching: false,
+          error: error.message || 'Erreur lors de la recherche par zone',
+        },
+      }));
+
+      toast.error(error.message || 'Erreur lors de la recherche d\'activités dans cette zone');
+      throw error;
+    }
+  }, []);
+
   // ============================================================================
   // RECOMMENDATIONS
   // ============================================================================
@@ -760,6 +868,7 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
       state,
       allDestinations, // Computed: accommodations + local
       searchActivities,
+      searchActivitiesByBounds,
       loadMoreResults,
       clearSearch,
       loadRecommendations,
@@ -783,6 +892,7 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
       state,
       allDestinations,
       searchActivities,
+      searchActivitiesByBounds,
       loadMoreResults,
       clearSearch,
       loadRecommendations,

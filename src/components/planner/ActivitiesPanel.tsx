@@ -30,7 +30,6 @@ import { toast } from "sonner";
 import { eventBus } from "@/lib/eventBus";
 import { format, differenceInDays } from "date-fns";
 import { fr } from "date-fns/locale";
-import { supabase } from "@/integrations/supabase/client";
 import type { ViatorActivity } from "@/types/activity";
 import RangeCalendar from "@/components/RangeCalendar";
 import type { DateRange } from "react-day-picker";
@@ -246,6 +245,7 @@ const ActivitiesPanel = () => {
     state: activityState,
     allDestinations, // Computed: inherited from accommodations + local
     searchActivities,
+    searchActivitiesByBounds,
     clearSearch,
     loadRecommendations,
     addActivityFromSearch,
@@ -341,74 +341,40 @@ const ActivitiesPanel = () => {
     return breakdown;
   }, [sortedSearchResults]);
 
-  // Handle search using Supabase edge function
+  // Handle search using context method
   const handleSearch = useCallback(async () => {
     if (!activeCity) {
       toast.error("Veuillez sélectionner une ville");
       return;
     }
 
-    setIsSearching(true);
-    setSearchError(null);
-
     try {
-      const requestBody = {
-        search_mode: "both",  // Enable unified search (activities + attractions with 50/50 balancing)
-        location: {
-          city: activeCity.city,
-          country_code: activeCity.countryCode,
+      await searchActivities({
+        city: activeCity.city,
+        countryCode: activeCity.countryCode,
+        startDate: activeCity.checkIn?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0],
+        endDate: activeCity.checkOut?.toISOString().split("T")[0],
+        categories: activityState.activeFilters.categories,
+        priceRange: {
+          min: activityState.activeFilters.priceRange[0],
+          max: activityState.activeFilters.priceRange[1],
         },
-        dates: {
-          start: activeCity.checkIn?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0],
-          end: activeCity.checkOut?.toISOString().split("T")[0],
-        },
-        filters: {
-          categories: activityState.activeFilters.categories,
-          price_range: {
-            min: activityState.activeFilters.priceRange[0],
-            max: activityState.activeFilters.priceRange[1],
-          },
-          rating_min: activityState.activeFilters.ratingMin,
-        },
+        ratingMin: activityState.activeFilters.ratingMin,
         currency: "EUR",
         language: "fr",
-        pagination: {
-          page: 1,
-          limit: 50,  // Increased from 20 to leverage backend 50/50 balancing
-        },
-      };
-
-      const { data, error } = await supabase.functions.invoke("activities-search", {
-        body: requestBody,
+        page: 1,
+        limit: 40,
       });
 
-      if (error) {
-        throw new Error(error.message || "Erreur lors de la recherche");
-      }
-
-      // API V2: Separate pools - activities_list for panel, attractions for map
-      const activities = data?.results?.activities_list || data?.results?.activities || data?.activities || [];
-      const attractions = data?.results?.attractions || [];
-
-      if (activities.length > 0 || attractions.length > 0) {
-        setSearchResults(activities);  // Only activities in list (attractions shown on map as pins)
-        setCurrentView("results");
-        console.log(
-          `[Activities] Found ${activities.length} activities + ${attractions.length} attractions for ${activeCity.city}`
-        );
-      } else {
-        setSearchResults([]);
-        setCurrentView("results");
-        console.log(`[Activities] No results found for ${activeCity.city}`);
-      }
+      setCurrentView("results");
+      console.log(
+        `[Activities] Search completed for ${activeCity.city}`
+      );
     } catch (error: any) {
       console.error("[Activities] Search error:", error);
-      setSearchError(error.message || "Erreur lors de la recherche");
       setCurrentView("results");
-    } finally {
-      setIsSearching(false);
     }
-  }, [activeCity, activityState.activeFilters]);
+  }, [activeCity, activityState.activeFilters, searchActivities]);
 
   // Handle map bounds search (search in visible map area)
   const handleMapBoundsSearch = useCallback(async () => {
@@ -417,8 +383,6 @@ const ActivitiesPanel = () => {
       return;
     }
 
-    setIsSearching(true);
-    setSearchError(null);
     eventBus.emit("map:searchInAreaStatus", { isSearching: true });
 
     try {
@@ -446,66 +410,39 @@ const ActivitiesPanel = () => {
         return;
       }
 
-      const requestBody = {
-        search_mode: "both",
-        location: {
-          geo: {
-            bounds: mapBounds,  // Use map viewport bounds instead of city
-          },
+      // Use context method to search by bounds
+      const result = await searchActivitiesByBounds({
+        bounds: mapBounds,
+        startDate: activeCity.checkIn?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0],
+        endDate: activeCity.checkOut?.toISOString().split("T")[0],
+        categories: activityState.activeFilters.categories,
+        priceRange: {
+          min: activityState.activeFilters.priceRange[0],
+          max: activityState.activeFilters.priceRange[1],
         },
-        dates: {
-          start: activeCity.checkIn?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0],
-          end: activeCity.checkOut?.toISOString().split("T")[0],
-        },
-        filters: {
-          categories: activityState.activeFilters.categories,
-          price_range: {
-            min: activityState.activeFilters.priceRange[0],
-            max: activityState.activeFilters.priceRange[1],
-          },
-          rating_min: activityState.activeFilters.ratingMin,
-        },
+        ratingMin: activityState.activeFilters.ratingMin,
         currency: "EUR",
         language: "fr",
-        pagination: {
-          page: 1,
-          limit: 40,  // Fetch 40 activities
-        },
-      };
-
-      const { data, error } = await supabase.functions.invoke("activities-search", {
-        body: requestBody,
       });
 
-      if (error) {
-        throw new Error(error.message || "Erreur lors de la recherche");
-      }
-
-      const activities = data?.results?.activities_list || data?.results?.activities || data?.activities || [];
-      const attractions = data?.results?.attractions || [];
-
-      if (activities.length > 0 || attractions.length > 0) {
-        setSearchResults(activities);
+      if (result.activities.length > 0 || result.attractions.length > 0) {
         setCurrentView("results");
-        toast.success(`${attractions.length} attractions et ${activities.length} activités trouvées dans cette zone`);
+        toast.success(`${result.attractions.length} attractions et ${result.activities.length} activités trouvées dans cette zone`);
         console.log(
-          `[Activities] Map bounds search: ${activities.length} activities + ${attractions.length} attractions`
+          `[Activities] Map bounds search: ${result.activities.length} activities + ${result.attractions.length} attractions`
         );
       } else {
-        setSearchResults([]);
         setCurrentView("results");
         toast.info("Aucune activité trouvée dans cette zone");
       }
     } catch (error: any) {
       console.error("[Activities] Map bounds search error:", error);
-      setSearchError(error.message || "Erreur lors de la recherche");
       toast.error("Erreur lors de la recherche dans cette zone");
       setCurrentView("results");
     } finally {
-      setIsSearching(false);
       eventBus.emit("map:searchInAreaStatus", { isSearching: false });
     }
-  }, [activeCity, activityState.activeFilters]);
+  }, [activeCity, activityState.activeFilters, searchActivitiesByBounds]);
 
   // Handle add activity
   const handleAddActivity = useCallback(
@@ -637,9 +574,8 @@ const ActivitiesPanel = () => {
   // Back to filters
   const handleBackToFilters = useCallback(() => {
     setCurrentView("filters");
-    setSearchResults([]);
-    setSearchError(null);
-  }, []);
+    clearSearch();
+  }, [clearSearch]);
 
   // Load recommendations
   const handleLoadRecommendations = useCallback(() => {
