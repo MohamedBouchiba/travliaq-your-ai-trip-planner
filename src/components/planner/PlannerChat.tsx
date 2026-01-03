@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from "react";
-import { Plane, History } from "lucide-react";
+import { Plane, History, User, Send } from "lucide-react";
+import logo from "@/assets/logo-travliaq.png";
 import { ChatHistorySidebar } from "./ChatHistorySidebar";
 import { useChatSessions, type StoredMessage } from "@/hooks/useChatSessions";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,7 @@ import {
   AirportButton,
   DualAirportSelection,
   AirportConfirmationWidget,
+  MarkdownMessage,
 } from "./chat/widgets";
 import { getCityCoords } from "./chat/types";
 import type { CountrySelectionEvent } from "@/types/flight";

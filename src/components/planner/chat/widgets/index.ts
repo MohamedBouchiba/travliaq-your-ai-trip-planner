@@ -8,3 +8,4 @@ export { TravelersWidget, TravelersConfirmBeforeSearchWidget } from "./Travelers
 export { TripTypeConfirmWidget } from "./TripTypeWidget";
 export { CitySelectionWidget } from "./CitySelectionWidget";
 export { AirportButton, DualAirportSelection, AirportConfirmationWidget } from "./AirportWidgets";
+export { MarkdownMessage } from "./MarkdownMessage";

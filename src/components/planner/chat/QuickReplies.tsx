@@ -36,7 +36,8 @@ export function QuickReplies({
         break;
 
       case "emitEvent":
-        eventBus.emit(action.event as keyof typeof eventBus, action.payload);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        eventBus.emit(action.event as any, action.payload);
         break;
 
       case "navigate":
