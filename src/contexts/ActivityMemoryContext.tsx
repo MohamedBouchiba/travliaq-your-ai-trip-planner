@@ -355,23 +355,24 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
       const cached = activityCacheService.get<ActivitySearchResponse>('search', params);
 
       if (cached) {
+        const activities = cached.results.activities || [];
         setState((prev) => ({
           ...prev,
           search: {
             ...prev.search,
             isSearching: false,
             // V1 fields
-            searchResults: cached.results.activities || [],
-            totalResults: cached.results.total_count || cached.results.total || 0,
+            searchResults: activities,
+            totalResults: cached.results.total_count || 0,
             currentPage: params.page || 1,
             hasMore: cached.results.has_more || false,
             lastSearchParams: params,
 
-            // V2 fields
-            attractions: cached.results.attractions || [],
-            activities: cached.results.activities_list || cached.results.activities || [],
-            totalAttractions: cached.results.total_attractions || 0,
-            totalActivities: cached.results.total_activities || cached.results.total_count || 0,
+            // V2 fields - use same activities for both (API doesn't separate)
+            attractions: activities.slice(0, 15), // Top 15 for map pins
+            activities: activities,
+            totalAttractions: Math.min(activities.length, 15),
+            totalActivities: cached.results.total_count || activities.length,
           },
         }));
         return;
@@ -383,23 +384,24 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
       // Cache response
       activityCacheService.set('search', params, response);
 
+      const activities = response.results.activities || [];
       setState((prev) => ({
         ...prev,
         search: {
           ...prev.search,
           isSearching: false,
           // V1 fields (backward compat)
-          searchResults: response.results.activities || [],  // Fallback to old format
-          totalResults: response.results.total_count || response.results.total || 0,
+          searchResults: activities,
+          totalResults: response.results.total_count || activities.length,
           currentPage: params.page || 1,
           hasMore: response.results.has_more || false,
           lastSearchParams: params,
 
-          // V2 fields (NEW - separate pools)
-          attractions: response.results.attractions || [],
-          activities: response.results.activities_list || response.results.activities || [],
-          totalAttractions: response.results.total_attractions || 0,
-          totalActivities: response.results.total_activities || response.results.total_count || 0,
+          // V2 fields - use same activities for both (API doesn't separate)
+          attractions: activities.slice(0, 15), // Top 15 for map pins
+          activities: activities,
+          totalAttractions: Math.min(activities.length, 15),
+          totalActivities: response.results.total_count || activities.length,
         },
       }));
     } catch (error: any) {
@@ -440,13 +442,11 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
           currentPage: nextPage,
           hasMore: response.results.has_more || false,
 
-          // V2 fields
-          // Attractions: Keep same top 15 (don't paginate)
-          attractions: response.results.attractions || prev.search.attractions,
-          // Activities: Append new page
-          activities: [...prev.search.activities, ...(response.results.activities_list || response.results.activities || [])],
-          totalAttractions: response.results.total_attractions || prev.search.totalAttractions,
-          totalActivities: response.results.total_activities || response.results.total_count || prev.search.totalActivities,
+          // V2 fields - keep attractions (top 15), append activities
+          attractions: prev.search.attractions, // Keep original top 15
+          activities: [...prev.search.activities, ...(response.results.activities || [])],
+          totalAttractions: prev.search.totalAttractions,
+          totalActivities: response.results.total_count || prev.search.totalActivities,
         },
       }));
     } catch (error: any) {
@@ -522,31 +522,32 @@ export function ActivityMemoryProvider({ children }: { children: ReactNode }) {
         }
       );
 
+      const activities = data.results.activities || [];
       setState((prev) => ({
         ...prev,
         search: {
           ...prev.search,
           isSearching: false,
           // V1 fields (backward compat)
-          searchResults: data.results.activities || [],
-          totalResults: data.results.total_count || data.results.total || 0,
+          searchResults: activities,
+          totalResults: data.results.total_count || activities.length,
           currentPage: 1,
           hasMore: data.results.has_more || false,
           lastSearchParams: null, // Bounds search doesn't use standard params
 
-          // V2 fields (NEW - separate pools)
-          attractions: data.results.attractions || [],
-          activities: data.results.activities_list || data.results.activities || [],
-          totalAttractions: data.results.total_attractions || 0,
-          totalActivities: data.results.total_activities || data.results.total_count || 0,
+          // V2 fields - use same activities for both
+          attractions: activities.slice(0, 15), // Top 15 for map pins
+          activities: activities,
+          totalAttractions: Math.min(activities.length, 15),
+          totalActivities: data.results.total_count || activities.length,
         },
       }));
 
       return {
-        attractions: data.results.attractions || [],
-        activities: data.results.activities_list || data.results.activities || [],
-        totalAttractions: data.results.total_attractions || 0,
-        totalActivities: data.results.total_activities || data.results.total_count || 0,
+        attractions: activities.slice(0, 15),
+        activities: activities,
+        totalAttractions: Math.min(activities.length, 15),
+        totalActivities: data.results.total_count || activities.length,
       };
     } catch (error: any) {
       setState((prev) => ({

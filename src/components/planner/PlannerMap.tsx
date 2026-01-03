@@ -1349,8 +1349,12 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     if (attractions.length === 0) return;
 
     attractions.forEach((attraction, idx) => {
-      const coords = attraction.location?.coordinates;
-      if (!coords?.lat || !coords?.lon) return;
+      // Use coordinates from the activity (can be in coordinates or location.coordinates)
+      const coords = attraction.coordinates || attraction.location?.coordinates;
+      if (!coords) return;
+      const lat = coords.lat;
+      const lng = 'lng' in coords ? coords.lng : ('lon' in coords ? (coords as any).lon : null);
+      if (!lat || !lng) return;
 
       // Create attraction pin - orange with landmark icon 🏛️
       const el = document.createElement("div");
@@ -1423,7 +1427,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
               </div>
             </div>
           </div>
-        `).setLngLat([coords.lon, coords.lat]).addTo(map.current!);
+        `).setLngLat([lng, lat]).addTo(map.current!);
       });
 
       pinEl?.addEventListener("mouseleave", () => {
@@ -1442,7 +1446,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       });
 
       const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
-        .setLngLat([coords.lon, coords.lat])
+        .setLngLat([lng, lat])
         .addTo(map.current!);
 
       attractionPinsRef.current.push(marker);
