@@ -310,11 +310,17 @@ const ActivitiesPanel = () => {
   // Get planned activities for current city
   const plannedActivities = activeCity ? getActivitiesByDestination(activeCity.id) : [];
 
-  // Sort search results
+  // Filter to show only activities (not attractions) in the list
+  // Attractions are shown only as pins on the map
+  const activitiesOnlyResults = useMemo(() => {
+    return searchResults.filter((item) => item.type !== "attraction");
+  }, [searchResults]);
+
+  // Sort search results (activities only)
   const sortedSearchResults = useMemo(() => {
-    if (sortBy === "default" || searchResults.length === 0) return searchResults;
+    if (sortBy === "default" || activitiesOnlyResults.length === 0) return activitiesOnlyResults;
     
-    const sorted = [...searchResults];
+    const sorted = [...activitiesOnlyResults];
     switch (sortBy) {
       case "price_asc":
         return sorted.sort((a, b) => (a.pricing?.from_price || 0) - (b.pricing?.from_price || 0));
@@ -327,19 +333,12 @@ const ActivitiesPanel = () => {
       default:
         return sorted;
     }
-  }, [searchResults, sortBy]);
+  }, [activitiesOnlyResults, sortBy]);
 
-  // Calculate type breakdown for unified search results
-  const typeBreakdown = useMemo(() => {
-    const breakdown = { activity: 0, attraction: 0 };
-    sortedSearchResults.forEach((item) => {
-      const type = item.type || "activity";
-      if (type === "activity" || type === "attraction") {
-        breakdown[type]++;
-      }
-    });
-    return breakdown;
-  }, [sortedSearchResults]);
+  // Count attractions for display info
+  const attractionsCount = useMemo(() => {
+    return searchResults.filter((item) => item.type === "attraction").length;
+  }, [searchResults]);
 
   // Handle search using context method
   const handleSearch = useCallback(async () => {
@@ -904,12 +903,12 @@ const ActivitiesPanel = () => {
               {!searchError && sortedSearchResults.length > 0 && (
                 <div className="flex flex-col gap-0.5">
                   <p className="text-xs font-medium text-foreground">
-                    {sortedSearchResults.length} résultat{sortedSearchResults.length > 1 ? "s" : ""} trouvé{sortedSearchResults.length > 1 ? "s" : ""}
+                    {sortedSearchResults.length} activité{sortedSearchResults.length > 1 ? "s" : ""} trouvée{sortedSearchResults.length > 1 ? "s" : ""}
                   </p>
-                  {/* Breakdown if both types present (unified search) */}
-                  {typeBreakdown.activity > 0 && typeBreakdown.attraction > 0 && (
+                  {/* Show attractions count if any */}
+                  {attractionsCount > 0 && (
                     <p className="text-xs text-muted-foreground">
-                      {typeBreakdown.activity} activité{typeBreakdown.activity > 1 ? "s" : ""} · {typeBreakdown.attraction} attraction{typeBreakdown.attraction > 1 ? "s" : ""}
+                      + {attractionsCount} attraction{attractionsCount > 1 ? "s" : ""} sur la carte
                     </p>
                   )}
                 </div>
