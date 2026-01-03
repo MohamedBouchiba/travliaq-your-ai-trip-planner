@@ -50,6 +50,10 @@ export interface ActivityLocation {
   destination: string;
   country: string;
   city?: string;
+  coordinates?: {
+    lat: number;
+    lon: number;
+  };
 }
 
 /**

@@ -531,7 +531,7 @@ const ActivitiesPanel = () => {
     if (newCityData.lat && newCityData.lng) {
       eventBus.emit("map:zoom", {
         center: [newCityData.lng, newCityData.lat] as [number, number],
-        zoom: 12,
+        zoom: 10,
       });
     }
   }, [newCityData, newCityCheckIn, newCityCheckOut, addLocalDestination]);
@@ -592,7 +592,7 @@ const ActivitiesPanel = () => {
     if (city?.lat && city?.lng) {
       eventBus.emit("map:zoom", {
         center: [city.lng, city.lat] as [number, number],
-        zoom: 12,
+        zoom: 10,
       });
     }
   }, [cities]);
