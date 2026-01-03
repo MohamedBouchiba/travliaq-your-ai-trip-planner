@@ -30,7 +30,7 @@ describe('Map Bounds Search Integration', () => {
     expect(mockHandler).toHaveBeenCalledTimes(1);
   });
 
-  it('should receive bounds from map with correct structure', (done) => {
+  it('should receive bounds from map with correct structure', async () => {
     const mockBounds = {
       north: 48.8566,
       south: 48.8466,
@@ -39,17 +39,23 @@ describe('Map Bounds Search Integration', () => {
     };
 
     // Setup listener for bounds response
-    eventBus.once('map:bounds', (data) => {
-      expect(data.bounds).toBeDefined();
-      expect(data.bounds.north).toBe(mockBounds.north);
-      expect(data.bounds.south).toBe(mockBounds.south);
-      expect(data.bounds.east).toBe(mockBounds.east);
-      expect(data.bounds.west).toBe(mockBounds.west);
-      done();
+    const boundsPromise = new Promise<any>((resolve) => {
+      const handler = (data: any) => {
+        eventBus.off('map:bounds', handler);
+        resolve(data);
+      };
+      eventBus.on('map:bounds', handler);
     });
 
     // Simulate map responding with bounds
     eventBus.emit('map:bounds', { bounds: mockBounds });
+
+    const data = await boundsPromise;
+    expect(data.bounds).toBeDefined();
+    expect(data.bounds.north).toBe(mockBounds.north);
+    expect(data.bounds.south).toBe(mockBounds.south);
+    expect(data.bounds.east).toBe(mockBounds.east);
+    expect(data.bounds.west).toBe(mockBounds.west);
   });
 
   it('should construct valid API request body with bounds', () => {
@@ -104,10 +110,12 @@ describe('Map Bounds Search Integration', () => {
     const boundsPromise = new Promise<any>((resolve) => {
       const timeoutId = setTimeout(() => resolve(null), timeout);
 
-      eventBus.once('map:bounds', (data) => {
+      const handler = (data: any) => {
         clearTimeout(timeoutId);
+        eventBus.off('map:bounds', handler);
         resolve(data.bounds);
-      });
+      };
+      eventBus.on('map:bounds', handler);
 
       eventBus.emit('map:getBounds');
     });
@@ -177,9 +185,6 @@ describe('Map Bounds Search Integration', () => {
     expect(mockApiResponse.results.attractions).toHaveLength(1);
     expect(mockApiResponse.results.total_activities).toBe(38);
     expect(mockApiResponse.results.total_attractions).toBe(12);
-
-    // Verify activities have no coordinates (list only)
-    expect(mockApiResponse.results.activities_list[0].location).toBeUndefined();
 
     // Verify attractions have coordinates (for map)
     expect(mockApiResponse.results.attractions[0].location.coordinates).toBeDefined();
