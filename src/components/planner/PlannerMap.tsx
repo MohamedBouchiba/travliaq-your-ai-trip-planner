@@ -1452,7 +1452,35 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
   }, [center, zoom]);
 
   return (
-    <div ref={mapContainer} className="absolute inset-0 w-full h-full" style={{ minHeight: "100%" }} />
+    <div className="absolute inset-0 w-full h-full relative">
+      <div ref={mapContainer} className="absolute inset-0 w-full h-full" style={{ minHeight: "100%" }} />
+
+      {/* Search in Area Button - Only visible on activities tab */}
+      {activeTab === "activities" && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
+          <button
+            onClick={() => eventBus.emit("map:searchInArea")}
+            className="px-4 py-2.5 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 font-medium text-sm transition-all flex items-center gap-2 hover:shadow-xl"
+            title="Rechercher des activités dans la zone visible"
+          >
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            Rechercher dans cette zone
+          </button>
+        </div>
+      )}
+    </div>
   );
 };
 

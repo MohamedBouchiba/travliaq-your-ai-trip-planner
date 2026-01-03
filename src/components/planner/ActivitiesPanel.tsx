@@ -655,6 +655,19 @@ const ActivitiesPanel = () => {
     }
   }, [cities]);
 
+  // Listen to map:searchInArea event from map button
+  useEffect(() => {
+    const handleSearchInArea = () => {
+      handleMapBoundsSearch();
+    };
+
+    eventBus.on("map:searchInArea", handleSearchInArea);
+
+    return () => {
+      eventBus.off("map:searchInArea", handleSearchInArea);
+    };
+  }, [handleMapBoundsSearch]);
+
   // ============================================================================
   // RENDER
   // ============================================================================
@@ -820,28 +833,6 @@ const ActivitiesPanel = () => {
                   travelers={travelers}
                 />
               </div>
-
-              {/* Map Bounds Search Button (NEW) */}
-              <Button
-                onClick={handleMapBoundsSearch}
-                disabled={!activeCity || isSearching}
-                className="w-full gap-2"
-                size="lg"
-                variant="outline"
-              >
-                {isSearching ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Recherche en cours...
-                  </>
-                ) : (
-                  <>
-                    <MapPin className="h-4 w-4" />
-                    Rechercher dans cette zone
-                    <Compass className="h-3.5 w-3.5 ml-auto text-muted-foreground" />
-                  </>
-                )}
-              </Button>
 
               {/* City Search Button */}
               <Button

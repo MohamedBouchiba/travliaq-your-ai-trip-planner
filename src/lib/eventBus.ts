@@ -43,6 +43,7 @@ export type PlannerEvents = {
       west: number;
     };
   };
+  "map:searchInArea": void;
   
   // Flight-related
   "flight:updateFormData": FlightFormData;
