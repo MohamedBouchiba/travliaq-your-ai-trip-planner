@@ -457,6 +457,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
   }, []);
 
   // Fetch airports when map moves (only on flights tab)
+  // IMPORTANT: Account for panel offset so airports under the panel are still fetched
   useEffect(() => {
     if (!map.current || !mapLoaded || activeTab !== "flights") return;
 
@@ -466,11 +467,27 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       const bounds = map.current.getBounds();
       const zoom = map.current.getZoom();
       
+      // Get the current padding (accounts for panel offset)
+      // Extend the bounds to the left to compensate for the panel overlay
+      // The panel takes about 350-450px on the left, we need to extend the bounds
+      const container = map.current.getContainer();
+      const containerWidth = container.clientWidth;
+      
+      // Calculate how much extra longitude we need to cover the hidden area
+      // At current zoom, the visible width in degrees is:
+      const lngSpan = bounds.getEast() - bounds.getWest();
+      const panelWidthPx = isPanelOpen ? 450 : 350; // Match the padding values
+      const extraLngRatio = panelWidthPx / containerWidth;
+      const extraLng = lngSpan * extraLngRatio * 1.2; // Add 20% buffer
+      
+      // Extend the western bound to cover the area hidden by the panel
+      const adjustedWest = bounds.getWest() - extraLng;
+      
       fetchAirports({
         north: bounds.getNorth(),
         south: bounds.getSouth(),
         east: bounds.getEast(),
-        west: bounds.getWest(),
+        west: adjustedWest,
       });
       
       // Emit event for other components
@@ -479,7 +496,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
           north: bounds.getNorth(),
           south: bounds.getSouth(),
           east: bounds.getEast(),
-          west: bounds.getWest(),
+          west: adjustedWest,
         },
         zoom,
       });
@@ -493,7 +510,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     return () => {
       map.current?.off("moveend", handleMoveEnd);
     };
-  }, [mapLoaded, activeTab, fetchAirports]);
+  }, [mapLoaded, activeTab, fetchAirports, isPanelOpen]);
 
   // Emit loading state for airports
   useEffect(() => {
@@ -522,19 +539,11 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     const userDepartureCity = flightMem?.departure?.city?.toLowerCase().trim();
 
     // Hide departure city badge when zoomed out (< 7) to avoid overlapping with nearby cities
-    // The user location pulsing dot remains visible
+    // The user location pulsing dot remains visible - we don't filter the airport, just skip rendering its marker
     const hideDeparturePin = currentZoom < 7;
 
-    // Filter and sort airports
+    // Sort airports (large hubs first) - NO filtering, we handle visibility in the render loop
     const filteredAirports = airports
-      .filter((a) => {
-        // Hide departure city at low zoom levels
-        if (hideDeparturePin) {
-          if (userDepartureIata && a.iata.toUpperCase() === userDepartureIata) return false;
-          if (userDepartureCity && a.cityName?.toLowerCase().trim() === userDepartureCity) return false;
-        }
-        return true;
-      })
       .sort((a, b) => {
         // Large hubs first
         if (a.type === "large" && b.type !== "large") return -1;
@@ -561,6 +570,21 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     filteredAirports.forEach((airport, idx) => {
       const hubId = hubIdOf(airport);
       const existingMarker = displayedAirportsRef.current.get(hubId);
+      
+      // Check if this is the departure city (origin)
+      const isOrigin =
+        (userDepartureIata && airport.iata.toUpperCase() === userDepartureIata) ||
+        (userDepartureCity && airport.cityName?.toLowerCase().trim() === userDepartureCity);
+      
+      // If this is the departure city and zoom is low, hide the marker entirely
+      if (isOrigin && hideDeparturePin) {
+        if (existingMarker) {
+          const el = existingMarker.getElement();
+          el.style.opacity = "0";
+          el.style.pointerEvents = "none";
+        }
+        return; // Skip creating/showing this marker
+      }
 
       if (existingMarker) {
         // Keep the marker, only update position if it really changed (prevents micro-jitter)
@@ -580,9 +604,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       el.className = "airport-marker";
 
       const cityName = airport.cityName || airport.name;
-      const isOrigin =
-        (userDepartureIata && airport.iata.toUpperCase() === userDepartureIata) ||
-        (userDepartureCity && airport.cityName?.toLowerCase().trim() === userDepartureCity);
+      // isOrigin is already computed above
       const priceText = isOrigin ? "Départ" : `${airport.price}€`;
 
       // NOTE: Do NOT set `transform` on the marker element itself.
