@@ -581,44 +581,55 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         transition: opacity 0.2s ease-out;
       `;
 
+      // Travliaq-style airport badge: city name on top, price below, elegant rounded design
       el.innerHTML = `
         <div class="airport-badge" style="
           display: flex;
           flex-direction: column;
           align-items: center;
           cursor: pointer;
-          transition: transform 0.2s ease-out;
-          transform: scale(0.9);
+          transition: transform 0.15s ease-out, filter 0.15s ease-out;
+          transform: scale(0.92);
           transform-origin: bottom center;
+          filter: drop-shadow(0 2px 6px rgba(0,0,0,0.25));
         ">
           <div style="
             display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 4px;
-            background: rgba(32, 33, 36, 0.95);
-            padding: 4px 8px;
-            border-radius: 12px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            white-space: nowrap;
+            background: linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.95) 100%);
+            padding: 5px 10px 4px;
+            border-radius: 10px;
+            border: 1px solid rgba(0,0,0,0.08);
+            min-width: 44px;
           ">
             <span style="
-              color: white;
-              font-size: 10px;
+              color: #1e293b;
+              font-size: 9px;
               font-weight: 600;
+              letter-spacing: 0.01em;
+              line-height: 1.1;
+              max-width: 80px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
             ">${cityName}</span>
             <span style="
-              color: #8ab4f8;
-              font-size: 10px;
-              font-weight: 500;
+              color: #0d9488;
+              font-size: 11px;
+              font-weight: 700;
+              line-height: 1.2;
+              margin-top: 1px;
             ">${priceText}</span>
           </div>
           <div style="
             width: 0;
             height: 0;
-            border-left: 5px solid transparent;
-            border-right: 5px solid transparent;
-            border-top: 6px solid rgba(32, 33, 36, 0.95);
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 7px solid rgba(255,255,255,0.98);
             margin-top: -1px;
+            filter: drop-shadow(0 1px 1px rgba(0,0,0,0.1));
           "></div>
         </div>
       `;
@@ -634,12 +645,14 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         }, delay);
       });
 
-      // Hover effects
+      // Hover effects - subtle scale + lift
       badge?.addEventListener("mouseenter", () => {
-        badge.style.transform = "scale(1.15)";
+        badge.style.transform = "scale(1.08)";
+        badge.style.filter = "drop-shadow(0 4px 10px rgba(0,0,0,0.3))";
       });
       badge?.addEventListener("mouseleave", () => {
         badge.style.transform = "scale(1)";
+        badge.style.filter = "drop-shadow(0 2px 6px rgba(0,0,0,0.25))";
       });
 
       // Click handler - emit event for flight form
