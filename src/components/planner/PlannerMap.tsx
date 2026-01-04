@@ -517,17 +517,12 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       return;
     }
 
-    // Get user's departure airport info to exclude from display
+    // Get user's departure airport info (we keep it visible, but make it non-clickable)
     const userDepartureIata = flightMem?.departure?.iata?.toUpperCase();
     const userDepartureCity = flightMem?.departure?.city?.toLowerCase().trim();
 
-    // Filter airports: exclude user's departure airport/city and keep stable hub markers
+    // Keep stable hub markers, but sort large hubs first
     const filteredAirports = airports
-      .filter((a) => {
-        if (userDepartureIata && a.iata.toUpperCase() === userDepartureIata) return false;
-        if (userDepartureCity && a.cityName?.toLowerCase().trim() === userDepartureCity) return false;
-        return true;
-      })
       .sort((a, b) => {
         // Large hubs first
         if (a.type === "large" && b.type !== "large") return -1;
@@ -573,7 +568,10 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       el.className = "airport-marker";
 
       const cityName = airport.cityName || airport.name;
-      const priceText = `${airport.price}€`;
+      const isOrigin =
+        (userDepartureIata && airport.iata.toUpperCase() === userDepartureIata) ||
+        (userDepartureCity && airport.cityName?.toLowerCase().trim() === userDepartureCity);
+      const priceText = isOrigin ? "Départ" : `${airport.price}€`;
 
       // NOTE: Do NOT set `transform` on the marker element itself.
       el.style.cssText = `
@@ -587,7 +585,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
           display: flex;
           flex-direction: column;
           align-items: center;
-          cursor: pointer;
+          cursor: ${isOrigin ? "default" : "pointer"};
           transition: transform 0.15s ease-out, filter 0.15s ease-out;
           transform: scale(0.92);
           transform-origin: bottom center;
@@ -615,7 +613,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
               white-space: nowrap;
             ">${cityName}</span>
             <span style="
-              color: #0d9488;
+              color: ${isOrigin ? "#475569" : "#0d9488"};
               font-size: 11px;
               font-weight: 700;
               line-height: 1.2;
@@ -645,19 +643,22 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         }, delay);
       });
 
-      // Hover effects - subtle scale + lift
-      badge?.addEventListener("mouseenter", () => {
-        badge.style.transform = "scale(1.08)";
-        badge.style.filter = "drop-shadow(0 4px 10px rgba(0,0,0,0.3))";
-      });
-      badge?.addEventListener("mouseleave", () => {
-        badge.style.transform = "scale(1)";
-        badge.style.filter = "drop-shadow(0 2px 6px rgba(0,0,0,0.25))";
-      });
+      // Hover effects - subtle scale + lift (disabled for origin)
+      if (!isOrigin) {
+        badge?.addEventListener("mouseenter", () => {
+          badge.style.transform = "scale(1.08)";
+          badge.style.filter = "drop-shadow(0 4px 10px rgba(0,0,0,0.3))";
+        });
+        badge?.addEventListener("mouseleave", () => {
+          badge.style.transform = "scale(1)";
+          badge.style.filter = "drop-shadow(0 2px 6px rgba(0,0,0,0.25))";
+        });
+      }
 
-      // Click handler - emit event for flight form
+      // Click handler - emit event for flight form (disabled for origin)
       badge?.addEventListener("click", (e) => {
         e.stopPropagation();
+        if (isOrigin) return;
         console.log(`[PlannerMap] Hub clicked: ${hubId} (cheapest=${airport.iata}) - ${airport.cityName}`);
         eventBus.emit("airports:click", { airport });
       });
