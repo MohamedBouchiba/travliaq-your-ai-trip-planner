@@ -524,7 +524,10 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       const markerSize = isLarge ? 42 : 32;
       const fontSize = isLarge ? 11 : 9;
       
-      // Create the marker HTML - dark badge with city name like Google Flights
+      // Create the marker HTML - dark badge with city name and price like Google Flights
+      const displayName = airport.cityName || airport.name;
+      const priceText = `${airport.price} €`;
+      
       el.innerHTML = `
         <div class="airport-badge" style="
           display: flex;
@@ -550,10 +553,13 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
             font-size: ${fontSize}px;
             font-weight: 600;
             letter-spacing: 0.01em;
-            max-width: ${isLarge ? '120px' : '80px'};
-            overflow: hidden;
-            text-overflow: ellipsis;
-          ">${airport.cityName || airport.name}</span>
+          ">${displayName}</span>
+          <span style="
+            color: #8ab4f8;
+            font-size: ${fontSize}px;
+            font-weight: 500;
+            margin-left: 2px;
+          ">${priceText}</span>
         </div>
         <style>
           @keyframes airportFadeIn {

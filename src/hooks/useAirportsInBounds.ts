@@ -10,6 +10,7 @@ export interface AirportMarker {
   lat: number;
   lng: number;
   type: "large" | "medium";
+  price: number;
 }
 
 export interface MapBounds {
