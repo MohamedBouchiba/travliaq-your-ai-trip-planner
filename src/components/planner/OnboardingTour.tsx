@@ -327,7 +327,7 @@ export default function OnboardingTour({
       spotlightPadding: 8,
     },
     {
-      target: '[data-tour="flights-panel"]',
+      target: '[data-tour="stays-panel"]',
       placement: "right",
       title: "Hébergements",
       content: (
@@ -341,7 +341,7 @@ export default function OnboardingTour({
       spotlightPadding: 8,
     },
     {
-      target: '[data-tour="flights-panel"]',
+      target: '[data-tour="activities-panel"]',
       placement: "right",
       title: "Activités",
       content: (
@@ -355,7 +355,7 @@ export default function OnboardingTour({
       spotlightPadding: 8,
     },
     {
-      target: '[data-tour="flights-panel"]',
+      target: '[data-tour="preferences-panel"]',
       placement: "right",
       title: "Préférences Globales",
       content: (

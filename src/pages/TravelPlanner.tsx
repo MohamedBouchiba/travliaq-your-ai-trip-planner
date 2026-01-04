@@ -207,7 +207,7 @@ const TravelPlanner = () => {
                         </aside>
                       ) : (
                         /* Regular Overlay panel */
-                        <div data-tour="flights-panel">
+                        <div>
                           <PlannerErrorBoundary componentName="PlannerPanel">
                             <PlannerPanel
                               activeTab={activeTab}
