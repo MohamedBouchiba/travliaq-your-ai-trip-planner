@@ -308,7 +308,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     debounceMs: 500, // Increased debounce for smoother experience
     // Include medium airports when zoomed in (zoom >= 6)
     includeMediumAirports: currentZoom >= 6,
-    limit: 100,
+    limit: 150, // Increased to show more airports
     zoom: currentZoom,
   });
 
@@ -546,52 +546,53 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       const el = document.createElement("div");
       el.className = "airport-marker";
       
-      // Size based on airport type
-      const isLarge = airport.type === "large";
-      const fontSize = isLarge ? 11 : 9;
-      
-      // Create the marker HTML - dark badge with city name and price like Google Flights
-      const displayName = airport.cityName || airport.name;
-      const priceText = `${airport.price} €`;
+      // Compact pin style - smaller and more precise
+      const priceText = `${airport.price}€`;
       
       // NOTE: Do NOT set `transform` on the marker element itself.
       // Mapbox uses `transform` to position markers; overriding it makes markers jump to top-left.
       el.style.cssText = `
         opacity: 0;
-        transition: opacity 0.25s ease-out;
+        transition: opacity 0.2s ease-out;
       `;
       
       el.innerHTML = `
         <div class="airport-badge" style="
           display: flex;
+          flex-direction: column;
           align-items: center;
-          gap: 4px;
-          padding: ${isLarge ? '6px 10px' : '4px 8px'};
-          background: rgba(32, 33, 36, 0.95);
-          border-radius: 20px;
           cursor: pointer;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-          transition: background 0.15s ease, transform 0.25s ease-out, box-shadow 0.15s ease;
-          white-space: nowrap;
+          transition: transform 0.2s ease-out;
           transform: scale(0.9);
-          transform-origin: center;
+          transform-origin: bottom center;
         ">
-          <span style="
-            font-size: ${fontSize + 2}px;
-            filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2));
-          ">✈️</span>
-          <span style="
-            color: white;
-            font-size: ${fontSize}px;
-            font-weight: 600;
-            letter-spacing: 0.01em;
-          ">${displayName}</span>
-          <span style="
+          <div style="
+            background: rgba(32, 33, 36, 0.95);
             color: #8ab4f8;
-            font-size: ${fontSize}px;
-            font-weight: 500;
-            margin-left: 2px;
-          ">${priceText}</span>
+            font-size: 10px;
+            font-weight: 600;
+            padding: 3px 6px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            white-space: nowrap;
+          ">${priceText}</div>
+          <div style="
+            width: 0;
+            height: 0;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 5px solid rgba(32, 33, 36, 0.95);
+            margin-top: -1px;
+          "></div>
+          <div style="
+            width: 6px;
+            height: 6px;
+            background: hsl(220, 90%, 56%);
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+            margin-top: 2px;
+          "></div>
         </div>
       `;
 
@@ -606,16 +607,12 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         }, delay);
       });
 
-      // Hover effects
+      // Hover effects - scale up pin on hover
       badge?.addEventListener("mouseenter", () => {
-        badge.style.background = "rgba(66, 133, 244, 0.95)";
-        badge.style.transform = "scale(1.08)";
-        badge.style.boxShadow = "0 4px 12px rgba(66, 133, 244, 0.4)";
+        badge.style.transform = "scale(1.15)";
       });
       badge?.addEventListener("mouseleave", () => {
-        badge.style.background = "rgba(32, 33, 36, 0.95)";
         badge.style.transform = "scale(1)";
-        badge.style.boxShadow = "0 2px 6px rgba(0,0,0,0.3)";
       });
 
       // Click handler - emit event for flight form
