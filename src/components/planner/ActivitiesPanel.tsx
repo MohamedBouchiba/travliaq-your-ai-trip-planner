@@ -766,7 +766,7 @@ const ActivitiesPanel = () => {
           {currentView === "filters" && (
             <div className="space-y-4">
               {/* Filters Card */}
-              <div className="rounded-xl border border-border/40 bg-card/50 p-3">
+              <div className="rounded-xl border border-border/40 bg-card/50 p-3" data-tour="activities-widget">
                 <ActivityFilters
                   filters={activityState.activeFilters}
                   onFiltersChange={updateFilters}

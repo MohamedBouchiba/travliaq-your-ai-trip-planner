@@ -66,7 +66,7 @@ const PreferencesPanel = () => {
       )}
 
       {/* Travel Pace */}
-      <div>
+      <div data-tour="preferences-widget">
         <SectionHeader icon={Clock} title="Rythme de voyage" />
         <div className="grid grid-cols-3 gap-2">
           {[

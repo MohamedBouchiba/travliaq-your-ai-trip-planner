@@ -1481,14 +1481,16 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
         </div>
       </div>
 
-      {/* Route Builder */}
-      <FlightRouteBuilder
-        legs={legs}
-        onLegsChange={handleLegsChange}
-        maxLegs={getMaxLegs()}
-        tripType={tripType}
-        onCountrySelected={(field, country) => onCountrySelected?.({ field, country })}
-      />
+      <div data-tour="flights-widget">
+        {/* Route Builder */}
+        <FlightRouteBuilder
+          legs={legs}
+          onLegsChange={handleLegsChange}
+          maxLegs={getMaxLegs()}
+          tripType={tripType}
+          onCountrySelected={(field, country) => onCountrySelected?.({ field, country })}
+        />
+      </div>
 
       {/* Passengers & Baggage Section */}
       <div className="space-y-2">

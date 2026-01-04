@@ -1138,7 +1138,7 @@ const AccommodationPanel = ({ onMapMove }: AccommodationPanelProps) => {
       )}
 
       {/* BLOC 1: Essentiel - Destination, Dates, Voyageurs, Budget */}
-      <div className="rounded-xl border border-border/40 bg-card/50 overflow-hidden">
+      <div className="rounded-xl border border-border/40 bg-card/50 overflow-hidden" data-tour="stays-widget">
         {/* Ligne 1: Destination + Dates */}
         <div className="flex items-center gap-2.5 p-2.5 border-b border-border/30">
           <div className="flex-1 min-w-0">

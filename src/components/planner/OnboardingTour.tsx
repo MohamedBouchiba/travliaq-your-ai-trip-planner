@@ -323,7 +323,7 @@ export default function OnboardingTour({
       spotlightPadding: 4,
     },
     {
-      target: '[data-tour="flights-panel"]',
+      target: '[data-tour="flights-widget"]',
       placement: "right",
       title: "Recherche de Vols",
       content: (
@@ -334,10 +334,10 @@ export default function OnboardingTour({
           </p>
         </div>
       ),
-      spotlightPadding: 8,
+      spotlightPadding: 10,
     },
     {
-      target: '[data-tour="stays-panel-target"]',
+      target: '[data-tour="stays-widget"]',
       placement: "right",
       title: "Hébergements",
       content: (
@@ -348,10 +348,10 @@ export default function OnboardingTour({
           </p>
         </div>
       ),
-      spotlightPadding: 8,
+      spotlightPadding: 10,
     },
     {
-      target: '[data-tour="activities-panel-target"]',
+      target: '[data-tour="activities-widget"]',
       placement: "right",
       title: "Activités",
       content: (
@@ -362,10 +362,10 @@ export default function OnboardingTour({
           </p>
         </div>
       ),
-      spotlightPadding: 8,
+      spotlightPadding: 10,
     },
     {
-      target: '[data-tour="preferences-panel-target"]',
+      target: '[data-tour="preferences-widget"]',
       placement: "right",
       title: "Préférences Globales",
       content: (
@@ -376,7 +376,7 @@ export default function OnboardingTour({
           </p>
         </div>
       ),
-      spotlightPadding: 8,
+      spotlightPadding: 10,
     },
     {
       target: "body",
