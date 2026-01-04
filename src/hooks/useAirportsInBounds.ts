@@ -2,15 +2,17 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface AirportMarker {
-  iata: string;
+  iata: string;           // Primary airport IATA (cheapest one)
   name: string;
   cityName: string | null;
   countryCode: string | null;
   countryName: string | null;
-  lat: number;
+  lat: number;            // City center coordinates
   lng: number;
   type: "large" | "medium";
-  price: number;
+  price: number;          // Cheapest price in city
+  airportCount?: number;  // Number of airports in this city
+  allIatas?: string[];    // All airport IATA codes (for API calls)
 }
 
 export interface MapBounds {

@@ -17,15 +17,17 @@ interface BoundsRequest {
 }
 
 interface AirportResult {
-  iata: string;
-  name: string;
+  iata: string;           // Primary airport IATA (cheapest one)
+  name: string;           // Primary airport name
   cityName: string | null;
   countryCode: string | null;
   countryName: string | null;
-  lat: number;
+  lat: number;            // City center (average of all airports)
   lng: number;
   type: "large" | "medium";
-  price: number;
+  price: number;          // Cheapest price among all airports in city
+  airportCount: number;   // Number of airports in this city
+  allIatas: string[];     // All airport IATA codes in this city (for API calls)
 }
 
 // Normalize city name: First letter uppercase, rest lowercase
@@ -140,22 +142,22 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Transform to clean format, deduplicate by city, and filter by spacing
-    const cityMap = new Map<string, AirportResult>();
-    const placedAirports: { lat: number; lng: number }[] = [];
-
-    // Check if a new airport is too close to already placed ones
-    const isTooClose = (lat: number, lng: number): boolean => {
-      for (const placed of placedAirports) {
-        const dLat = Math.abs(lat - placed.lat);
-        const dLng = Math.abs(lng - placed.lng);
-        // Use combined distance check
-        if (dLat < minDistance && dLng < minDistance * 1.5) {
-          return true;
-        }
-      }
-      return false;
-    };
+    // Group airports by city - collect all airports for each city
+    interface CityData {
+      airports: Array<{
+        iata: string;
+        name: string;
+        lat: number;
+        lng: number;
+        type: string;
+        price: number;
+        countryCode: string | null;
+        countryName: string | null;
+      }>;
+      cityName: string;
+    }
+    
+    const cityGroups = new Map<string, CityData>();
 
     for (const row of data || []) {
       const normalizedCity = normalizeCityName(row.city_name) || row.name;
@@ -164,39 +166,97 @@ Deno.serve(async (req) => {
       // Skip if this is the user's departure city (exclude their origin)
       if (excludeCityLower && cityKey === excludeCityLower) continue;
 
-      // Skip if city already added
-      if (cityMap.has(cityKey)) continue;
+      const price = generateFakePrice(row.city_name, row.iata);
       
-      // Skip if too close to another airport
-      if (isTooClose(row.latitude, row.longitude)) continue;
-
-      // Stop if we have enough airports
-      if (cityMap.size >= dynamicLimit) break;
-
-      cityMap.set(cityKey, {
+      if (!cityGroups.has(cityKey)) {
+        cityGroups.set(cityKey, {
+          airports: [],
+          cityName: normalizedCity,
+        });
+      }
+      
+      cityGroups.get(cityKey)!.airports.push({
         iata: row.iata,
         name: row.name,
-        cityName: normalizedCity,
-        countryCode: row.country_code,
-        countryName: row.country_name,
         lat: row.latitude,
         lng: row.longitude,
-        type: row.airport_type === "large_airport" ? "large" : "medium",
-        price: generateFakePrice(row.city_name, row.iata),
+        type: row.airport_type,
+        price,
+        countryCode: row.country_code,
+        countryName: row.country_name,
       });
-
-      placedAirports.push({ lat: row.latitude, lng: row.longitude });
     }
 
-    const airports: AirportResult[] = Array.from(cityMap.values());
+    // Now create one result per city with:
+    // - Center coordinates (average of all airports)
+    // - Cheapest price
+    // - All IATA codes for future API calls
+    const cityResults: AirportResult[] = [];
+    const placedCities: { lat: number; lng: number }[] = [];
 
-    console.log(`[airports-in-bounds] Found ${airports.length} airports (filtered from ${data?.length || 0})`);
+    // Check if a city center is too close to already placed ones
+    const isTooClose = (lat: number, lng: number): boolean => {
+      for (const placed of placedCities) {
+        const dLat = Math.abs(lat - placed.lat);
+        const dLng = Math.abs(lng - placed.lng);
+        if (dLat < minDistance && dLng < minDistance * 1.5) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    // Sort cities by having large airports first, then by number of airports
+    const sortedCities = Array.from(cityGroups.entries()).sort((a, b) => {
+      const aHasLarge = a[1].airports.some(ap => ap.type === "large_airport");
+      const bHasLarge = b[1].airports.some(ap => ap.type === "large_airport");
+      if (aHasLarge && !bHasLarge) return -1;
+      if (!aHasLarge && bHasLarge) return 1;
+      return b[1].airports.length - a[1].airports.length;
+    });
+
+    for (const [, cityData] of sortedCities) {
+      if (cityResults.length >= dynamicLimit) break;
+
+      const { airports: cityAirports, cityName } = cityData;
+      
+      // Calculate city center (average of all airport coordinates)
+      const centerLat = cityAirports.reduce((sum, a) => sum + a.lat, 0) / cityAirports.length;
+      const centerLng = cityAirports.reduce((sum, a) => sum + a.lng, 0) / cityAirports.length;
+
+      // Skip if too close to another city
+      if (isTooClose(centerLat, centerLng)) continue;
+
+      // Find cheapest airport
+      const cheapest = cityAirports.reduce((min, a) => a.price < min.price ? a : min, cityAirports[0]);
+      
+      // Check if any airport is large
+      const hasLargeAirport = cityAirports.some(a => a.type === "large_airport");
+
+      cityResults.push({
+        iata: cheapest.iata,  // Primary IATA is the cheapest one
+        name: cheapest.name,
+        cityName,
+        countryCode: cheapest.countryCode,
+        countryName: cheapest.countryName,
+        lat: centerLat,
+        lng: centerLng,
+        type: hasLargeAirport ? "large" : "medium",
+        price: cheapest.price,
+        airportCount: cityAirports.length,
+        allIatas: cityAirports.map(a => a.iata),
+      });
+
+      placedCities.push({ lat: centerLat, lng: centerLng });
+    }
+
+    console.log(`[airports-in-bounds] Found ${cityResults.length} cities (from ${data?.length || 0} airports)`);
 
     return new Response(
       JSON.stringify({
-        airports,
-        total: airports.length,
-        hasMore: airports.length >= dynamicLimit,
+        airports: cityResults,
+        total: cityResults.length,
+        hasMore: cityResults.length >= dynamicLimit,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
