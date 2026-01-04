@@ -103,6 +103,24 @@ export type PlannerEvents = {
   // User actions
   "user:locationDetected": { lat: number; lng: number; city: string };
   
+  // Airports layer (Google Flights style)
+  "airports:fetch": {
+    bounds: { north: number; south: number; east: number; west: number };
+    zoom: number;
+  };
+  "airports:loading": { isLoading: boolean };
+  "airports:click": {
+    airport: {
+      iata: string;
+      name: string;
+      cityName: string | null;
+      countryCode: string | null;
+      lat: number;
+      lng: number;
+      type: "large" | "medium";
+    };
+  };
+  
   // Onboarding
   "onboarding:start": void;
   "onboarding:complete": void;

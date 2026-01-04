@@ -7,6 +7,7 @@ import type { FlightRoutePoint } from "./PlannerPanel";
 import { useFlightMemory, type MemoryRoutePoint } from "@/contexts/FlightMemoryContext";
 import { useAccommodationMemory } from "@/contexts/AccommodationMemoryContext";
 import { useActivityMemory } from "@/contexts/ActivityMemoryContext";
+import { useAirportsInBounds, type AirportMarker } from "@/hooks/useAirportsInBounds";
 import eventBus from "@/lib/eventBus";
 
 // Destination click event for popup
@@ -298,6 +299,17 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
   const [mapLoaded, setMapLoaded] = useState(false);
   const hasAnimatedRef = useRef(false);
   const [isSearchingInArea, setIsSearchingInArea] = useState(false);
+  const airportMarkersRef = useRef<mapboxgl.Marker[]>([]);
+  const [currentZoom, setCurrentZoom] = useState(zoom);
+
+  // Airports layer hook - enabled only on flights tab
+  const { airports, isLoading: isLoadingAirports, fetchAirports } = useAirportsInBounds({
+    enabled: activeTab === "flights",
+    debounceMs: 400,
+    // Include medium airports when zoomed in (zoom >= 5)
+    includeMediumAirports: currentZoom >= 5,
+    limit: 200,
+  });
 
   // Get route points from flight memory
   const { getRoutePoints } = useFlightMemory();
@@ -390,6 +402,13 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       setMapLoaded(true);
     });
 
+    // Track zoom level for airport marker sizing
+    map.current.on("zoomend", () => {
+      if (map.current) {
+        setCurrentZoom(map.current.getZoom());
+      }
+    });
+
     return () => {
       window.removeEventListener("destination-popup-close", handlePopupClose);
       handlePopupClose();
@@ -435,6 +454,150 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       eventBus.off("map:searchInAreaStatus", handleSearchStatus);
     };
   }, []);
+
+  // Fetch airports when map moves (only on flights tab)
+  useEffect(() => {
+    if (!map.current || !mapLoaded || activeTab !== "flights") return;
+
+    const handleMoveEnd = () => {
+      if (!map.current) return;
+      
+      const bounds = map.current.getBounds();
+      const zoom = map.current.getZoom();
+      
+      fetchAirports({
+        north: bounds.getNorth(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        west: bounds.getWest(),
+      });
+      
+      // Emit event for other components
+      eventBus.emit("airports:fetch", {
+        bounds: {
+          north: bounds.getNorth(),
+          south: bounds.getSouth(),
+          east: bounds.getEast(),
+          west: bounds.getWest(),
+        },
+        zoom,
+      });
+    };
+
+    // Fetch immediately on tab switch
+    handleMoveEnd();
+
+    map.current.on("moveend", handleMoveEnd);
+
+    return () => {
+      map.current?.off("moveend", handleMoveEnd);
+    };
+  }, [mapLoaded, activeTab, fetchAirports]);
+
+  // Emit loading state for airports
+  useEffect(() => {
+    eventBus.emit("airports:loading", { isLoading: isLoadingAirports });
+  }, [isLoadingAirports]);
+
+  // Display airport markers when on flights tab
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    // Clear existing airport markers
+    airportMarkersRef.current.forEach((marker) => marker.remove());
+    airportMarkersRef.current = [];
+
+    // Only show on flights tab
+    if (activeTab !== "flights") return;
+
+    if (airports.length === 0) return;
+
+    console.log(`[PlannerMap] Rendering ${airports.length} airport markers`);
+
+    airports.forEach((airport, idx) => {
+      // Create Google Flights style marker
+      const el = document.createElement("div");
+      el.className = "airport-marker";
+      
+      // Size based on airport type
+      const isLarge = airport.type === "large";
+      const markerSize = isLarge ? 42 : 32;
+      const fontSize = isLarge ? 11 : 9;
+      
+      // Create the marker HTML - dark badge with city name like Google Flights
+      el.innerHTML = `
+        <div class="airport-badge" style="
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: ${isLarge ? '6px 10px' : '4px 8px'};
+          background: rgba(32, 33, 36, 0.95);
+          border-radius: 20px;
+          cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+          transition: all 0.15s ease;
+          animation: airportFadeIn 0.3s ease-out ${Math.min(idx * 0.02, 0.5)}s forwards;
+          opacity: 0;
+          transform: scale(0.8);
+          white-space: nowrap;
+        ">
+          <span style="
+            font-size: ${fontSize + 2}px;
+            filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2));
+          ">✈️</span>
+          <span style="
+            color: white;
+            font-size: ${fontSize}px;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            max-width: ${isLarge ? '120px' : '80px'};
+            overflow: hidden;
+            text-overflow: ellipsis;
+          ">${airport.cityName || airport.name}</span>
+        </div>
+        <style>
+          @keyframes airportFadeIn {
+            0% { opacity: 0; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
+          }
+        </style>
+      `;
+
+      // Hover effects
+      const badge = el.querySelector(".airport-badge") as HTMLElement;
+      badge?.addEventListener("mouseenter", () => {
+        badge.style.background = "rgba(66, 133, 244, 0.95)";
+        badge.style.transform = "scale(1.08)";
+        badge.style.boxShadow = "0 4px 12px rgba(66, 133, 244, 0.4)";
+      });
+      badge?.addEventListener("mouseleave", () => {
+        badge.style.background = "rgba(32, 33, 36, 0.95)";
+        badge.style.transform = "scale(1)";
+        badge.style.boxShadow = "0 2px 6px rgba(0,0,0,0.3)";
+      });
+
+      // Click handler - emit event for flight form
+      badge?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        console.log(`[PlannerMap] Airport clicked: ${airport.iata} - ${airport.cityName}`);
+        eventBus.emit("airports:click", { airport });
+      });
+
+      const marker = new mapboxgl.Marker({
+        element: el,
+        anchor: "center",
+      })
+        .setLngLat([airport.lng, airport.lat])
+        .addTo(map.current!);
+
+      airportMarkersRef.current.push(marker);
+    });
+
+    return () => {
+      airportMarkersRef.current.forEach((marker) => marker.remove());
+      airportMarkersRef.current = [];
+    };
+  }, [activeTab, mapLoaded, airports]);
 
   // Animate to user location on initial load
   useEffect(() => {
