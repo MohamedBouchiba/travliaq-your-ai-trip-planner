@@ -239,12 +239,22 @@ export default function OnboardingTour({
   const handleJoyrideCallback = (data: CallBackProps) => {
     const { status, action, index, type } = data;
 
-    // Handle step transitions
-    if (type === EVENTS.STEP_AFTER || type === EVENTS.TARGET_NOT_FOUND) {
-      // Navigate to next/previous step
-      const nextIndex = action === ACTIONS.PREV ? index - 1 : index + 1;
-      setStepIndex(nextIndex);
+    const goToStep = (nextIndex: number) => {
       configureStep(nextIndex);
+      // Give the UI a moment to render the right tab/panel (lazy panels)
+      setTimeout(() => setStepIndex(nextIndex), 180);
+    };
+
+    // If the target is missing (usually because the panel/tab hasn't rendered yet), retry instead of skipping.
+    if (type === EVENTS.TARGET_NOT_FOUND) {
+      goToStep(index);
+      return;
+    }
+
+    // Handle step transitions
+    if (type === EVENTS.STEP_AFTER) {
+      const nextIndex = action === ACTIONS.PREV ? index - 1 : index + 1;
+      goToStep(nextIndex);
     }
 
     // Handle tour completion
@@ -327,7 +337,7 @@ export default function OnboardingTour({
       spotlightPadding: 8,
     },
     {
-      target: '[data-tour="stays-panel"]',
+      target: '[data-tour="stays-panel-target"]',
       placement: "right",
       title: "Hébergements",
       content: (
@@ -341,7 +351,7 @@ export default function OnboardingTour({
       spotlightPadding: 8,
     },
     {
-      target: '[data-tour="activities-panel"]',
+      target: '[data-tour="activities-panel-target"]',
       placement: "right",
       title: "Activités",
       content: (
@@ -355,7 +365,7 @@ export default function OnboardingTour({
       spotlightPadding: 8,
     },
     {
-      target: '[data-tour="preferences-panel"]',
+      target: '[data-tour="preferences-panel-target"]',
       placement: "right",
       title: "Préférences Globales",
       content: (
