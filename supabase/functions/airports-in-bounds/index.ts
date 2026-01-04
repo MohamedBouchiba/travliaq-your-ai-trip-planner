@@ -23,6 +23,25 @@ interface AirportResult {
   lat: number;
   lng: number;
   type: "large" | "medium";
+  price: number; // Fake price for now
+}
+
+// Normalize city name: First letter uppercase, rest lowercase
+function normalizeCityName(name: string | null): string | null {
+  if (!name) return null;
+  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+}
+
+// Generate a fake price based on city name (deterministic)
+function generateFakePrice(cityName: string | null, iata: string): number {
+  const str = cityName || iata;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  // Price between 29€ and 399€
+  return 29 + Math.abs(hash % 370);
 }
 
 Deno.serve(async (req) => {
@@ -83,19 +102,32 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Transform to clean format
-    const airports: AirportResult[] = (data || []).map((row) => ({
-      iata: row.iata,
-      name: row.name,
-      cityName: row.city_name,
-      countryCode: row.country_code,
-      countryName: row.country_name,
-      lat: row.latitude,
-      lng: row.longitude,
-      type: row.airport_type === "large_airport" ? "large" : "medium",
-    }));
+    // Transform to clean format and deduplicate by city
+    const cityMap = new Map<string, AirportResult>();
+    
+    for (const row of data || []) {
+      const normalizedCity = normalizeCityName(row.city_name) || row.name;
+      const cityKey = normalizedCity.toLowerCase();
+      
+      // Keep the largest airport per city (large_airport comes first due to ordering)
+      if (!cityMap.has(cityKey)) {
+        cityMap.set(cityKey, {
+          iata: row.iata,
+          name: row.name,
+          cityName: normalizedCity,
+          countryCode: row.country_code,
+          countryName: row.country_name,
+          lat: row.latitude,
+          lng: row.longitude,
+          type: row.airport_type === "large_airport" ? "large" : "medium",
+          price: generateFakePrice(row.city_name, row.iata),
+        });
+      }
+    }
+    
+    const airports: AirportResult[] = Array.from(cityMap.values());
 
-    console.log(`[airports-in-bounds] Found ${airports.length} airports`);
+    console.log(`[airports-in-bounds] Found ${airports.length} unique airports (deduplicated by city)`);
 
     return new Response(
       JSON.stringify({
