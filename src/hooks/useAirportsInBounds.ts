@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface AirportMarker {
+  hubId?: string;         // Stable identifier for the city hub (preferred)
   iata: string;           // Primary airport IATA (cheapest one)
   name: string;
   cityName: string | null;

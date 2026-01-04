@@ -17,12 +17,13 @@ interface BoundsRequest {
 }
 
 interface AirportResult {
+  hubId: string;          // Stable identifier for the city hub (used as marker key)
   iata: string;           // Primary airport IATA (cheapest one)
   name: string;           // Primary airport name
   cityName: string | null;
   countryCode: string | null;
   countryName: string | null;
-  lat: number;            // City center (average of all airports)
+  lat: number;            // City center (stable when possible)
   lng: number;
   type: "large" | "medium";
   price: number;          // Cheapest price among all airports in city
@@ -190,11 +191,46 @@ Deno.serve(async (req) => {
     // Now create one result per city with:
     // - Center coordinates (average of all airports)
     // - Cheapest price
+    // Now create one result per city with:
+    // - Center coordinates (prefer stable city coordinates from `cities` table)
+    // - Cheapest price
     // - All IATA codes for future API calls
+
+    // Best-effort lookup of stable city coordinates (prevents pins from shifting when bounds change)
+    const uniqueCityNames = Array.from(
+      new Set(
+        Array.from(cityGroups.values())
+          .map((c) => c.airports[0]?.countryCode ? `${c.cityName}|||${c.airports[0].countryCode}` : null)
+          .filter((v): v is string => Boolean(v))
+      )
+    );
+
+    const cityCenterMap = new Map<string, { lat: number; lng: number }>();
+    if (uniqueCityNames.length > 0) {
+      const names = uniqueCityNames.map((v) => v.split("|||")[0]);
+      const countryCodes = uniqueCityNames.map((v) => v.split("|||")[1]);
+
+      const { data: citiesData, error: citiesError } = await supabase
+        .from("cities")
+        .select("name, country_code, latitude, longitude")
+        .in("name", names)
+        .in("country_code", countryCodes)
+        .limit(1000);
+
+      if (citiesError) {
+        console.warn(`[airports-in-bounds] cities lookup failed: ${citiesError.message}`);
+      } else {
+        for (const c of citiesData || []) {
+          if (c.latitude == null || c.longitude == null) continue;
+          const key = `${c.name.toLowerCase()}|||${(c.country_code || "").toLowerCase()}`;
+          cityCenterMap.set(key, { lat: c.latitude, lng: c.longitude });
+        }
+      }
+    }
+
     const cityResults: AirportResult[] = [];
     const placedCities: { lat: number; lng: number }[] = [];
 
-    // Check if a city center is too close to already placed ones
     const isTooClose = (lat: number, lng: number): boolean => {
       for (const placed of placedCities) {
         const dLat = Math.abs(lat - placed.lat);
@@ -219,22 +255,33 @@ Deno.serve(async (req) => {
       if (cityResults.length >= dynamicLimit) break;
 
       const { airports: cityAirports, cityName } = cityData;
-      
-      // Calculate city center (average of all airport coordinates)
-      const centerLat = cityAirports.reduce((sum, a) => sum + a.lat, 0) / cityAirports.length;
-      const centerLng = cityAirports.reduce((sum, a) => sum + a.lng, 0) / cityAirports.length;
+
+      // Stable hub id (prevents marker key from changing when cheapest airport changes)
+      const hubId = `${(cityAirports[0]?.countryCode || "xx").toLowerCase()}:${cityName.toLowerCase()}`;
+
+      // Choose a stable city center if possible
+      const stableKey = `${cityName.toLowerCase()}|||${(cityAirports[0]?.countryCode || "").toLowerCase()}`;
+      const stableCenter = cityCenterMap.get(stableKey);
+
+      const centerLat = stableCenter
+        ? stableCenter.lat
+        : cityAirports.reduce((sum, a) => sum + a.lat, 0) / cityAirports.length;
+      const centerLng = stableCenter
+        ? stableCenter.lng
+        : cityAirports.reduce((sum, a) => sum + a.lng, 0) / cityAirports.length;
 
       // Skip if too close to another city
       if (isTooClose(centerLat, centerLng)) continue;
 
       // Find cheapest airport
-      const cheapest = cityAirports.reduce((min, a) => a.price < min.price ? a : min, cityAirports[0]);
-      
+      const cheapest = cityAirports.reduce((min, a) => (a.price < min.price ? a : min), cityAirports[0]);
+
       // Check if any airport is large
-      const hasLargeAirport = cityAirports.some(a => a.type === "large_airport");
+      const hasLargeAirport = cityAirports.some((a) => a.type === "large_airport");
 
       cityResults.push({
-        iata: cheapest.iata,  // Primary IATA is the cheapest one
+        hubId,
+        iata: cheapest.iata, // Primary IATA is the cheapest one
         name: cheapest.name,
         cityName,
         countryCode: cheapest.countryCode,
@@ -244,7 +291,7 @@ Deno.serve(async (req) => {
         type: hasLargeAirport ? "large" : "medium",
         price: cheapest.price,
         airportCount: cityAirports.length,
-        allIatas: cityAirports.map(a => a.iata),
+        allIatas: cityAirports.map((a) => a.iata),
       });
 
       placedCities.push({ lat: centerLat, lng: centerLng });
