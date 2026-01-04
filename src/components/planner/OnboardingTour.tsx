@@ -424,13 +424,16 @@ export default function OnboardingTour({
       run={runTour}
       stepIndex={stepIndex}
       continuous
-      scrollToFirstStep
+      scrollToFirstStep={false}
+      disableScrolling
+      disableScrollParentFix
       showSkipButton
       disableOverlayClose
       spotlightClicks={false}
       callback={handleJoyrideCallback}
       tooltipComponent={CustomTooltip}
       floaterProps={{
+        disableAnimation: false,
         styles: {
           floater: {
             filter: "drop-shadow(0 20px 40px rgba(0, 0, 0, 0.3))",
@@ -450,6 +453,11 @@ export default function OnboardingTour({
         },
         overlay: {
           mixBlendMode: "normal" as const,
+          position: "fixed" as const,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
         },
       }}
     />
