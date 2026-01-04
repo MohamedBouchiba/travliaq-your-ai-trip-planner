@@ -253,10 +253,45 @@ Deno.serve(async (req) => {
       return b[1].airports.length - a[1].airports.length;
     });
 
+    // Helper: haversine distance in km
+    const distanceKm = (aLat: number, aLng: number, bLat: number, bLng: number) => {
+      const R = 6371;
+      const toRad = (d: number) => (d * Math.PI) / 180;
+      const dLat = toRad(bLat - aLat);
+      const dLng = toRad(bLng - aLng);
+      const lat1 = toRad(aLat);
+      const lat2 = toRad(bLat);
+      const h =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(h));
+    };
+
     for (const [, cityData] of sortedCities) {
       if (cityResults.length >= dynamicLimit) break;
 
-      const { airports: cityAirports, cityName } = cityData;
+      let { airports: cityAirports, cityName } = cityData;
+
+      // Filter out airports that are too far from the main cluster (>80km from median).
+      // This prevents Paris-Vatry (150km east) from pulling the Paris hub marker off-center.
+      if (cityAirports.length > 1) {
+        // Use median as reference point (more robust than mean for outliers)
+        const sortedByLat = [...cityAirports].sort((a, b) => a.lat - b.lat);
+        const sortedByLng = [...cityAirports].sort((a, b) => a.lng - b.lng);
+        const midIdx = Math.floor(cityAirports.length / 2);
+        const medianLat = sortedByLat[midIdx].lat;
+        const medianLng = sortedByLng[midIdx].lng;
+
+        const MAX_DISTANCE_KM = 80;
+        const closeAirports = cityAirports.filter(
+          (a) => distanceKm(a.lat, a.lng, medianLat, medianLng) <= MAX_DISTANCE_KM
+        );
+
+        // Only filter if we still have at least one airport left
+        if (closeAirports.length > 0) {
+          cityAirports = closeAirports;
+        }
+      }
 
       // Stable hub id (prevents marker key from changing when cheapest airport changes)
       const hubId = `${(cityAirports[0]?.countryCode || "xx").toLowerCase()}:${cityName.toLowerCase()}`;
@@ -270,19 +305,6 @@ Deno.serve(async (req) => {
 
       // Some city names are ambiguous (e.g., "Newcastle" GB can be NI vs upon Tyne).
       // Only trust the `cities` table center if it's close to the airports' average.
-      const distanceKm = (aLat: number, aLng: number, bLat: number, bLng: number) => {
-        const R = 6371;
-        const toRad = (d: number) => (d * Math.PI) / 180;
-        const dLat = toRad(bLat - aLat);
-        const dLng = toRad(bLng - aLng);
-        const lat1 = toRad(aLat);
-        const lat2 = toRad(bLat);
-        const h =
-          Math.sin(dLat / 2) ** 2 +
-          Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-        return 2 * R * Math.asin(Math.sqrt(h));
-      };
-
       const shouldUseStable =
         stableCenter && distanceKm(avgLat, avgLng, stableCenter.lat, stableCenter.lng) <= 120;
 
