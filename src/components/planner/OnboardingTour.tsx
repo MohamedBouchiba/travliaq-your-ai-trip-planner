@@ -317,7 +317,7 @@ export default function OnboardingTour({
           </p>
         </div>
       ),
-      spotlightPadding: 8,
+      spotlightPadding: 16,
     },
     {
       target: '[data-tour="tabs-bar"]',
@@ -331,7 +331,7 @@ export default function OnboardingTour({
           </p>
         </div>
       ),
-      spotlightPadding: 4,
+      spotlightPadding: 12,
     },
     {
       target: '[data-tour="map-area"]',
@@ -345,63 +345,63 @@ export default function OnboardingTour({
           </p>
         </div>
       ),
-      spotlightPadding: 10,
+      spotlightPadding: 20,
     },
     {
       target: '[data-tour="flights-widget"]',
       placement: "right",
-      title: "Recherche de Vols",
+      title: "Widget Vols",
       content: (
         <div className="space-y-2">
-          <p>Configurez vos vols ici.</p>
+          <p>Tout le panneau de recherche de vols.</p>
           <p className="text-muted-foreground text-sm">
-            Multi-destinations, classes de voyage, bagages... Les dates et destinations se synchronisent avec vos hébergements.
+            Type de trajet, destinations, dates, passagers, bagages et options de vol. Les données se synchronisent automatiquement avec les autres widgets.
           </p>
         </div>
       ),
-      spotlightPadding: 10,
+      spotlightPadding: 16,
     },
     {
       target: '[data-tour="stays-widget"]',
       placement: "right",
-      title: "Hébergements",
+      title: "Widget Hébergements",
       content: (
         <div className="space-y-2">
-          <p>Trouvez l'hébergement parfait pour chaque destination.</p>
+          <p>Tout le panneau de recherche d'hébergements.</p>
           <p className="text-muted-foreground text-sm">
-            Les dates et villes sont automatiquement reprises de vos vols. Filtrez par confort, équipements et budget.
+            Destinations, dates, voyageurs, budget, type de logement, équipements... Tout est personnalisable.
           </p>
         </div>
       ),
-      spotlightPadding: 10,
+      spotlightPadding: 16,
     },
     {
       target: '[data-tour="activities-widget"]',
       placement: "right",
-      title: "Activités",
+      title: "Widget Activités",
       content: (
         <div className="space-y-2">
-          <p>Planifiez vos activités par destination.</p>
+          <p>Tout le panneau de recherche d'activités.</p>
           <p className="text-muted-foreground text-sm">
-            Culture, gastronomie, nature... Lancez une recherche ou explorez par filtres.
+            Filtrez par catégorie, prix, durée... Lancez une recherche par ville ou explorez directement sur la carte.
           </p>
         </div>
       ),
-      spotlightPadding: 10,
+      spotlightPadding: 16,
     },
     {
       target: '[data-tour="preferences-widget"]',
       placement: "right",
-      title: "Préférences Globales",
+      title: "Widget Préférences",
       content: (
         <div className="space-y-2">
           <p>Définissez votre style de voyage.</p>
           <p className="text-muted-foreground text-sm">
-            Rythme, confort, centres d'intérêt, restrictions alimentaires... Toutes ces préférences affectent les suggestions de l'IA.
+            Rythme, confort, centres d'intérêt, restrictions alimentaires, accessibilité... Toutes ces préférences affectent les suggestions de l'IA.
           </p>
         </div>
       ),
-      spotlightPadding: 10,
+      spotlightPadding: 16,
     },
     {
       target: "body",
