@@ -420,6 +420,7 @@ export default function OnboardingTour({
         },
         spotlight: {
           borderRadius: 16,
+          backgroundColor: "transparent",
           boxShadow: "0 0 0 4px hsl(var(--primary) / 0.4), 0 0 30px 10px hsl(var(--primary) / 0.2)",
         },
         overlay: {
