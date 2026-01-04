@@ -299,13 +299,13 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
   const [mapLoaded, setMapLoaded] = useState(false);
   const hasAnimatedRef = useRef(false);
   const [isSearchingInArea, setIsSearchingInArea] = useState(false);
-  const airportMarkersRef = useRef<mapboxgl.Marker[]>([]);
+  // Removed - using displayedAirportsRef for optimized rendering
   const [currentZoom, setCurrentZoom] = useState(zoom);
 
   // Airports layer hook - enabled only on flights tab
   const { airports, isLoading: isLoadingAirports, fetchAirports } = useAirportsInBounds({
     enabled: activeTab === "flights",
-    debounceMs: 400,
+    debounceMs: 500, // Increased debounce for smoother experience
     // Include medium airports when zoomed in (zoom >= 6)
     includeMediumAirports: currentZoom >= 6,
     limit: 100,
@@ -500,34 +500,69 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     eventBus.emit("airports:loading", { isLoading: isLoadingAirports });
   }, [isLoadingAirports]);
 
-  // Display airport markers when on flights tab
+  // Track which airports are currently displayed (by IATA code)
+  const displayedAirportsRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
+
+  // Display airport markers when on flights tab - OPTIMIZED to avoid flickering
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
 
-    // Clear existing airport markers
-    airportMarkersRef.current.forEach((marker) => marker.remove());
-    airportMarkersRef.current = [];
+    // Hide all markers when not on flights tab
+    if (activeTab !== "flights") {
+      displayedAirportsRef.current.forEach((marker) => {
+        const el = marker.getElement();
+        el.style.opacity = "0";
+        el.style.pointerEvents = "none";
+      });
+      return;
+    }
 
-    // Only show on flights tab
-    if (activeTab !== "flights") return;
+    // Create a set of current airport IATAs for quick lookup
+    const currentIatas = new Set(airports.map((a) => a.iata));
 
-    if (airports.length === 0) return;
+    // Remove markers that are no longer in the viewport
+    displayedAirportsRef.current.forEach((marker, iata) => {
+      if (!currentIatas.has(iata)) {
+        const el = marker.getElement();
+        el.style.opacity = "0";
+        el.style.transform = "scale(0.8)";
+        // Remove after animation
+        setTimeout(() => {
+          marker.remove();
+          displayedAirportsRef.current.delete(iata);
+        }, 200);
+      }
+    });
 
-    console.log(`[PlannerMap] Rendering ${airports.length} airport markers`);
-
+    // Add or update markers for current airports
     airports.forEach((airport, idx) => {
-      // Create Google Flights style marker
+      const existingMarker = displayedAirportsRef.current.get(airport.iata);
+      
+      if (existingMarker) {
+        // Marker already exists - just make sure it's visible
+        const el = existingMarker.getElement();
+        el.style.opacity = "1";
+        el.style.pointerEvents = "auto";
+        return;
+      }
+
+      // Create new marker
       const el = document.createElement("div");
       el.className = "airport-marker";
       
       // Size based on airport type
       const isLarge = airport.type === "large";
-      const markerSize = isLarge ? 42 : 32;
       const fontSize = isLarge ? 11 : 9;
       
       // Create the marker HTML - dark badge with city name and price like Google Flights
       const displayName = airport.cityName || airport.name;
       const priceText = `${airport.price} €`;
+      
+      el.style.cssText = `
+        opacity: 0;
+        transform: scale(0.8);
+        transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+      `;
       
       el.innerHTML = `
         <div class="airport-badge" style="
@@ -539,10 +574,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
           border-radius: 20px;
           cursor: pointer;
           box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-          transition: all 0.15s ease;
-          animation: airportFadeIn 0.3s ease-out ${Math.min(idx * 0.02, 0.5)}s forwards;
-          opacity: 0;
-          transform: scale(0.8);
+          transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
           white-space: nowrap;
         ">
           <span style="
@@ -562,13 +594,16 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
             margin-left: 2px;
           ">${priceText}</span>
         </div>
-        <style>
-          @keyframes airportFadeIn {
-            0% { opacity: 0; transform: scale(0.8); }
-            100% { opacity: 1; transform: scale(1); }
-          }
-        </style>
       `;
+
+      // Animate in with staggered delay (capped)
+      const delay = Math.min(idx * 15, 300);
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          el.style.opacity = "1";
+          el.style.transform = "scale(1)";
+        }, delay);
+      });
 
       // Hover effects
       const badge = el.querySelector(".airport-badge") as HTMLElement;
@@ -597,14 +632,21 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         .setLngLat([airport.lng, airport.lat])
         .addTo(map.current!);
 
-      airportMarkersRef.current.push(marker);
+      displayedAirportsRef.current.set(airport.iata, marker);
     });
 
     return () => {
-      airportMarkersRef.current.forEach((marker) => marker.remove());
-      airportMarkersRef.current = [];
+      // Don't clear on every change - only on unmount
     };
   }, [activeTab, mapLoaded, airports]);
+
+  // Cleanup all airport markers on unmount
+  useEffect(() => {
+    return () => {
+      displayedAirportsRef.current.forEach((marker) => marker.remove());
+      displayedAirportsRef.current.clear();
+    };
+  }, []);
 
   // Animate to user location on initial load
   useEffect(() => {
