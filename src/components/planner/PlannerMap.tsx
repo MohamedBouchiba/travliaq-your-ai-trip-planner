@@ -500,7 +500,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     eventBus.emit("airports:loading", { isLoading: isLoadingAirports });
   }, [isLoadingAirports]);
 
-  // Track which airports are currently displayed (by IATA code)
+  // Track which airports are currently displayed (by hub id)
   const displayedAirportsRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
 
   // Display airport markers when on flights tab - OPTIMIZED to avoid flickering
@@ -521,41 +521,47 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
     const userDepartureIata = flightMem?.departure?.iata?.toUpperCase();
     const userDepartureCity = flightMem?.departure?.city?.toLowerCase().trim();
 
-    // Filter airports: exclude user's departure airport/city and sort large airports first
+    // Filter airports: exclude user's departure airport/city and keep stable hub markers
     const filteredAirports = airports
       .filter((a) => {
-        // Exclude by IATA code
         if (userDepartureIata && a.iata.toUpperCase() === userDepartureIata) return false;
-        // Exclude by city name (in case same city has multiple airports)
         if (userDepartureCity && a.cityName?.toLowerCase().trim() === userDepartureCity) return false;
         return true;
       })
       .sort((a, b) => {
-        // Large airports first
+        // Large hubs first
         if (a.type === "large" && b.type !== "large") return -1;
         if (a.type !== "large" && b.type === "large") return 1;
         return 0;
       });
 
-    // Create a set of current airport IATAs for quick lookup
-    const currentIatas = new Set(filteredAirports.map((a) => a.iata));
+    const hubIdOf = (a: AirportMarker) => a.hubId ?? a.cityName?.toLowerCase().trim() ?? a.iata;
+
+    // Current hubs in response
+    const currentHubIds = new Set(filteredAirports.map(hubIdOf));
 
     // Remove markers that are no longer in the viewport - IMMEDIATE removal to prevent glitches
     const toRemove: string[] = [];
-    displayedAirportsRef.current.forEach((marker, iata) => {
-      if (!currentIatas.has(iata)) {
+    displayedAirportsRef.current.forEach((marker, hubId) => {
+      if (!currentHubIds.has(hubId)) {
         marker.remove();
-        toRemove.push(iata);
+        toRemove.push(hubId);
       }
     });
-    toRemove.forEach((iata) => displayedAirportsRef.current.delete(iata));
+    toRemove.forEach((hubId) => displayedAirportsRef.current.delete(hubId));
 
-    // Add or update markers for current airports
+    // Add or update markers for current hubs
     filteredAirports.forEach((airport, idx) => {
-      const existingMarker = displayedAirportsRef.current.get(airport.iata);
-      
+      const hubId = hubIdOf(airport);
+      const existingMarker = displayedAirportsRef.current.get(hubId);
+
       if (existingMarker) {
-        // Marker already exists - just make sure it's visible
+        // Keep the marker, only update position if it really changed (prevents micro-jitter)
+        const prev = existingMarker.getLngLat();
+        if (Math.abs(prev.lng - airport.lng) > 0.0001 || Math.abs(prev.lat - airport.lat) > 0.0001) {
+          existingMarker.setLngLat([airport.lng, airport.lat]);
+        }
+
         const el = existingMarker.getElement();
         el.style.opacity = "1";
         el.style.pointerEvents = "auto";
@@ -565,18 +571,17 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       // Create new marker
       const el = document.createElement("div");
       el.className = "airport-marker";
-      
-      // Display city name + price
+
       const cityName = airport.cityName || airport.name;
       const priceText = `${airport.price}€`;
-      
+      const countText = airport.airportCount && airport.airportCount > 1 ? ` · ${airport.airportCount} aéroports` : "";
+
       // NOTE: Do NOT set `transform` on the marker element itself.
-      // Mapbox uses `transform` to position markers; overriding it makes markers jump to top-left.
       el.style.cssText = `
         opacity: 0;
         transition: opacity 0.2s ease-out;
       `;
-      
+
       el.innerHTML = `
         <div class="airport-badge" style="
           display: flex;
@@ -601,7 +606,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
               color: white;
               font-size: 10px;
               font-weight: 600;
-            ">${cityName}</span>
+            ">${cityName}${countText}</span>
             <span style="
               color: #8ab4f8;
               font-size: 10px;
@@ -621,16 +626,16 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
 
       // Animate in with staggered delay (capped)
       const delay = Math.min(idx * 15, 300);
-      const badge = el.querySelector(".airport-badge") as HTMLElement;
+      const badge = el.querySelector(".airport-badge") as HTMLElement | null;
 
       requestAnimationFrame(() => {
         setTimeout(() => {
           el.style.opacity = "1";
-          badge.style.transform = "scale(1)";
+          if (badge) badge.style.transform = "scale(1)";
         }, delay);
       });
 
-      // Hover effects - scale up pin on hover
+      // Hover effects
       badge?.addEventListener("mouseenter", () => {
         badge.style.transform = "scale(1.15)";
       });
@@ -641,7 +646,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       // Click handler - emit event for flight form
       badge?.addEventListener("click", (e) => {
         e.stopPropagation();
-        console.log(`[PlannerMap] Airport clicked: ${airport.iata} - ${airport.cityName}`);
+        console.log(`[PlannerMap] Hub clicked: ${hubId} (cheapest=${airport.iata}) - ${airport.cityName}`);
         eventBus.emit("airports:click", { airport });
       });
 
@@ -652,13 +657,13 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
         .setLngLat([airport.lng, airport.lat])
         .addTo(map.current!);
 
-      displayedAirportsRef.current.set(airport.iata, marker);
+      displayedAirportsRef.current.set(hubId, marker);
     });
 
     return () => {
       // Don't clear on every change - only on unmount
     };
-  }, [activeTab, mapLoaded, airports]);
+  }, [activeTab, mapLoaded, airports, flightMem]);
 
   // Cleanup all airport markers on unmount
   useEffect(() => {
