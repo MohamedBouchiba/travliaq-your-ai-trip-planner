@@ -10,9 +10,10 @@ interface BoundsRequest {
   south: number;
   east: number;
   west: number;
-  types?: ("large_airport" | "medium_airport")[];
+  types?: ("large_airport" | "medium_airport" | "small_airport")[];
   limit?: number;
   zoom?: number;
+  excludeCity?: string; // City name to exclude (user's departure city)
 }
 
 interface AirportResult {
@@ -71,7 +72,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { north, south, east, west, types = ["large_airport"], limit = 100, zoom = 5 } = await req.json() as BoundsRequest;
+    const { north, south, east, west, types = ["large_airport"], limit = 100, zoom = 5, excludeCity } = await req.json() as BoundsRequest;
 
     // Validate bounds
     if (north === undefined || south === undefined || east === undefined || west === undefined) {
@@ -85,10 +86,25 @@ Deno.serve(async (req) => {
     const dynamicLimit = getDynamicLimit(zoom);
     const minDistance = getMinDistance(zoom);
 
-    // At low zoom, only show large airports regardless of what's requested
-    const effectiveTypes = zoom < 5 ? ["large_airport"] : types;
+    // Determine which airport types to show based on zoom level:
+    // - zoom < 5: only large airports
+    // - zoom 5-7: large + medium airports
+    // - zoom >= 8: large + medium + small airports (only at high zoom)
+    let effectiveTypes: string[];
+    if (zoom < 5) {
+      effectiveTypes = ["large_airport"];
+    } else if (zoom < 8) {
+      // Only include medium if requested, but never small at this zoom
+      effectiveTypes = types.filter(t => t !== "small_airport");
+    } else {
+      // High zoom - can show small airports if requested
+      effectiveTypes = types;
+    }
 
-    console.log(`[airports-in-bounds] zoom=${zoom}, limit=${dynamicLimit}, minDist=${minDistance}, types=${effectiveTypes.join(",")}`);
+    // Normalize the excluded city name for comparison
+    const excludeCityLower = excludeCity?.toLowerCase().trim();
+
+    console.log(`[airports-in-bounds] zoom=${zoom}, limit=${dynamicLimit}, minDist=${minDistance}, types=${effectiveTypes.join(",")}, excludeCity=${excludeCityLower || "none"}`);
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -144,6 +160,9 @@ Deno.serve(async (req) => {
     for (const row of data || []) {
       const normalizedCity = normalizeCityName(row.city_name) || row.name;
       const cityKey = normalizedCity.toLowerCase();
+
+      // Skip if this is the user's departure city (exclude their origin)
+      if (excludeCityLower && cityKey === excludeCityLower) continue;
 
       // Skip if city already added
       if (cityMap.has(cityKey)) continue;

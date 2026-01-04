@@ -517,12 +517,19 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
       return;
     }
 
-    // Get user's departure airport IATA to exclude from display
+    // Get user's departure airport info to exclude from display
     const userDepartureIata = flightMem?.departure?.iata?.toUpperCase();
+    const userDepartureCity = flightMem?.departure?.city?.toLowerCase().trim();
 
-    // Filter airports: exclude user's departure airport and sort large airports first
+    // Filter airports: exclude user's departure airport/city and sort large airports first
     const filteredAirports = airports
-      .filter((a) => !userDepartureIata || a.iata.toUpperCase() !== userDepartureIata)
+      .filter((a) => {
+        // Exclude by IATA code
+        if (userDepartureIata && a.iata.toUpperCase() === userDepartureIata) return false;
+        // Exclude by city name (in case same city has multiple airports)
+        if (userDepartureCity && a.cityName?.toLowerCase().trim() === userDepartureCity) return false;
+        return true;
+      })
       .sort((a, b) => {
         // Large airports first
         if (a.type === "large" && b.type !== "large") return -1;
