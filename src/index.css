@@ -100,6 +100,8 @@ All colors MUST be HSL.
   html {
     /* Slightly larger base font for better readability in production */
     font-size: 17px;
+    /* Prevent layout shift when Joyride locks body scrolling */
+    scrollbar-gutter: stable;
   }
 
   body {

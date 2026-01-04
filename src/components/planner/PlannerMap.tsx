@@ -574,7 +574,6 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
 
       const cityName = airport.cityName || airport.name;
       const priceText = `${airport.price}€`;
-      const countText = airport.airportCount && airport.airportCount > 1 ? ` · ${airport.airportCount} aéroports` : "";
 
       // NOTE: Do NOT set `transform` on the marker element itself.
       el.style.cssText = `
@@ -606,7 +605,7 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
               color: white;
               font-size: 10px;
               font-weight: 600;
-            ">${cityName}${countText}</span>
+            ">${cityName}</span>
             <span style="
               color: #8ab4f8;
               font-size: 10px;
