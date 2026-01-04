@@ -25,13 +25,12 @@ interface StepConfig {
 const STEP_CONFIG: Record<number, StepConfig> = {
   0: { panelOpen: false },  // Welcome - no panel
   1: { panelOpen: false },  // Chat panel - no widget panel
-  2: { panelOpen: false },  // Map - no widget panel
-  3: { panelOpen: false },  // Tabs bar explanation - no widget yet
-  4: { tab: "flights", panelOpen: true },     // Flights panel
-  5: { tab: "stays", panelOpen: true },       // Stays panel  
-  6: { tab: "activities", panelOpen: true },  // Activities panel
-  7: { tab: "preferences", panelOpen: true }, // Preferences panel
-  8: { panelOpen: false },  // Final step - close panel
+  2: { panelOpen: false },  // Tabs bar explanation - no widget yet
+  3: { tab: "flights", panelOpen: true },     // Flights panel
+  4: { tab: "stays", panelOpen: true },       // Stays panel  
+  5: { tab: "activities", panelOpen: true },  // Activities panel
+  6: { tab: "preferences", panelOpen: true }, // Preferences panel
+  7: { panelOpen: false },  // Final step - close panel
 };
 
 /**
@@ -145,19 +144,6 @@ export default function OnboardingTour({
           <p>Parlez à notre assistant comme à un ami.</p>
           <p className="text-muted-foreground text-sm">
             Dites-lui simplement "Je veux partir à Barcelone en mars" et il s'occupe du reste !
-          </p>
-        </div>
-      ),
-    },
-    {
-      target: '[data-tour="map-area"]',
-      placement: "left",
-      title: "Carte Interactive 🗺️",
-      content: (
-        <div className="space-y-2">
-          <p>Visualisez vos destinations en un coup d'œil.</p>
-          <p className="text-muted-foreground text-sm">
-            Cliquez sur les pays pour explorer les villes et voir les trajets de vol.
           </p>
         </div>
       ),
