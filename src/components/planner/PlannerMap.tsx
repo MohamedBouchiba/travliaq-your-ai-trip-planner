@@ -306,9 +306,10 @@ const PlannerMap = ({ activeTab, center, zoom, onPinClick, selectedPinId, flight
   const { airports, isLoading: isLoadingAirports, fetchAirports } = useAirportsInBounds({
     enabled: activeTab === "flights",
     debounceMs: 400,
-    // Include medium airports when zoomed in (zoom >= 5)
-    includeMediumAirports: currentZoom >= 5,
-    limit: 200,
+    // Include medium airports when zoomed in (zoom >= 6)
+    includeMediumAirports: currentZoom >= 6,
+    limit: 100,
+    zoom: currentZoom,
   });
 
   // Get route points from flight memory

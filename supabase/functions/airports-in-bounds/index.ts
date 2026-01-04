@@ -12,6 +12,7 @@ interface BoundsRequest {
   west: number;
   types?: ("large_airport" | "medium_airport")[];
   limit?: number;
+  zoom?: number;
 }
 
 interface AirportResult {
@@ -23,7 +24,7 @@ interface AirportResult {
   lat: number;
   lng: number;
   type: "large" | "medium";
-  price: number; // Fake price for now
+  price: number;
 }
 
 // Normalize city name: First letter uppercase, rest lowercase
@@ -44,6 +45,25 @@ function generateFakePrice(cityName: string | null, iata: string): number {
   return 29 + Math.abs(hash % 370);
 }
 
+// Calculate minimum distance between airports based on zoom level
+function getMinDistance(zoom: number): number {
+  if (zoom < 3) return 6;    // Very zoomed out - 6 degrees apart
+  if (zoom < 4) return 4;    // 4 degrees
+  if (zoom < 5) return 2;    // 2 degrees
+  if (zoom < 6) return 1;    // 1 degree
+  if (zoom < 7) return 0.5;  // 0.5 degree
+  return 0.25;               // Very zoomed in
+}
+
+// Get dynamic limit based on zoom
+function getDynamicLimit(zoom: number): number {
+  if (zoom < 3) return 12;   // Continental view - very few major hubs
+  if (zoom < 4) return 20;
+  if (zoom < 5) return 35;
+  if (zoom < 6) return 50;
+  return 80;
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -51,7 +71,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { north, south, east, west, types = ["large_airport"], limit = 100 } = await req.json() as BoundsRequest;
+    const { north, south, east, west, types = ["large_airport"], limit = 100, zoom = 5 } = await req.json() as BoundsRequest;
 
     // Validate bounds
     if (north === undefined || south === undefined || east === undefined || west === undefined) {
@@ -61,21 +81,26 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`[airports-in-bounds] Fetching airports in bounds: N=${north}, S=${south}, E=${east}, W=${west}`);
-    console.log(`[airports-in-bounds] Types: ${types.join(", ")}, Limit: ${limit}`);
+    // Calculate dynamic limits based on zoom
+    const dynamicLimit = getDynamicLimit(zoom);
+    const minDistance = getMinDistance(zoom);
+
+    // At low zoom, only show large airports regardless of what's requested
+    const effectiveTypes = zoom < 5 ? ["large_airport"] : types;
+
+    console.log(`[airports-in-bounds] zoom=${zoom}, limit=${dynamicLimit}, minDist=${minDistance}, types=${effectiveTypes.join(",")}`);
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Query airports within bounds
-    // Using latitude/longitude range query (efficient with proper indexes)
+    // Query airports within bounds - fetch more than we need, then filter
     let query = supabase
       .from("airports")
       .select("iata, name, city_name, country_code, country_name, latitude, longitude, airport_type")
       .eq("scheduled_service", "yes")
-      .in("airport_type", types)
+      .in("airport_type", effectiveTypes)
       .gte("latitude", south)
       .lte("latitude", north);
 
@@ -83,14 +108,11 @@ Deno.serve(async (req) => {
     if (east >= west) {
       query = query.gte("longitude", west).lte("longitude", east);
     } else {
-      // Crossing international date line - we need OR logic, but Supabase doesn't support it directly
-      // So we fetch in two parts or use a wider range
-      // For simplicity, let's just not filter longitude when crossing date line
-      console.log(`[airports-in-bounds] Date line crossing detected, fetching all longitudes`);
+      console.log(`[airports-in-bounds] Date line crossing detected`);
     }
 
     // Order by airport type (large first) then by city name
-    query = query.order("airport_type").order("city_name").limit(limit);
+    query = query.order("airport_type").order("city_name").limit(dynamicLimit * 3);
 
     const { data, error } = await query;
 
@@ -102,38 +124,60 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Transform to clean format and deduplicate by city
+    // Transform to clean format, deduplicate by city, and filter by spacing
     const cityMap = new Map<string, AirportResult>();
-    
+    const placedAirports: { lat: number; lng: number }[] = [];
+
+    // Check if a new airport is too close to already placed ones
+    const isTooClose = (lat: number, lng: number): boolean => {
+      for (const placed of placedAirports) {
+        const dLat = Math.abs(lat - placed.lat);
+        const dLng = Math.abs(lng - placed.lng);
+        // Use combined distance check
+        if (dLat < minDistance && dLng < minDistance * 1.5) {
+          return true;
+        }
+      }
+      return false;
+    };
+
     for (const row of data || []) {
       const normalizedCity = normalizeCityName(row.city_name) || row.name;
       const cityKey = normalizedCity.toLowerCase();
+
+      // Skip if city already added
+      if (cityMap.has(cityKey)) continue;
       
-      // Keep the largest airport per city (large_airport comes first due to ordering)
-      if (!cityMap.has(cityKey)) {
-        cityMap.set(cityKey, {
-          iata: row.iata,
-          name: row.name,
-          cityName: normalizedCity,
-          countryCode: row.country_code,
-          countryName: row.country_name,
-          lat: row.latitude,
-          lng: row.longitude,
-          type: row.airport_type === "large_airport" ? "large" : "medium",
-          price: generateFakePrice(row.city_name, row.iata),
-        });
-      }
+      // Skip if too close to another airport
+      if (isTooClose(row.latitude, row.longitude)) continue;
+
+      // Stop if we have enough airports
+      if (cityMap.size >= dynamicLimit) break;
+
+      cityMap.set(cityKey, {
+        iata: row.iata,
+        name: row.name,
+        cityName: normalizedCity,
+        countryCode: row.country_code,
+        countryName: row.country_name,
+        lat: row.latitude,
+        lng: row.longitude,
+        type: row.airport_type === "large_airport" ? "large" : "medium",
+        price: generateFakePrice(row.city_name, row.iata),
+      });
+
+      placedAirports.push({ lat: row.latitude, lng: row.longitude });
     }
-    
+
     const airports: AirportResult[] = Array.from(cityMap.values());
 
-    console.log(`[airports-in-bounds] Found ${airports.length} unique airports (deduplicated by city)`);
+    console.log(`[airports-in-bounds] Found ${airports.length} airports (filtered from ${data?.length || 0})`);
 
     return new Response(
       JSON.stringify({
         airports,
         total: airports.length,
-        hasMore: airports.length >= limit,
+        hasMore: airports.length >= dynamicLimit,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

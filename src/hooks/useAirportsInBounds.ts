@@ -25,6 +25,7 @@ interface UseAirportsInBoundsOptions {
   debounceMs?: number;
   includeMediumAirports?: boolean;
   limit?: number;
+  zoom?: number;
 }
 
 interface UseAirportsInBoundsResult {
@@ -38,23 +39,24 @@ interface UseAirportsInBoundsResult {
 const boundsCache = new Map<string, { airports: AirportMarker[]; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-function getBoundsCacheKey(bounds: MapBounds, includeMedium: boolean): string {
-  // Round to 2 decimal places to allow for small movements without refetching
+function getBoundsCacheKey(bounds: MapBounds, includeMedium: boolean, zoom: number): string {
+  // Round to 1 decimal place to allow for small movements without refetching
   const rounded = {
-    north: Math.round(bounds.north * 100) / 100,
-    south: Math.round(bounds.south * 100) / 100,
-    east: Math.round(bounds.east * 100) / 100,
-    west: Math.round(bounds.west * 100) / 100,
+    north: Math.round(bounds.north * 10) / 10,
+    south: Math.round(bounds.south * 10) / 10,
+    east: Math.round(bounds.east * 10) / 10,
+    west: Math.round(bounds.west * 10) / 10,
   };
-  return `${rounded.north},${rounded.south},${rounded.east},${rounded.west},${includeMedium}`;
+  return `${rounded.north},${rounded.south},${rounded.east},${rounded.west},${includeMedium},z${Math.floor(zoom)}`;
 }
 
 export function useAirportsInBounds(options: UseAirportsInBoundsOptions = {}): UseAirportsInBoundsResult {
   const {
     enabled = true,
-    debounceMs = 300,
+    debounceMs = 400,
     includeMediumAirports = false,
-    limit = 150,
+    limit = 100,
+    zoom = 5,
   } = options;
 
   const [airports, setAirports] = useState<AirportMarker[]>([]);
@@ -64,6 +66,14 @@ export function useAirportsInBounds(options: UseAirportsInBoundsOptions = {}): U
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastBoundsKeyRef = useRef<string>("");
+  const zoomRef = useRef(zoom);
+  const includeMediumRef = useRef(includeMediumAirports);
+
+  // Update refs when options change
+  useEffect(() => {
+    zoomRef.current = zoom;
+    includeMediumRef.current = includeMediumAirports;
+  }, [zoom, includeMediumAirports]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -76,8 +86,8 @@ export function useAirportsInBounds(options: UseAirportsInBoundsOptions = {}): U
   const fetchAirports = useCallback((bounds: MapBounds) => {
     if (!enabled) return;
 
-    // Calculate bounds cache key
-    const cacheKey = getBoundsCacheKey(bounds, includeMediumAirports);
+    // Calculate bounds cache key with zoom
+    const cacheKey = getBoundsCacheKey(bounds, includeMediumRef.current, zoomRef.current);
     
     // Skip if bounds haven't changed significantly
     if (cacheKey === lastBoundsKeyRef.current) {
@@ -87,7 +97,7 @@ export function useAirportsInBounds(options: UseAirportsInBoundsOptions = {}): U
     // Check cache
     const cached = boundsCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      console.log(`[useAirportsInBounds] Cache hit for bounds`);
+      console.log(`[useAirportsInBounds] Cache hit`);
       setAirports(cached.airports);
       lastBoundsKeyRef.current = cacheKey;
       return;
@@ -109,9 +119,7 @@ export function useAirportsInBounds(options: UseAirportsInBoundsOptions = {}): U
       setError(null);
 
       try {
-        console.log(`[useAirportsInBounds] Fetching airports for bounds:`, bounds);
-        
-        const types: ("large_airport" | "medium_airport")[] = includeMediumAirports
+        const types: ("large_airport" | "medium_airport")[] = includeMediumRef.current
           ? ["large_airport", "medium_airport"]
           : ["large_airport"];
 
@@ -123,6 +131,7 @@ export function useAirportsInBounds(options: UseAirportsInBoundsOptions = {}): U
             west: bounds.west,
             types,
             limit,
+            zoom: zoomRef.current,
           },
         });
 
@@ -140,11 +149,10 @@ export function useAirportsInBounds(options: UseAirportsInBoundsOptions = {}): U
           });
           lastBoundsKeyRef.current = cacheKey;
           
-          console.log(`[useAirportsInBounds] Loaded ${data.airports.length} airports`);
+          console.log(`[useAirportsInBounds] Loaded ${data.airports.length} airports at zoom ${zoomRef.current}`);
         }
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
-          // Request was cancelled, ignore
           return;
         }
         console.error(`[useAirportsInBounds] Error:`, err);
@@ -153,7 +161,7 @@ export function useAirportsInBounds(options: UseAirportsInBoundsOptions = {}): U
         setIsLoading(false);
       }
     }, debounceMs);
-  }, [enabled, debounceMs, includeMediumAirports, limit]);
+  }, [enabled, debounceMs, limit]);
 
   return {
     airports,
