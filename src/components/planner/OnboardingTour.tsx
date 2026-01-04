@@ -227,6 +227,33 @@ export default function OnboardingTour({
   const [stepIndex, setStepIndex] = useState(0);
   const targetRetryRef = useRef(0);
 
+  // Add spotlight animation style
+  useEffect(() => {
+    if (!document.getElementById("spotlight-animation-style")) {
+      const style = document.createElement("style");
+      style.id = "spotlight-animation-style";
+      style.textContent = `
+        @keyframes spotlight-pulse {
+          0%, 100% {
+            box-shadow: 
+              0 0 0 4px hsl(var(--primary)),
+              0 0 0 8px hsl(var(--primary) / 0.5),
+              0 0 60px 20px hsl(var(--primary) / 0.3),
+              inset 0 0 30px 10px hsl(var(--primary) / 0.1);
+          }
+          50% {
+            box-shadow: 
+              0 0 0 4px hsl(var(--primary)),
+              0 0 0 12px hsl(var(--primary) / 0.4),
+              0 0 80px 30px hsl(var(--primary) / 0.4),
+              inset 0 0 40px 15px hsl(var(--primary) / 0.15);
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }, []);
+
   // Check if user has already seen the tour
   useEffect(() => {
     if (forceShow) {
@@ -339,110 +366,178 @@ export default function OnboardingTour({
     {
       target: '[data-tour="chat-panel"]',
       placement: "right",
-      title: "Assistant Intelligent",
+      title: "💬 Votre Assistant IA",
       content: (
-        <div className="space-y-2">
-          <p>Parlez à notre assistant comme à un ami.</p>
-          <p className="text-muted-foreground text-sm">
-            Dites-lui simplement "Je veux partir à Barcelone en mars" et il s'occupe du reste !
+        <div className="space-y-3">
+          <p className="font-medium text-foreground">
+            <span className="text-primary">Zone surlignée</span> : le chat intelligent
           </p>
+          <p>
+            Parlez naturellement à l'assistant : <em>"Je veux partir à Barcelone en mars"</em>
+          </p>
+          <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+            <li>Demandez des recommandations de destinations</li>
+            <li>Configurez votre voyage par la conversation</li>
+            <li>L'IA synchronise tout automatiquement</li>
+          </ul>
         </div>
       ),
-      spotlightPadding: 16,
+      spotlightPadding: 8,
     },
     {
       target: '[data-tour="tabs-bar"]',
-      placement: "center",
-      title: "Vos Outils de Planification",
+      placement: "bottom",
+      title: "🛠️ Barre d'Outils",
       content: (
-        <div className="space-y-2">
-          <p>Utilisez ces onglets pour configurer chaque aspect de votre voyage.</p>
-          <p className="text-muted-foreground text-sm">
-            Vols → Hébergements → Activités → Préférences. Tout est synchronisé automatiquement !
+        <div className="space-y-3">
+          <p className="font-medium text-foreground">
+            <span className="text-primary">Zone surlignée</span> : les onglets de navigation
           </p>
+          <p>Accédez rapidement à chaque aspect de votre voyage :</p>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-2 py-1">
+              <span>✈️</span> <span>Vols</span>
+            </div>
+            <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-2 py-1">
+              <span>🏨</span> <span>Hébergements</span>
+            </div>
+            <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-2 py-1">
+              <span>🎭</span> <span>Activités</span>
+            </div>
+            <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-2 py-1">
+              <span>⚙️</span> <span>Préférences</span>
+            </div>
+          </div>
         </div>
       ),
-      spotlightPadding: 16,
+      spotlightPadding: 12,
     },
     {
       target: '[data-tour="map-area"]',
-      placement: "center",
-      title: "Carte Interactive",
+      placement: "left",
+      title: "🗺️ Carte Interactive",
       content: (
-        <div className="space-y-2">
-          <p>Visualisez votre voyage sur la carte.</p>
-          <p className="text-muted-foreground text-sm">
-            Les pins, itinéraires et recherches se mettent à jour selon vos choix (vols, hébergements, activités).
+        <div className="space-y-3">
+          <p className="font-medium text-foreground">
+            <span className="text-primary">Zone surlignée</span> : la carte du monde
           </p>
+          <p>Visualisez votre voyage en temps réel :</p>
+          <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+            <li>Cliquez sur une ville pour voir les prix</li>
+            <li>Les itinéraires s'affichent automatiquement</li>
+            <li>Zoomez pour découvrir plus d'options</li>
+          </ul>
         </div>
       ),
-      spotlightPadding: 22,
+      spotlightPadding: 0,
     },
     {
       target: '[data-tour="flights-widget"]',
-      placement: "center",
-      title: "Widget Vols",
+      placement: "right",
+      title: "✈️ Widget Vols",
       content: (
-        <div className="space-y-2">
-          <p>Tout le panneau de recherche de vols.</p>
-          <p className="text-muted-foreground text-sm">
-            Type de trajet, destinations, dates, passagers, bagages et options de vol. Les données se synchronisent automatiquement avec les autres widgets.
+        <div className="space-y-3">
+          <p className="font-medium text-foreground">
+            <span className="text-primary">Zone surlignée</span> : le panneau de recherche de vols
+          </p>
+          <p>Configurez tous les détails de vos vols :</p>
+          <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+            <li><strong>Type de trajet</strong> : aller-simple, aller-retour, multi-destinations</li>
+            <li><strong>Villes</strong> : départ et destination</li>
+            <li><strong>Dates</strong> : calendrier interactif</li>
+            <li><strong>Voyageurs</strong> : adultes, enfants, bagages</li>
+          </ul>
+          <p className="text-xs text-primary/80 mt-2">
+            💡 Les données se synchronisent avec l'assistant et les autres widgets
           </p>
         </div>
       ),
-      spotlightPadding: 18,
+      spotlightPadding: 12,
     },
     {
       target: '[data-tour="stays-widget"]',
-      placement: "center",
-      title: "Widget Hébergements",
+      placement: "right",
+      title: "🏨 Widget Hébergements",
       content: (
-        <div className="space-y-2">
-          <p>Tout le panneau de recherche d'hébergements.</p>
-          <p className="text-muted-foreground text-sm">
-            Destinations, dates, voyageurs, budget, type de logement, équipements... Tout est personnalisable.
+        <div className="space-y-3">
+          <p className="font-medium text-foreground">
+            <span className="text-primary">Zone surlignée</span> : le panneau de recherche d'hébergements
+          </p>
+          <p>Trouvez le logement idéal :</p>
+          <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+            <li><strong>Destination</strong> : synchronisée avec vos vols</li>
+            <li><strong>Budget</strong> : définissez votre fourchette de prix</li>
+            <li><strong>Type</strong> : hôtel, appartement, villa...</li>
+            <li><strong>Équipements</strong> : wifi, piscine, parking...</li>
+          </ul>
+          <p className="text-xs text-primary/80 mt-2">
+            💡 Les dates et voyageurs sont pré-remplis depuis vos vols
           </p>
         </div>
       ),
-      spotlightPadding: 18,
+      spotlightPadding: 12,
     },
     {
       target: '[data-tour="activities-widget"]',
-      placement: "center",
-      title: "Widget Activités",
+      placement: "right",
+      title: "🎭 Widget Activités",
       content: (
-        <div className="space-y-2">
-          <p>Tout le panneau de recherche d'activités.</p>
-          <p className="text-muted-foreground text-sm">
-            Filtrez par catégorie, prix, durée... Lancez une recherche par ville ou explorez directement sur la carte.
+        <div className="space-y-3">
+          <p className="font-medium text-foreground">
+            <span className="text-primary">Zone surlignée</span> : le panneau de recherche d'activités
+          </p>
+          <p>Découvrez que faire sur place :</p>
+          <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+            <li><strong>Catégories</strong> : culture, nature, gastronomie...</li>
+            <li><strong>Filtres</strong> : prix, durée, accessibilité</li>
+            <li><strong>Recherche</strong> : par ville ou directement sur la carte</li>
+          </ul>
+          <p className="text-xs text-primary/80 mt-2">
+            💡 Les activités s'affichent comme pins sur la carte
           </p>
         </div>
       ),
-      spotlightPadding: 18,
+      spotlightPadding: 12,
     },
     {
       target: '[data-tour="preferences-widget"]',
-      placement: "center",
-      title: "Widget Préférences",
+      placement: "right",
+      title: "⚙️ Widget Préférences",
       content: (
-        <div className="space-y-2">
-          <p>Définissez votre style de voyage.</p>
-          <p className="text-muted-foreground text-sm">
-            Rythme, confort, centres d'intérêt, restrictions alimentaires, accessibilité... Toutes ces préférences affectent les suggestions de l'IA.
+        <div className="space-y-3">
+          <p className="font-medium text-foreground">
+            <span className="text-primary">Zone surlignée</span> : vos préférences de voyage
+          </p>
+          <p>Personnalisez votre expérience :</p>
+          <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+            <li><strong>Rythme</strong> : intensif, équilibré, détendu</li>
+            <li><strong>Confort</strong> : budget, standard, luxe</li>
+            <li><strong>Centres d'intérêt</strong> : ce qui vous passionne</li>
+            <li><strong>Restrictions</strong> : alimentaires, accessibilité</li>
+          </ul>
+          <p className="text-xs text-primary/80 mt-2">
+            💡 Ces préférences influencent les suggestions de l'IA
           </p>
         </div>
       ),
-      spotlightPadding: 18,
+      spotlightPadding: 12,
     },
     {
       target: "body",
       placement: "center",
-      title: "C'est parti !",
+      title: "🚀 C'est parti !",
       content: (
-        <div className="space-y-2">
-          <p>Vous êtes prêt à planifier votre prochain voyage.</p>
-          <p className="text-muted-foreground text-sm">
-            Commencez par dire bonjour à l'assistant ou configurez vos vols directement !
+        <div className="space-y-3">
+          <p className="font-medium">Vous êtes prêt à planifier votre prochain voyage.</p>
+          <div className="bg-primary/10 rounded-lg p-3 text-sm">
+            <p className="font-medium text-primary mb-1">Commencez par :</p>
+            <ul className="text-muted-foreground space-y-1 list-disc list-inside">
+              <li>Dire bonjour à l'assistant 💬</li>
+              <li>Ou configurer vos vols directement ✈️</li>
+            </ul>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Vous pouvez relancer ce guide à tout moment depuis les paramètres.
           </p>
         </div>
       ),
@@ -475,13 +570,19 @@ export default function OnboardingTour({
         options: {
           primaryColor: "hsl(var(--primary))",
           zIndex: 10000,
-          overlayColor: "rgba(0, 0, 0, 0.78)",
+          overlayColor: "rgba(0, 0, 0, 0.85)",
         },
         spotlight: {
-          borderRadius: 18,
+          borderRadius: 16,
           backgroundColor: "transparent",
-          boxShadow:
-            "0 0 0 6px hsl(var(--primary) / 0.45), 0 0 36px 12px hsl(var(--primary) / 0.22)",
+          // Enhanced glow effect with animated border
+          boxShadow: `
+            0 0 0 4px hsl(var(--primary)),
+            0 0 0 8px hsl(var(--primary) / 0.5),
+            0 0 60px 20px hsl(var(--primary) / 0.3),
+            inset 0 0 30px 10px hsl(var(--primary) / 0.1)
+          `,
+          animation: "spotlight-pulse 2s ease-in-out infinite",
         },
         overlay: {
           mixBlendMode: "normal" as const,
