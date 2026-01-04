@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, lazy, Suspense, useCallback } from "react";
 import { Calendar as CalendarIcon, Users, Plane, MapPin, Building2, Star, Clock, Wifi, Car, Coffee, Wind, X, Heart, Utensils, TreePine, Palette, Waves, Dumbbell, Sparkles, Loader2, Search, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TabType, SelectedAirport } from "@/pages/TravelPlanner";
@@ -8,6 +8,7 @@ import FlightRouteBuilder, { FlightLeg } from "./FlightRouteBuilder";
 import type { LocationResult } from "@/hooks/useLocationAutocomplete";
 import { findNearestAirports, Airport } from "@/hooks/useNearestAirports";
 import FlightResults, { FlightOffer, generateMockFlights } from "./FlightResults";
+import eventBus from "@/lib/eventBus";
 import { useFlightMemory, type AirportInfo } from "@/contexts/FlightMemoryContext";
 import { ActivitiesPanelSkeleton, AccommodationPanelSkeleton, PreferencesPanelSkeleton } from "./PanelSkeletons";
 
@@ -420,6 +421,59 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
     
     onSelectedAirportConsumed?.();
   }, [selectedAirport, onSelectedAirportConsumed, onSearchReady]);
+
+  // Handle airport selection from map (Google Flights style)
+  useEffect(() => {
+    const handleAirportClick = (data: { airport: { iata: string; name: string; cityName: string | null; countryCode: string | null; lat: number; lng: number; type: "large" | "medium" } }) => {
+      const { airport } = data;
+      const airportDisplay = `${airport.name} (${airport.iata})`;
+      
+      // Determine which field to fill: if "from" is empty, fill it; otherwise fill "to"
+      setLegs((prev) => {
+        const newLegs = [...prev];
+        if (newLegs.length > 0) {
+          const firstLeg = newLegs[0];
+          const fromHasValue = firstLeg.from && firstLeg.from.trim() !== "";
+          
+          if (!fromHasValue) {
+            // Fill departure
+            newLegs[0] = { ...firstLeg, from: airportDisplay };
+            // Update memory
+            updateMemory({
+              departure: {
+                airport: airport.name,
+                iata: airport.iata,
+                city: airport.cityName || undefined,
+                countryCode: airport.countryCode || undefined,
+                lat: airport.lat,
+                lng: airport.lng,
+              },
+            });
+          } else {
+            // Fill destination
+            newLegs[0] = { ...firstLeg, to: airportDisplay };
+            // Update memory
+            updateMemory({
+              arrival: {
+                airport: airport.name,
+                iata: airport.iata,
+                city: airport.cityName || undefined,
+                countryCode: airport.countryCode || undefined,
+                lat: airport.lat,
+                lng: airport.lng,
+              },
+            });
+          }
+        }
+        return newLegs;
+      });
+    };
+
+    eventBus.on("airports:click", handleAirportClick);
+    return () => {
+      eventBus.off("airports:click", handleAirportClick);
+    };
+  }, [updateMemory]);
 
   // Detect user's city from IP on mount and add to memory
   useEffect(() => {
