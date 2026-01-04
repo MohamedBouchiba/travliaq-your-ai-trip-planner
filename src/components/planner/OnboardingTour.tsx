@@ -2,11 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { driver, type DriveStep, type Config } from "driver.js";
 import "driver.js/dist/driver.css";
 import { eventBus } from "@/lib/eventBus";
-import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import type { TabType } from "@/pages/TravelPlanner";
-import { createRoot } from "react-dom/client";
 
 interface OnboardingTourProps {
   forceShow?: boolean;
@@ -35,138 +32,6 @@ const STEP_CONFIG: Record<number, StepConfig> = {
 };
 
 const STEP_ICONS = ["✨", "💬", "🛠️", "🗺️", "✈️", "🏨", "🎭", "⚙️", "🚀"];
-
-interface TooltipProps {
-  step: DriveStep;
-  currentStep: number;
-  totalSteps: number;
-  onPrev: () => void;
-  onNext: () => void;
-  onClose: () => void;
-}
-
-function CustomTooltip({ step, currentStep, totalSteps, onPrev, onNext, onClose }: TooltipProps) {
-  const isFirst = currentStep === 0;
-  const isLast = currentStep === totalSteps - 1;
-  const icon = STEP_ICONS[currentStep] || "✨";
-
-  return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={currentStep}
-        initial={{ opacity: 0, scale: 0.96, y: 8 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: -8 }}
-        transition={{ duration: 0.22, ease: "easeOut" }}
-        className="relative bg-card border border-border/50 rounded-2xl shadow-2xl overflow-hidden w-[min(420px,calc(100vw-32px))]"
-      >
-        {/* Animated gradient border */}
-        <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 animate-pulse pointer-events-none" />
-
-        {/* Content container */}
-        <div className="relative bg-card/95 backdrop-blur-sm rounded-2xl p-5">
-          {/* Header with icon and close button */}
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <motion.div
-                initial={{ rotate: -10, scale: 0 }}
-                animate={{ rotate: 0, scale: 1 }}
-                transition={{ delay: 0.12, type: "spring", stiffness: 220 }}
-                className="text-3xl"
-              >
-                {icon}
-              </motion.div>
-              {step.popover?.title && (
-                <motion.h3
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.08 }}
-                  className="text-lg font-bold text-foreground"
-                >
-                  {step.popover.title}
-                </motion.h3>
-              )}
-            </div>
-            <button
-              onClick={onClose}
-              className="p-1 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-            >
-              <X size={18} />
-            </button>
-          </div>
-
-          {/* Content */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.1 }}
-            className="text-foreground/90 mb-4"
-            dangerouslySetInnerHTML={{ __html: step.popover?.description || "" }}
-          />
-
-          {/* Progress indicator */}
-          <div className="flex items-center gap-1 mb-4">
-            {Array.from({ length: totalSteps }).map((_, i) => (
-              <motion.div
-                key={i}
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.18 + i * 0.04 }}
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  i === currentStep
-                    ? "w-6 bg-primary"
-                    : i < currentStep
-                      ? "w-2 bg-primary/50"
-                      : "w-2 bg-muted"
-                }`}
-              />
-            ))}
-            <span className="ml-2 text-xs text-muted-foreground">
-              {currentStep + 1}/{totalSteps}
-            </span>
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex items-center justify-between">
-            <button
-              onClick={onClose}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Passer
-            </button>
-
-            <div className="flex items-center gap-2">
-              {!isFirst && (
-                <Button onClick={onPrev} variant="ghost" size="sm" className="gap-1">
-                  <ChevronLeft size={16} />
-                  Précédent
-                </Button>
-              )}
-
-              <Button
-                onClick={onNext}
-                size="sm"
-                className="gap-1 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25"
-              >
-                {isLast ? (
-                  <>
-                    <Sparkles size={16} />
-                    C'est parti !
-                  </>
-                ) : (
-                  <>
-                    Suivant
-                    <ChevronRight size={16} />
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-    </AnimatePresence>
-  );
-}
 
 // Inject custom CSS for Driver.js
 function injectDriverStyles() {
@@ -229,29 +94,187 @@ function injectDriverStyles() {
       }
     }
     
-    /* Hide default popover - we render our own */
+    /* Custom popover styling */
     .driver-popover {
-      background: transparent !important;
-      border: none !important;
-      box-shadow: none !important;
+      background: hsl(var(--card)) !important;
+      border: 1px solid hsl(var(--border) / 0.5) !important;
+      border-radius: 16px !important;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
       padding: 0 !important;
-      max-width: none !important;
+      max-width: min(420px, calc(100vw - 32px)) !important;
+      overflow: hidden !important;
     }
     
     .driver-popover-arrow {
       display: none !important;
     }
     
-    .driver-popover-title,
-    .driver-popover-description,
-    .driver-popover-footer {
+    /* Popover header */
+    .driver-popover-title {
+      display: flex !important;
+      align-items: center !important;
+      gap: 12px !important;
+      font-size: 1.125rem !important;
+      font-weight: 700 !important;
+      color: hsl(var(--foreground)) !important;
+      padding: 20px 20px 0 20px !important;
+      margin: 0 !important;
+    }
+    
+    .driver-popover-title::before {
+      content: attr(data-icon);
+      font-size: 1.75rem;
+    }
+    
+    /* Popover description */
+    .driver-popover-description {
+      color: hsl(var(--foreground) / 0.9) !important;
+      padding: 12px 20px !important;
+      margin: 0 !important;
+      font-size: 0.9375rem !important;
+      line-height: 1.6 !important;
+    }
+    
+    .driver-popover-description .highlight-text {
+      color: hsl(var(--primary)) !important;
+      font-weight: 600 !important;
+    }
+    
+    .driver-popover-description ul {
+      margin: 8px 0 !important;
+      padding-left: 20px !important;
+    }
+    
+    .driver-popover-description li {
+      margin: 4px 0 !important;
+      color: hsl(var(--muted-foreground)) !important;
+      font-size: 0.875rem !important;
+    }
+    
+    .driver-popover-description strong {
+      color: hsl(var(--foreground)) !important;
+    }
+    
+    .driver-popover-description .tip {
+      font-size: 0.75rem !important;
+      color: hsl(var(--primary) / 0.8) !important;
+      margin-top: 12px !important;
+    }
+    
+    .driver-popover-description .cta-box {
+      background: hsl(var(--primary) / 0.1) !important;
+      border-radius: 8px !important;
+      padding: 12px !important;
+      margin-top: 12px !important;
+    }
+    
+    .driver-popover-description .cta-box-title {
+      font-weight: 600 !important;
+      color: hsl(var(--primary)) !important;
+      margin-bottom: 4px !important;
+    }
+    
+    .driver-popover-description .grid-2 {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr !important;
+      gap: 8px !important;
+      margin-top: 8px !important;
+    }
+    
+    .driver-popover-description .grid-item {
+      display: flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+      background: hsl(var(--muted) / 0.5) !important;
+      border-radius: 8px !important;
+      padding: 6px 10px !important;
+      font-size: 0.875rem !important;
+    }
+    
+    /* Progress indicator */
+    .driver-popover-progress-text {
       display: none !important;
     }
     
-    /* Custom popover container */
-    .driver-popover-custom {
-      position: relative;
-      z-index: 10002;
+    /* Footer with buttons */
+    .driver-popover-footer {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      padding: 16px 20px !important;
+      border-top: 1px solid hsl(var(--border) / 0.3) !important;
+      margin: 0 !important;
+    }
+    
+    /* Progress dots */
+    .driver-popover-footer::before {
+      content: '';
+      display: flex;
+      gap: 4px;
+    }
+    
+    /* Skip button */
+    .driver-popover-close-btn {
+      background: transparent !important;
+      border: none !important;
+      color: hsl(var(--muted-foreground)) !important;
+      font-size: 0.875rem !important;
+      cursor: pointer !important;
+      padding: 4px 8px !important;
+      transition: color 0.2s !important;
+    }
+    
+    .driver-popover-close-btn:hover {
+      color: hsl(var(--foreground)) !important;
+    }
+    
+    /* Navigation buttons container */
+    .driver-popover-navigation-btns {
+      display: flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+    }
+    
+    /* Previous button */
+    .driver-popover-prev-btn {
+      background: transparent !important;
+      border: 1px solid hsl(var(--border)) !important;
+      color: hsl(var(--foreground)) !important;
+      padding: 8px 16px !important;
+      border-radius: 8px !important;
+      font-size: 0.875rem !important;
+      font-weight: 500 !important;
+      cursor: pointer !important;
+      transition: all 0.2s !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+    }
+    
+    .driver-popover-prev-btn:hover {
+      background: hsl(var(--muted)) !important;
+    }
+    
+    /* Next button */
+    .driver-popover-next-btn {
+      background: hsl(var(--primary)) !important;
+      border: none !important;
+      color: hsl(var(--primary-foreground)) !important;
+      padding: 8px 20px !important;
+      border-radius: 8px !important;
+      font-size: 0.875rem !important;
+      font-weight: 500 !important;
+      cursor: pointer !important;
+      transition: all 0.2s !important;
+      box-shadow: 0 4px 12px hsl(var(--primary) / 0.25) !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+    }
+    
+    .driver-popover-next-btn:hover {
+      background: hsl(var(--primary) / 0.9) !important;
+      transform: translateY(-1px) !important;
     }
   `;
   document.head.appendChild(style);
@@ -265,9 +288,6 @@ export default function OnboardingTour({
 }: OnboardingTourProps) {
   const [isRunning, setIsRunning] = useState(false);
   const driverRef = useRef<ReturnType<typeof driver> | null>(null);
-  const currentStepRef = useRef(0);
-  const tooltipRootRef = useRef<ReturnType<typeof createRoot> | null>(null);
-  const tooltipContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Configure step: open tab and panel as needed
   const configureStep = useCallback(
@@ -299,16 +319,6 @@ export default function OnboardingTour({
     }, 300);
     
     onComplete?.();
-    
-    // Cleanup tooltip
-    if (tooltipRootRef.current) {
-      tooltipRootRef.current.unmount();
-      tooltipRootRef.current = null;
-    }
-    if (tooltipContainerRef.current) {
-      tooltipContainerRef.current.remove();
-      tooltipContainerRef.current = null;
-    }
   }, [onComplete, onPanelVisibilityChange, onRequestAnimation]);
 
   const steps: DriveStep[] = [
@@ -317,12 +327,10 @@ export default function OnboardingTour({
       popover: {
         title: "Bienvenue sur Travliaq !",
         description: `
-          <div class="space-y-2">
-            <p>Planifiez votre voyage de façon simple et fluide.</p>
-            <p class="text-muted-foreground text-sm">
-              Ce guide vous montre les fonctionnalités principales. Vous pouvez le passer à tout moment.
-            </p>
-          </div>
+          <p>Planifiez votre voyage de façon simple et fluide.</p>
+          <p style="color: hsl(var(--muted-foreground)); font-size: 0.875rem; margin-top: 8px;">
+            Ce guide vous montre les fonctionnalités principales. Vous pouvez le passer à tout moment.
+          </p>
         `,
       },
     },
@@ -331,19 +339,13 @@ export default function OnboardingTour({
       popover: {
         title: "💬 Votre Assistant IA",
         description: `
-          <div class="space-y-3">
-            <p class="font-medium text-foreground">
-              <span class="text-primary">Zone surlignée</span> : le chat intelligent
-            </p>
-            <p>
-              Parlez naturellement à l'assistant : <em>"Je veux partir à Barcelone en mars"</em>
-            </p>
-            <ul class="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-              <li>Demandez des recommandations de destinations</li>
-              <li>Configurez votre voyage par la conversation</li>
-              <li>L'IA synchronise tout automatiquement</li>
-            </ul>
-          </div>
+          <p><span class="highlight-text">Zone surlignée</span> : le chat intelligent</p>
+          <p style="margin-top: 8px;">Parlez naturellement à l'assistant : <em>"Je veux partir à Barcelone en mars"</em></p>
+          <ul>
+            <li>Demandez des recommandations de destinations</li>
+            <li>Configurez votre voyage par la conversation</li>
+            <li>L'IA synchronise tout automatiquement</li>
+          </ul>
         `,
       },
     },
@@ -352,25 +354,13 @@ export default function OnboardingTour({
       popover: {
         title: "🛠️ Barre d'Outils",
         description: `
-          <div class="space-y-3">
-            <p class="font-medium text-foreground">
-              <span class="text-primary">Zone surlignée</span> : les onglets de navigation
-            </p>
-            <p>Accédez rapidement à chaque aspect de votre voyage :</p>
-            <div class="grid grid-cols-2 gap-2 text-sm mt-2">
-              <div class="flex items-center gap-2 bg-muted/50 rounded-lg px-2 py-1">
-                <span>✈️</span> <span>Vols</span>
-              </div>
-              <div class="flex items-center gap-2 bg-muted/50 rounded-lg px-2 py-1">
-                <span>🏨</span> <span>Hébergements</span>
-              </div>
-              <div class="flex items-center gap-2 bg-muted/50 rounded-lg px-2 py-1">
-                <span>🎭</span> <span>Activités</span>
-              </div>
-              <div class="flex items-center gap-2 bg-muted/50 rounded-lg px-2 py-1">
-                <span>⚙️</span> <span>Préférences</span>
-              </div>
-            </div>
+          <p><span class="highlight-text">Zone surlignée</span> : les onglets de navigation</p>
+          <p style="margin-top: 8px;">Accédez rapidement à chaque aspect de votre voyage :</p>
+          <div class="grid-2">
+            <div class="grid-item"><span>✈️</span> <span>Vols</span></div>
+            <div class="grid-item"><span>🏨</span> <span>Hébergements</span></div>
+            <div class="grid-item"><span>🎭</span> <span>Activités</span></div>
+            <div class="grid-item"><span>⚙️</span> <span>Préférences</span></div>
           </div>
         `,
       },
@@ -380,17 +370,13 @@ export default function OnboardingTour({
       popover: {
         title: "🗺️ Carte Interactive",
         description: `
-          <div class="space-y-3">
-            <p class="font-medium text-foreground">
-              <span class="text-primary">Zone surlignée</span> : la carte du monde
-            </p>
-            <p>Visualisez votre voyage en temps réel :</p>
-            <ul class="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-              <li>Cliquez sur une ville pour voir les prix</li>
-              <li>Les itinéraires s'affichent automatiquement</li>
-              <li>Zoomez pour découvrir plus d'options</li>
-            </ul>
-          </div>
+          <p><span class="highlight-text">Zone surlignée</span> : la carte du monde</p>
+          <p style="margin-top: 8px;">Visualisez votre voyage en temps réel :</p>
+          <ul>
+            <li>Cliquez sur une ville pour voir les prix</li>
+            <li>Les itinéraires s'affichent automatiquement</li>
+            <li>Zoomez pour découvrir plus d'options</li>
+          </ul>
         `,
       },
     },
@@ -399,21 +385,15 @@ export default function OnboardingTour({
       popover: {
         title: "✈️ Widget Vols",
         description: `
-          <div class="space-y-3">
-            <p class="font-medium text-foreground">
-              <span class="text-primary">Zone surlignée</span> : le panneau de recherche de vols
-            </p>
-            <p>Configurez tous les détails de vos vols :</p>
-            <ul class="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-              <li><strong>Type de trajet</strong> : aller-simple, aller-retour, multi-destinations</li>
-              <li><strong>Villes</strong> : départ et destination</li>
-              <li><strong>Dates</strong> : calendrier interactif</li>
-              <li><strong>Voyageurs</strong> : adultes, enfants, bagages</li>
-            </ul>
-            <p class="text-xs text-primary/80 mt-2">
-              💡 Les données se synchronisent avec l'assistant et les autres widgets
-            </p>
-          </div>
+          <p><span class="highlight-text">Zone surlignée</span> : le panneau de recherche de vols</p>
+          <p style="margin-top: 8px;">Configurez tous les détails de vos vols :</p>
+          <ul>
+            <li><strong>Type de trajet</strong> : aller-simple, aller-retour, multi-destinations</li>
+            <li><strong>Villes</strong> : départ et destination</li>
+            <li><strong>Dates</strong> : calendrier interactif</li>
+            <li><strong>Voyageurs</strong> : adultes, enfants, bagages</li>
+          </ul>
+          <p class="tip">💡 Les données se synchronisent avec l'assistant et les autres widgets</p>
         `,
       },
     },
@@ -422,21 +402,15 @@ export default function OnboardingTour({
       popover: {
         title: "🏨 Widget Hébergements",
         description: `
-          <div class="space-y-3">
-            <p class="font-medium text-foreground">
-              <span class="text-primary">Zone surlignée</span> : le panneau de recherche d'hébergements
-            </p>
-            <p>Trouvez le logement idéal :</p>
-            <ul class="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-              <li><strong>Destination</strong> : synchronisée avec vos vols</li>
-              <li><strong>Budget</strong> : définissez votre fourchette de prix</li>
-              <li><strong>Type</strong> : hôtel, appartement, villa...</li>
-              <li><strong>Équipements</strong> : wifi, piscine, parking...</li>
-            </ul>
-            <p class="text-xs text-primary/80 mt-2">
-              💡 Les dates et voyageurs sont pré-remplis depuis vos vols
-            </p>
-          </div>
+          <p><span class="highlight-text">Zone surlignée</span> : le panneau de recherche d'hébergements</p>
+          <p style="margin-top: 8px;">Trouvez le logement idéal :</p>
+          <ul>
+            <li><strong>Destination</strong> : synchronisée avec vos vols</li>
+            <li><strong>Budget</strong> : définissez votre fourchette de prix</li>
+            <li><strong>Type</strong> : hôtel, appartement, villa...</li>
+            <li><strong>Équipements</strong> : wifi, piscine, parking...</li>
+          </ul>
+          <p class="tip">💡 Les dates et voyageurs sont pré-remplis depuis vos vols</p>
         `,
       },
     },
@@ -445,20 +419,14 @@ export default function OnboardingTour({
       popover: {
         title: "🎭 Widget Activités",
         description: `
-          <div class="space-y-3">
-            <p class="font-medium text-foreground">
-              <span class="text-primary">Zone surlignée</span> : le panneau de recherche d'activités
-            </p>
-            <p>Découvrez que faire sur place :</p>
-            <ul class="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-              <li><strong>Catégories</strong> : culture, nature, gastronomie...</li>
-              <li><strong>Filtres</strong> : prix, durée, accessibilité</li>
-              <li><strong>Recherche</strong> : par ville ou directement sur la carte</li>
-            </ul>
-            <p class="text-xs text-primary/80 mt-2">
-              💡 Les activités s'affichent comme pins sur la carte
-            </p>
-          </div>
+          <p><span class="highlight-text">Zone surlignée</span> : le panneau de recherche d'activités</p>
+          <p style="margin-top: 8px;">Découvrez que faire sur place :</p>
+          <ul>
+            <li><strong>Catégories</strong> : culture, nature, gastronomie...</li>
+            <li><strong>Filtres</strong> : prix, durée, accessibilité</li>
+            <li><strong>Recherche</strong> : par ville ou directement sur la carte</li>
+          </ul>
+          <p class="tip">💡 Les activités s'affichent comme pins sur la carte</p>
         `,
       },
     },
@@ -467,21 +435,15 @@ export default function OnboardingTour({
       popover: {
         title: "⚙️ Widget Préférences",
         description: `
-          <div class="space-y-3">
-            <p class="font-medium text-foreground">
-              <span class="text-primary">Zone surlignée</span> : vos préférences de voyage
-            </p>
-            <p>Personnalisez votre expérience :</p>
-            <ul class="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-              <li><strong>Rythme</strong> : intensif, équilibré, détendu</li>
-              <li><strong>Confort</strong> : budget, standard, luxe</li>
-              <li><strong>Centres d'intérêt</strong> : ce qui vous passionne</li>
-              <li><strong>Restrictions</strong> : alimentaires, accessibilité</li>
-            </ul>
-            <p class="text-xs text-primary/80 mt-2">
-              💡 Ces préférences influencent les suggestions de l'IA
-            </p>
-          </div>
+          <p><span class="highlight-text">Zone surlignée</span> : vos préférences de voyage</p>
+          <p style="margin-top: 8px;">Personnalisez votre expérience :</p>
+          <ul>
+            <li><strong>Rythme</strong> : intensif, équilibré, détendu</li>
+            <li><strong>Confort</strong> : budget, standard, luxe</li>
+            <li><strong>Centres d'intérêt</strong> : ce qui vous passionne</li>
+            <li><strong>Restrictions</strong> : alimentaires, accessibilité</li>
+          </ul>
+          <p class="tip">💡 Ces préférences influencent les suggestions de l'IA</p>
         `,
       },
     },
@@ -490,82 +452,21 @@ export default function OnboardingTour({
       popover: {
         title: "🚀 C'est parti !",
         description: `
-          <div class="space-y-3">
-            <p class="font-medium">Vous êtes prêt à planifier votre prochain voyage.</p>
-            <div class="bg-primary/10 rounded-lg p-3 text-sm">
-              <p class="font-medium text-primary mb-1">Commencez par :</p>
-              <ul class="text-muted-foreground space-y-1 list-disc list-inside">
-                <li>Dire bonjour à l'assistant 💬</li>
-                <li>Ou configurer vos vols directement ✈️</li>
-              </ul>
-            </div>
-            <p class="text-xs text-muted-foreground">
-              Vous pouvez relancer ce guide à tout moment depuis les paramètres.
-            </p>
+          <p style="font-weight: 500;">Vous êtes prêt à planifier votre prochain voyage.</p>
+          <div class="cta-box">
+            <p class="cta-box-title">Commencez par :</p>
+            <ul style="color: hsl(var(--muted-foreground)); margin: 0; padding-left: 20px;">
+              <li>Dire bonjour à l'assistant 💬</li>
+              <li>Ou configurer vos vols directement ✈️</li>
+            </ul>
           </div>
+          <p style="font-size: 0.75rem; color: hsl(var(--muted-foreground)); margin-top: 12px;">
+            Vous pouvez relancer ce guide à tout moment depuis les paramètres.
+          </p>
         `,
       },
     },
   ];
-
-  // Render custom tooltip
-  const renderTooltip = useCallback((step: DriveStep, currentStep: number) => {
-    // Create container if it doesn't exist
-    if (!tooltipContainerRef.current) {
-      tooltipContainerRef.current = document.createElement("div");
-      tooltipContainerRef.current.className = "driver-popover-custom";
-      document.body.appendChild(tooltipContainerRef.current);
-    }
-
-    // Create root if it doesn't exist
-    if (!tooltipRootRef.current) {
-      tooltipRootRef.current = createRoot(tooltipContainerRef.current);
-    }
-
-    // Position the tooltip in the center of the screen
-    tooltipContainerRef.current.style.cssText = `
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 100000;
-    `;
-
-    tooltipRootRef.current.render(
-      <CustomTooltip
-        step={step}
-        currentStep={currentStep}
-        totalSteps={steps.length}
-        onPrev={() => {
-          if (driverRef.current && currentStep > 0) {
-            currentStepRef.current = currentStep - 1;
-            configureStep(currentStepRef.current);
-            setTimeout(() => {
-              driverRef.current?.movePrevious();
-            }, 300);
-          }
-        }}
-        onNext={() => {
-          if (driverRef.current) {
-            if (currentStep === steps.length - 1) {
-              driverRef.current.destroy();
-              handleComplete();
-            } else {
-              currentStepRef.current = currentStep + 1;
-              configureStep(currentStepRef.current);
-              setTimeout(() => {
-                driverRef.current?.moveNext();
-              }, 300);
-            }
-          }
-        }}
-        onClose={() => {
-          driverRef.current?.destroy();
-          handleComplete();
-        }}
-      />
-    );
-  }, [steps.length, configureStep, handleComplete]);
 
   // Initialize driver
   useEffect(() => {
@@ -578,24 +479,24 @@ export default function OnboardingTour({
         onPanelVisibilityChange?.(false);
         
         const driverConfig: Config = {
-          showButtons: [],
-          showProgress: false,
-          allowClose: false,
+          showButtons: ['next', 'previous', 'close'],
+          showProgress: true,
+          allowClose: true,
           overlayOpacity: 0.85,
           stagePadding: 12,
           stageRadius: 16,
           animate: true,
           smoothScroll: false,
           disableActiveInteraction: true,
+          popoverClass: "travliaq-popover",
+          nextBtnText: "Suivant →",
+          prevBtnText: "← Précédent",
+          doneBtnText: "C'est parti ! ✨",
+          progressText: "{{current}} / {{total}}",
           steps: steps.map((step, index) => ({
             ...step,
             onHighlightStarted: () => {
-              currentStepRef.current = index;
-              renderTooltip(step, index);
-            },
-            onHighlighted: () => {
-              // Re-render tooltip when highlight animation completes
-              renderTooltip(step, index);
+              configureStep(index);
             },
           })),
           onDestroyed: () => {
@@ -613,19 +514,13 @@ export default function OnboardingTour({
 
       return () => clearTimeout(timer);
     }
-  }, [forceShow, onPanelVisibilityChange, renderTooltip, configureStep, handleComplete, steps]);
+  }, [forceShow, onPanelVisibilityChange, configureStep, handleComplete]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (driverRef.current) {
         driverRef.current.destroy();
-      }
-      if (tooltipRootRef.current) {
-        tooltipRootRef.current.unmount();
-      }
-      if (tooltipContainerRef.current) {
-        tooltipContainerRef.current.remove();
       }
     };
   }, []);
