@@ -17,11 +17,40 @@ import { getMissingFieldLabel } from "../utils/flightDataToMemory";
 import { plannerLogger } from "@/utils/logger";
 
 /**
+ * Maximum messages to send to API to prevent context overflow
+ * The memoryContext already contains structured summaries, so we only need recent messages
+ */
+export const MAX_MESSAGES_TO_SEND = 15;
+
+/**
  * API message format for the chat endpoint
  */
 export interface APIMessage {
   role: string;
   content: string;
+}
+
+/**
+ * Limit messages to MAX_MESSAGES_TO_SEND while preserving system context
+ * Keeps the first system message (if any) and the last N-1 messages
+ */
+export function limitMessages(messages: APIMessage[]): APIMessage[] {
+  if (messages.length <= MAX_MESSAGES_TO_SEND) {
+    return messages;
+  }
+  
+  // Check if first message is a system message
+  const hasSystemMessage = messages[0]?.role === "system";
+  
+  if (hasSystemMessage) {
+    // Keep system message + last (MAX - 1) messages
+    const systemMessage = messages[0];
+    const recentMessages = messages.slice(-(MAX_MESSAGES_TO_SEND - 1));
+    return [systemMessage, ...recentMessages];
+  }
+  
+  // No system message - just take the last MAX messages
+  return messages.slice(-MAX_MESSAGES_TO_SEND);
 }
 
 /**
@@ -491,7 +520,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
                 "X-Request-ID": requestId,
               },
               body: JSON.stringify({
-                messages: apiMessages,
+                messages: limitMessages(apiMessages),
                 stream: true,
                 requestId, // Also in body for backup
                 memoryContext: contextMessage,

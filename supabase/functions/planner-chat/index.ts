@@ -3,8 +3,6 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildPhaseSystemPrompt, type TravelPhase } from "./prompts/phasePrompts.ts";
 import { buildBaseSystemPrompt, buildChooseForMeInstructions, detectLanguage, type SupportedLanguage } from "./prompts/systemPrompts.ts";
-import { intentClassifierTool, parseIntentClassification, type IntentClassificationResult } from "./tools/intentClassifier.ts";
-import { reasoningTool, parseReasoningResult, CHAIN_OF_THOUGHT_INSTRUCTIONS, type ReasoningResult } from "./tools/reasoningEngine.ts";
 import { createRequestLogger, extractRequestId, type RequestLogger } from "../_shared/logger.ts";
 import {
   FlightDataSchema,
@@ -17,10 +15,77 @@ import {
   type ToolResult,
 } from "./validators/schemas.ts";
 
+// Import tools from modular files
+import { intentClassifierTool, parseIntentClassification, type IntentClassificationResult } from "./tools/intentClassifier.ts";
+import { reasoningTool, parseReasoningResult, CHAIN_OF_THOUGHT_INSTRUCTIONS, type ReasoningResult } from "./tools/reasoningEngine.ts";
+import { flightExtractionTool } from "./tools/flightExtractor.ts";
+import { accommodationExtractionTool } from "./tools/accommodationExtractor.ts";
+import { preferenceExtractionTool } from "./tools/preferenceExtractor.ts";
+import { quickRepliesExtractionTool } from "./tools/quickReplies.ts";
+import { destinationSuggestionTool } from "./tools/destinationSuggestions.ts";
+import { flightSearchTriggerTool } from "./tools/flightSearchTrigger.ts";
+import { TOOL_NAMES } from "./tools/index.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-request-id",
 };
+
+// ============================================================================
+// RATE LIMITING (Simple in-memory - resets on function cold start)
+// In production, use Redis via Upstash for persistent rate limiting
+// ============================================================================
+const rateLimits = new Map<string, { count: number; resetAt: number }>();
+const MAX_REQUESTS_PER_MINUTE = 20;
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+
+/**
+ * Check if user has exceeded rate limit
+ * Returns true if request is allowed, false if rate limited
+ */
+function checkRateLimit(userId: string, log: RequestLogger): boolean {
+  const now = Date.now();
+  const limit = rateLimits.get(userId);
+  
+  // Clean up old entries periodically (every 100th check)
+  if (Math.random() < 0.01) {
+    for (const [key, value] of rateLimits.entries()) {
+      if (now > value.resetAt) {
+        rateLimits.delete(key);
+      }
+    }
+  }
+  
+  if (!limit || now > limit.resetAt) {
+    rateLimits.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  
+  if (limit.count >= MAX_REQUESTS_PER_MINUTE) {
+    log.warn("rate_limit", "Rate limit exceeded", { 
+      user_id: userId, 
+      count: limit.count,
+      resets_in_ms: limit.resetAt - now,
+    });
+    return false;
+  }
+  
+  limit.count++;
+  return true;
+}
+
+// Maximum messages to process (context window protection)
+const MAX_MESSAGES = 50;
+
+// NOTE: Tool definitions are now imported from ./tools/*.ts files
+// - flightExtractionTool from ./tools/flightExtractor.ts
+// - accommodationExtractionTool from ./tools/accommodationExtractor.ts
+// - preferenceExtractionTool from ./tools/preferenceExtractor.ts
+// - quickRepliesExtractionTool from ./tools/quickReplies.ts
+// - destinationSuggestionTool from ./tools/destinationSuggestions.ts
+// - flightSearchTriggerTool from ./tools/flightSearchTrigger.ts
+// - intentClassifierTool from ./tools/intentClassifier.ts
+// - reasoningTool from ./tools/reasoningEngine.ts
 
 // Tool definition for extracting flight intent from user message
 const flightExtractionTool = {
@@ -424,8 +489,32 @@ serve(async (req) => {
     // Initialize request-scoped logger
     const log = createRequestLogger(requestId, userId);
     
+    // Check rate limit BEFORE processing
+    if (!checkRateLimit(userId, log)) {
+      log.error("rate_limit", "Request blocked by rate limit");
+      await log.flush();
+      return new Response(JSON.stringify({ 
+        error: "Trop de requêtes. Veuillez patienter quelques secondes.",
+        code: "RATE_LIMITED",
+        retryAfter: 60,
+      }), {
+        status: 429,
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json",
+          "Retry-After": "60",
+        },
+      });
+    }
+    
+    // Limit messages to prevent context overflow
+    const limitedMessages = Array.isArray(messages) 
+      ? messages.slice(-MAX_MESSAGES) 
+      : messages;
+    
     log.info("request", "Request started", {
-      messages_count: messages.length,
+      messages_count: limitedMessages.length,
+      original_count: messages?.length || 0,
       stream,
       phase: currentPhase,
       language: requestLanguage,
