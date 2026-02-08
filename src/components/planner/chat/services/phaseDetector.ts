@@ -5,6 +5,8 @@
  * the AI's personality, tone, and approach dynamically.
  */
 
+import i18n from "@/i18n/config";
+
 // ===== Types =====
 
 export type TravelPhase =
@@ -228,12 +230,20 @@ export function getSimplePhase(
  * Get phase display info for debugging/UI
  */
 export function getPhaseDisplayInfo(phase: TravelPhase): { label: string; emoji: string; color: string } {
-  const info: Record<TravelPhase, { label: string; emoji: string; color: string }> = {
-    inspiration: { label: "Inspiration", emoji: "✨", color: "text-purple-500" },
-    research: { label: "Recherche", emoji: "🔍", color: "text-blue-500" },
-    comparison: { label: "Comparaison", emoji: "⚖️", color: "text-amber-500" },
-    planning: { label: "Planification", emoji: "📋", color: "text-green-500" },
-    booking: { label: "Réservation", emoji: "✅", color: "text-emerald-500" },
+  const t = i18n.t.bind(i18n);
+  
+  const info: Record<TravelPhase, { labelKey: string; emoji: string; color: string }> = {
+    inspiration: { labelKey: "planner.phase.inspiration", emoji: "✨", color: "text-purple-500" },
+    research: { labelKey: "planner.phase.research", emoji: "🔍", color: "text-blue-500" },
+    comparison: { labelKey: "planner.phase.comparison", emoji: "⚖️", color: "text-amber-500" },
+    planning: { labelKey: "planner.phase.planning", emoji: "📋", color: "text-green-500" },
+    booking: { labelKey: "planner.phase.booking", emoji: "✅", color: "text-emerald-500" },
   };
-  return info[phase];
+  
+  const phaseInfo = info[phase];
+  return {
+    label: t(phaseInfo.labelKey),
+    emoji: phaseInfo.emoji,
+    color: phaseInfo.color,
+  };
 }

@@ -23,55 +23,66 @@ export interface ContextualSuggestion {
 interface SeasonalInfo {
   month: number;
   season: "low" | "shoulder" | "high" | "peak";
-  weather: string;
+  weather: string; // Now uses translation keys
   avgTemp: number;
   priceMultiplier: number;
   events?: string[];
   crowdLevel: "low" | "moderate" | "high" | "very_high";
 }
 
+// Weather keys for i18n
+const WEATHER_KEYS = {
+  cold: "planner.weather.cold",
+  cool: "planner.weather.cool",
+  mild: "planner.weather.mild",
+  pleasant: "planner.weather.pleasant",
+  warm: "planner.weather.warm",
+  hot: "planner.weather.hot",
+  veryHot: "planner.weather.veryHot",
+};
+
 const SEASONAL_DATA: Record<string, SeasonalInfo[]> = {
   ES: [
-    { month: 1, season: "low", weather: "Frais", avgTemp: 12, priceMultiplier: 0.8, crowdLevel: "low" },
-    { month: 2, season: "low", weather: "Frais", avgTemp: 13, priceMultiplier: 0.8, crowdLevel: "low" },
-    { month: 3, season: "shoulder", weather: "Doux", avgTemp: 16, priceMultiplier: 0.9, crowdLevel: "moderate" },
-    { month: 4, season: "shoulder", weather: "Agréable", avgTemp: 18, priceMultiplier: 0.95, crowdLevel: "moderate", events: ["Semana Santa"] },
-    { month: 5, season: "shoulder", weather: "Chaud", avgTemp: 22, priceMultiplier: 1.0, crowdLevel: "moderate" },
-    { month: 6, season: "high", weather: "Chaud", avgTemp: 26, priceMultiplier: 1.2, crowdLevel: "high" },
-    { month: 7, season: "peak", weather: "Très chaud", avgTemp: 30, priceMultiplier: 1.4, crowdLevel: "very_high" },
-    { month: 8, season: "peak", weather: "Très chaud", avgTemp: 30, priceMultiplier: 1.5, crowdLevel: "very_high" },
-    { month: 9, season: "shoulder", weather: "Chaud", avgTemp: 26, priceMultiplier: 1.1, crowdLevel: "high" },
-    { month: 10, season: "shoulder", weather: "Agréable", avgTemp: 22, priceMultiplier: 0.95, crowdLevel: "moderate" },
-    { month: 11, season: "low", weather: "Doux", avgTemp: 16, priceMultiplier: 0.85, crowdLevel: "low" },
-    { month: 12, season: "shoulder", weather: "Frais", avgTemp: 13, priceMultiplier: 0.9, crowdLevel: "moderate", events: ["Noël", "Nouvel An"] },
+    { month: 1, season: "low", weather: "cool", avgTemp: 12, priceMultiplier: 0.8, crowdLevel: "low" },
+    { month: 2, season: "low", weather: "cool", avgTemp: 13, priceMultiplier: 0.8, crowdLevel: "low" },
+    { month: 3, season: "shoulder", weather: "mild", avgTemp: 16, priceMultiplier: 0.9, crowdLevel: "moderate" },
+    { month: 4, season: "shoulder", weather: "pleasant", avgTemp: 18, priceMultiplier: 0.95, crowdLevel: "moderate", events: ["Semana Santa"] },
+    { month: 5, season: "shoulder", weather: "warm", avgTemp: 22, priceMultiplier: 1.0, crowdLevel: "moderate" },
+    { month: 6, season: "high", weather: "warm", avgTemp: 26, priceMultiplier: 1.2, crowdLevel: "high" },
+    { month: 7, season: "peak", weather: "veryHot", avgTemp: 30, priceMultiplier: 1.4, crowdLevel: "very_high" },
+    { month: 8, season: "peak", weather: "veryHot", avgTemp: 30, priceMultiplier: 1.5, crowdLevel: "very_high" },
+    { month: 9, season: "shoulder", weather: "warm", avgTemp: 26, priceMultiplier: 1.1, crowdLevel: "high" },
+    { month: 10, season: "shoulder", weather: "pleasant", avgTemp: 22, priceMultiplier: 0.95, crowdLevel: "moderate" },
+    { month: 11, season: "low", weather: "mild", avgTemp: 16, priceMultiplier: 0.85, crowdLevel: "low" },
+    { month: 12, season: "shoulder", weather: "cool", avgTemp: 13, priceMultiplier: 0.9, crowdLevel: "moderate", events: ["Noël", "Nouvel An"] },
   ],
   IT: [
-    { month: 1, season: "low", weather: "Froid", avgTemp: 8, priceMultiplier: 0.75, crowdLevel: "low" },
-    { month: 2, season: "low", weather: "Froid", avgTemp: 10, priceMultiplier: 0.75, crowdLevel: "low", events: ["Carnaval de Venise"] },
-    { month: 3, season: "shoulder", weather: "Doux", avgTemp: 14, priceMultiplier: 0.9, crowdLevel: "moderate" },
-    { month: 4, season: "shoulder", weather: "Agréable", avgTemp: 17, priceMultiplier: 1.0, crowdLevel: "high", events: ["Pâques"] },
-    { month: 5, season: "high", weather: "Chaud", avgTemp: 22, priceMultiplier: 1.1, crowdLevel: "high" },
-    { month: 6, season: "high", weather: "Chaud", avgTemp: 26, priceMultiplier: 1.3, crowdLevel: "very_high" },
-    { month: 7, season: "peak", weather: "Très chaud", avgTemp: 30, priceMultiplier: 1.4, crowdLevel: "very_high" },
-    { month: 8, season: "peak", weather: "Très chaud", avgTemp: 30, priceMultiplier: 1.5, crowdLevel: "very_high", events: ["Ferragosto"] },
-    { month: 9, season: "shoulder", weather: "Chaud", avgTemp: 25, priceMultiplier: 1.1, crowdLevel: "high" },
-    { month: 10, season: "shoulder", weather: "Agréable", avgTemp: 20, priceMultiplier: 0.95, crowdLevel: "moderate" },
-    { month: 11, season: "low", weather: "Frais", avgTemp: 14, priceMultiplier: 0.8, crowdLevel: "low" },
-    { month: 12, season: "shoulder", weather: "Froid", avgTemp: 10, priceMultiplier: 0.85, crowdLevel: "moderate", events: ["Noël"] },
+    { month: 1, season: "low", weather: "cold", avgTemp: 8, priceMultiplier: 0.75, crowdLevel: "low" },
+    { month: 2, season: "low", weather: "cold", avgTemp: 10, priceMultiplier: 0.75, crowdLevel: "low", events: ["Carnaval de Venise"] },
+    { month: 3, season: "shoulder", weather: "mild", avgTemp: 14, priceMultiplier: 0.9, crowdLevel: "moderate" },
+    { month: 4, season: "shoulder", weather: "pleasant", avgTemp: 17, priceMultiplier: 1.0, crowdLevel: "high", events: ["Pâques"] },
+    { month: 5, season: "high", weather: "warm", avgTemp: 22, priceMultiplier: 1.1, crowdLevel: "high" },
+    { month: 6, season: "high", weather: "warm", avgTemp: 26, priceMultiplier: 1.3, crowdLevel: "very_high" },
+    { month: 7, season: "peak", weather: "veryHot", avgTemp: 30, priceMultiplier: 1.4, crowdLevel: "very_high" },
+    { month: 8, season: "peak", weather: "veryHot", avgTemp: 30, priceMultiplier: 1.5, crowdLevel: "very_high", events: ["Ferragosto"] },
+    { month: 9, season: "shoulder", weather: "warm", avgTemp: 25, priceMultiplier: 1.1, crowdLevel: "high" },
+    { month: 10, season: "shoulder", weather: "pleasant", avgTemp: 20, priceMultiplier: 0.95, crowdLevel: "moderate" },
+    { month: 11, season: "low", weather: "cool", avgTemp: 14, priceMultiplier: 0.8, crowdLevel: "low" },
+    { month: 12, season: "shoulder", weather: "cold", avgTemp: 10, priceMultiplier: 0.85, crowdLevel: "moderate", events: ["Noël"] },
   ],
   PT: [
-    { month: 1, season: "low", weather: "Doux", avgTemp: 12, priceMultiplier: 0.75, crowdLevel: "low" },
-    { month: 2, season: "low", weather: "Doux", avgTemp: 13, priceMultiplier: 0.75, crowdLevel: "low" },
-    { month: 3, season: "shoulder", weather: "Agréable", avgTemp: 16, priceMultiplier: 0.85, crowdLevel: "moderate" },
-    { month: 4, season: "shoulder", weather: "Agréable", avgTemp: 18, priceMultiplier: 0.95, crowdLevel: "moderate" },
-    { month: 5, season: "shoulder", weather: "Chaud", avgTemp: 21, priceMultiplier: 1.0, crowdLevel: "moderate" },
-    { month: 6, season: "high", weather: "Chaud", avgTemp: 25, priceMultiplier: 1.2, crowdLevel: "high", events: ["Fêtes de Lisbonne"] },
-    { month: 7, season: "peak", weather: "Très chaud", avgTemp: 28, priceMultiplier: 1.4, crowdLevel: "very_high" },
-    { month: 8, season: "peak", weather: "Très chaud", avgTemp: 28, priceMultiplier: 1.5, crowdLevel: "very_high" },
-    { month: 9, season: "shoulder", weather: "Chaud", avgTemp: 25, priceMultiplier: 1.1, crowdLevel: "high" },
-    { month: 10, season: "shoulder", weather: "Agréable", avgTemp: 21, priceMultiplier: 0.9, crowdLevel: "moderate" },
-    { month: 11, season: "low", weather: "Doux", avgTemp: 16, priceMultiplier: 0.8, crowdLevel: "low" },
-    { month: 12, season: "shoulder", weather: "Doux", avgTemp: 13, priceMultiplier: 0.85, crowdLevel: "moderate", events: ["Noël"] },
+    { month: 1, season: "low", weather: "mild", avgTemp: 12, priceMultiplier: 0.75, crowdLevel: "low" },
+    { month: 2, season: "low", weather: "mild", avgTemp: 13, priceMultiplier: 0.75, crowdLevel: "low" },
+    { month: 3, season: "shoulder", weather: "pleasant", avgTemp: 16, priceMultiplier: 0.85, crowdLevel: "moderate" },
+    { month: 4, season: "shoulder", weather: "pleasant", avgTemp: 18, priceMultiplier: 0.95, crowdLevel: "moderate" },
+    { month: 5, season: "shoulder", weather: "warm", avgTemp: 21, priceMultiplier: 1.0, crowdLevel: "moderate" },
+    { month: 6, season: "high", weather: "warm", avgTemp: 25, priceMultiplier: 1.2, crowdLevel: "high", events: ["Fêtes de Lisbonne"] },
+    { month: 7, season: "peak", weather: "veryHot", avgTemp: 28, priceMultiplier: 1.4, crowdLevel: "very_high" },
+    { month: 8, season: "peak", weather: "veryHot", avgTemp: 28, priceMultiplier: 1.5, crowdLevel: "very_high" },
+    { month: 9, season: "shoulder", weather: "warm", avgTemp: 25, priceMultiplier: 1.1, crowdLevel: "high" },
+    { month: 10, season: "shoulder", weather: "pleasant", avgTemp: 21, priceMultiplier: 0.9, crowdLevel: "moderate" },
+    { month: 11, season: "low", weather: "mild", avgTemp: 16, priceMultiplier: 0.8, crowdLevel: "low" },
+    { month: 12, season: "shoulder", weather: "mild", avgTemp: 13, priceMultiplier: 0.85, crowdLevel: "moderate", events: ["Noël"] },
   ],
 };
 
@@ -288,7 +299,31 @@ export function getQuickRepliesForStep(step: PlanningStep, context: WorkflowCont
 }
 
 export const SUGGESTION_PRESETS = {
-  flexibleDates: { id: "preset-flexible", type: "tip" as SuggestionType, priority: "medium" as SuggestionPriority, title: "Dates flexibles", message: "Des dates flexibles peuvent vous faire économiser jusqu'à 30%", trigger: { step: "dates" as PlanningStep }, dismissible: true },
-  earlyBooking: { id: "preset-early", type: "timing" as SuggestionType, priority: "medium" as SuggestionPriority, title: "Réservez tôt", message: "Réserver 6-8 semaines à l'avance offre souvent les meilleurs prix", trigger: { step: "flights" as PlanningStep }, dismissible: true },
-  compareHotels: { id: "preset-compare", type: "insight" as SuggestionType, priority: "low" as SuggestionPriority, title: "Comparez", message: "Comparez plusieurs hôtels pour trouver le meilleur rapport qualité-prix", trigger: { step: "hotels" as PlanningStep }, dismissible: true },
+  flexibleDates: { 
+    id: "preset-flexible", 
+    type: "tip" as SuggestionType, 
+    priority: "medium" as SuggestionPriority, 
+    get title() { return i18n.t("planner.suggestionPreset.flexibleDatesTitle"); },
+    get message() { return i18n.t("planner.suggestionPreset.flexibleDatesMessage"); },
+    trigger: { step: "dates" as PlanningStep }, 
+    dismissible: true 
+  },
+  earlyBooking: { 
+    id: "preset-early", 
+    type: "timing" as SuggestionType, 
+    priority: "medium" as SuggestionPriority, 
+    get title() { return i18n.t("planner.suggestionPreset.earlyBookingTitle"); },
+    get message() { return i18n.t("planner.suggestionPreset.earlyBookingMessage"); },
+    trigger: { step: "flights" as PlanningStep }, 
+    dismissible: true 
+  },
+  compareHotels: { 
+    id: "preset-compare", 
+    type: "insight" as SuggestionType, 
+    priority: "low" as SuggestionPriority, 
+    get title() { return i18n.t("planner.suggestionPreset.compareHotelsTitle"); },
+    get message() { return i18n.t("planner.suggestionPreset.compareHotelsMessage"); },
+    trigger: { step: "hotels" as PlanningStep }, 
+    dismissible: true 
+  },
 };
