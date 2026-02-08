@@ -59,6 +59,23 @@ export interface ReasoningData {
 }
 
 /**
+ * Tool execution status for real-time tracking
+ */
+export interface ToolStatusEvent {
+  tool: string;
+  status: "started" | "finished" | "failed";
+  reason?: string;
+  summary?: string;
+  latency_ms?: number;
+  timestamp: number;
+}
+
+/**
+ * Callback for tool status updates
+ */
+export type OnToolStatusUpdate = (event: ToolStatusEvent) => void;
+
+/**
  * Stream response result
  */
 export interface StreamResult {
@@ -367,6 +384,7 @@ export interface UseChatStreamOptions {
   retryConfig?: Partial<RetryConfig>;
   onError?: (error: StreamError) => void;
   onRetry?: (attempt: number, maxRetries: number) => void;
+  onToolStatus?: OnToolStatusUpdate;
 }
 
 /**
@@ -575,6 +593,31 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
                   } else if (parsed.type === "flightSearchTrigger" && parsed.trigger) {
                     flightSearchTrigger = true;
                     console.log("[Stream] Flight search trigger received");
+                  } else if (parsed.type === "tool_started" && parsed.tool) {
+                    // Handle tool started event
+                    plannerLogger.logToolEvent(requestId, parsed.tool, "started", {
+                      reason: parsed.reason,
+                    });
+                    options.onToolStatus?.({
+                      tool: parsed.tool,
+                      status: "started",
+                      reason: parsed.reason,
+                      timestamp: parsed.timestamp || Date.now(),
+                    });
+                  } else if (parsed.type === "tool_finished" && parsed.tool) {
+                    // Handle tool finished event
+                    const status = parsed.success ? "finished" : "failed";
+                    plannerLogger.logToolEvent(requestId, parsed.tool, status, {
+                      latency_ms: parsed.latency_ms,
+                      summary: parsed.summary,
+                    });
+                    options.onToolStatus?.({
+                      tool: parsed.tool,
+                      status,
+                      latency_ms: parsed.latency_ms,
+                      summary: parsed.summary,
+                      timestamp: parsed.timestamp || Date.now(),
+                    });
                   } else if (parsed.type === "content" && parsed.content) {
                     fullContent += parsed.content;
                     // Throttled content update to reduce flickering

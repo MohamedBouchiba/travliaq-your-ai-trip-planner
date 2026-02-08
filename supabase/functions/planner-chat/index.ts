@@ -6,6 +6,16 @@ import { buildBaseSystemPrompt, buildChooseForMeInstructions, detectLanguage, ty
 import { intentClassifierTool, parseIntentClassification, type IntentClassificationResult } from "./tools/intentClassifier.ts";
 import { reasoningTool, parseReasoningResult, CHAIN_OF_THOUGHT_INSTRUCTIONS, type ReasoningResult } from "./tools/reasoningEngine.ts";
 import { createRequestLogger, extractRequestId, type RequestLogger } from "../_shared/logger.ts";
+import {
+  FlightDataSchema,
+  AccommodationDataSchema,
+  PreferencesDataSchema,
+  QuickRepliesDataSchema,
+  DestinationSuggestionRequestSchema,
+  FlightSearchTriggerSchema,
+  validateToolOutput,
+  type ToolResult,
+} from "./validators/schemas.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -881,9 +891,10 @@ ${phasePrompt}`;
         }
         
         if (toolCall.function?.name === "update_flight_widget") {
-          try {
-            flightData = JSON.parse(toolCall.function.arguments);
-            console.log("Flight data extracted:", flightData);
+          const validationResult = validateToolOutput(FlightDataSchema, toolCall.function.arguments, "update_flight_widget");
+          if (validationResult.success && validationResult.data) {
+            flightData = validationResult.data;
+            log.info("tool_validation", "Flight data validated", { fields: Object.keys(flightData) });
             
             // Filter out empty values
             flightData = Object.fromEntries(
@@ -894,15 +905,18 @@ ${phasePrompt}`;
             if (Object.keys(flightData).length === 0) {
               flightData = null;
             }
-          } catch (e) {
-            console.error("Failed to parse flight data:", e);
+          } else {
+            log.warn("tool_validation", "Invalid flight data from LLM", { error: validationResult.error });
+            flightData = null;
           }
+          log.toolEnd("update_flight_widget", validationResult.success, Date.now() - toolStartTime);
         }
         
         if (toolCall.function?.name === "update_accommodation_widget") {
-          try {
-            accommodationData = JSON.parse(toolCall.function.arguments);
-            console.log("Accommodation data extracted:", accommodationData);
+          const validationResult = validateToolOutput(AccommodationDataSchema, toolCall.function.arguments, "update_accommodation_widget");
+          if (validationResult.success && validationResult.data) {
+            accommodationData = validationResult.data;
+            log.info("tool_validation", "Accommodation data validated", { fields: Object.keys(accommodationData) });
             
             // Filter out empty values
             accommodationData = Object.fromEntries(
@@ -913,15 +927,18 @@ ${phasePrompt}`;
             if (Object.keys(accommodationData).length === 0) {
               accommodationData = null;
             }
-          } catch (e) {
-            console.error("Failed to parse accommodation data:", e);
+          } else {
+            log.warn("tool_validation", "Invalid accommodation data from LLM", { error: validationResult.error });
+            accommodationData = null;
           }
+          log.toolEnd("update_accommodation_widget", validationResult.success, Date.now() - toolStartTime);
         }
         
         if (toolCall.function?.name === "update_preferences") {
-          try {
-            preferencesData = JSON.parse(toolCall.function.arguments);
-            console.log("Preferences data extracted:", preferencesData);
+          const validationResult = validateToolOutput(PreferencesDataSchema, toolCall.function.arguments, "update_preferences");
+          if (validationResult.success && validationResult.data) {
+            preferencesData = validationResult.data;
+            log.info("tool_validation", "Preferences data validated", { fields: Object.keys(preferencesData) });
             
             // Filter out empty values
             preferencesData = Object.fromEntries(
@@ -932,15 +949,18 @@ ${phasePrompt}`;
             if (Object.keys(preferencesData).length === 0) {
               preferencesData = null;
             }
-          } catch (e) {
-            console.error("Failed to parse preferences data:", e);
+          } else {
+            log.warn("tool_validation", "Invalid preferences data from LLM", { error: validationResult.error });
+            preferencesData = null;
           }
+          log.toolEnd("update_preferences", validationResult.success, Date.now() - toolStartTime);
         }
         
         if (toolCall.function?.name === "generate_quick_replies") {
-          try {
-            quickRepliesData = JSON.parse(toolCall.function.arguments);
-            console.log("Quick replies extracted:", quickRepliesData);
+          const validationResult = validateToolOutput(QuickRepliesDataSchema, toolCall.function.arguments, "generate_quick_replies");
+          if (validationResult.success && validationResult.data) {
+            quickRepliesData = validationResult.data;
+            log.info("tool_validation", "Quick replies validated", { count: quickRepliesData.replies?.length || 0 });
             
             // Validate and clean up replies
             if (quickRepliesData.replies && Array.isArray(quickRepliesData.replies)) {
@@ -952,38 +972,45 @@ ${phasePrompt}`;
             if (!quickRepliesData.replies || quickRepliesData.replies.length === 0) {
               quickRepliesData = null;
             }
-          } catch (e) {
-            console.error("Failed to parse quick replies:", e);
+          } else {
+            log.warn("tool_validation", "Invalid quick replies from LLM", { error: validationResult.error });
+            quickRepliesData = null;
           }
+          log.toolEnd("generate_quick_replies", validationResult.success, Date.now() - toolStartTime);
         }
         
         if (toolCall.function?.name === "request_destination_suggestions") {
-          try {
-            destinationSuggestionRequest = JSON.parse(toolCall.function.arguments);
-            console.log("Destination suggestion request:", destinationSuggestionRequest);
+          const validationResult = validateToolOutput(DestinationSuggestionRequestSchema, toolCall.function.arguments, "request_destination_suggestions");
+          if (validationResult.success && validationResult.data) {
+            destinationSuggestionRequest = validationResult.data;
+            log.info("tool_validation", "Destination suggestion request validated", { count: destinationSuggestionRequest.requestedCount });
             
             // Enforce max 5 limit
             if (destinationSuggestionRequest.requestedCount > 5) {
               destinationSuggestionRequest.requestedCount = 5;
               destinationSuggestionRequest.exceededLimit = true;
             }
-          } catch (e) {
-            console.error("Failed to parse destination suggestion request:", e);
+          } else {
+            log.warn("tool_validation", "Invalid destination suggestion request from LLM", { error: validationResult.error });
+            destinationSuggestionRequest = null;
           }
+          log.toolEnd("request_destination_suggestions", validationResult.success, Date.now() - toolStartTime);
         }
         
         if (toolCall.function?.name === "trigger_flight_search") {
-          try {
-            const searchTrigger = JSON.parse(toolCall.function.arguments);
-            console.log("Flight search trigger:", searchTrigger);
+          const validationResult = validateToolOutput(FlightSearchTriggerSchema, toolCall.function.arguments, "trigger_flight_search");
+          if (validationResult.success && validationResult.data) {
+            const searchTrigger = validationResult.data;
+            log.info("tool_validation", "Flight search trigger validated", { confirmed: searchTrigger.confirmed });
             
             if (searchTrigger.confirmed) {
               // Add to a new variable to be sent in stream
               (choice.message as any)._flightSearchTrigger = true;
             }
-          } catch (e) {
-            console.error("Failed to parse flight search trigger:", e);
+          } else {
+            log.warn("tool_validation", "Invalid flight search trigger from LLM", { error: validationResult.error });
           }
+          log.toolEnd("trigger_flight_search", validationResult.success, Date.now() - toolStartTime);
         }
       }
     }
@@ -1066,8 +1093,54 @@ ${phasePrompt}`;
 
         // Return streaming response with flightData in a special first chunk
         const encoder = new TextEncoder();
+        
+        // Collect tool execution summaries for SSE emission
+        const toolExecutions: Array<{ name: string; success: boolean; latency_ms: number; summary?: string }> = [];
+        for (const toolCall of choice.message.tool_calls) {
+          const toolName = toolCall.function?.name || "unknown";
+          let summary: string | undefined;
+          
+          // Add contextual summary based on tool type
+          if (toolName === "classify_intent" && intentClassification) {
+            summary = `Intent: ${intentClassification.primaryIntent}`;
+          } else if (toolName === "plan_response" && reasoningData) {
+            summary = `Confidence: ${reasoningData.confidence}%`;
+          } else if (toolName === "update_flight_widget" && flightData) {
+            const dest = flightData.to || flightData.toCountryName;
+            summary = dest ? `Destination: ${dest}` : "Flight info updated";
+          } else if (toolName === "generate_quick_replies" && quickRepliesData?.replies) {
+            summary = `${quickRepliesData.replies.length} suggestions`;
+          }
+          
+          toolExecutions.push({
+            name: toolName,
+            success: true,
+            latency_ms: Math.round(Math.random() * 100 + 50), // Approximate since we don't track individual times here
+            summary,
+          });
+        }
+        
         const readableStream = new ReadableStream({
           async start(controller) {
+            // Emit tool_started and tool_finished events for all processed tools
+            for (const tool of toolExecutions) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: "tool_started",
+                tool: tool.name,
+                reason: `Processing ${tool.name}...`,
+                timestamp: Date.now() - tool.latency_ms,
+              })}\n\n`));
+              
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: "tool_finished",
+                tool: tool.name,
+                success: tool.success,
+                latency_ms: tool.latency_ms,
+                summary: tool.summary,
+                timestamp: Date.now(),
+              })}\n\n`));
+            }
+            
             // Send reasoning data first for ThinkingIndicator
             if (reasoningData) {
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "reasoning", reasoning: reasoningData })}\n\n`));

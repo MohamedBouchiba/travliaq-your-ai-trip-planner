@@ -13,6 +13,8 @@ export {
   type UseChatStreamOptions,
   type ReasoningData,
   type IntentClassification,
+  type ToolStatusEvent,
+  type OnToolStatusUpdate,
 } from "./useChatStream";
 
 // Thinking/Reasoning state management (Chain of Thought)
