@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { FlightFormData } from "@/types/flight";
 import type { MissingField } from "@/stores/hooks";
 import { getMissingFieldLabel } from "../utils/flightDataToMemory";
+import { plannerLogger } from "@/utils/logger";
 
 /**
  * API message format for the chat endpoint
@@ -70,6 +71,7 @@ export interface StreamResult {
   intentClassification: IntentClassification | null;
   reasoning: ReasoningData | null;
   flightSearchTrigger: boolean;
+  requestId: string;
 }
 
 /**
@@ -418,6 +420,18 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
       const retryConfig = { ...DEFAULT_RETRY_CONFIG, ...options.retryConfig };
 
+      // Generate unique request ID for tracing
+      const requestId = crypto.randomUUID();
+      const requestStartTime = Date.now();
+      
+      // Set Sentry context for this request
+      plannerLogger.setRequestContext(requestId, memoryContext.currentPhase);
+      plannerLogger.logRequest(requestId, "Starting chat request", {
+        messages_count: apiMessages.length,
+        phase: memoryContext.currentPhase,
+        has_blocked_widgets: (memoryContext.blockedWidgets?.length || 0) > 0,
+      });
+
       if (isMountedRef.current) {
         setIsStreaming(true);
         setError(null);
@@ -456,10 +470,12 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${session?.access_token}`,
                 apikey: supabaseAnonKey,
+                "X-Request-ID": requestId,
               },
               body: JSON.stringify({
                 messages: apiMessages,
                 stream: true,
+                requestId, // Also in body for backup
                 memoryContext: contextMessage,
                 missingFields: memoryContext.missingFields,
                 currentPhase: memoryContext.currentPhase || "research",
@@ -576,12 +592,34 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
             onContentUpdate(messageId, fullContent, true);
           }
 
-          return { content: fullContent, flightData, accommodationData, preferencesData, quickReplies, destinationSuggestionRequest, intentClassification, reasoning, flightSearchTrigger };
+          // Log request completion with timing
+          plannerLogger.logRequestComplete(requestId, Date.now() - requestStartTime, {
+            content_length: fullContent.length,
+            has_flight_data: !!flightData,
+            has_intent: !!intentClassification,
+            tools_detected: [
+              flightData && 'flight',
+              accommodationData && 'accommodation',
+              preferencesData && 'preferences',
+              quickReplies && 'quickReplies',
+              destinationSuggestionRequest && 'destinationSuggestion',
+              flightSearchTrigger && 'flightSearch',
+            ].filter(Boolean),
+          });
+
+          return { content: fullContent, flightData, accommodationData, preferencesData, quickReplies, destinationSuggestionRequest, intentClassification, reasoning, flightSearchTrigger, requestId };
 
         } catch (err) {
           lastError = err instanceof Error && "type" in err
             ? (err as StreamError)
             : classifyError(err);
+
+          // Log the error
+          plannerLogger.logError(requestId, lastError, {
+            attempt,
+            type: lastError.type,
+            retryable: lastError.retryable,
+          });
 
           // Don't retry non-retryable errors
           if (!lastError.retryable || lastError.type === "cancelled") {

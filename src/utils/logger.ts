@@ -25,7 +25,9 @@ export enum LogCategory {
   NAVIGATION = 'navigation',
   VALIDATION = 'validation',
   SUBMISSION = 'submission',
-  PERFORMANCE = 'performance'
+  PERFORMANCE = 'performance',
+  PLANNER_CHAT = 'planner_chat',
+  PLANNER_TOOL = 'planner_tool'
 }
 
 interface LogContext {
@@ -271,6 +273,108 @@ export const questionnaireLogger = {
     logger.debug(`Performance - ${metric}: ${duration}ms`, {
       category: LogCategory.PERFORMANCE,
       metadata: { metric, duration }
+    });
+  }
+};
+
+/**
+ * Planner Chat Logger - Specialized logging for the travel planner chat
+ * Traces requests from frontend to backend with request IDs
+ */
+export const plannerLogger = {
+  /**
+   * Log the start of a chat request
+   */
+  logRequest(requestId: string, message: string, metadata?: Record<string, any>) {
+    logger.info(`[${requestId}] ${message}`, {
+      category: LogCategory.PLANNER_CHAT,
+      metadata: { request_id: requestId, ...metadata }
+    });
+  },
+
+  /**
+   * Log tool execution events (started, finished, failed)
+   */
+  logToolEvent(
+    requestId: string, 
+    tool: string, 
+    status: 'started' | 'finished' | 'failed', 
+    metadata?: Record<string, any>
+  ) {
+    const level = status === 'failed' ? 'warn' : 'info';
+    const message = `[${requestId}] Tool ${tool} ${status}`;
+    
+    if (level === 'warn') {
+      logger.warn(message, {
+        category: LogCategory.PLANNER_TOOL,
+        metadata: { request_id: requestId, tool, status, ...metadata }
+      });
+    } else {
+      logger.info(message, {
+        category: LogCategory.PLANNER_TOOL,
+        metadata: { request_id: requestId, tool, status, ...metadata }
+      });
+    }
+
+    // Also add a breadcrumb for the tool event
+    Sentry.addBreadcrumb({
+      type: 'info',
+      category: 'planner.tool',
+      message: `Tool ${tool} ${status}`,
+      level: status === 'failed' ? 'warning' : 'info',
+      data: sanitizeData({ request_id: requestId, tool, status, ...metadata })
+    });
+  },
+
+  /**
+   * Log SSE events received from backend
+   */
+  logSSEEvent(requestId: string, eventType: string, data?: Record<string, any>) {
+    logger.debug(`[${requestId}] SSE event: ${eventType}`, {
+      category: LogCategory.PLANNER_CHAT,
+      metadata: { request_id: requestId, event_type: eventType, ...sanitizeData(data) }
+    });
+  },
+
+  /**
+   * Log errors with full context
+   */
+  logError(requestId: string, error: Error, context?: Record<string, any>) {
+    logger.error(`[${requestId}] Error: ${error.message}`, {
+      category: LogCategory.PLANNER_CHAT,
+      error,
+      metadata: { request_id: requestId, ...context }
+    });
+  },
+
+  /**
+   * Log request completion with timing
+   */
+  logRequestComplete(requestId: string, durationMs: number, metadata?: Record<string, any>) {
+    logger.info(`[${requestId}] Request completed in ${durationMs}ms`, {
+      category: LogCategory.PLANNER_CHAT,
+      metadata: { request_id: requestId, duration_ms: durationMs, ...metadata }
+    });
+
+    // Add performance span
+    Sentry.addBreadcrumb({
+      type: 'info',
+      category: 'planner.performance',
+      message: `Request ${requestId} completed`,
+      level: 'info',
+      data: { request_id: requestId, duration_ms: durationMs, ...sanitizeData(metadata) }
+    });
+  },
+
+  /**
+   * Set request context in Sentry for correlation
+   */
+  setRequestContext(requestId: string, phase?: string, language?: string) {
+    Sentry.setContext('planner_request', {
+      request_id: requestId,
+      phase,
+      language,
+      timestamp: new Date().toISOString()
     });
   }
 };

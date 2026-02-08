@@ -5,10 +5,11 @@ import { buildPhaseSystemPrompt, type TravelPhase } from "./prompts/phasePrompts
 import { buildBaseSystemPrompt, buildChooseForMeInstructions, detectLanguage, type SupportedLanguage } from "./prompts/systemPrompts.ts";
 import { intentClassifierTool, parseIntentClassification, type IntentClassificationResult } from "./tools/intentClassifier.ts";
 import { reasoningTool, parseReasoningResult, CHAIN_OF_THOUGHT_INSTRUCTIONS, type ReasoningResult } from "./tools/reasoningEngine.ts";
+import { createRequestLogger, extractRequestId, type RequestLogger } from "../_shared/logger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-request-id",
 };
 
 // Tool definition for extracting flight intent from user message
@@ -382,6 +383,13 @@ serve(async (req) => {
   }
 
   try {
+    // Parse body first to extract requestId
+    const body = await req.json();
+    const { messages, stream = false, currentStep, currentPhase, negativePreferences, widgetHistory, activeWidgetsContext, language: requestLanguage, blockedWidgets = [], requestId: bodyRequestId } = body;
+    
+    // Extract or generate request ID for tracing
+    const requestId = extractRequestId(req, { requestId: bodyRequestId });
+    
     // Authentication is optional - we log user if available but don't require it
     const authHeader = req.headers.get("authorization");
     let userId = "anonymous";
@@ -397,21 +405,26 @@ serve(async (req) => {
         const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
         if (!authError && user) {
           userId = user.id;
-          console.log("Authenticated user:", userId);
         }
       } catch (e) {
         // Silently continue without auth
-        console.log("Auth check skipped (anonymous user)");
       }
-    } else {
-      console.log("Anonymous user request");
     }
-
-    const { messages, stream = false, currentStep, currentPhase, negativePreferences, widgetHistory, activeWidgetsContext, language: requestLanguage, blockedWidgets = [] } = await req.json();
+    
+    // Initialize request-scoped logger
+    const log = createRequestLogger(requestId, userId);
+    
+    log.info("request", "Request started", {
+      messages_count: messages.length,
+      stream,
+      phase: currentPhase,
+      language: requestLanguage,
+      blocked_widgets: blockedWidgets,
+      user_id: userId,
+    });
     
     // Detect language from request or default to French
     const language: SupportedLanguage = detectLanguage(requestLanguage);
-    console.log("User:", userId, "Messages:", messages.length, "Stream:", stream, "Phase:", currentPhase, "Language:", language, "Blocked widgets:", blockedWidgets);
 
     const AZURE_OPENAI_API_KEY = Deno.env.get("AZURE_OPENAI_API_KEY");
     const AZURE_OPENAI_ENDPOINT = Deno.env.get("AZURE_OPENAI_ENDPOINT");
@@ -419,14 +432,14 @@ serve(async (req) => {
     const AZURE_OPENAI_DEPLOYMENT = Deno.env.get("AZURE_OPENAI_DEPLOYMENT");
 
     if (!AZURE_OPENAI_API_KEY || !AZURE_OPENAI_ENDPOINT || !AZURE_OPENAI_DEPLOYMENT) {
-      console.error("Missing Azure OpenAI configuration");
+      log.error("request", "Missing Azure OpenAI configuration");
       throw new Error("Azure OpenAI configuration is incomplete");
     }
 
     const apiVersion = AZURE_OPENAI_API_VERSION || "2025-01-01-preview";
     const url = `${AZURE_OPENAI_ENDPOINT}openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=${apiVersion}`;
 
-    console.log("Calling Azure OpenAI:", url);
+    log.debug("azure_openai", "Preparing Azure OpenAI call", { url, deployment: AZURE_OPENAI_DEPLOYMENT });
 
     const currentDate = new Date().toISOString().split('T')[0];
     
@@ -577,6 +590,9 @@ ${phasePrompt}`;
     const enhancedSystemPrompt = `${systemPrompt}\n\n${CHAIN_OF_THOUGHT_INSTRUCTIONS}`;
 
     // Non-streaming request (for tool calls including reasoning)
+    log.azureCall("start");
+    const azureStartTime = Date.now();
+    
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -598,7 +614,8 @@ ${phasePrompt}`;
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Azure OpenAI error:", response.status, errorText);
+      log.error("azure_openai", "Azure OpenAI API error", new Error(errorText), { status: response.status });
+      await log.flush();
       return new Response(JSON.stringify({ error: "Erreur API Azure OpenAI", details: errorText }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -606,7 +623,8 @@ ${phasePrompt}`;
     }
 
     const data = await response.json();
-    console.log("Azure OpenAI response:", JSON.stringify(data, null, 2));
+    const azureLatency = Date.now() - azureStartTime;
+    log.azureCall("end", azureLatency, data.usage?.total_tokens);
 
     const choice = data.choices?.[0];
     let content = choice?.message?.content || "";
@@ -620,21 +638,27 @@ ${phasePrompt}`;
 
     // Check if the model called any extraction tools
     if (choice?.message?.tool_calls) {
+      log.info("tool_execution", `Processing ${choice.message.tool_calls.length} tool calls`, {
+        tools: choice.message.tool_calls.map((t: any) => t.function?.name),
+      });
+      
       for (const toolCall of choice.message.tool_calls) {
+        const toolStartTime = Date.now();
+        const toolName = toolCall.function?.name || "unknown";
+        log.toolStart(toolName);
+        
         // Handle Chain of Thought reasoning (should be called first)
         if (toolCall.function?.name === "plan_response") {
           reasoningData = parseReasoningResult(toolCall.function.arguments);
           if (reasoningData) {
-            console.log("🧠 Chain of Thought reasoning:", {
-              understanding: reasoningData.understanding.substring(0, 100) + "...",
-              confidence: reasoningData.confidence,
-              keyInsights: reasoningData.keyInsights,
-            });
+            log.toolEnd("plan_response", true, Date.now() - toolStartTime, `confidence: ${reasoningData.confidence}`);
             
             // Use reasoning data to enhance subsequent processing
             // If confidence is low, we might want to ask for clarification
             if (reasoningData.confidence < 70) {
-              console.log("⚠️ Low confidence reasoning - may need clarification");
+              log.warn("tool_execution", "Low confidence reasoning - may need clarification", {
+                confidence: reasoningData.confidence,
+              });
             }
           }
         }
@@ -643,7 +667,8 @@ ${phasePrompt}`;
         if (toolCall.function?.name === "classify_intent") {
           intentClassification = parseIntentClassification(toolCall.function.arguments);
           if (intentClassification) {
-            console.log("Intent classified:", intentClassification.primaryIntent, "confidence:", intentClassification.confidence);
+            log.toolEnd("classify_intent", true, Date.now() - toolStartTime, `intent: ${intentClassification.primaryIntent}`);
+            
             
             // Map intent entities to flightData for backward compatibility
             const entities = intentClassification.entities;
@@ -1196,7 +1221,16 @@ ${phasePrompt}`;
       content = "Désolé, je n'ai pas pu générer de réponse.";
     }
 
-    console.log("Final response - content:", content, "flightData:", flightData, "intentClassification:", intentClassification?.primaryIntent, "reasoning confidence:", reasoningData?.confidence);
+    log.info("response", "Sending final response", {
+      content_length: content.length,
+      has_flight_data: !!flightData,
+      has_intent: !!intentClassification,
+      intent: intentClassification?.primaryIntent,
+      reasoning_confidence: reasoningData?.confidence,
+    });
+
+    // Flush logs to Sentry
+    await log.flush();
 
     return new Response(JSON.stringify({ 
       content, 
