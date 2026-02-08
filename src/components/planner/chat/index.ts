@@ -22,6 +22,7 @@ export { MemoizedSmartSuggestions, type InspireFlowStep } from "./MemoizedSmartS
 export { SmartSuggestions, type DynamicSuggestion } from "./SmartSuggestions";
 export { ChatMessageItem } from "./ChatMessageItem";
 export { IntentDebugPanel } from "./IntentDebugPanel";
+export { ToolStatusIndicator, type ToolExecution, type ToolStatus } from "./ToolStatusIndicator";
 
 // Widgets
 export {
