@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import i18n from "@/i18n/config";
 
 const SYNC_DEBOUNCE_MS = 3000; // Debounce sync to every 3 seconds
 const CRITICAL_ACTION_TYPES = [
@@ -184,8 +185,8 @@ export const usePlannerPersistence = (
           accommodationMemory: dbSession.accommodation_memory || {},
           travelMemory: dbSession.travel_memory || {},
           chatMessages: dbSession.chat_messages || [],
-          title: dbSession.title || "Nouvelle conversation",
-          preview: dbSession.preview || "Démarrez la conversation...",
+          title: dbSession.title || i18n.t("planner.chat.newConversation"),
+          preview: dbSession.preview || i18n.t("planner.chat.startConversation"),
         };
       } catch (error) {
         console.error("[PlannerPersistence] Load failed:", error);

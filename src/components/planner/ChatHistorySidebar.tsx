@@ -48,6 +48,25 @@ export const ChatHistorySidebar = ({
   const { t } = useTranslation();
   const { dateFnsLocale } = useLocale();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  // Helper to normalize session titles/previews - always show current locale translation for default values
+  const DEFAULT_TITLES = ["Nouvelle conversation", "New conversation", "✈️ Nouvelle conversation", "✈️ New conversation"];
+  const DEFAULT_PREVIEWS = ["Démarrez la conversation...", "Start the conversation..."];
+  
+  const normalizeTitle = (title: string): string => {
+    const titleWithoutEmoji = title.replace(/^\p{Extended_Pictographic}\s*/u, "");
+    if (DEFAULT_TITLES.some(def => def.replace(/^\p{Extended_Pictographic}\s*/u, "") === titleWithoutEmoji)) {
+      return t("planner.chat.newConversation");
+    }
+    return title;
+  };
+  
+  const normalizePreview = (preview: string): string => {
+    if (DEFAULT_PREVIEWS.includes(preview)) {
+      return t("planner.chat.startConversation");
+    }
+    return preview;
+  };
   const [showNewSessionConfirm, setShowNewSessionConfirm] = useState(false);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   
@@ -227,10 +246,10 @@ export const ChatHistorySidebar = ({
                 />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm text-foreground truncate">
-                    {session.title}
+                    {normalizeTitle(session.title)}
                   </div>
                   <div className="text-xs text-muted-foreground truncate mt-0.5">
-                    {session.preview}
+                    {normalizePreview(session.preview)}
                   </div>
                   <div className="text-[10px] text-muted-foreground/70 mt-1">
                     {format(session.updatedAt, "d MMM, HH:mm", { locale: dateFnsLocale })}
