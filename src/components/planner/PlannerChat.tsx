@@ -491,7 +491,9 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     const next = storedMessages.map((m) => ({
       id: m.id,
       role: m.role,
-      text: m.text,
+      // CRITICAL: For welcome messages, always use the current translation instead of stored text
+      // This ensures welcome message displays in the user's current language, not the language when it was stored
+      text: m.id === "welcome" ? chatTranslations.welcomeMessage : m.text,
       isHidden: m.isHidden,
       hasSearchButton: m.hasSearchButton,
       // CRITICAL: Always reset streaming/typing states when loading from storage
@@ -511,7 +513,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
       setMessages(next);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSessionId, storedMessages]);
+  }, [activeSessionId, storedMessages, chatTranslations.welcomeMessage]);
 
   // Persist messages (only if changed) with guard against deleted sessions
   const isSwitchingSessionRef = useRef(false);
@@ -1255,7 +1257,13 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
             <span className="font-medium text-foreground text-sm truncate max-w-[240px]">
               {(() => {
                 const title = sessions.find((s) => s.id === activeSessionId)?.title || t("planner.chat.newConversation");
-                return title.replace(/^\p{Extended_Pictographic}\s*/u, "");
+                const titleWithoutEmoji = title.replace(/^\p{Extended_Pictographic}\s*/u, "");
+                // Normalize default titles to current locale
+                const defaultTitles = ["Nouvelle conversation", "New conversation"];
+                if (defaultTitles.includes(titleWithoutEmoji)) {
+                  return t("planner.chat.newConversation");
+                }
+                return titleWithoutEmoji;
               })()}
             </span>
           </div>
