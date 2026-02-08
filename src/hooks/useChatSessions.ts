@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import i18n from "@/i18n/config";
 
 export interface StoredMessage {
   id: string;
@@ -33,14 +34,14 @@ const SYNC_DEBOUNCE_MS = 3000;
 
 const generateId = () => crypto.randomUUID();
 
-// Default translations (French fallback - will be overridden by i18n in components)
-const DEFAULT_TRANSLATIONS = {
-  newConversation: "Nouvelle conversation",
-  startConversation: "Démarrez la conversation...",
-  welcomeMessage: "Bonjour ! Je suis votre assistant de voyage. Dites-moi où vous souhaitez aller et je vous aiderai à planifier votre voyage.",
-};
+// Helper to get translations (always use current i18n language)
+const getTranslations = () => ({
+  newConversation: i18n.t("planner.chat.newConversation"),
+  startConversation: i18n.t("planner.chat.startConversation"),
+  welcomeMessage: i18n.t("planner.chat.welcomeMessage"),
+});
 
-const getDefaultWelcomeMessage = (translations = DEFAULT_TRANSLATIONS): StoredMessage => ({
+const getDefaultWelcomeMessage = (translations = getTranslations()): StoredMessage => ({
   id: "welcome",
   role: "assistant",
   text: translations.welcomeMessage,
@@ -78,7 +79,7 @@ const getEmojiForText = (text: string): string => {
   return "✈️";
 };
 
-const generateTitle = (messages: StoredMessage[], translations = DEFAULT_TRANSLATIONS): string => {
+const generateTitle = (messages: StoredMessage[], translations = getTranslations()): string => {
   const firstUserMessage = messages.find((m) => m.role === "user");
   if (firstUserMessage) {
     const text = firstUserMessage.text.slice(0, 35);
@@ -89,7 +90,7 @@ const generateTitle = (messages: StoredMessage[], translations = DEFAULT_TRANSLA
   return `✈️ ${translations.newConversation}`;
 };
 
-const generatePreview = (messages: StoredMessage[], translations = DEFAULT_TRANSLATIONS): string => {
+const generatePreview = (messages: StoredMessage[], translations = getTranslations()): string => {
   const lastMessage = [...messages].reverse().find((m) => !m.isHidden && m.text);
   if (lastMessage) {
     const text = lastMessage.text.slice(0, 50);
@@ -112,7 +113,9 @@ interface UseChatSessionsOptions {
 }
 
 export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
-  const { getFlightMemory, getAccommodationMemory, getTravelMemory, translations = DEFAULT_TRANSLATIONS } = options;
+  // Use provided translations or fall back to i18n
+  const { getFlightMemory, getAccommodationMemory, getTravelMemory, translations } = options;
+  const effectiveTranslations = translations || getTranslations();
   const { user } = useAuth();
   
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -136,14 +139,15 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
       lastSyncRef.current = now;
 
       try {
+        const currentTranslations = getTranslations();
         const payload = {
           chatSessionId: sessionId,
           flightMemory: getFlightMemory?.() || {},
           accommodationMemory: getAccommodationMemory?.() || {},
           travelMemory: getTravelMemory?.() || {},
           chatMessages: sessionMessages,
-          title: session?.title || generateTitle(sessionMessages),
-          preview: session?.preview || generatePreview(sessionMessages),
+          title: session?.title || generateTitle(sessionMessages, currentTranslations),
+          preview: session?.preview || generatePreview(sessionMessages, currentTranslations),
         };
 
         console.log("[ChatSessions] Syncing to database:", sessionId);
@@ -205,6 +209,8 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
 
   // Load sessions index on mount
   useEffect(() => {
+    const currentTranslations = getTranslations();
+    
     try {
       const indexRaw = localStorage.getItem(SESSIONS_INDEX_KEY);
       let loadedSessions: ChatSession[] = [];
@@ -217,16 +223,16 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
       if (loadedSessions.length === 0) {
         const newSession: ChatSession = {
           id: generateId(),
-          title: translations.newConversation,
+          title: currentTranslations.newConversation,
           createdAt: Date.now(),
           updatedAt: Date.now(),
-          preview: translations.startConversation,
+          preview: currentTranslations.startConversation,
         };
         loadedSessions = [newSession];
         localStorage.setItem(SESSIONS_INDEX_KEY, JSON.stringify(loadedSessions));
         localStorage.setItem(
           SESSION_PREFIX + newSession.id,
-          JSON.stringify([getDefaultWelcomeMessage(translations)])
+          JSON.stringify([getDefaultWelcomeMessage(currentTranslations)])
         );
       }
 
@@ -240,23 +246,23 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
       const messagesRaw = localStorage.getItem(SESSION_PREFIX + mostRecent.id);
       if (messagesRaw) {
         const parsed = JSON.parse(messagesRaw);
-        setMessages(Array.isArray(parsed) ? parsed : [getDefaultWelcomeMessage(translations)]);
+        setMessages(Array.isArray(parsed) ? parsed : [getDefaultWelcomeMessage(currentTranslations)]);
       } else {
-        setMessages([getDefaultWelcomeMessage(translations)]);
+        setMessages([getDefaultWelcomeMessage(currentTranslations)]);
       }
     } catch (e) {
       console.error("Error loading chat sessions:", e);
       // Create a fresh session on error
       const newSession: ChatSession = {
         id: generateId(),
-        title: translations.newConversation,
+        title: currentTranslations.newConversation,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        preview: translations.startConversation,
+        preview: currentTranslations.startConversation,
       };
       setSessions([newSession]);
       setActiveSessionId(newSession.id);
-      setMessages([getDefaultWelcomeMessage(translations)]);
+      setMessages([getDefaultWelcomeMessage(currentTranslations)]);
     }
   }, []);
 
@@ -317,6 +323,8 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
       if (!sessionId) return;
 
       try {
+        const currentTranslations = getTranslations();
+        
         // Save messages
         localStorage.setItem(SESSION_PREFIX + sessionId, JSON.stringify(newMessages));
 
@@ -326,8 +334,8 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
           s.id === sessionId
             ? {
                 ...s,
-                title: generateTitle(newMessages),
-                preview: generatePreview(newMessages),
+                title: generateTitle(newMessages, currentTranslations),
+                preview: generatePreview(newMessages, currentTranslations),
                 updatedAt: Date.now(),
               }
             : s
@@ -396,32 +404,36 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
 
   // Switch to a different session
   const selectSession = useCallback((sessionId: string) => {
+    const currentTranslations = getTranslations();
+    
     try {
       const messagesRaw = localStorage.getItem(SESSION_PREFIX + sessionId);
       if (messagesRaw) {
         const parsed = JSON.parse(messagesRaw);
-        setMessages(Array.isArray(parsed) ? parsed : [getDefaultWelcomeMessage(translations)]);
+        setMessages(Array.isArray(parsed) ? parsed : [getDefaultWelcomeMessage(currentTranslations)]);
       } else {
-        setMessages([getDefaultWelcomeMessage(translations)]);
+        setMessages([getDefaultWelcomeMessage(currentTranslations)]);
       }
       setActiveSessionId(sessionId);
     } catch (e) {
       console.error("Error loading session:", e);
-      setMessages([getDefaultWelcomeMessage(translations)]);
+      setMessages([getDefaultWelcomeMessage(currentTranslations)]);
     }
-  }, [translations]);
+  }, []);
 
   // Create a new session
   const createNewSession = useCallback(() => {
+    const currentTranslations = getTranslations();
+    
     const newSession: ChatSession = {
       id: generateId(),
-      title: translations.newConversation,
+      title: currentTranslations.newConversation,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      preview: translations.startConversation,
+      preview: currentTranslations.startConversation,
     };
 
-    const defaultMessages = [getDefaultWelcomeMessage(translations)];
+    const defaultMessages = [getDefaultWelcomeMessage(currentTranslations)];
 
     try {
       // Save new session
@@ -450,6 +462,8 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
   // Delete a session - atomic operation with safe state transitions
   const deleteSession = useCallback(
     (sessionId: string) => {
+      const currentTranslations = getTranslations();
+      
       try {
         // Get current sessions from ref to avoid stale state
         const currentSessions = sessionsRef.current;
@@ -464,7 +478,7 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
             const mostRecent = [...remaining].sort((a, b) => b.updatedAt - a.updatedAt)[0];
             
             // Load new session messages BEFORE any React state updates
-            let nextMessages: StoredMessage[] = [getDefaultWelcomeMessage()];
+            let nextMessages: StoredMessage[] = [getDefaultWelcomeMessage(currentTranslations)];
             const messagesRaw = localStorage.getItem(SESSION_PREFIX + mostRecent.id);
             if (messagesRaw) {
               try {
@@ -498,12 +512,12 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
             // Create a new session if all are deleted
             const newSession: ChatSession = {
               id: generateId(),
-              title: `✈️ ${translations.newConversation}`,
+              title: `✈️ ${currentTranslations.newConversation}`,
               createdAt: Date.now(),
               updatedAt: Date.now(),
-              preview: translations.startConversation,
+              preview: currentTranslations.startConversation,
             };
-            const defaultMessages = [getDefaultWelcomeMessage(translations)];
+            const defaultMessages = [getDefaultWelcomeMessage(currentTranslations)];
 
             // Update refs first
             sessionsRef.current = [newSession];
@@ -546,6 +560,8 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
 
   // Delete ALL sessions (clear history completely)
   const deleteAllSessions = useCallback(() => {
+    const currentTranslations = getTranslations();
+    
     try {
       // Cancel any pending saves/syncs that could re-create data right after clearing
       if (saveTimeoutRef.current) {
@@ -579,12 +595,12 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
       // Create fresh session
       const newSession: ChatSession = {
         id: generateId(),
-        title: "✈️ Nouvelle conversation",
+        title: `✈️ ${currentTranslations.newConversation}`,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        preview: "Démarrez la conversation...",
+        preview: currentTranslations.startConversation,
       };
-      const defaultMessages = [getDefaultWelcomeMessage()];
+      const defaultMessages = [getDefaultWelcomeMessage(currentTranslations)];
 
       // Save new session
       localStorage.setItem(SESSION_PREFIX + newSession.id, JSON.stringify(defaultMessages));
@@ -626,10 +642,11 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
 
   // Get current session metadata
   const getSessionMetadata = useCallback(() => {
+    const currentTranslations = getTranslations();
     const currentSession = sessions.find(s => s.id === activeSessionId);
     return {
-      title: currentSession?.title || "Nouvelle conversation",
-      preview: currentSession?.preview || "Démarrez la conversation...",
+      title: currentSession?.title || currentTranslations.newConversation,
+      preview: currentSession?.preview || currentTranslations.startConversation,
     };
   }, [sessions, activeSessionId]);
 

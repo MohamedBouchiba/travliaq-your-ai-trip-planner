@@ -13,9 +13,12 @@ import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toastSuccess, toastError } from "@/lib/toast";
 import { eventBus } from "@/lib/eventBus";
+import i18n from "@/i18n/config";
 import type { CountrySelectionEvent, AirportChoice, DualAirportChoice, AirportConfirmationData, CitySelectionData } from "@/types/flight";
 import type { AccommodationEntry, ActivityEntry, TripPreferences } from "@/stores/hooks";
 import type { ChatMessage } from "../types";
+
+const t = i18n.t.bind(i18n);
 
 /**
  * Options for the imperative handlers hook
@@ -60,7 +63,7 @@ async function fetchTopCities(countryCode: string): Promise<CitySelectionData["c
     if (data.cities && data.cities.length > 0) {
       return data.cities.map((c: any) => ({
         name: c.name,
-        description: c.description || `Ville importante`,
+        description: c.description || t("planner.systemMessage.importantCity"),
         population: c.population,
       }));
     }
@@ -112,6 +115,10 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
 
       const countryName = event.country.name;
       const messageId = `city-select-${Date.now()}`;
+      
+      const action = event.field === "from" 
+        ? t("planner.systemMessage.actionDepart") 
+        : t("planner.systemMessage.actionArrive");
 
       setIsLoading(true);
       setMessages((prev) => [
@@ -119,9 +126,7 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
         {
           id: messageId,
           role: "assistant",
-          text: `Je vois que vous avez sélectionné **${countryName}**. Dans quelle ville de ce pays souhaitez-vous ${
-            event.field === "from" ? "partir" : "arriver"
-          } ?`,
+          text: t("planner.systemMessage.countrySelected", { country: countryName, action }),
           isTyping: true,
         },
       ]);
@@ -158,7 +163,7 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
             m.id === messageId
               ? {
                   ...m,
-                  text: `${countryName} est une destination fascinante ! Dans quelle ville souhaites-tu aller ?`,
+                  text: t("planner.systemMessage.fascinatingDestination", { country: countryName }),
                   isTyping: false,
                 }
               : m
@@ -176,7 +181,9 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
    */
   const askAirportChoice = useCallback(
     (choice: AirportChoice) => {
-      const fieldLabel = choice.field === "from" ? "départ" : "destination";
+      const fieldLabel = choice.field === "from" 
+        ? t("planner.systemMessage.fieldDeparture") 
+        : t("planner.systemMessage.fieldDestination");
       const messageId = `airport-choice-${Date.now()}`;
 
       setMessages((prev) => [
@@ -184,7 +191,7 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
         {
           id: messageId,
           role: "assistant",
-          text: `🛫 La ville de **${choice.cityName}** a plusieurs aéroports. Lequel souhaitez-vous utiliser comme ${fieldLabel} ?`,
+          text: t("planner.systemMessage.multipleAirports", { city: choice.cityName, fieldLabel }),
           airportChoices: choice,
         },
       ]);
@@ -200,17 +207,15 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
       const messageId = `dual-airport-choice-${Date.now()}`;
 
       const parts: string[] = [];
-      if (choices.from) parts.push(`**${choices.from.cityName}** (départ)`);
-      if (choices.to) parts.push(`**${choices.to.cityName}** (arrivée)`);
+      if (choices.from) parts.push(`**${choices.from.cityName}** (${t("planner.systemMessage.fieldDeparture")})`);
+      if (choices.to) parts.push(`**${choices.to.cityName}** (${t("planner.systemMessage.fieldArrival")})`);
 
       setMessages((prev) => [
         ...prev,
         {
           id: messageId,
           role: "assistant",
-          text: `Plusieurs aéroports sont disponibles pour ${parts.join(
-            " et "
-          )}. Sélectionnez vos préférences :`,
+          text: t("planner.systemMessage.multipleAirportsConfirm", { locations: parts.join(` ${t("planner.systemMessage.and")} `) }),
           dualAirportChoices: choices,
         },
       ]);
@@ -231,7 +236,7 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
         {
           id: `search-ready-${Date.now()}`,
           role: "assistant",
-          text: `Parfait ! Votre itinéraire **${fromCode} → ${toCode}** est prêt. Cliquez ci-dessous pour lancer la recherche de vols.`,
+          text: t("planner.systemMessage.routeReady", { from: fromCode, to: toCode }),
           hasSearchButton: true,
         },
       ]);
@@ -247,14 +252,20 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
       const accommodation = findAccommodationByCity(city);
       if (!accommodation) {
         console.warn(`[Chat] No accommodation found for city: ${city}`);
-        toastError("Hébergement introuvable", `Aucun hébergement trouvé pour ${city}`);
+        toastError(
+          t("planner.toast.accommodationNotFound"), 
+          t("planner.toast.accommodationNotFoundDesc", { city })
+        );
         return false;
       }
 
       updateAccommodation(accommodation.id, updates);
       console.log(`[Chat] Updated accommodation for ${city}:`, updates);
 
-      toastSuccess("Hébergement mis à jour", `Les préférences pour ${city} ont été modifiées`);
+      toastSuccess(
+        t("planner.toast.accommodationUpdated"), 
+        t("planner.toast.accommodationUpdatedDesc", { city })
+      );
       return true;
     },
     [findAccommodationByCity, updateAccommodation]
@@ -269,7 +280,7 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
         .map((leg, i) => {
           const fromAirport = leg.from.suggestedAirport;
           const toAirport = leg.to.suggestedAirport;
-          return `**Segment ${i + 1}** : ${leg.from.city} → ${leg.to.city} (${fromAirport.iata} → ${toAirport.iata})`;
+          return `**${t("planner.systemMessage.segment", { number: i + 1 })}** : ${leg.from.city} → ${leg.to.city} (${fromAirport.iata} → ${toAirport.iata})`;
         })
         .join("\n");
 
@@ -278,7 +289,7 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
         {
           id: `airport-confirm-${Date.now()}`,
           role: "assistant",
-          text: `J'ai identifié les aéroports suivants pour votre itinéraire multi-destination :\n\n${legsText}\n\nVous pouvez modifier chaque aéroport ci-dessous ou valider pour lancer la recherche.`,
+          text: t("planner.systemMessage.airportsIdentified", { legs: legsText }),
           widget: "airportConfirmation",
           widgetData: {
             airportConfirmation: data,
@@ -298,7 +309,10 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
 
       if (activities.length === 0) {
         console.warn(`[Chat] No activities found for city: ${city}`);
-        toastError("Aucune activité", `Aucune activité trouvée pour ${city}`);
+        toastError(
+          t("planner.toast.activityNotFound"), 
+          t("planner.toast.activityNotFoundDesc", { city })
+        );
         return false;
       }
 
@@ -309,8 +323,8 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
       console.log(`[Chat] Updated ${activities.length} activity(ies) for ${city}:`, updates);
 
       toastSuccess(
-        "Activité mise à jour",
-        `${activities.length} activité(s) pour ${city} modifiée(s)`
+        t("planner.toast.activityUpdated"),
+        t("planner.toast.activityUpdatedDesc", { count: activities.length, city })
       );
       return true;
     },
@@ -328,7 +342,10 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
 
       if (!destination) {
         console.warn(`[Chat] No destination found for city: ${city}`);
-        toastError("Destination introuvable", `Aucune destination trouvée pour ${city}`);
+        toastError(
+          t("planner.toast.destinationNotFound"), 
+          t("planner.toast.destinationNotFoundDesc", { city })
+        );
         return null;
       }
 
@@ -341,7 +358,10 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
 
       console.log(`[Chat] Added activity for ${city}:`, activity);
 
-      toastSuccess("Activité ajoutée", `Nouvelle activité pour ${city}`);
+      toastSuccess(
+        t("planner.toast.activityAdded"), 
+        t("planner.toast.activityAddedDesc", { city })
+      );
       return id;
     },
     [accomMemory.accommodations, addManualActivity]
@@ -479,30 +499,30 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
 
       // Build summary for toast
       const summary: string[] = [];
-      if (storeUpdates.pace) summary.push(`rythme ${storeUpdates.pace}`);
+      if (storeUpdates.pace) summary.push(`${t("planner.toast.pace")} ${storeUpdates.pace}`);
       if (storeUpdates.interests && storeUpdates.interests.length > 0) {
-        summary.push(`centres d'intérêt: ${storeUpdates.interests.join(", ")}`);
+        summary.push(`${t("planner.toast.interests")}: ${storeUpdates.interests.join(", ")}`);
       }
-      if (storeUpdates.travelStyle) summary.push(`style ${storeUpdates.travelStyle}`);
+      if (storeUpdates.travelStyle) summary.push(`${t("planner.toast.style")} ${storeUpdates.travelStyle}`);
       if (storeUpdates.dietaryRestrictions && storeUpdates.dietaryRestrictions.length > 0) {
-        summary.push(`alimentation: ${storeUpdates.dietaryRestrictions.join(", ")}`);
+        summary.push(`${t("planner.toast.dietary")}: ${storeUpdates.dietaryRestrictions.join(", ")}`);
       }
       if (hasMustHaves) {
         const mustHavesLabels: string[] = [];
-        if (detectedPrefs.accessibilityRequired) mustHavesLabels.push("accessibilité");
-        if (detectedPrefs.petFriendly) mustHavesLabels.push("animaux");
-        if (detectedPrefs.familyFriendly) mustHavesLabels.push("famille");
-        if (detectedPrefs.needsWifi) mustHavesLabels.push("WiFi");
+        if (detectedPrefs.accessibilityRequired) mustHavesLabels.push(t("planner.toast.accessibility"));
+        if (detectedPrefs.petFriendly) mustHavesLabels.push(t("planner.toast.pets"));
+        if (detectedPrefs.familyFriendly) mustHavesLabels.push(t("planner.toast.family"));
+        if (detectedPrefs.needsWifi) mustHavesLabels.push(t("planner.toast.wifi"));
         if (mustHavesLabels.length > 0) {
-          summary.push(`critères: ${mustHavesLabels.join(", ")}`);
+          summary.push(`${t("planner.toast.criteria")}: ${mustHavesLabels.join(", ")}`);
         }
       }
 
       if (summary.length > 0) {
         console.log(`[Chat] Detected preferences:`, storeUpdates);
         toastSuccess(
-          "Préférences détectées",
-          `L'IA a détecté: ${summary.join(", ")}. Modifiez-les dans l'onglet Préférences.`
+          t("planner.toast.preferencesDetected"),
+          t("planner.toast.preferencesDetectedDesc", { summary: summary.join(", ") })
         );
       }
     },

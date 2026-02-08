@@ -9,6 +9,7 @@
  * - Active visual context (map, panels)
  */
 
+import i18n from "@/i18n/config";
 import { 
   analyzeLastAssistantMessage, 
   analyzeUserIntent, 
@@ -16,6 +17,8 @@ import {
   detectLanguage,
   type AnticipatedSuggestion
 } from './messageAnalyzer';
+
+const t = i18n.t.bind(i18n);
 
 export interface SuggestionContext {
   // Workflow state
@@ -64,40 +67,42 @@ export interface Suggestion {
   emoji?: string; // For anticipated suggestions
 }
 
-// Get current month name in French
-function getNextMonthName(): string {
-  const months = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+// Get next month key for i18n
+function getNextMonthKey(): string {
+  const monthKeys = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
   const nextMonth = new Date();
   nextMonth.setMonth(nextMonth.getMonth() + 1);
-  return months[nextMonth.getMonth()];
+  return monthKeys[nextMonth.getMonth()];
 }
 
 // INSPIRATION suggestions (no destination yet)
 function getInspirationSuggestions(): Suggestion[] {
-  const nextMonth = getNextMonthName();
+  const monthKey = getNextMonthKey();
+  const monthName = t(`planner.months.${monthKey}`);
+  
   return [
     {
       id: 'inspire',
-      label: 'Inspire-moi',
-      message: 'Inspire-moi pour mon prochain voyage',
+      label: t('planner.suggestions.inspire'),
+      message: t('planner.suggestions.inspireMessage'),
       iconName: 'sparkles',
     },
     {
       id: 'weekend-sun',
-      label: 'Weekend au soleil',
-      message: 'Trouve-moi un weekend pas cher au soleil',
+      label: t('planner.suggestions.weekendSun'),
+      message: t('planner.suggestions.weekendSunMessage'),
       iconName: 'sun',
     },
     {
       id: 'city-break',
-      label: 'City break',
-      message: 'Je veux faire un city break de 3-4 jours en Europe',
+      label: t('planner.suggestions.cityBreak'),
+      message: t('planner.suggestions.cityBreakMessage'),
       iconName: 'building',
     },
     {
       id: 'where-month',
-      label: `Où en ${nextMonth} ?`,
-      message: `Où partir en ${nextMonth} ?`,
+      label: t('planner.suggestions.whereIn', { month: monthName }),
+      message: t('planner.suggestions.whereInMessage', { month: monthName }),
       iconName: 'calendar',
     },
   ];
@@ -105,24 +110,24 @@ function getInspirationSuggestions(): Suggestion[] {
 
 // DESTINATION suggestions (has destination, no dates)
 function getDatesSuggestions(context: SuggestionContext): Suggestion[] {
-  const dest = context.destinationName || 'cette destination';
+  const dest = context.destinationName || t('planner.suggestions.thisDestination');
   return [
     {
       id: 'best-period',
-      label: 'Meilleure période',
-      message: `Quelle est la meilleure période pour visiter ${dest} ?`,
+      label: t('planner.suggestions.bestPeriod'),
+      message: t('planner.suggestions.bestPeriodMessage', { destination: dest }),
       iconName: 'calendar',
     },
     {
       id: 'this-weekend',
-      label: 'Ce weekend',
-      message: `Je veux partir ce weekend à ${dest}`,
+      label: t('planner.suggestions.thisWeekend'),
+      message: t('planner.suggestions.thisWeekendMessage', { destination: dest }),
       iconName: 'zap',
     },
     {
       id: 'next-week',
-      label: 'Semaine prochaine',
-      message: 'Je peux partir la semaine prochaine',
+      label: t('planner.suggestions.nextWeek'),
+      message: t('planner.suggestions.nextWeekMessage'),
       iconName: 'calendar',
     },
   ];
@@ -133,20 +138,20 @@ function getTravelersSuggestions(): Suggestion[] {
   return [
     {
       id: 'solo',
-      label: 'Voyage solo',
-      message: 'Je voyage seul',
+      label: t('planner.suggestions.solo'),
+      message: t('planner.suggestions.soloMessage'),
       iconName: 'user',
     },
     {
       id: 'couple',
-      label: 'En couple',
-      message: 'Nous sommes 2 adultes',
+      label: t('planner.suggestions.couple'),
+      message: t('planner.suggestions.coupleMessage'),
       iconName: 'users',
     },
     {
       id: 'family',
-      label: 'En famille',
-      message: 'Nous voyageons en famille avec enfants',
+      label: t('planner.suggestions.family'),
+      message: t('planner.suggestions.familyMessage'),
       iconName: 'users',
     },
   ];
@@ -155,14 +160,14 @@ function getTravelersSuggestions(): Suggestion[] {
 // FLIGHTS TAB suggestions
 function getFlightSuggestions(context: SuggestionContext): Suggestion[] {
   const suggestions: Suggestion[] = [];
-  const dest = context.destinationName || 'cette destination';
+  const dest = context.destinationName || t('planner.suggestions.thisDestination');
   
   // If cheapest price is visible
   if (context.cheapestFlightPrice) {
     suggestions.push({
       id: 'cheapest-flight',
-      label: `Vol à ${context.cheapestFlightPrice}€`,
-      message: `Parle-moi du vol le moins cher à ${context.cheapestFlightPrice}€`,
+      label: t('planner.suggestions.cheapestFlight', { price: context.cheapestFlightPrice }),
+      message: t('planner.suggestions.cheapestFlightMessage', { price: context.cheapestFlightPrice }),
       iconName: 'plane',
     });
   }
@@ -171,16 +176,16 @@ function getFlightSuggestions(context: SuggestionContext): Suggestion[] {
   if (context.visibleFlightsCount > 2) {
     suggestions.push({
       id: 'compare-flights',
-      label: 'Compare les vols',
-      message: 'Compare les vols affichés et recommande-moi le meilleur',
+      label: t('planner.suggestions.compareFlights'),
+      message: t('planner.suggestions.compareFlightsMessage'),
       iconName: 'scale',
     });
   }
   
   suggestions.push({
     id: 'morning-flight',
-    label: 'Départ le matin',
-    message: 'Je préfère partir le matin',
+    label: t('planner.suggestions.morningFlight'),
+    message: t('planner.suggestions.morningFlightMessage'),
     iconName: 'sunrise',
   });
   
@@ -188,8 +193,8 @@ function getFlightSuggestions(context: SuggestionContext): Suggestion[] {
   if (context.visibleFlightsCount === 0) {
     suggestions.unshift({
       id: 'find-flights',
-      label: 'Chercher des vols',
-      message: `Trouve-moi les meilleurs vols pour ${dest}`,
+      label: t('planner.suggestions.findFlights'),
+      message: t('planner.suggestions.findFlightsMessage', { destination: dest }),
       iconName: 'search',
     });
   }
@@ -200,22 +205,22 @@ function getFlightSuggestions(context: SuggestionContext): Suggestion[] {
 // STAYS TAB suggestions
 function getStaysSuggestions(context: SuggestionContext): Suggestion[] {
   const suggestions: Suggestion[] = [];
-  const dest = context.destinationName || 'cette destination';
+  const dest = context.destinationName || t('planner.suggestions.thisDestination');
   
   // If cheapest hotel price visible
   if (context.cheapestHotelPrice) {
     suggestions.push({
       id: 'best-value',
-      label: 'Meilleur rapport qualité/prix',
-      message: 'Quel hôtel a le meilleur rapport qualité/prix parmi ceux affichés ?',
+      label: t('planner.suggestions.bestValue'),
+      message: t('planner.suggestions.bestValueMessage'),
       iconName: 'star',
     });
   }
   
   suggestions.push({
     id: 'central-location',
-    label: 'Proche du centre',
-    message: `Je veux un hôtel bien situé, proche du centre de ${dest}`,
+    label: t('planner.suggestions.centralLocation'),
+    message: t('planner.suggestions.centralLocationMessage', { destination: dest }),
     iconName: 'map-pin',
   });
   
@@ -223,15 +228,15 @@ function getStaysSuggestions(context: SuggestionContext): Suggestion[] {
   if (context.visibleHotelsCount > 2) {
     suggestions.push({
       id: 'compare-hotels',
-      label: 'Compare les hôtels',
-      message: 'Compare les hôtels affichés et dis-moi lequel choisir',
+      label: t('planner.suggestions.compareHotels'),
+      message: t('planner.suggestions.compareHotelsMessage'),
       iconName: 'scale',
     });
   } else {
     suggestions.push({
       id: 'find-hotels',
-      label: 'Chercher des hôtels',
-      message: `Trouve-moi des hôtels à ${dest}`,
+      label: t('planner.suggestions.findHotels'),
+      message: t('planner.suggestions.findHotelsMessage', { destination: dest }),
       iconName: 'search',
     });
   }
@@ -241,25 +246,25 @@ function getStaysSuggestions(context: SuggestionContext): Suggestion[] {
 
 // ACTIVITIES TAB suggestions
 function getActivitiesSuggestions(context: SuggestionContext): Suggestion[] {
-  const dest = context.destinationName || 'cette destination';
+  const dest = context.destinationName || t('planner.suggestions.thisDestination');
   
   return [
     {
       id: 'must-see',
-      label: 'Incontournables',
-      message: `Quels sont les incontournables à ${dest} ?`,
+      label: t('planner.suggestions.mustSee'),
+      message: t('planner.suggestions.mustSeeMessage', { destination: dest }),
       iconName: 'camera',
     },
     {
       id: 'hidden-gems',
-      label: 'Hors des sentiers',
-      message: `Quels sont les endroits moins touristiques à ${dest} ?`,
+      label: t('planner.suggestions.hiddenGems'),
+      message: t('planner.suggestions.hiddenGemsMessage', { destination: dest }),
       iconName: 'compass',
     },
     {
       id: 'local-food',
-      label: 'Gastronomie locale',
-      message: `Où manger local à ${dest} ? Quels plats goûter ?`,
+      label: t('planner.suggestions.localFood'),
+      message: t('planner.suggestions.localFoodMessage', { destination: dest }),
       iconName: 'utensils',
     },
   ];
@@ -267,25 +272,25 @@ function getActivitiesSuggestions(context: SuggestionContext): Suggestion[] {
 
 // PREFERENCES TAB suggestions
 function getPreferencesSuggestions(context: SuggestionContext): Suggestion[] {
-  const dest = context.destinationName || 'mon voyage';
+  const dest = context.destinationName || t('planner.suggestions.thisDestination');
   
   return [
     {
       id: 'optimize-trip',
-      label: 'Optimise mon voyage',
-      message: `Comment optimiser mon séjour à ${dest} ?`,
+      label: t('planner.suggestions.optimizeTrip'),
+      message: t('planner.suggestions.optimizeTripMessage', { destination: dest }),
       iconName: 'sparkles',
     },
     {
       id: 'itinerary',
-      label: 'Créer un itinéraire',
-      message: `Propose-moi un itinéraire jour par jour pour ${dest}`,
+      label: t('planner.suggestions.itinerary'),
+      message: t('planner.suggestions.itineraryMessage', { destination: dest }),
       iconName: 'calendar',
     },
     {
       id: 'budget-tips',
-      label: 'Astuces budget',
-      message: `Comment économiser sur ce voyage ?`,
+      label: t('planner.suggestions.budgetTips'),
+      message: t('planner.suggestions.budgetTipsMessage'),
       iconName: 'star',
     },
   ];
@@ -293,25 +298,25 @@ function getPreferencesSuggestions(context: SuggestionContext): Suggestion[] {
 
 // SEARCH READY suggestions (all info but no search yet)
 function getSearchReadySuggestions(context: SuggestionContext): Suggestion[] {
-  const dest = context.destinationName || 'ma destination';
+  const dest = context.destinationName || t('planner.suggestions.thisDestination');
   
   return [
     {
       id: 'launch-search',
-      label: 'Lancer la recherche',
-      message: 'Recherche les meilleurs vols maintenant',
+      label: t('planner.suggestions.launchSearch'),
+      message: t('planner.suggestions.launchSearchMessage'),
       iconName: 'search',
     },
     {
       id: 'direct-flights',
-      label: 'Vols directs',
-      message: 'Je préfère les vols directs uniquement',
+      label: t('planner.suggestions.directFlights'),
+      message: t('planner.suggestions.directFlightsMessage'),
       iconName: 'plane',
     },
     {
       id: 'best-time',
-      label: 'Meilleur horaire',
-      message: `À quelle heure partir pour ${dest} ?`,
+      label: t('planner.suggestions.bestTime'),
+      message: t('planner.suggestions.bestTimeMessage', { destination: dest }),
       iconName: 'clock',
     },
   ];
@@ -323,8 +328,8 @@ function getDestinationChoiceSuggestions(context: SuggestionContext): Suggestion
   const suggestions: Suggestion[] = [
     {
       id: 'choose-for-me',
-      label: 'Choisis pour moi',
-      message: 'Choisis la meilleure destination pour moi',
+      label: t('planner.suggestions.chooseForMe'),
+      message: t('planner.suggestions.chooseForMeMessage'),
       iconName: 'sparkles',
     },
   ];
@@ -332,16 +337,16 @@ function getDestinationChoiceSuggestions(context: SuggestionContext): Suggestion
   if (destinations.length > 0) {
     suggestions.push({
       id: 'more-about-first',
-      label: `Plus sur ${destinations[0]}`,
-      message: `Dis-moi en plus sur ${destinations[0]}`,
+      label: t('planner.suggestions.moreAbout', { destination: destinations[0] }),
+      message: t('planner.suggestions.moreAboutMessage', { destination: destinations[0] }),
       iconName: 'compass',
     });
   }
   
   suggestions.push({
     id: 'other-destinations',
-    label: 'Autres destinations',
-    message: 'Propose-moi d\'autres destinations',
+    label: t('planner.suggestions.otherDestinations'),
+    message: t('planner.suggestions.otherDestinationsMessage'),
     iconName: 'search',
   });
   
@@ -411,8 +416,13 @@ export function getSuggestions(context: SuggestionContext): Suggestion[] {
     const userIntent = analyzeUserIntent(context.lastUserMessage);
     const conversationTurn = context.conversationTurn ?? 0;
     
-    // Detect language from conversation (prefer user message, fallback to assistant)
-    const detectedLang = detectLanguage(context.lastUserMessage || context.lastAssistantMessage);
+    // Use i18n language instead of text detection for default
+    const currentLang = i18n.language?.split('-')[0] as 'fr' | 'en' || 'en';
+    
+    // Detect language from conversation (prefer user message, fallback to current i18n language)
+    const detectedLang = context.lastUserMessage 
+      ? detectLanguage(context.lastUserMessage) 
+      : currentLang;
     
     const anticipated = getAnticipatedSuggestions(lastContent, userIntent, conversationTurn, detectedLang);
     

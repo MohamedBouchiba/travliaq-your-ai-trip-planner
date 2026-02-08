@@ -7,6 +7,8 @@
  * BILINGUAL: Supports both French and English patterns.
  */
 
+import i18n from "@/i18n/config";
+
 export type ProposedContentType = 
   | 'destinations'
   | 'dates_question'
@@ -480,10 +482,14 @@ export function analyzeUserIntent(text: string | undefined): UserIntent {
 // ============================================================================
 
 /**
- * Detect language from text
+ * Detect language from text - uses i18n.language as default when text is ambiguous
  */
 export function detectLanguage(text: string | undefined): 'fr' | 'en' {
-  if (!text) return 'fr';
+  // If no text, use current i18n language
+  if (!text || text.trim().length === 0) {
+    const currentLang = i18n.language?.split('-')[0];
+    return currentLang === 'fr' ? 'fr' : 'en';
+  }
   
   // French markers
   const frMarkers = /\b(je|tu|nous|vous|est|sont|le|la|les|un|une|des|pour|avec|dans|sur|qui|que|quoi|comment|pourquoi|où|quand|bonjour|merci|oui|non)\b/i;
@@ -494,7 +500,13 @@ export function detectLanguage(text: string | undefined): 'fr' | 'en' {
   const frCount = (text.match(frMarkers) || []).length;
   const enCount = (text.match(enMarkers) || []).length;
   
-  return frCount >= enCount ? 'fr' : 'en';
+  // If counts are equal or both zero, use current i18n language
+  if (frCount === enCount) {
+    const currentLang = i18n.language?.split('-')[0];
+    return currentLang === 'fr' ? 'fr' : 'en';
+  }
+  
+  return frCount > enCount ? 'fr' : 'en';
 }
 
 /**
@@ -678,8 +690,9 @@ export function getAnticipatedSuggestions(
   conversationTurn: number,
   detectedLang?: 'fr' | 'en'
 ): AnticipatedSuggestion[] {
-  // Use provided lang or default to 'fr'
-  const lang = detectedLang || 'fr';
+  // Use provided lang or current i18n language
+  const currentLang = i18n.language?.split('-')[0] as 'fr' | 'en';
+  const lang = detectedLang || currentLang || 'en';
   const suggestions: AnticipatedSuggestion[] = [];
   
   switch (lastAssistantContent.type) {
