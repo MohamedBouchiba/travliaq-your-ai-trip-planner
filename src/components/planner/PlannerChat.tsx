@@ -1911,7 +1911,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                   <Send className="h-4 w-4" />
                 </button>
               </div>
-              <p className="text-xs text-muted-foreground text-center mt-2">
+              <p className="text-[10px] text-muted-foreground/70 text-center mt-1.5">
                 {t("planner.chat.inputHelper")}
               </p>
             </div>

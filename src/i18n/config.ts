@@ -4229,7 +4229,7 @@ const resources = {
       "planner.chat.closeChat": "Close chat",
       "planner.chat.inputPlaceholder": "Send a message...",
       "planner.chat.inputLoading": "Responding...",
-      "planner.chat.inputHelper": "Destination, flights, stays, activities...",
+      "planner.chat.inputHelper": "Ask me anything about your trip",
       "planner.chat.send": "Send",
       "planner.chat.noConversation": "No conversations",
       "planner.chat.creating": "Creating...",
