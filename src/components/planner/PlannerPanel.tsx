@@ -11,6 +11,7 @@ import { findNearestAirports, Airport } from "@/hooks/useNearestAirports";
 import FlightResults, { FlightOffer, generateMockFlights } from "./FlightResults";
 import eventBus from "@/lib/eventBus";
 import { useFlightMemoryStore, type AirportInfo } from "@/stores/hooks";
+import { SUPABASE_URL } from "@/integrations/supabase/client";
 import { ActivitiesPanelSkeleton, AccommodationPanelSkeleton, PreferencesPanelSkeleton } from "./PanelSkeletons";
 
 // Lazy load panels for code splitting
@@ -717,7 +718,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
   const fetchCitiesForCountry = async (countryCode: string, countryName: string, field: "from" | "to"): Promise<boolean> => {
     try {
       const response = await fetch(
-        `https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/top-cities-by-country?country_code=${countryCode}&limit=5`,
+        `${SUPABASE_URL}/functions/v1/top-cities-by-country?country_code=${countryCode}&limit=5`,
         {
           method: "GET",
           headers: { "Content-Type": "application/json" },
@@ -1037,7 +1038,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
 
             try {
               const response = await fetch(
-                "https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/flight-search",
+                `${SUPABASE_URL}/functions/v1/flight-search`,
                 {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
@@ -1133,7 +1134,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
       console.log("[FlightsPanel] Searching flights:", requestBody);
 
       const response = await fetch(
-        "https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/flight-search",
+        `${SUPABASE_URL}/functions/v1/flight-search`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

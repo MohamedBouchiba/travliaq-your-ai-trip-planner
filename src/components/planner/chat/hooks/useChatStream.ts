@@ -10,7 +10,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import type { FlightFormData } from "@/types/flight";
 import type { MissingField } from "@/stores/hooks";
 import { getMissingFieldLabel } from "../utils/flightDataToMemory";
@@ -506,17 +506,15 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
           // Get session
           const session = (await supabase.auth.getSession()).data.session;
-          const supabaseUrl = "https://cinbnmlfpffmyjmkwbco.supabase.co";
-          const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpbmJubWxmcGZmbXlqbWt3YmNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc5NDQ2MTQsImV4cCI6MjA3MzUyMDYxNH0.yrju-Pv4OlfU9Et-mRWg0GRHTusL7ZpJevqKemJFbuA";
 
           const response = await fetch(
-            `${supabaseUrl}/functions/v1/planner-chat`,
+            `${SUPABASE_URL}/functions/v1/planner-chat`,
             {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${session?.access_token}`,
-                apikey: supabaseAnonKey,
+                apikey: SUPABASE_PUBLISHABLE_KEY,
                 "X-Request-ID": requestId,
               },
               body: JSON.stringify({

@@ -10,7 +10,7 @@
  */
 
 import { useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { toastSuccess, toastError } from "@/lib/toast";
 import { eventBus } from "@/lib/eventBus";
 import i18n from "@/i18n/config";
@@ -47,13 +47,12 @@ export interface UseChatImperativeHandlersOptions {
 async function fetchTopCities(countryCode: string): Promise<CitySelectionData["cities"] | null> {
   try {
     const response = await fetch(
-      `https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/top-cities-by-country?country_code=${countryCode}&limit=5`,
+      `${SUPABASE_URL}/functions/v1/top-cities-by-country?country_code=${countryCode}&limit=5`,
       {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          apikey:
-            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpbmJubWxmcGZmbXlqbWt3YmNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc5NDQ2MTQsImV4cCI6MjA3MzUyMDYxNH0.yrju-Pv4OlfU9Et-mRWg0GRHTusL7ZpJevqKemJFbuA",
+          apikey: SUPABASE_PUBLISHABLE_KEY,
         },
       }
     );
