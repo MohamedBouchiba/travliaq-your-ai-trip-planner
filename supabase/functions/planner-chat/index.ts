@@ -609,7 +609,8 @@ serve(async (req) => {
           temperature: 0.7,
           max_tokens: 600,
           tools: ALL_TOOLS,
-          tool_choice: "auto",
+          // Force tool usage on first iteration to ensure classify_intent is called
+          tool_choice: loopCount === 0 ? "required" : "auto",
           stream: false,
         }),
       });
@@ -691,7 +692,38 @@ serve(async (req) => {
       }
     }
     
-    // If we still don't have content, make a final call
+    // Fallback: if classify_intent was never called, detect indecision from user message
+    if (!collectedData.intentClassification) {
+      const lastUserMsg = limitedMessages.filter((m: { role: string }) => m.role === "user").pop();
+      const userText = (lastUserMsg?.content || "").toLowerCase();
+      const indecisionPatterns = ["sais pas", "ne sais pas", "aucune idée", "pas d'idée", "hésite", "aide-moi", "inspire", "où aller"];
+      const isIndecis = indecisionPatterns.some(p => userText.includes(p));
+      
+      if (isIndecis && (!preferencesState.interests || preferencesState.interests.length === 0)) {
+        log.info("preference_first_fallback", "No classify_intent called, but indecision detected. Injecting preferenceInterests.");
+        collectedData.intentClassification = {
+          primaryIntent: "gather_preferences",
+          confidence: 90,
+          entities: {},
+          widgetToShow: {
+            type: "preferenceInterests",
+            reason: "Fallback: indecision detected without preferences",
+          },
+        };
+      } else if (isIndecis && !preferencesState.style) {
+        log.info("preference_first_fallback", "No classify_intent called, indecision detected. Injecting preferenceStyle.");
+        collectedData.intentClassification = {
+          primaryIntent: "gather_preferences",
+          confidence: 90,
+          entities: {},
+          widgetToShow: {
+            type: "preferenceStyle",
+            reason: "Fallback: indecision detected without style",
+          },
+        };
+      }
+    }
+    
     if (!finalContent && loopCount > 0) {
       log.info("multi_tool", "Making final content generation call");
       
@@ -723,6 +755,9 @@ serve(async (req) => {
     if (!finalContent) {
       finalContent = "Désolé, je n'ai pas pu générer de réponse.";
     }
+    
+    // Strip <action> tags from content (LLM sometimes generates these instead of using tools)
+    finalContent = finalContent.replace(/<action>[\s\S]*?<\/action>/g, "").trim();
 
     // Handle streaming for collected data
     if (stream && finalContent) {
