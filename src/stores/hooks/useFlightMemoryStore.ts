@@ -172,6 +172,9 @@ export function useFlightMemoryStore(): FlightMemoryStoreValue {
     if (partial.flexibleDates !== undefined) {
       store.setFlexibleDates(partial.flexibleDates);
     }
+    if (partial.legs !== undefined) {
+      store.setLegs(partial.legs);
+    }
   }, [store]);
 
   // Reset memory

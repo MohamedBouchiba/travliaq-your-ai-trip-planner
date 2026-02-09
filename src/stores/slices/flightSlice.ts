@@ -55,6 +55,7 @@ export interface FlightSlice {
   addLeg: () => void;
   removeLeg: (legId: string) => void;
   updateLeg: (legId: string, update: Partial<FlightLegMemory>) => void;
+  setLegs: (legs: FlightLegMemory[]) => void;
   resetFlight: () => void;
 }
 
@@ -204,6 +205,10 @@ export const createFlightSlice: StateCreator<
       false,
       'flight/updateLeg'
     );
+  },
+
+  setLegs: (legs: FlightLegMemory[]) => {
+    set({ legs }, false, 'flight/setLegs');
   },
 
   resetFlight: () => {
