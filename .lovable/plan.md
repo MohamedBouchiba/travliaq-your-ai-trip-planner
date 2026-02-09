@@ -1,114 +1,118 @@
 
-# Fix 3 Issues from Debug Trace Analysis
 
-## Issue 1 (HIGH): citySelector fallback path bypass
+# 3 Improvements from Debug Trace
 
-**Root cause**: When the backend suggests `preferenceInterests` (blocked by cooldown), the fallback at line 489 does `validation.suggestedWidget || getNextRequiredWidget()`. While our previous fix made `getNextRequiredWidget()` return `null` when no country is selected, `validation.suggestedWidget` from other widget prerequisites (e.g., `tripTypeConfirm` suggests `travelersSelector`, `dateRangePicker` suggests `citySelector` in `useIntentRouter.ts`) could still inject `citySelector`. We need to guard the fallback result itself.
+## Issue 1 (HIGH): After preferences complete, system should suggest destinations, not ask for dates
 
-**File**: `src/components/planner/chat/hooks/useUnifiedIntentRouter.ts` (lines 488-500)
+**What happens**: User says "non rien d'autre" after preferences. Intent is classified as `"other"`. The system responds with "passons aux dates" but destination is still missing. Per the phased workflow, Discovery (destinations) must come before Logistics (dates).
 
-**Change**: After computing `fallbackWidget`, check if it's `citySelector` and `!flowState.hasDestination`. If so, try `destinationSuggestions` instead (if preferences are filled), or set to `null`.
+**Root cause**: The proactive destination suggestion logic (line 739-761 in `useUnifiedIntentRouter.ts`) only runs for intents in `widgetTriggeringIntents`, but `"other"` is not in that list. So the entire fallback block is skipped.
 
-```typescript
-// Replace lines 488-500:
-// Widget can't be shown, use suggested fallback or next required
-let fallbackWidget = validation.suggestedWidget || getNextRequiredWidget();
+**Fix**: Add `"other"`, `"thank_you"`, and `"greeting"` to `widgetTriggeringIntents` -- OR better, move the "no destination + preferences filled = suggest destinations" guard **outside** the `widgetTriggeringIntents` check so it always runs as a last resort before returning `{ shouldShowWidget: false }`.
 
-// Guard: don't fallback to citySelector if no country is selected
-if (fallbackWidget === "citySelector" && !flowState.hasDestination) {
-  console.log("[UnifiedIntentRouter] Fallback citySelector blocked — no country selected");
-  const hasPreferences = widgetInteractions.some(i => 
-    i.interactionType === "style_configured" || i.interactionType === "interests_selected"
-  );
-  if (hasPreferences) {
-    const destValidation = canShowWidget("destinationSuggestions");
-    fallbackWidget = destValidation.valid ? "destinationSuggestions" : null;
-  } else {
-    fallbackWidget = null;
-  }
-}
+**File**: `src/components/planner/chat/hooks/useUnifiedIntentRouter.ts` (lines 739-792)
 
-if (fallbackWidget) {
-  if (onWidgetTriggered) onWidgetTriggered(fallbackWidget);
-  return {
-    shouldShowWidget: true,
-    widgetType: fallbackWidget,
-    action: "none",
-    reason: validation.reason || "Fallback to required widget",
-  };
+Move the proactive destination check (lines 742-761) to run **before** the final return at line 792, regardless of intent type.
+
+---
+
+## Issue 2 (MEDIUM): `tripDuration: "3 jours"` detected but never persisted
+
+**What happens**: The first intent classification correctly extracts `entities.tripDuration: "3 jours"`, but `flightData` is `null` in that response. The `setPendingTripDuration` call only happens inside the `if (flightData)` block. So the duration is lost.
+
+**Root cause**: The intent classifier extracts the entity, but `tripDuration` is only consumed from `flightData` (the flight extractor tool), which doesn't run during the preference-gathering phase.
+
+**Fix**: After the intent router processes the response, check `intentClassification.entities.tripDuration` and call `setPendingTripDuration()` if present, even when `flightData` is null.
+
+**File**: `src/components/planner/PlannerChat.tsx` (around line 1268)
+
+Add a new block before/after the `flightData` check:
+
+```text
+// Persist tripDuration from intent entities even without flightData
+if (!flightData && intentClassification?.entities?.tripDuration) {
+  widgetFlow.setPendingTripDuration(intentClassification.entities.tripDuration);
 }
 ```
 
 ---
 
-## Issue 2 (MEDIUM): Debug panel shows stale flightSummary ("1 voyageur")
+## Issue 3 (LOW): Intent "other" with high confidence for "non rien d'autre"
 
-**Root cause**: `debugStore.setMemoryContext()` is only called inside `useChatStream.ts` (line 723) during LLM calls. Widget-only flows (city, dates, travelers, tripType) never call the LLM, so the debug panel keeps showing old context.
+**What happens**: The user confirms they have no more criteria ("non rien d'autre de precis"). The LLM classifies this as `primaryIntent: "other"` with confidence 95 and no widget. This is technically correct (it's not a preference or destination intent), but it means the system loses awareness that the user just **completed** the preferences phase.
 
-**File**: `src/components/planner/PlannerChat.tsx`
+**Fix**: In the backend intent classifier prompt (`supabase/functions/planner-chat/tools/intentClassifier.ts`), add a rule: when the user confirms completion of a phase (e.g., "non rien d'autre", "c'est tout", "pas de restriction"), classify as `confirm_selection` or add a new intent `"confirm_completion"` rather than `"other"`. This would ensure the `widgetTriggeringIntents` list catches it and triggers the next flow step.
 
-**Change**: Add a `useEffect` that watches key memory values and syncs the debug store whenever they change (not just during LLM calls).
+Alternatively (simpler, frontend-only): In Issue 1's fix, since we're moving the proactive destination check outside the intent filter, this becomes less critical -- the system will suggest destinations regardless of the intent type.
 
-```typescript
-// Add near the other useEffect hooks in PlannerChat:
-useEffect(() => {
-  if (process.env.NODE_ENV !== "production") {
-    const { setMemoryContext } = useDebugStore.getState();
-    setMemoryContext({
-      flightSummary: getMemorySummary(),
-      preferenceContext: preferenceContext,
-      widgetHistory: widgetTracking.getContextForLLM(),
-      blockedWidgets: widgetCooldown.getBlockedWidgets(),
-      basketSummary: getBasketSummary(),
-      conversationSummary: sessionContext.buildConversationSummary(5),
-      sessionEntities: sessionContext.sessionEntities,
-      missingFields: missingFields?.map(getMissingFieldLabel),
-    });
-  }
-}, [getMemorySummary, preferenceContext, widgetTracking, widgetCooldown, getBasketSummary, sessionContext, missingFields]);
-```
-
-This ensures the debug panel always reflects the real-time state, even after widget-only interactions.
-
----
-
-## Issue 3 (LOW): sessionEntities.constraints concatenates unrelated messages
-
-**Root cause**: `useSessionContext.ts` (line 119-122) joins ALL user message text with `.join(" ")` before running regex extraction. Two separate messages ("Je veux definir mes criteres obligatoires" + "non pas specialement") get merged, and the constraint regex matches across the boundary, producing "definir mes criteres obligatoires non pas specialement".
-
-**File**: `src/components/planner/chat/hooks/useSessionContext.ts` (lines 117-128)
-
-**Change**: Extract entities per-message individually, then merge/deduplicate.
-
-```typescript
-// Replace lines 117-128:
-const sessionEntities = useMemo<SessionEntities>(() => {
-  const userMessages = messages.filter((m) => m.role === "user" && m.text);
-
-  const destinationsSet = new Set<string>();
-  const datesSet = new Set<string>();
-  const budgetsSet = new Set<string>();
-  const constraintsSet = new Set<string>();
-
-  for (const msg of userMessages) {
-    for (const d of extractEntities(msg.text, ENTITY_PATTERNS.destinations)) destinationsSet.add(d);
-    for (const d of extractEntities(msg.text, ENTITY_PATTERNS.dates)) datesSet.add(d);
-    for (const b of extractEntities(msg.text, ENTITY_PATTERNS.budgets)) budgetsSet.add(b);
-    for (const c of extractEntities(msg.text, ENTITY_PATTERNS.constraints)) constraintsSet.add(c);
-  }
-
-  const destinations = Array.from(destinationsSet);
-  const dates = Array.from(datesSet);
-  const budgets = Array.from(budgetsSet);
-  const constraints = Array.from(constraintsSet);
-```
+**File**: `supabase/functions/planner-chat/tools/intentClassifier.ts` -- update the system prompt to instruct classification of "nothing else" / "no more" as `confirm_selection`.
 
 ---
 
 ## Summary
 
-| # | Issue | File | Change |
-|---|-------|------|--------|
-| 1 | citySelector fallback bypass | `useUnifiedIntentRouter.ts` L488-500 | Guard fallback result against citySelector when no country |
-| 2 | Stale debug memoryContext | `PlannerChat.tsx` | Add useEffect to sync debug store on memory changes |
-| 3 | Constraint concatenation | `useSessionContext.ts` L117-128 | Per-message entity extraction instead of joined text |
+| # | Severity | Problem | Fix location |
+|---|----------|---------|-------------|
+| 1 | HIGH | Destinations skipped after preferences | `useUnifiedIntentRouter.ts` -- move proactive destination check outside intent filter |
+| 2 | MEDIUM | "3 jours" duration lost | `PlannerChat.tsx` -- persist `tripDuration` from intent entities |
+| 3 | LOW | "non rien d'autre" classified as "other" | `intentClassifier.ts` prompt + Issue 1 fix makes it less critical |
+
+## Technical details
+
+**Issue 1 code change** (`useUnifiedIntentRouter.ts`):
+
+```text
+// BEFORE (line 739):
+if (widgetTriggeringIntents.includes(intent.primaryIntent)) {
+  // ... proactive destination check inside here ...
+}
+return { shouldShowWidget: false, widgetType: null, action: "none" };
+
+// AFTER:
+if (widgetTriggeringIntents.includes(intent.primaryIntent)) {
+  // ... nextRequired widget logic only ...
+}
+
+// Proactive destination guard -- runs for ALL intents as last resort
+if (!flowState.hasDestination) {
+  const hasPreferences = widgetInteractions.some(i =>
+    i.interactionType === "style_configured" || i.interactionType === "interests_selected"
+  );
+  if (hasPreferences) {
+    const destValidation = canShowWidget("destinationSuggestions");
+    if (destValidation.valid) {
+      if (onWidgetTriggered) onWidgetTriggered("destinationSuggestions");
+      return {
+        shouldShowWidget: true,
+        widgetType: "destinationSuggestions",
+        action: "none",
+        reason: "Preferences filled, no destination -- proactive suggestions",
+      };
+    }
+  }
+}
+
+return { shouldShowWidget: false, widgetType: null, action: "none" };
+```
+
+**Issue 2 code change** (`PlannerChat.tsx`, after line ~1267):
+
+```text
+// Persist tripDuration/preferredMonth from intent entities even without flightData
+if (intentClassification?.entities) {
+  const ent = intentClassification.entities;
+  if (ent.tripDuration && !widgetFlow.pendingTripDuration) {
+    widgetFlow.setPendingTripDuration(ent.tripDuration);
+  }
+  if (ent.preferredMonth && !widgetFlow.pendingPreferredMonth) {
+    widgetFlow.setPendingPreferredMonth(ent.preferredMonth);
+  }
+}
+```
+
+**Issue 3 code change** (`intentClassifier.ts`): Add to the system prompt classification rules:
+
+```text
+- "non", "rien d'autre", "c'est tout", "pas de restriction", "non merci" 
+  → primaryIntent: "confirm_selection" (not "other")
+```
