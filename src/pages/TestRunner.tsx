@@ -1,88 +1,80 @@
 /**
- * TestRunner - Page de visualisation des suites de tests du projet
+ * TestRunner - Page d'exécution des tests en direct dans le navigateur
  * Accessible à /test-runner, réservée au développement
  */
 
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import { ArrowLeft, CheckCircle2, XCircle, Clock, Play, FlaskConical } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  XCircle,
+  Play,
+  FlaskConical,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-interface TestSuite {
-  name: string;
-  file: string;
-  description: string;
-  tests: number;
-}
-
-const TEST_SUITES: TestSuite[] = [
-  {
-    name: "Validators",
-    file: "src/components/planner/chat/utils/__tests__/validators.test.ts",
-    description: "Validation des entrées utilisateur chat (78 tests)",
-    tests: 78,
-  },
-  {
-    name: "Security",
-    file: "src/components/planner/chat/utils/__tests__/security.test.ts",
-    description: "Tests de sécurité et sanitisation (57 tests)",
-    tests: 57,
-  },
-  {
-    name: "Parse Action",
-    file: "src/components/planner/chat/utils/__tests__/parseAction.test.ts",
-    description: "Parsing des tags action dans le chat (11 tests)",
-    tests: 11,
-  },
-  {
-    name: "Questionnaire Logic",
-    file: "src/test/questionnaire.test.tsx",
-    description: "Cohérence du calcul d'étapes du questionnaire (25 tests)",
-    tests: 25,
-  },
-  {
-    name: "Questionnaire Data Integrity",
-    file: "src/test/questionnaire-data-integrity.test.tsx",
-    description: "Intégrité des constantes du questionnaire (35 tests)",
-    tests: 35,
-  },
-  {
-    name: "Questionnaire Submission",
-    file: "src/test/questionnaire-submission.test.tsx",
-    description: "Normalisation des données de soumission (33 tests)",
-    tests: 33,
-  },
-  {
-    name: "Hotel Service",
-    file: "src/test/hotel-service-request.test.ts",
-    description: "Construction des requêtes API hôtels (4 tests)",
-    tests: 4,
-  },
-  {
-    name: "Travelers Widget",
-    file: "src/components/planner/chat/widgets/__tests__/TravelersWidget.test.tsx",
-    description: "Widget sélection voyageurs",
-    tests: 5,
-  },
-  {
-    name: "City Selection Widget",
-    file: "src/components/planner/chat/widgets/__tests__/CitySelectionWidget.test.tsx",
-    description: "Widget sélection de ville",
-    tests: 3,
-  },
-  {
-    name: "Airport Widgets",
-    file: "src/components/planner/chat/widgets/__tests__/AirportWidgets.test.tsx",
-    description: "Widgets sélection aéroports",
-    tests: 4,
-  },
-];
+import { Progress } from "@/components/ui/progress";
+import type { SuiteResult, TestResult } from "@/lib/browser-test-runner";
 
 const TestRunner = () => {
-  const totalTests = TEST_SUITES.reduce((acc, s) => acc + s.tests, 0);
+  const [running, setRunning] = useState(false);
+  const [results, setResults] = useState<SuiteResult[] | null>(null);
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [expandedSuites, setExpandedSuites] = useState<Set<string>>(new Set());
+  const startTimeRef = useRef(0);
+  const [totalDuration, setTotalDuration] = useState(0);
+
+  const runTests = useCallback(async () => {
+    setRunning(true);
+    setResults(null);
+    setProgress({ current: 0, total: 0 });
+    startTimeRef.current = performance.now();
+
+    try {
+      // Dynamic import to avoid loading test code on initial page load
+      const { registerAllBrowserTests } = await import("@/lib/browser-test-suites");
+      const { runAllTests } = await import("@/lib/browser-test-runner");
+
+      registerAllBrowserTests();
+
+      const suiteResults = await runAllTests((_, index, total) => {
+        setProgress({ current: index + 1, total });
+      });
+
+      setResults(suiteResults);
+      setTotalDuration(performance.now() - startTimeRef.current);
+
+      // Auto-expand failed suites
+      const failedSuites = new Set<string>();
+      suiteResults.forEach((s) => {
+        if (s.failed > 0) failedSuites.add(s.name);
+      });
+      setExpandedSuites(failedSuites);
+    } catch (e) {
+      console.error("Test runner error:", e);
+    } finally {
+      setRunning(false);
+    }
+  }, []);
+
+  const toggleSuite = (name: string) => {
+    setExpandedSuites((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
+  const totalPassed = results?.reduce((a, s) => a + s.passed, 0) ?? 0;
+  const totalFailed = results?.reduce((a, s) => a + s.failed, 0) ?? 0;
+  const totalTests = totalPassed + totalFailed;
 
   return (
     <>
@@ -98,44 +90,163 @@ const TestRunner = () => {
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <FlaskConical className="h-6 w-6 text-primary" />
-            <div>
+            <div className="flex-1">
               <h1 className="text-xl font-bold">Test Runner</h1>
               <p className="text-sm text-muted-foreground">
-                {TEST_SUITES.length} suites · ~{totalTests} tests au total
+                Tests unitaires exécutés dans le navigateur
               </p>
             </div>
+            <Button
+              onClick={runTests}
+              disabled={running}
+              variant="default"
+              size="lg"
+              className="gap-2"
+            >
+              {running ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+              {running ? "En cours..." : "Lancer les tests"}
+            </Button>
           </div>
         </header>
 
-        <main className="container mx-auto px-4 py-8 space-y-4">
-          <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-            <p>
-              Les tests sont exécutés via <code className="text-primary font-mono">vitest</code> dans le terminal Lovable.
-              Cette page liste les suites de tests disponibles dans le projet.
-            </p>
-          </div>
+        <main className="container mx-auto px-4 py-8 space-y-6">
+          {/* Progress bar */}
+          {running && progress.total > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>Exécution en cours...</span>
+                <span>
+                  {progress.current}/{progress.total}
+                </span>
+              </div>
+              <Progress value={(progress.current / progress.total) * 100} />
+            </div>
+          )}
 
-          <div className="grid gap-4 md:grid-cols-2">
-            {TEST_SUITES.map((suite) => (
-              <Card key={suite.file} className="hover:border-primary/40 transition-colors">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <FlaskConical className="h-4 w-4 text-primary" />
-                    {suite.name}
-                    <Badge variant="secondary" className="ml-auto text-xs">
-                      {suite.tests} tests
-                    </Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <p className="text-sm text-muted-foreground">{suite.description}</p>
-                  <code className="text-xs text-muted-foreground/70 block truncate">
-                    {suite.file}
-                  </code>
+          {/* Summary */}
+          {results && !running && (
+            <div className="grid grid-cols-3 gap-4">
+              <Card className="border-primary/30">
+                <CardContent className="pt-6 text-center">
+                  <p className="text-3xl font-bold">{totalTests}</p>
+                  <p className="text-sm text-muted-foreground">Total</p>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+              <Card className="border-green-500/30">
+                <CardContent className="pt-6 text-center">
+                  <p className="text-3xl font-bold text-green-500">{totalPassed}</p>
+                  <p className="text-sm text-muted-foreground">Réussis</p>
+                </CardContent>
+              </Card>
+              <Card className={totalFailed > 0 ? "border-destructive/30" : "border-green-500/30"}>
+                <CardContent className="pt-6 text-center">
+                  <p className={`text-3xl font-bold ${totalFailed > 0 ? "text-destructive" : "text-green-500"}`}>
+                    {totalFailed}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Échoués</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {results && !running && (
+            <p className="text-sm text-muted-foreground text-right">
+              Terminé en {(totalDuration / 1000).toFixed(2)}s
+            </p>
+          )}
+
+          {/* No results yet */}
+          {!results && !running && (
+            <div className="rounded-lg border border-border bg-muted/30 p-8 text-center">
+              <FlaskConical className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+              <p className="text-muted-foreground">
+                Cliquez sur <strong>Lancer les tests</strong> pour exécuter les suites de tests
+                directement dans le navigateur.
+              </p>
+              <p className="text-sm text-muted-foreground/70 mt-2">
+                Validators · Security · ParseAction — fonctions pures testées sans serveur
+              </p>
+            </div>
+          )}
+
+          {/* Suite results */}
+          {results && (
+            <div className="space-y-3">
+              {results.map((suite) => {
+                const expanded = expandedSuites.has(suite.name);
+                const allPassed = suite.failed === 0;
+
+                return (
+                  <Card key={suite.name} className={allPassed ? "border-green-500/20" : "border-destructive/20"}>
+                    <CardHeader
+                      className="pb-2 cursor-pointer select-none"
+                      onClick={() => toggleSuite(suite.name)}
+                    >
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        {expanded ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        {allPassed ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-destructive" />
+                        )}
+                        <span className="flex-1">{suite.name}</span>
+                        <Badge variant={allPassed ? "secondary" : "destructive"} className="text-xs">
+                          {suite.passed}/{suite.passed + suite.failed}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground font-normal">
+                          {suite.duration.toFixed(1)}ms
+                        </span>
+                      </CardTitle>
+                    </CardHeader>
+
+                    {expanded && (
+                      <CardContent className="pt-0">
+                        <div className="space-y-1">
+                          {suite.tests.map((test, i) => (
+                            <div
+                              key={i}
+                              className={`flex items-start gap-2 text-xs py-1 px-2 rounded ${
+                                test.passed
+                                  ? "text-muted-foreground"
+                                  : "text-destructive bg-destructive/5"
+                              }`}
+                            >
+                              {test.passed ? (
+                                <CheckCircle2 className="h-3 w-3 mt-0.5 text-green-500 shrink-0" />
+                              ) : (
+                                <XCircle className="h-3 w-3 mt-0.5 text-destructive shrink-0" />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <span className="block truncate">
+                                  {test.name.split(" > ").pop()}
+                                </span>
+                                {test.error && (
+                                  <span className="block text-destructive/80 mt-0.5 font-mono text-[10px] break-all">
+                                    {test.error}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-muted-foreground/50 shrink-0">
+                                {test.duration.toFixed(1)}ms
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </main>
       </div>
     </>
