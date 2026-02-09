@@ -1,9 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { checkRateLimit, getClientIp, cleanupRateLimitMap, rateLimitResponse } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const MAX_REQUESTS_PER_HOUR = 30; // Nearest airports - allows exploration
 
 interface NearestAirportsRequest {
   city?: string;
@@ -115,6 +118,17 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Rate limiting
+    const clientIp = getClientIp(req);
+    if (!checkRateLimit(clientIp, MAX_REQUESTS_PER_HOUR)) {
+      console.warn(`[nearest-airports] Rate limit exceeded for IP: ${clientIp}`);
+      return rateLimitResponse(corsHeaders);
+    }
+    
+    // Periodic cleanup (1% of requests)
+    if (Math.random() < 0.01) {
+      cleanupRateLimitMap();
+    }
     const payload = (await req.json().catch(() => null)) as NearestAirportsRequest | null;
 
     const rawCity = payload?.city;

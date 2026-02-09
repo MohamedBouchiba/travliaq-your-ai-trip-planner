@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { checkRateLimit, getClientIp, cleanupRateLimitMap, rateLimitResponse } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,6 +7,7 @@ const corsHeaders = {
 };
 
 const API_BASE_URL = "https://travliaq-api-production.up.railway.app";
+const MAX_REQUESTS_PER_HOUR = 30; // Activities search - allows exploration
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -14,6 +16,18 @@ serve(async (req) => {
   }
 
   try {
+    // Rate limiting
+    const clientIp = getClientIp(req);
+    if (!checkRateLimit(clientIp, MAX_REQUESTS_PER_HOUR)) {
+      console.warn(`[activities-search] Rate limit exceeded for IP: ${clientIp}`);
+      return rateLimitResponse(corsHeaders);
+    }
+    
+    // Periodic cleanup (1% of requests)
+    if (Math.random() < 0.01) {
+      cleanupRateLimitMap();
+    }
+
     const body = await req.json();
 
     const response = await fetch(`${API_BASE_URL}/api/v1/activities/search`, {
