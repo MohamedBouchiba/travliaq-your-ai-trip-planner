@@ -199,6 +199,12 @@ Tu DOIS inclure cette balise à la fin de ta réponse pour que le choix soit ex�
 - tripTypeConfirm: "roundtrip" | "oneway" | "multi"
 - travelersSelector: format texte + optionData avec {adults, children, infants}
 
+### INTERDICTIONS ABSOLUES
+- Ne JAMAIS générer une balise <action> avec chooseWidget SAUF si l'utilisateur a EXPLICITEMENT dit "choisis pour moi", "décide pour moi", "à toi de choisir", "je te fais confiance", etc.
+- Proposer des destinations n'est PAS la même chose que choisir pour l'utilisateur
+- Si l'utilisateur demande "d'autres destinations" ou "propose-moi", ne PAS choisir pour lui — propose simplement
+- En cas de doute, ne génère PAS de balise <action> chooseWidget
+
 ### IMPORTANT
 - Explique TOUJOURS pourquoi tu fais ce choix AVANT la balise action
 - Choisis UNIQUEMENT parmi les options listées dans [WIDGETS ACTIFS]

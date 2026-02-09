@@ -151,6 +151,7 @@ export interface ChatMessage {
   id: string;
   role: "assistant" | "user" | "system";
   text: string;
+  timestamp?: number; // Date.now() when message was created
 
   // Loading/streaming states
   isTyping?: boolean;
