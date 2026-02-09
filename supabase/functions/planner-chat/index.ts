@@ -441,11 +441,15 @@ function applyPreferenceFirstLogic(
  */
 function buildClassificationSystemPrompt(
   preferencesState: { interests: string[]; style: string | null; pace: string | null },
+  blockedWidgets: string[] = [],
 ): string {
   const interestsStr = preferencesState.interests.length > 0
     ? preferencesState.interests.join(", ")
     : "VIDE";
   const styleStr = preferencesState.style || "NON DÉFINI";
+  const blockedStr = blockedWidgets.length > 0
+    ? blockedWidgets.join(", ")
+    : "aucun";
 
   return `Tu es un classificateur d'intention pour un assistant de voyage. Analyse le message utilisateur et appelle classify_intent.
 
@@ -453,10 +457,14 @@ CONTEXTE PRÉFÉRENCES ACTUELLES:
 - Intérêts: ${interestsStr}
 - Style: ${styleStr}
 
+[WIDGETS DÉJÀ CONFIRMÉS] ${blockedStr}
+RÈGLE: Ne JAMAIS suggérer un widget qui est dans la liste ci-dessus. Ces widgets ont déjà été complétés par l'utilisateur.
+
 RÈGLE CRITIQUE: Si l'utilisateur hésite / ne sait pas et que le style est NON DÉFINI, 
 primaryIntent = "gather_preferences", widgetType = "preferenceStyle".
-Si le style existe mais les intérêts sont VIDES,
-primaryIntent = "gather_preferences", widgetType = "preferenceInterests".`;
+Si le style existe mais les intérêts sont VIDES et "preferenceInterests" n'est PAS dans les widgets confirmés,
+primaryIntent = "gather_preferences", widgetType = "preferenceInterests".
+Si l'utilisateur répond négativement (non, pas spécialement, rien, etc.), primaryIntent = "other", widgetToShow = null.`;
 }
 
 /**
@@ -668,7 +676,7 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             messages: [
-              { role: "system", content: buildClassificationSystemPrompt(preferencesState) },
+              { role: "system", content: buildClassificationSystemPrompt(preferencesState, blockedWidgets) },
               lastUserMessage,
             ],
             temperature: 0.3,
