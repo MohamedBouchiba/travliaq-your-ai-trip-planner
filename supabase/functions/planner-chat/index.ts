@@ -364,6 +364,9 @@ function applyWidgetForcingLogic(
       log.info("widget_forcing", `Forced ${check.widget} widget based on keywords`);
       break;
     }
+  }
+  
+  return intentClassification;
 }
 
 /**
@@ -383,8 +386,6 @@ function applyPreferenceFirstLogic(
     intentClassification.widgetToShow?.type === "destinationSuggestions" ||
     intentClassification.primaryIntent === "ask_inspiration";
 
-  // If user is indecis OR system wants to show destinations
-  // BUT preferences are empty -> override to preferenceInterests
   if ((isIndecisIntent || isDestinationSuggestion) && 
       (!preferencesState.interests || preferencesState.interests.length === 0)) {
     log.info("preference_first", "Overriding to preferenceInterests (empty interests)");
@@ -396,7 +397,6 @@ function applyPreferenceFirstLogic(
     return intentClassification;
   }
 
-  // If interests exist but no style -> preferenceStyle
   if ((isIndecisIntent || isDestinationSuggestion) && !preferencesState.style) {
     log.info("preference_first", "Overriding to preferenceStyle (missing style)");
     intentClassification.primaryIntent = "gather_preferences";
@@ -407,9 +407,6 @@ function applyPreferenceFirstLogic(
     return intentClassification;
   }
 
-  return intentClassification;
-}
-  
   return intentClassification;
 }
 
