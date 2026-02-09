@@ -609,6 +609,22 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
                     });
                     // Update debug store
                     debugStore.setReasoning(reasoning);
+                    
+                    // If no explicit intentClassification, derive it from reasoning
+                    if (!intentClassification && reasoning.widgetDecision) {
+                      const derivedIntent: IntentClassification = {
+                        primaryIntent: reasoning.widgetDecision.widgetType || "unknown",
+                        confidence: reasoning.confidence,
+                        entities: {},
+                        widgetToShow: {
+                          type: reasoning.widgetDecision.widgetType || "",
+                          reason: reasoning.widgetDecision.reason || "",
+                        },
+                      };
+                      intentClassification = derivedIntent;
+                      debugStore.setLastIntent(derivedIntent);
+                      console.log("[Stream] Intent derived from reasoning:", derivedIntent.primaryIntent);
+                    }
                   } else if (parsed.type === "intentClassification" && parsed.intentClassification) {
                     intentClassification = parsed.intentClassification;
                     console.log("[Stream] Intent classified:", intentClassification.primaryIntent, "confidence:", intentClassification.confidence);
