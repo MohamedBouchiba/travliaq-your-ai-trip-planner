@@ -683,6 +683,14 @@ serve(async (req) => {
       loopCount++;
     }
     
+    // Post-loop: If preference-first override was applied, suppress destination suggestions
+    if (collectedData.intentClassification?.primaryIntent === "gather_preferences") {
+      if (collectedData.destinationSuggestionRequest) {
+        log.info("preference_first", "Suppressing destinationSuggestionRequest due to gather_preferences override");
+        collectedData.destinationSuggestionRequest = null;
+      }
+    }
+    
     // If we still don't have content, make a final call
     if (!finalContent && loopCount > 0) {
       log.info("multi_tool", "Making final content generation call");
