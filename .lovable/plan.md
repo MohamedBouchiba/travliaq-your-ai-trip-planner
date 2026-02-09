@@ -1,92 +1,218 @@
 
-# Plan : Workflow Intelligent pour Suggestions de Destinations + Profil Incomplet
 
-## Probleme
+# Plan : Debug Enrichi + Fix Bug Auto-Selection + Axes d'Amelioration Chat
 
-Quand l'utilisateur dit "je ne sais pas ou aller" avec un profil a 35% :
-1. Le message IA naturel est ecrase par un texte systeme generique
-2. Les suggestions sont montrees sans avertissement clair que le profil est quasi vide
-3. Pas de quick reply pour remplir les preferences
-4. Le titre reste le texte brut de l'utilisateur trop longtemps
+## Bug Identifie : Auto-Selection "Oman"
 
-Le workflow actuel n'est pas intelligent : il montre 3 destinations basees sur presque rien, sans guider l'utilisateur.
+**Cause racine** : Le LLM a genere une balise `<action>{"type":"chooseWidget","widgetType":"destinationSuggestions","option":"Oman",...}</action>` dans sa reponse alors que l'utilisateur n'a **jamais** dit "choisis pour moi". Le frontend a parse cette action et execute le choix automatiquement via `executeChooseWidgetAction`.
 
-## Solution : Workflow en 2 branches selon le score profil
+Le probleme est double :
+1. **Backend** : Le system prompt autorise le `chooseWidget` de maniere trop large, le LLM l'utilise meme quand ce n'est pas demande
+2. **Frontend** : Aucune verification que l'utilisateur a explicitement demande un choix automatique avant d'executer `chooseWidget`
 
-| Score profil | Comportement |
-|-------------|-------------|
-| < 50% | Montrer les suggestions MAIS avec un bandeau d'avertissement prominent + quick reply "Renseigner mes preferences" + message IA adapte |
-| >= 50% | Montrer les suggestions normalement avec le badge de completion |
+---
 
-## Modifications
+## Partie 1 : Fix du Bug chooseWidget
 
-### 1. PlannerChat.tsx - Conserver le message IA + ajouter quick replies contextuels
+### 1.1 Frontend - Guard de securite dans `parseAction.ts`
 
-**Ligne ~987-1056** : Quand `destinationSuggestionRequest` est recu :
+Ajouter un mecanisme de confirmation : le `chooseWidget` ne s'execute que si le **dernier message utilisateur** contient explicitement une demande de delegation ("choisis pour moi", "decide pour moi", "a toi de choisir", etc.).
 
-- **Garder le texte `content` de l'IA** au lieu de le remplacer par une traduction systeme
-- Apres le chargement des destinations, **ne pas ecraser le texte** avec `t("planner.messages.destinationsFoundPlural")`
-- Si `completionScore < 50%`, ajouter automatiquement un quick reply "Renseigner mes preferences" qui bascule sur l'onglet preferences
+**Fichier** : `src/components/planner/PlannerChat.tsx` (lignes 1172-1179)
+
+Au lieu d'executer directement `chooseWidget`, verifier le contexte :
 
 ```typescript
-// Au lieu de :
-text: t("planner.messages.destinationsFoundPlural", { count, score })
-
-// On fait :
-text: content, // Garder le message naturel de l'IA
-
-// Et on ajoute des quick replies si profil bas :
-quickReplies: completionScore < 50 ? [
-  { label: "Renseigner mes preferences", action: "open_preferences" },
-  { label: "Ca me va comme ca", action: "continue" }
-] : undefined
+} else if (action) {
+  if (action.type === "chooseWidget") {
+    // GUARD: Only execute if user explicitly asked
+    const lastUserMsg = messages.filter(m => m.role === "user").pop();
+    const delegationPatterns = /choisis|decide|a toi|fais confiance|prends le|meilleur pour moi/i;
+    const userAskedForChoice = lastUserMsg && delegationPatterns.test(lastUserMsg.text);
+    
+    if (userAskedForChoice) {
+      const executed = widgetActionExecutor.executeChooseWidgetAction(action);
+      // ...
+    } else {
+      console.warn("[PlannerChat] Blocked auto-chooseWidget - user did not ask for delegation");
+    }
+  }
+  // ... rest of actions
+}
 ```
 
-### 2. DestinationSuggestionsGrid.tsx - Bandeau d'avertissement ameliore
+### 1.2 Backend - Renforcer le system prompt
 
-Le bandeau actuel (lignes 108-133) est trop discret. On le transforme en un composant plus visible et actionnable :
+**Fichier** : `supabase/functions/planner-chat/prompts/phasePrompts.ts` (lignes 162-210)
 
-**Quand score < 50%** :
-- Bandeau orange/ambre avec icone d'avertissement
-- Message clair : "Ces suggestions sont basees sur un profil incomplet (35%). Affine tes preferences pour des recommandations sur mesure !"
-- Bouton cliquable "Completer mon profil" qui emet un evenement pour basculer sur l'onglet preferences
-- Barre de progression visuelle du score
+Ajouter une regle negative explicite :
 
-**Quand score >= 50% et < 70%** :
-- Bandeau bleu/info actuel mais avec la barre de progression
-- Message encourageant : "Tes suggestions sont deja bien personnalisees ! Complete ton profil pour encore mieux."
+```
+### INTERDICTIONS ABSOLUES
+- Ne JAMAIS generer une balise <action> avec chooseWidget SAUF si l'utilisateur 
+  a EXPLICITEMENT dit "choisis pour moi", "decide pour moi", etc.
+- Proposer des destinations n'est PAS la meme chose que choisir pour l'utilisateur
+- Si l'utilisateur demande "d'autres destinations", ne PAS choisir pour lui
+```
 
-**Quand score >= 70%** :
-- Badge vert : "Suggestions hautement personnalisees"
+---
 
-### 3. useChatSessions.ts - Titre intelligent des 2 messages
+## Partie 2 : Debug Panel Enrichi
 
-Changer le seuil de `userMessageCount >= 3` a `userMessageCount >= 2` (ligne 403).
+### 2.1 Timestamps et chronologie des messages
 
-### 4. Traductions - Nouvelles cles
+Ajouter un champ `timestamp` dans le type `ChatMessage` pour tracer quand chaque message est cree.
 
-Ajouter dans `src/i18n/config.ts` et les fichiers JSON :
-- `planner.suggestions.lowProfileWarning` : "Ces suggestions sont basees sur un profil a {{score}}%. Affine tes preferences pour des recommandations sur mesure !"
-- `planner.suggestions.mediumProfileInfo` : "Bon debut ! Complete ton profil pour des suggestions encore plus precises."
-- `planner.suggestions.highProfileSuccess` : "Suggestions hautement personnalisees"
-- `planner.suggestions.completeProfile` : "Completer mon profil"
+**Fichier** : `src/components/planner/chat/types.ts`
 
-## Resume des fichiers
+```typescript
+export interface ChatMessage {
+  id: string;
+  role: "assistant" | "user" | "system";
+  text: string;
+  timestamp?: number; // Date.now() when message was created
+  // ... rest
+}
+```
+
+**Fichier** : `src/components/planner/PlannerChat.tsx`
+
+A chaque creation de message (utilisateur ou assistant), ajouter `timestamp: Date.now()`.
+
+### 2.2 Copie debug enrichie avec chronologie
+
+**Fichier** : `src/components/planner/debug/DebugPanel.tsx`
+
+Enrichir `handleCopyDebugInfo` pour inclure :
+- **Chronologie des messages** : texte tronque + timestamp + role + widget attache
+- **Interactions** : actions chooseWidget bloquees ou executees
+- **Version du debug** pour tracabilite
+
+```typescript
+const handleCopyDebugInfo = () => {
+  const debugData = {
+    debugVersion: "2.0",
+    timestamp: new Date().toISOString(),
+    // Nouveau : chronologie complete des messages
+    messageTimeline: messages.map(m => ({
+      id: m.id,
+      role: m.role,
+      text: m.text.substring(0, 100) + (m.text.length > 100 ? "..." : ""),
+      timestamp: m.timestamp ? new Date(m.timestamp).toISOString() : null,
+      widget: m.widget || null,
+      widgetConfirmed: m.widgetConfirmed || false,
+      isAutoGenerated: m.isAutoGenerated || false,
+      hasQuickReplies: (m.quickReplies?.length || 0) > 0,
+    })),
+    // Nouveau : actions bloquees
+    blockedActions: blockedActionsRef.current,
+    intent: lastIntent,
+    reasoning,
+    flowState,
+    toolExecutions: toolExecutions.map(t => ({
+      tool: t.tool,
+      status: t.status,
+      reason: t.reason,
+      summary: t.summary,
+      latency_ms: t.latency_ms,
+      timestamp: new Date(t.timestamp).toISOString(),
+    })),
+    memoryContext,
+    rawResponses: rawResponses.map(r => r.data),
+  };
+  // ...
+};
+```
+
+### 2.3 Nouvel onglet "Timeline" dans le Debug Panel
+
+Ajouter un 5eme onglet dans le debug panel qui montre la chronologie visuelle des messages avec :
+- Timestamp de chaque message
+- Role (user/assistant/system)
+- Widget attache et son etat (pending/confirmed/dismissed)
+- Actions executees ou bloquees
+
+**Fichier** : `src/components/planner/debug/DebugPanel.tsx` - Nouvel onglet
+**Fichier** : `src/components/planner/debug/MessageTimeline.tsx` - Nouveau composant
+
+---
+
+## Partie 3 : Rendre le Debug Panel conscient des messages
+
+Le Debug Panel n'a actuellement pas acces aux messages du chat. Il faut soit :
+- Passer les messages via le store Zustand (ajouter un champ `messages` au debugStore)
+- Ou passer les messages en props via le `PlannerDebug.tsx`
+
+**Approche choisie** : Ajouter au `debugStore` un champ `messageTimeline` (version legere des messages) mis a jour a chaque changement.
+
+**Fichier** : `src/stores/debugStore.ts`
+
+```typescript
+export interface DebugMessageSnapshot {
+  id: string;
+  role: "user" | "assistant" | "system";
+  textPreview: string; // first 100 chars
+  timestamp: number;
+  widget?: string;
+  widgetConfirmed?: boolean;
+  isAutoGenerated?: boolean;
+}
+
+// Add to store:
+messageTimeline: DebugMessageSnapshot[];
+setMessageTimeline: (timeline: DebugMessageSnapshot[]) => void;
+```
+
+**Fichier** : `src/components/planner/PlannerChat.tsx`
+
+Synchroniser le `messageTimeline` dans le debug store a chaque mise a jour des messages.
+
+---
+
+## Partie 4 : Axes d'Amelioration du Chat
+
+### 4.1 Tracker les actions bloquees
+
+Quand un `chooseWidget` est bloque par le guard, le logger dans le debug store pour visibilite.
+
+**Fichier** : `src/stores/debugStore.ts`
+
+```typescript
+export interface BlockedAction {
+  type: string;
+  widgetType: string;
+  option: string;
+  reason: string;
+  timestamp: number;
+}
+// blockedActions: BlockedAction[];
+// addBlockedAction: (action: BlockedAction) => void;
+```
+
+### 4.2 Amelioration du conversationSummary
+
+Le `conversationSummary` dans le memory context montre encore l'ancien texte systeme ("Voici 3 destinations parfaites pour vous, basees sur votre profil (35% de completion)"). Il faut s'assurer que le resume utilise le texte reel du message AI, pas le texte systeme.
+
+Ce changement est cote backend dans la construction du memory context - verifier que le texte passe au resume est bien le `content` du stream et non le texte remplace.
+
+---
+
+## Resume des fichiers a modifier
 
 | Fichier | Changement |
 |---------|------------|
-| `src/components/planner/PlannerChat.tsx` | Conserver texte IA + quick replies conditionnel profil |
-| `src/components/planner/chat/widgets/DestinationSuggestionsGrid.tsx` | Bandeau 3 niveaux (rouge/orange/vert) + bouton action + barre progression |
-| `src/hooks/useChatSessions.ts` | Seuil titre a 2 messages |
-| `src/i18n/config.ts` | Nouvelles cles de traduction |
-| `src/i18n/locales/fr/planner.json` | Traductions FR |
-| `src/i18n/locales/en/planner.json` | Traductions EN |
+| `src/components/planner/PlannerChat.tsx` | Guard chooseWidget + timestamps messages + sync debug store |
+| `src/components/planner/chat/types.ts` | Ajouter `timestamp` a `ChatMessage` |
+| `src/components/planner/chat/utils/parseAction.ts` | Aucun changement (le guard est dans PlannerChat) |
+| `src/stores/debugStore.ts` | `messageTimeline` + `blockedActions` |
+| `src/components/planner/debug/DebugPanel.tsx` | Copie enrichie + onglet Timeline |
+| `src/components/planner/debug/MessageTimeline.tsx` | Nouveau composant chronologie |
+| `supabase/functions/planner-chat/prompts/phasePrompts.ts` | Renforcer interdiction chooseWidget |
 
 ## Resultat attendu
 
-L'utilisateur dit "je ne sais pas ou aller" avec 35% de profil :
-1. L'IA repond naturellement : "Pas de souci, je vais te proposer quelques idees..."
-2. Les cartes de destinations s'affichent avec un bandeau orange : "Ces suggestions sont basees sur un profil a 35%. Affine tes preferences pour des recommandations sur mesure !"
-3. Un bouton "Completer mon profil" est visible dans le bandeau
-4. Des quick replies apparaissent : "Renseigner mes preferences" / "Ca me va comme ca"
-5. Le titre se genere intelligemment des le 2e message
+1. **Le bug "Oman auto-selectionne" ne se reproduira plus** : guard frontend + prompt renforce
+2. **Le debug copie inclura la chronologie complete** des messages avec timestamps
+3. **Un nouvel onglet Timeline** montrera visuellement les interactions
+4. **Les actions bloquees seront visibles** dans le debug pour diagnostiquer les hallucinations du LLM
+
