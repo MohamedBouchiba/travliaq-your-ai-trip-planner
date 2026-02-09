@@ -323,6 +323,7 @@ export function useDynamicQuickReplies(
   widgetInteractions: WidgetInteraction[],
   sessionEntities?: SessionEntities,
   flowState?: {
+    hasDestination: boolean;
     hasDestinationCity: boolean;
     hasDepartureDate: boolean;
     hasTravelers: boolean;
@@ -388,7 +389,7 @@ export function useDynamicQuickReplies(
 
     // If user configured style/interests BUT hasn't chosen a destination yet, offer suggestions
     if ((recentTypes.has("style_configured") || recentTypes.has("interests_selected")) && 
-        flowState && !flowState.hasDestinationCity) {
+        flowState && !flowState.hasDestinationCity && !flowState.hasDestination) {
       replies.push({
         id: "suggest-destinations",
         label: t("planner.quickReplies.suggestForMe", "Suggère-moi des destinations"),
@@ -418,7 +419,7 @@ export function useDynamicQuickReplies(
     // If nothing specific, return general helpful suggestions
     if (replies.length === 0) {
       // Based on what's missing in flow state
-      if (flowState && !flowState.hasDestinationCity) {
+      if (flowState && !flowState.hasDestinationCity && !flowState.hasDestination) {
         replies.push({
           id: "inspire-me",
           label: t("planner.quickReplies.inspireMe", "Inspirez-moi"),
