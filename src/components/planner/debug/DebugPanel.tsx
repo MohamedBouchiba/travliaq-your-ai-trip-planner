@@ -13,9 +13,11 @@ import { useState, useEffect, memo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Bug, Brain, Wrench, Database, FileJson, Activity, ChevronDown, ChevronRight } from "lucide-react";
+import { Bug, Brain, Wrench, Database, FileJson, Activity, ChevronDown, ChevronRight, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDebugStore } from "@/stores/debugStore";
+import { Button } from "@/components/ui/button";
+import { toastSuccess } from "@/lib/toast";
 import { ToolTimeline } from "./ToolTimeline";
 import { MemoryInspector } from "./MemoryInspector";
 import { RawResponseViewer } from "./RawResponseViewer";
@@ -31,6 +33,29 @@ function DebugPanelComponent() {
   } = useDebugStore();
   
   const [activeTab, setActiveTab] = useState("intent");
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyDebugInfo = () => {
+    const debugData = {
+      timestamp: new Date().toISOString(),
+      intent: lastIntent,
+      reasoning,
+      flowState,
+      toolExecutions: toolExecutions.map(t => ({
+        tool: t.tool,
+        status: t.status,
+        reason: t.reason,
+        summary: t.summary,
+        latency_ms: t.latency_ms,
+      })),
+      memoryContext,
+      rawResponses: rawResponses.map(r => r.data),
+    };
+    navigator.clipboard.writeText(JSON.stringify(debugData, null, 2));
+    setCopied(true);
+    toastSuccess("Debug info copiée !");
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <div className="h-full flex flex-col bg-background border-l border-border">
@@ -39,6 +64,9 @@ function DebugPanelComponent() {
         <Bug className="h-4 w-4 text-primary" />
         <span className="font-semibold text-sm">Debug Panel</span>
         <Badge variant="outline" className="ml-auto text-xs">DEV</Badge>
+        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handleCopyDebugInfo}>
+          {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+        </Button>
       </div>
       
       {/* Tabs */}
