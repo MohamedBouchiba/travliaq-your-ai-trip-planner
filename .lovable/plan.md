@@ -1,66 +1,106 @@
 
 
-## Plan: Fix 4 Issues from the Debug Trace
+## Analysis of Debug Trace - 5 Issues Found
 
-### Issue 1: LLM generates a list when showing preferenceStyle widget
+### Issue 1: LLM text still lists options when preferenceStyle widget is shown (Prompt fix insufficient)
 
-**Problem**: When the `preferenceStyle` widget is shown, the LLM writes "indique ce qui t'attire le plus : 🏖️ Plage, 🏛️ Culture, 🌲 Aventure, 🛍️ Shopping" -- a bullet list that duplicates the widget's purpose. The system prompt already says "TEXTE COURT" and "NE LISTE PAS" but the LLM ignores it because the examples are too vague.
+**Problem**: The assistant says *"peux-t me dire ce qui te fait rêver ? Plage, culture, aventure ?"* -- this is still a mini-list that duplicates the widget's purpose. The prompt fix from the previous plan wasn't strong enough, the LLM still finds ways to enumerate options inline.
 
-**Fix**: Strengthen the system prompt examples in `supabase/functions/planner-chat/index.ts` (lines 513-520):
-- Replace the generic examples with more specific, context-aware ones
-- Add an explicit example for `preferenceStyle`: "Pour mieux cerner tes envies, commence par ajuster ces curseurs selon tes preferences :"
-- Add an explicit NEGATIVE example: "NE FAIS PAS de liste a puces quand un widget est affiche. Le widget EST la liste."
+**Root cause**: The system prompt at line 505 still contains `Poser UNE question sur les envies : "Qu'est-ce qui te fait rêver ? Plage, culture, aventure ?"` which the LLM uses as an example to follow. This directly contradicts the "no listing" rule added at line 517-529.
+
+**Fix**: Remove the contradictory example at line 505 and replace it with a reference to the widget. Also strengthen the example in the "correct examples" section to be more process-oriented (as you requested: explain we're entering a process to understand preferences).
 
 | File | Change |
 |------|--------|
-| `supabase/functions/planner-chat/index.ts` (lines 513-520) | Rewrite the "TEXTE COURT QUAND WIDGET AFFICHE" section with stronger instructions and better examples targeting `preferenceStyle` specifically |
+| `supabase/functions/planner-chat/index.ts` ~line 505 | Remove `"Poser UNE question sur les envies : Qu'est-ce qui te fait rêver ? Plage, culture, aventure ?"` and replace with `"Afficher le widget preferenceStyle pour collecter les envies"` |
+| `supabase/functions/planner-chat/index.ts` ~line 520 | Change preferenceStyle example to: `"On va d'abord cerner ton style de voyage pour te faire les meilleures recommandations :"` |
 
 ---
 
-### Issue 2: `update_preferences` validation fails on valid fields
+### Issue 2: Text says "choisissons tes dates" but widget shows citySelector
 
-**Problem**: The Zod schema uses `.strict()` (line 80 of `schemas.ts`), which rejects unknown fields. But the error message says "Invalid update_preferences output: occasion, needsWifi, petFriendly, accessibilityRequired, familyFriendly" -- these fields ARE in the schema. The issue is likely that the LLM sends wrong types (e.g., string `"true"` instead of boolean `true`, or invalid enum value for `occasion`).
+**Problem**: When the user says "ok" to confirm Mexique, the LLM generates text mentioning dates ("Maintenant, choisissons tes dates de voyage :"), but the frontend detects that a city must be selected first and injects a `citySelector` widget. Result: the text promises dates but the UI shows city selection.
 
-**Fix**: Two changes:
-1. Change `.strict()` to `.passthrough()` on `PreferencesDataSchema` so unknown fields are silently stripped instead of causing full rejection
-2. Add Zod `.coerce` or `.preprocess` for boolean fields (`needsWifi`, `petFriendly`, `accessibilityRequired`, `familyFriendly`) to handle LLM sending `"true"/"false"` as strings
+**Root cause**: The LLM doesn't know the frontend will override with a citySelector. In `PlannerChat.tsx` (lines 1726-1780), when a destination suggestion is selected, the code creates a loading message then replaces it with the citySelector widget using `t("planner.chat.whichCityToVisit")`. But when the LLM responds to "ok", there's a separate path where the LLM's text is kept and the citySelector gets attached by the imperative handler flow.
+
+Looking at the trace: the `update_flight_widget` tool sets `toCountryCode: "MX"` which triggers the country selection event, which calls `useChatImperativeHandlers.injectSystemMessage()`. But the LLM already generated its own message with dates text. There are now TWO messages competing.
+
+**Fix**: When the imperative handler detects that a `citySelector` needs to be injected for a country, it should check if the last assistant message already mentions "dates" and either:
+- Replace the LLM's text with the proper city selection text, OR
+- Skip injecting a duplicate if the LLM message already has the correct context
+
+The cleanest fix: in `useChatImperativeHandlers.ts`, when injecting a city selector system message, check if the most recent assistant message (within last 2 seconds) was an LLM response about the same country and replace its text with the city selection prompt instead of adding a new message.
 
 | File | Change |
 |------|--------|
-| `supabase/functions/planner-chat/validators/schemas.ts` (lines 66-80) | Change `.strict()` to `.passthrough()`, add boolean coercion for `needsWifi`, `petFriendly`, `accessibilityRequired`, `familyFriendly` |
+| `src/components/planner/chat/hooks/useChatImperativeHandlers.ts` ~line 98-170 | In `injectSystemMessage`, check if the latest assistant message (added within last 3 seconds) already references the same country. If so, update that message's text and widget instead of creating a new one. |
 
 ---
 
-### Issue 3: Flow stops after date confirmation (no proactive next step)
+### Issue 3: `sessionEntities.destinations` is empty after Mexique is confirmed
 
-**Problem**: After dates are confirmed, `handleDateRangeSelect` checks `memory.passengers.adults < 1` to decide if the travelers widget should show. But `passengers.adults` defaults to `1` in the store, so the check is always false. The user never explicitly chose travelers, but the system assumes it's done.
+**Problem**: The `sessionEntities` extraction in `useSessionContext.ts` uses regex patterns on user messages and widget interaction events (`destination_selected`, `city_selected`). But when the user says "choisi moi la moins chers" and then "ok", neither triggers those interaction types. The LLM picks Mexique in text, not via a widget click.
 
-**Fix**: Track whether the user has EXPLICITLY interacted with the travelers widget, not just whether `adults >= 1`. Add a `travelersExplicitlySet` boolean to the flow.
+**Root cause**: In `useSessionContext.ts` (line 131-143), destinations are extracted from widget interactions of type `destination_selected` or `city_selected`. When the LLM chooses a destination on behalf of the user (delegate_choice), there's no widget interaction tracked. The regex-based extraction from user text also won't catch "Mexique" because it's only in the assistant's text, not the user's.
+
+**Fix**: Also scan assistant messages for confirmed destination names when `flightData.toCountryName` is set. Or better: when `updateMemory` is called with `arrival.country`, also inject a synthetic widget interaction of type `destination_selected`.
 
 | File | Change |
 |------|--------|
-| `src/components/planner/chat/hooks/useChatWidgetFlow.ts` (line 360-362) | Change the condition from `memory.passengers.adults < 1` to always show travelers widget after dates unless user already explicitly confirmed travelers via the widget. Add a `travelersConfirmedRef` that is only set to `true` in `handleTravelersSelect`. |
+| `src/components/planner/chat/hooks/useSessionContext.ts` ~line 117-160 | In the `sessionEntities` useMemo, also check assistant messages for destination confirmations. Specifically, look at messages where `widgetData?.citySelection?.countryName` is set, or where the message confirms a destination. |
+| Alternative: `src/components/planner/PlannerChat.tsx` ~line 1710-1720 | After `updateMemory` with arrival country, call `widgetTracking.trackInteraction('destination_selected', { destinationName: destination.countryName })` to register a synthetic interaction. |
+
+The second approach (tracking a synthetic interaction) is cleaner because it uses the existing pipeline.
 
 ---
 
-### Issue 4: Stale reasoning in debug panel
+### Issue 4: Quick reply "Suggere-moi des destinations" appears after destination is already chosen
 
-**Problem**: The reasoning block in the debug output is only updated when the backend calls `plan_response` and streams a `reasoning` event. For the second message (dietary), the backend skipped `plan_response`, so the debug panel kept showing stale reasoning from the first message.
+**Problem**: The quick reply chip "Suggere-moi des destinations" shows at the bottom even though the user already chose Mexique and is now in the city selection phase.
 
-**Fix**: Reset the reasoning in the debug store at the START of each new message stream, so stale data from the previous message is cleared.
+**Root cause**: In `QuickReplies.tsx` (lines 389-402), the condition is:
+```
+if ((recentTypes.has("style_configured") || recentTypes.has("interests_selected")) && 
+    flowState && !flowState.hasDestinationCity)
+```
+Since `hasDestinationCity` checks `memory.arrival?.city` (not country), it's still `false` at this stage. The code doesn't check `flowState.hasDestination` (which checks country).
+
+**Fix**: Add `!flowState.hasDestination` to the condition. If a country is already selected (even without a city), don't suggest "find destinations":
 
 | File | Change |
 |------|--------|
-| `src/components/planner/chat/hooks/useChatStream.ts` | At the beginning of `streamResponse`, call `debugStore.setReasoning(null)` to clear stale reasoning before a new stream starts |
+| `src/components/planner/chat/QuickReplies.tsx` ~line 390 | Change condition to: `&& !flowState.hasDestinationCity && !flowState.hasDestination` |
+| `src/components/planner/chat/QuickReplies.tsx` ~line 421 | Same fix for the fallback "Inspirez-moi" chip: also check `!flowState.hasDestination` |
+
+The `flowState` already has `hasDestination` (set at line 235 of useUnifiedIntentRouter.ts: `!!(memory.arrival?.country || memory.arrival?.countryCode)`), we just need to pass it to the quick replies and use it.
+
+---
+
+### Issue 5: `reasoning` is null for ALL responses (Chain of Thought completely bypassed)
+
+**Problem**: Every single `rawResponse` has `"reasoning": null`. The `plan_response` tool is never called. The debug trace shows no `plan_response` tool execution for any of the 4 interactions. This means the Chain of Thought (CoT) system is entirely non-functional.
+
+**Root cause**: The `plan_response` tool is included in the tools array, but the LLM is never forced to call it (unlike `classify_intent` which uses `tool_choice: "required"`). The system prompt says "tu DOIS appeler cet outil" but the LLM ignores it. This is a known issue with optional tool enforcement.
+
+**Fix**: This is not a regression from our previous fixes (the debug reset was correct). The issue is that `plan_response` has always been optional. Two options:
+1. **Quick fix**: Accept that reasoning is optional and remove the "OBLIGATOIRE" language to avoid confusion in the debug panel
+2. **Proper fix**: Add a dedicated lightweight reasoning pass (like the classify_intent pass) that forces `tool_choice` for `plan_response` before the main ReAct loop
+
+Given the added latency of another LLM call, option 1 is recommended for now. The reasoning tool adds value when it fires, but forcing it adds ~2s latency per message.
+
+| File | Change |
+|------|--------|
+| `supabase/functions/planner-chat/tools/reasoningEngine.ts` ~line 12 | Change description from "OBLIGATOIRE" to "RECOMMANDE" to reflect reality |
 
 ---
 
 ### Summary
 
-| # | Issue | File(s) | Type |
-|---|-------|---------|------|
-| 1 | LLM lists options when widget is shown | `planner-chat/index.ts` | Prompt fix |
-| 2 | `update_preferences` validation rejects valid data | `validators/schemas.ts` | Schema fix |
-| 3 | No travelers widget after dates | `useChatWidgetFlow.ts` | Logic fix |
-| 4 | Stale reasoning in debug | `useChatStream.ts` | State fix |
+| # | Issue | File(s) | Type | Priority |
+|---|-------|---------|------|----------|
+| 1 | LLM lists options with preferenceStyle widget | `planner-chat/index.ts` | Prompt contradiction | High |
+| 2 | Text says "dates" but widget shows citySelector | `useChatImperativeHandlers.ts` | Message collision | High |
+| 3 | sessionEntities.destinations empty after choice | `PlannerChat.tsx` | Missing tracking | Medium |
+| 4 | Stale "Suggere-moi" quick reply after destination chosen | `QuickReplies.tsx` | Wrong condition | Medium |
+| 5 | Chain of Thought never fires | `reasoningEngine.ts` | Optional tool | Low |
 
