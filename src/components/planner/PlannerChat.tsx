@@ -290,6 +290,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
   });
 
   // Sync memory context to debug store in real-time (not just during LLM calls)
+  // Use stable primitives as deps to avoid infinite loops from object references
+  const debugSyncKey = `${getMemorySummary()}|${missingFields?.join(",")}|${widgetTracking.interactions.length}|${widgetCooldown.getBlockedWidgets().join(",")}`;
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
       const { setMemoryContext } = useDebugStore.getState();
@@ -308,7 +310,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
         missingFields: missingFields?.map(getMissingFieldLabel),
       });
     }
-  }, [getMemorySummary, getPreferenceMemory, widgetTracking, widgetCooldown, getBasketSummary, sessionContext, missingFields]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debugSyncKey]);
 
   // Dynamic quick replies based on widget interactions and flow state (Phase 3)
   const { generateContextualReplies } = useDynamicQuickReplies(
