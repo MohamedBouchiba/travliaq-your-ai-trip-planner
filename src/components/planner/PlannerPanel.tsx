@@ -1615,40 +1615,40 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
               </div>
 
               {/* Baggage controls */}
-              <div className="flex items-center justify-center gap-3 flex-1">
+              <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
                 {/* Cabin bags */}
-                <div className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                  <span className="text-xs">🧳</span>
-                  <span className="text-[10px] text-muted-foreground">{t("planner.flights.cabinBag")}</span>
+                <div className="flex items-center gap-1 px-1.5 py-1.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors min-w-0">
+                  <span className="text-xs shrink-0">🧳</span>
+                  <span className="text-[10px] text-muted-foreground shrink-0">{t("planner.flights.cabinBag")}</span>
                   <button
                     onClick={() => updatePassenger(passenger.id, { cabinBags: Math.max(0, passenger.cabinBags - 1) })}
-                    className="w-5 h-5 rounded bg-background/50 hover:bg-primary/20 hover:text-primary text-foreground flex items-center justify-center text-xs font-medium transition-colors ml-1"
+                    className="w-5 h-5 rounded bg-background/50 hover:bg-primary/20 hover:text-primary text-foreground flex items-center justify-center text-xs font-medium transition-colors shrink-0"
                   >
                     −
                   </button>
-                  <span className="text-xs w-4 text-center font-medium">{passenger.cabinBags}</span>
+                  <span className="text-xs w-3 text-center font-medium shrink-0">{passenger.cabinBags}</span>
                   <button
                     onClick={() => updatePassenger(passenger.id, { cabinBags: Math.min(2, passenger.cabinBags + 1) })}
-                    className="w-5 h-5 rounded bg-background/50 hover:bg-primary/20 hover:text-primary text-foreground flex items-center justify-center text-xs font-medium transition-colors"
+                    className="w-5 h-5 rounded bg-background/50 hover:bg-primary/20 hover:text-primary text-foreground flex items-center justify-center text-xs font-medium transition-colors shrink-0"
                   >
                     +
                   </button>
                 </div>
 
                 {/* Checked bags */}
-                <div className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                  <span className="text-xs">🛄</span>
-                  <span className="text-[10px] text-muted-foreground">{t("planner.flights.checkedBag")}</span>
+                <div className="flex items-center gap-1 px-1.5 py-1.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors min-w-0">
+                  <span className="text-xs shrink-0">🛄</span>
+                  <span className="text-[10px] text-muted-foreground shrink-0">{t("planner.flights.checkedBag")}</span>
                   <button
                     onClick={() => updatePassenger(passenger.id, { checkedBags: Math.max(0, passenger.checkedBags - 1) })}
-                    className="w-5 h-5 rounded bg-background/50 hover:bg-primary/20 hover:text-primary text-foreground flex items-center justify-center text-xs font-medium transition-colors ml-1"
+                    className="w-5 h-5 rounded bg-background/50 hover:bg-primary/20 hover:text-primary text-foreground flex items-center justify-center text-xs font-medium transition-colors shrink-0"
                   >
                     −
                   </button>
-                  <span className="text-xs w-4 text-center font-medium">{passenger.checkedBags}</span>
+                  <span className="text-xs w-3 text-center font-medium shrink-0">{passenger.checkedBags}</span>
                   <button
                     onClick={() => updatePassenger(passenger.id, { checkedBags: passenger.checkedBags + 1 })}
-                    className="w-5 h-5 rounded bg-background/50 hover:bg-primary/20 hover:text-primary text-foreground flex items-center justify-center text-xs font-medium transition-colors"
+                    className="w-5 h-5 rounded bg-background/50 hover:bg-primary/20 hover:text-primary text-foreground flex items-center justify-center text-xs font-medium transition-colors shrink-0"
                   >
                     +
                   </button>
