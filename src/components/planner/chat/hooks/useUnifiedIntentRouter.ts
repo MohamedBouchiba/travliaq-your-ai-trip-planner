@@ -382,7 +382,13 @@ export function useUnifiedIntentRouter({
     // Each check now also verifies the user hasn't already provided this via widget
 
     if (!flowState.hasDestinationCity && !hasAlreadyProvided("citySelector")) {
-      return "citySelector";
+      // Only show citySelector if a country is already selected
+      // Otherwise, the user needs to pick a destination first
+      if (flowState.hasDestination) {
+        return "citySelector";
+      }
+      // No country selected — don't force citySelector, let LLM guide destination discovery
+      return null;
     }
 
     if (!flowState.hasDepartureDate) {
@@ -717,6 +723,28 @@ export function useUnifiedIntentRouter({
     
     if (widgetTriggeringIntents.includes(intent.primaryIntent)) {
       const nextRequired = getNextRequiredWidget();
+      
+      // If no required widget AND no destination AND preferences are partially filled,
+      // proactively trigger destination suggestions
+      if (!nextRequired && !flowState.hasDestination) {
+        const hasPreferences = widgetInteractions.some(i => 
+          i.interactionType === "style_configured" || i.interactionType === "interests_selected"
+        );
+        if (hasPreferences) {
+          const destValidation = canShowWidget("destinationSuggestions");
+          if (destValidation.valid) {
+            console.log("[UnifiedIntentRouter] Preferences filled, no destination — auto-triggering destinationSuggestions");
+            if (onWidgetTriggered) onWidgetTriggered("destinationSuggestions");
+            return {
+              shouldShowWidget: true,
+              widgetType: "destinationSuggestions" as WidgetType,
+              action: "none",
+              reason: "Preferences filled, no destination — proactive suggestions",
+            };
+          }
+        }
+      }
+      
       if (nextRequired) {
         // Build widget data from entities if available
         const widgetData: Record<string, unknown> = {};
