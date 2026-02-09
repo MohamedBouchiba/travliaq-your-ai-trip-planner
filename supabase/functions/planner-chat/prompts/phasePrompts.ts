@@ -55,7 +55,7 @@ const PHASE_PROMPTS: Record<TravelPhase, PhasePrompt> = {
     doNot: [
       "Ne JAMAIS proposer des destinations si les préférences sont vides (intérêts = vide)",
       "Ne pas poser plusieurs questions à la fois",
-      "Ne pas sauter aux dates/vols avant que la destination soit confirmée",
+      "Si l'utilisateur pose une question hors-phase (activités, budget, comparaison), réponds-y COMPLÈTEMENT avant de recentrer sur la découverte",
     ],
   },
 
@@ -79,8 +79,8 @@ const PHASE_PROMPTS: Record<TravelPhase, PhasePrompt> = {
     widgets: ["datePicker", "dateRangePicker", "travelersSelector", "citySelector", "tripTypeConfirm"],
     doNot: [
       "Ne pas chercher des vols sans avoir dates + voyageurs + ville départ",
-      "Ne pas revenir sur la destination sauf si l'utilisateur le demande",
       "Ne pas poser plusieurs questions à la fois",
+      "Si l'utilisateur pose une question sur les activités, la destination ou le budget, réponds-y COMPLÈTEMENT avant de recentrer sur la logistique",
     ],
   },
 
@@ -101,8 +101,8 @@ const PHASE_PROMPTS: Record<TravelPhase, PhasePrompt> = {
     transitionRule: "Passer en phase ACTIVITIES quand l'hébergement est sélectionné ou quand l'utilisateur veut passer aux activités.",
     widgets: ["preferenceStyle"],
     doNot: [
-      "Ne pas proposer d'activités avant que l'hébergement soit choisi (sauf si l'utilisateur le demande)",
-      "Ne pas revenir sur les vols sauf si demandé",
+      "Ne pas poser plusieurs questions à la fois",
+      "Si l'utilisateur pose une question sur les vols, activités ou destinations, réponds-y COMPLÈTEMENT avant de recentrer sur l'hébergement",
     ],
   },
 
@@ -126,6 +126,7 @@ const PHASE_PROMPTS: Record<TravelPhase, PhasePrompt> = {
       "Ne pas surcharger les journées (garder du temps libre)",
       "Ne pas ignorer les contraintes de mobilité mentionnées",
       "Ne pas oublier les temps de transport entre activités",
+      "Si l'utilisateur pose une question sur les vols, l'hébergement ou le budget, réponds-y COMPLÈTEMENT avant de recentrer sur les activités",
     ],
   },
 

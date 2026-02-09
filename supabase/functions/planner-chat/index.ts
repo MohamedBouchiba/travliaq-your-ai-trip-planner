@@ -349,7 +349,7 @@ function applyWidgetForcingLogic(
     { keywords: ["régime", "végétarien", "végan", "halal", "casher", "gluten", "allergi"], widget: "dietary" },
     { keywords: ["accessib", "fauteuil", "handicap", "mobilité réduite", "animal", "chien", "chat"], widget: "mustHaves" },
     { keywords: ["intérêt", "activité", "plage", "musée", "nature", "culture", "sport", "randonnée"], widget: "preferenceInterests" },
-    { keywords: ["style", "budget", "luxe", "économique", "confort"], widget: "preferenceStyle" },
+    { keywords: ["style", "luxe", "confort", "relax", "intensif", "authentique"], widget: "preferenceStyle" },
     { keywords: ["date", "quand", "février", "mars", "avril", "weekend", "semaine"], widget: "datePicker" },
     { keywords: ["famille", "potes", "amis", "couple", "seul", "solo", "groupe", "combien"], widget: "travelersSelector" },
     { keywords: ["inspire", "où aller", "destination", "idée", "recommand", "suggère", "propose"], widget: "destinationSuggestions" },
@@ -464,7 +464,16 @@ RÈGLE CRITIQUE: Si l'utilisateur hésite / ne sait pas et que le style est NON 
 primaryIntent = "gather_preferences", widgetType = "preferenceStyle".
 Si le style existe mais les intérêts sont VIDES et "preferenceInterests" n'est PAS dans les widgets confirmés,
 primaryIntent = "gather_preferences", widgetType = "preferenceInterests".
-Si l'utilisateur répond négativement (non, pas spécialement, rien, etc.), primaryIntent = "other", widgetToShow = null.`;
+Si l'utilisateur répond négativement (non, pas spécialement, rien, etc.), primaryIntent = "other", widgetToShow = null.
+
+RÈGLE CRITIQUE : NOMBRES EN CONTEXTE
+Si le dernier message assistant contenait une liste numérotée (1. Option A / 2. Option B) 
+et que l'utilisateur répond uniquement par un nombre ("2", "1", "3") :
+→ primaryIntent: "confirm_selection"
+→ entities.selectedOption: "[le numéro]"
+→ NE PAS interpréter comme provide_travelers ou adults
+Un nombre SEUL n'est JAMAIS un nombre de voyageurs sauf si le contexte 
+parle explicitement de voyageurs/passagers/personnes.`;
 }
 
 /**
@@ -519,8 +528,7 @@ Le voyage se planifie en 5 phases :
 
 Tu es actuellement en PHASE ci-dessous.
 Suis les instructions spécifiques de la phase active.
-NE SAUTE PAS de phase. NE MÉLANGE PAS les phases.
-Si l'utilisateur pose une question hors-phase, réponds brièvement puis recentre sur la phase en cours.
+Suis la phase en cours EN PRIORITÉ. Cependant, si l'utilisateur pose une question hors-phase (activités, comparaison, budget, informations générales sur une destination), réponds COMPLÈTEMENT à sa question sans la bloquer. Après avoir répondu, rappelle brièvement où vous en êtes dans le processus et propose de continuer. Ne refuse JAMAIS de répondre à une question pertinente au voyage.
 
 ## RÈGLE CRITIQUE : PRÉFÉRENCES AVANT DESTINATIONS
 Si l'utilisateur dit "je sais pas", "je ne sais pas où aller", "aide-moi", "j'hésite" :
