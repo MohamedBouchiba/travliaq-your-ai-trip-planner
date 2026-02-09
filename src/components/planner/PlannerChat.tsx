@@ -987,15 +987,11 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
       if (destinationSuggestionRequest) {
         console.log("[PlannerChat] LLM requested destination suggestions:", destinationSuggestionRequest);
         
-        // Update the message with loading state for destinations
-        const loadingText = destinationSuggestionRequest.exceededLimit
-          ? t("planner.messages.exceededLimit", { count: Math.min(destinationSuggestionRequest.requestedCount, 5) })
-          : content || t("planner.messages.searchingDestinations", { count: destinationSuggestionRequest.requestedCount });
-        
+        // Keep the AI's natural text, just show loading state
         setMessages((prev) =>
           prev.map((m) =>
             m.id === messageId
-              ? { ...m, text: loadingText, isStreaming: false, isTyping: true }
+              ? { ...m, isStreaming: false, isTyping: true }
               : m
           )
         );
@@ -1034,15 +1030,33 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
           if (response.success && response.suggestions.length > 0) {
             // Store suggestions in memory for context
             setDestinationSuggestions(response.suggestions);
-            setDestinationProfileScore(response.basedOnProfile?.completionScore || 0);
+            const completionScore = response.basedOnProfile?.completionScore || 0;
+            setDestinationProfileScore(completionScore);
             
-            // Update message with destination widget
+            // Build conditional quick replies for low profile scores
+            const profileQuickReplies: import("./chat/types").QuickReply[] = completionScore < 50 ? [
+              {
+                id: `profile-prefs-${Date.now()}`,
+                label: t("planner.suggestions.fillPreferences"),
+                icon: "⚙️",
+                action: { type: "navigate" as const, tab: "preferences" as const },
+                variant: "primary" as const,
+              },
+              {
+                id: `profile-ok-${Date.now()}`,
+                label: t("planner.suggestions.keepGoing"),
+                icon: "👍",
+                action: { type: "sendMessage" as const, message: t("planner.suggestions.keepGoing") },
+              },
+            ] : [];
+            
+            // Update message: keep AI natural text, attach widget + quick replies
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === messageId
                   ? {
                       ...m,
-                      text: t(response.suggestions.length > 1 ? "planner.messages.destinationsFoundPlural" : "planner.messages.destinationsFound", { count: response.suggestions.length, score: response.basedOnProfile?.completionScore || 0 }),
+                      // Keep the original AI text (content), don't overwrite with system text
                       isTyping: false,
                       isStreaming: false,
                       widget: "destinationSuggestions" as import("@/types/flight").WidgetType,
@@ -1050,6 +1064,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                         suggestions: response.suggestions,
                         basedOnProfile: response.basedOnProfile,
                       },
+                      quickReplies: profileQuickReplies.length > 0 ? profileQuickReplies : m.quickReplies,
                     }
                   : m
               )

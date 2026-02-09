@@ -399,8 +399,8 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
           isUpdatingRef.current = false;
         }
 
-        // SMART TITLE GENERATION: Trigger after 3 user messages if not already generated
-        if (userMessageCount >= 3 && !currentSession?.titleGenerated && !isGeneratingTitleRef.current) {
+        // SMART TITLE GENERATION: Trigger after 2 user messages if not already generated
+        if (userMessageCount >= 2 && !currentSession?.titleGenerated && !isGeneratingTitleRef.current) {
           isGeneratingTitleRef.current = true;
           
           // Generate smart title in background (non-blocking)

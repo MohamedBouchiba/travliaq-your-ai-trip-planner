@@ -5,7 +5,7 @@
 
 import { memo, useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Sparkles, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   Carousel,
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/carousel";
 import { cn } from "@/lib/utils";
 import { DestinationSuggestionCard } from "./DestinationSuggestionCard";
+import { ProfileCompletionBanner } from "./ProfileCompletionBanner";
 import type { DestinationSuggestion, ProfileCompleteness } from "@/types/destinations";
 
 interface DestinationSuggestionsGridProps {
@@ -104,32 +105,9 @@ export const DestinationSuggestionsGrid = memo(function DestinationSuggestionsGr
       transition={{ duration: 0.4, ease: "easeOut" }}
       className="mt-4 space-y-4"
     >
-      {/* Profile Completeness Badge */}
+      {/* Profile Completeness Banner - Tiered */}
       {basedOnProfile && (
-        <motion.div
-          initial={{ opacity: 0, x: -10 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-          className="flex flex-col gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20"
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-lg bg-primary/15">
-              <Sparkles className="h-4 w-4 text-primary" />
-            </div>
-            <span className="text-sm text-foreground/80">
-              {t("planner.suggestions.basedOnProfile")}{" "}
-              <span className="font-semibold text-primary">
-                {t("planner.suggestions.profileComplete", { score: basedOnProfile.completionScore })}
-              </span>
-            </span>
-          </div>
-          {/* Incitation message when profile is incomplete */}
-          {basedOnProfile.completionScore < 70 && (
-            <p className="text-xs text-muted-foreground ml-9">
-              {t("planner.suggestions.improveRecommendations")}
-            </p>
-          )}
-        </motion.div>
+        <ProfileCompletionBanner basedOnProfile={basedOnProfile} />
       )}
 
       {/* Carousel Container */}
