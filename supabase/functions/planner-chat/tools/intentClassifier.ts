@@ -79,6 +79,11 @@ Tu DOIS appeler cet outil en PREMIER pour CHAQUE message utilisateur avant de r�
 - SI préférences complètes → primaryIntent: "ask_inspiration", widgetType: "destinationSuggestions" (maintenant pertinent car basé sur les préférences)
 - IMPORTANT: L'utilisateur indécis doit d'abord exprimer ses envies AVANT de recevoir des suggestions de destinations
 
+### CONFIRMATION DE FIN DE PHASE
+- "non", "rien d'autre", "c'est tout", "pas de restriction", "non merci", "non rien d'autre", "pas besoin", "ça me va"
+  → primaryIntent: "confirm_selection" (PAS "other")
+- L'utilisateur confirme qu'il n'a plus de critères/préférences à ajouter
+
 ### ACTIONS SPÉCIALES
 - "choisis pour moi" → primaryIntent: "delegate_choice"
 - "lance la recherche" → primaryIntent: "trigger_search"

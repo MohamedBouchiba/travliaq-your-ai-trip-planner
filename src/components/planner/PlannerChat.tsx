@@ -1265,6 +1265,17 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
       let showDateWidget = false;
       let showTravelersWidget = false;
 
+      // Persist tripDuration/preferredMonth from intent entities even without flightData
+      if (intentClassification?.entities) {
+        const ent = intentClassification.entities as Record<string, unknown>;
+        if (ent.tripDuration && typeof ent.tripDuration === 'string') {
+          widgetFlow.setPendingTripDuration(ent.tripDuration);
+        }
+        if (ent.preferredMonth && typeof ent.preferredMonth === 'string') {
+          widgetFlow.setPendingPreferredMonth(ent.preferredMonth);
+        }
+      }
+
       if (flightData && Object.keys(flightData).length > 0) {
         const needsDestinationCity = flightData.needsCitySelection && flightData.toCountryCode;
         const needsDepartureCity = flightData.fromCountryCode && !flightData.from;
