@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronLeft, ChevronRight, Cloud, Sun, CloudRain, ChevronDown, Plane, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SUPABASE_URL } from "@/integrations/supabase/client";
 import {
   format,
   startOfMonth,
@@ -108,7 +109,7 @@ export default function PlannerCalendar({
         const monthEnd = endOfMonth(currentMonth);
         
         const response = await fetch(
-          "https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/calendar-prices",
+          `${SUPABASE_URL}/functions/v1/calendar-prices`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

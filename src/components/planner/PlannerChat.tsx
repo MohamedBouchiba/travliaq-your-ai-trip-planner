@@ -77,6 +77,7 @@ import { findNearestAirports } from "@/hooks/useNearestAirports";
 import { useFlightMemoryStore, useTravelMemoryStore, useAccommodationMemoryStore, useActivityMemoryStore, usePreferenceMemoryStore, useTripBasketStore, type AccommodationEntry } from "@/stores/hooks";
 import { useLocale } from "@/hooks/useLocale";
 import { eventBus, emitTabChange, emitTabAndZoom } from "@/lib/eventBus";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 
 // Re-export types for external consumers
 export type {
@@ -1596,12 +1597,12 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                           // Fetch cities for the selected country
                           try {
                             const response = await fetch(
-                              `https://cinbnmlfpffmyjmkwbco.supabase.co/functions/v1/top-cities-by-country?country_code=${destination.countryCode}&limit=5`,
+                              `${SUPABASE_URL}/functions/v1/top-cities-by-country?country_code=${destination.countryCode}&limit=5`,
                               {
                                 method: "GET",
                                 headers: {
                                   "Content-Type": "application/json",
-                                  apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpbmJubWxmcGZmbXlqbWt3YmNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc5NDQ2MTQsImV4cCI6MjA3MzUyMDYxNH0.yrju-Pv4OlfU9Et-mRWg0GRHTusL7ZpJevqKemJFbuA",
+                                  apikey: SUPABASE_PUBLISHABLE_KEY,
                                 },
                               }
                             );
