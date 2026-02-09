@@ -21,6 +21,7 @@
   "planner.preference.anythingElse": "Autre chose à mentionner ? (critères obligatoires, restrictions alimentaires...)",
   "planner.preference.afterMustHaves": "Parfait ! Avez-vous des restrictions alimentaires ?",
   "planner.preference.searchingDestinations": "Je recherche les meilleures destinations pour vous...",
+  "planner.preference.askDepartureCity": "Avant de vous proposer des destinations, d'où partez-vous ? ✈️ Indiquez votre ville de départ.",
   "planner.preference.configureDietary": "Configurons vos restrictions alimentaires :",
   "planner.preference.configureMustHaves": "Configurons vos critères obligatoires :",
   "planner.preference.configureStyle": "Définissons votre style de voyage :",

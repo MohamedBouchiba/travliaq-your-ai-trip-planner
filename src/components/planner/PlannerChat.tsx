@@ -477,6 +477,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     setDynamicSuggestions,
     handleFetchDestinations,
     widgetCooldown, // Pass cooldown system
+    departureCityName: departureCity, // Pass departure city for pre-destination check
   });
 
   // Utilities to avoid infinite sync loops between local state ↔ persisted state
@@ -1900,8 +1901,23 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                   return;
                 }
                 
-                // === CASE 2: Direct destination fetch ===
+                // === CASE 2: Direct destination fetch (with departure check) ===
                 if (message === "__FETCH_DESTINATIONS__") {
+                  // Check if departure city is set first
+                  if (!departureCity) {
+                    const askId = `ask-departure-${Date.now()}`;
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: askId,
+                        role: "assistant",
+                        text: t("planner.preference.askDepartureCity"),
+                      },
+                    ]);
+                    setDynamicSuggestions([]);
+                    return;
+                  }
+                  
                   const loadingId = `fetching-${Date.now()}`;
                   setMessages((prev) => [
                     ...prev,

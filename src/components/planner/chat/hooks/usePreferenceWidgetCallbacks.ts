@@ -44,6 +44,8 @@ interface UsePreferenceWidgetCallbacksOptions {
   handleFetchDestinations: (loadingMessageId: string) => Promise<void>;
   /** Widget cooldown system to prevent infinite loops */
   widgetCooldown?: UseWidgetCooldownReturn;
+  /** Departure city from flight memory - used to check if we need to ask before fetching destinations */
+  departureCityName?: string | null;
 }
 
 interface PreferenceWidgetCallbacks {
@@ -61,8 +63,31 @@ export function usePreferenceWidgetCallbacks({
   setDynamicSuggestions,
   handleFetchDestinations,
   widgetCooldown,
+  departureCityName,
 }: UsePreferenceWidgetCallbacksOptions): PreferenceWidgetCallbacks {
   const { t } = useTranslation();
+
+  /**
+   * Helper: check departure city before fetching destinations.
+   * If missing, show a message asking for the departure city and a departure widget.
+   * Returns true if departure is missing (fetch should be deferred).
+   */
+  const checkAndAskDepartureCity = useCallback((): boolean => {
+    if (departureCityName) return false; // departure set, proceed
+
+    // Departure city missing — ask user
+    const askId = `ask-departure-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: askId,
+        role: "assistant" as const,
+        text: t("planner.preference.askDepartureCity"),
+      },
+    ]);
+    setDynamicSuggestions([]);
+    return true; // departure missing
+  }, [departureCityName, setMessages, setDynamicSuggestions, t]);
 
   /**
    * Called when user completes style widget
@@ -278,7 +303,13 @@ export function usePreferenceWidgetCallbacks({
       )
     );
 
-    // After dietary, fetch destinations directly
+    // After dietary, check departure city before fetching destinations
+    if (checkAndAskDepartureCity()) {
+      // Departure missing — user will type their city, then we fetch
+      return;
+    }
+
+    // Departure set — fetch destinations directly
     const loadingId = `fetching-destinations-${Date.now()}`;
     setMessages((prev) => [
       ...prev,
@@ -301,6 +332,7 @@ export function usePreferenceWidgetCallbacks({
     handleFetchDestinations,
     t,
     widgetCooldown,
+    checkAndAskDepartureCity,
   ]);
 
   return {
