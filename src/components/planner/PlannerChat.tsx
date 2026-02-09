@@ -96,7 +96,8 @@ function persistExtractedEntities(
   widgetFlow: {
     setPendingTripDuration: (d: string) => void;
     setPendingPreferredMonth: (m: string) => void;
-  }
+  },
+  updateMemory?: (partial: Record<string, unknown>) => void,
 ) {
   // Merge: flightData values override intent entities when both exist
   const tripDuration = 
@@ -111,6 +112,18 @@ function persistExtractedEntities(
   }
   if (preferredMonth && typeof preferredMonth === 'string') {
     widgetFlow.setPendingPreferredMonth(preferredMonth);
+  }
+
+  // Persist multi-destination legs if present in flightData
+  if (flightData?.legs && Array.isArray(flightData.legs) && (flightData.legs as unknown[]).length > 0 && updateMemory) {
+    const legs = (flightData.legs as Array<{ from: string; to: string; date?: string }>);
+    const legMemories = legs.map((leg, i) => ({
+      departure: leg.from ? { city: leg.from } : null,
+      arrival: leg.to ? { city: leg.to } : null,
+      date: leg.date ? new Date(leg.date) : null,
+      id: `leg-${i}-${Date.now()}`,
+    }));
+    updateMemory({ legs: legMemories, tripType: "multi" as const });
   }
 }
 
@@ -1304,7 +1317,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
       persistExtractedEntities(
         intentClassification?.entities as Record<string, unknown> | undefined,
         flightData as unknown as Record<string, unknown> | null,
-        widgetFlow
+        widgetFlow,
+        updateMemory as (partial: Record<string, unknown>) => void,
       );
 
       if (flightData && Object.keys(flightData).length > 0) {

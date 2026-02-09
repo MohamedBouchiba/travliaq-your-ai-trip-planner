@@ -230,8 +230,16 @@ const WIDGET_TO_INTERACTION_MAP: Record<string, string[]> = {
 function evaluatePhaseTransition(
   flowState: FlowState,
   widgetInteractions: WidgetInteraction[],
-  canShowWidget: (widgetType: WidgetType) => WidgetValidation
+  canShowWidget: (widgetType: WidgetType) => WidgetValidation,
+  flightSearchTriggered?: boolean
 ): IntentProcessResult | null {
+  // Guard 0: If flight search is triggered, skip ALL phase transitions
+  // This prevents the search + datePicker conflict
+  if (flightSearchTriggered) {
+    console.log("[evaluatePhaseTransition] Skipped — flight search active");
+    return null;
+  }
+
   const hasInteraction = (type: string) => 
     widgetInteractions.some(i => i.interactionType === type);
 
@@ -249,22 +257,25 @@ function evaluatePhaseTransition(
   }
 
   // Guard 2: Destination set + no dates → date picker
-  // (Only if destination was selected via widget, not just mentioned)
+  // BUT skip if dates already confirmed via widget
   if (flowState.hasDestinationCity && !flowState.hasDepartureDate) {
-    const hasDestinationInteraction = hasInteraction("destination_selected") || hasInteraction("city_selected");
-    const dateWidget = flowState.tripType === "roundtrip" ? "dateRangePicker" : "datePicker";
-    if (hasDestinationInteraction && canShowWidget(dateWidget).valid) {
-      return {
-        shouldShowWidget: true,
-        widgetType: dateWidget as WidgetType,
-        action: "none",
-        reason: "Phase transition: destination complete → dates",
-      };
+    const hasDateConfirmation = hasInteraction("date_selected") || hasInteraction("date_range_selected");
+    if (!hasDateConfirmation) {
+      const hasDestinationInteraction = hasInteraction("destination_selected") || hasInteraction("city_selected");
+      const dateWidget = flowState.tripType === "roundtrip" ? "dateRangePicker" : "datePicker";
+      if (hasDestinationInteraction && canShowWidget(dateWidget).valid) {
+        return {
+          shouldShowWidget: true,
+          widgetType: dateWidget as WidgetType,
+          action: "none",
+          reason: "Phase transition: destination complete → dates",
+        };
+      }
     }
   }
 
   // Guard 3: Dates set + travelers not confirmed → travelers selector
-  // (Uses travelersConfirmedRef pattern from memory)
+  // BUT skip if travelers already confirmed via widget
   if (flowState.hasDepartureDate && !hasInteraction("travelers_selected")) {
     const hasDateInteraction = hasInteraction("date_selected") || hasInteraction("date_range_selected");
     if (hasDateInteraction && canShowWidget("travelersSelector").valid) {
@@ -600,189 +611,14 @@ export function useUnifiedIntentRouter({
       "gather_preferences",
     ];
     
-    // ============================================================================
-    // COMPREHENSIVE KEYWORD TRIGGERS - Maps user keywords to widgets (sorted by priority)
-    // ============================================================================
-    const COMPREHENSIVE_KEYWORD_TRIGGERS: Array<{
-      keywords: string[];
-      widgetType: WidgetType;
-      priority: number;
-    }> = [
-      // === DIETARY (priority 10 - highest) ===
-      { 
-        keywords: [
-          // FR
-          "végétarien", "végétarienne", "vegan", "végan", "halal", "casher", "kosher", 
-          "sans gluten", "gluten", "lactose", "intolérant", "allergie", "allergique", 
-          "régime", "restriction alimentaire", "alimentaire", "pescétarien", 
-          "sans œuf", "sans noix", "noix", "arachide", "je mange",
-          // EN
-          "vegetarian", "vegan", "halal", "kosher", "gluten-free", "gluten free", 
-          "lactose", "intolerant", "allergy", "allergic", "diet", "dietary", 
-          "restriction", "pescatarian", "no eggs", "no nuts", "nut", "peanut"
-        ],
-        widgetType: "dietary",
-        priority: 10
-      },
-      
-      // === MUST-HAVES (priority 9) ===
-      { 
-        keywords: [
-          // FR
-          "fauteuil roulant", "fauteuil", "mobilité réduite", "pmr", "handicap", 
-          "handicapé", "accessible", "accessibilité", "chien", "chat", "animal", 
-          "animaux", "pet", "wifi obligatoire", "piscine", "famille nombreuse",
-          "bébé", "poussette", "ascenseur", "rez-de-chaussée", "avec mon chien",
-          "avec mon chat", "animal de compagnie",
-          // EN
-          "wheelchair", "mobility", "disability", "disabled", "accessible", 
-          "accessibility", "dog", "cat", "pet", "pets", "wifi", "pool", 
-          "baby", "stroller", "elevator", "ground floor", "with my dog", "with my cat"
-        ],
-        widgetType: "mustHaves",
-        priority: 9
-      },
-      
-      // === PREFERENCE INTERESTS (priority 7) ===
-      { 
-        keywords: [
-          // FR - Direct interests
-          "plage", "culture", "nature", "gastronomie", "cuisine locale", 
-          "sport", "aventure", "bien-être", "wellness", "spa", "massage",
-          "shopping", "histoire", "musée", "musées", "vie nocturne", "nightlife",
-          "randonnée", "montagne", "mer", "océan", "lac", "forêt", "parc national",
-          "temple", "église", "monument", "architecture", "art", "galerie",
-          "festival", "concert", "théâtre", "danse", "photographie", "safari",
-          "plongée", "snorkeling", "surf", "ski", "escalade", "vélo", "kayak",
-          "j'aime", "j'adore", "je préfère", "passion", "passionné", "fan de",
-          "découvrir", "explorer", "visiter", "beach", "farniente", "détente",
-          // EN
-          "beach", "culture", "nature", "gastronomy", "local food", "cuisine",
-          "sport", "adventure", "wellness", "spa", "massage", "shopping",
-          "history", "museum", "museums", "nightlife", "hiking", "mountain",
-          "sea", "ocean", "lake", "forest", "national park", "temple", "church",
-          "monument", "architecture", "art", "gallery", "festival", "concert",
-          "theater", "dance", "photography", "safari", "diving", "snorkeling",
-          "surfing", "skiing", "climbing", "cycling", "kayaking",
-          "i like", "i love", "i prefer", "passion", "passionate", "fan of",
-          "discover", "explore", "visit"
-        ],
-        widgetType: "preferenceInterests",
-        priority: 7
-      },
-      
-      // === PREFERENCE STYLE (priority 6) ===
-      { 
-        keywords: [
-          // FR
-          "luxe", "luxueux", "économique", "pas cher", "budget", "backpacker", 
-          "routard", "premium", "haut de gamme", "5 étoiles", "4 étoiles",
-          "confort", "confortable", "relax", "relaxant", "zen", "chill", 
-          "intensif", "dynamique", "actif", "urbain", "campagne", 
-          "rural", "authentique", "local", "touristique", "populaire",
-          "tranquille", "calme", "animé", "festif", "romantique", "intime",
-          "voyage économique", "voyage luxe", "voyage relax",
-          // EN
-          "luxury", "luxurious", "cheap", "budget", "backpacker", "backpacking",
-          "premium", "high-end", "5 star", "4 star", "comfort", "comfortable",
-          "relax", "relaxing", "chill", "intense", "dynamic", "active", 
-          "urban", "city", "countryside", "rural", "authentic", "local", 
-          "touristy", "popular", "quiet", "calm", "lively", "festive", "romantic",
-          "budget trip", "luxury trip", "relaxing trip"
-        ],
-        widgetType: "preferenceStyle",
-        priority: 6
-      },
-      
-      // === DATE PICKER (priority 5) ===
-      { 
-        keywords: [
-          // FR
-          "quand partir", "quelle date", "quel mois", "dates", "départ", 
-          "partir en", "voyage en", "janvier", "février", "mars", "avril", 
-          "mai", "juin", "juillet", "août", "septembre", "octobre", 
-          "novembre", "décembre", "été", "hiver", "printemps", "automne",
-          "semaine prochaine", "mois prochain", "vacances", "congés",
-          "pâques", "noël", "toussaint", "été prochain", "cet hiver",
-          // EN
-          "when to go", "what date", "which month", "dates", "departure",
-          "travel in", "january", "february", "march", "april", "may", 
-          "june", "july", "august", "september", "october", "november", 
-          "december", "summer", "winter", "spring", "fall", "autumn",
-          "next week", "next month", "vacation", "holiday", "easter",
-          "christmas", "next summer", "this winter"
-        ],
-        widgetType: "datePicker",
-        priority: 5
-      },
-      
-      // === TRAVELERS SELECTOR (priority 5) ===
-      { 
-        keywords: [
-          // FR
-          "seul", "solo", "en solo", "couple", "à deux", "en couple",
-          "famille", "en famille", "avec enfants", "groupe", "entre amis",
-          "ami", "amis", "combien de personnes", "nombre de voyageurs",
-          "adulte", "adultes", "enfant", "enfants", "bébé", "nourrisson",
-          "nous sommes", "on est", "je suis seul", "on voyage", "voyager avec",
-          "personnes", "voyageurs",
-          // EN
-          "alone", "solo", "by myself", "couple", "together", "as a couple",
-          "family", "with family", "with children", "with kids", "group",
-          "with friends", "friend", "friends", "how many people", "travelers",
-          "adult", "adults", "child", "children", "baby", "infant",
-          "we are", "traveling with", "i'm alone", "i'm traveling"
-        ],
-        widgetType: "travelersSelector",
-        priority: 5
-      },
-      
-      // === DESTINATION SUGGESTIONS (priority 4) ===
-      { 
-        keywords: [
-          // FR
-          "inspire", "inspire-moi", "où aller", "quelle destination", 
-          "idée de voyage", "suggestion", "recommandation", "conseille-moi",
-          "je ne sais pas où", "pas d'idée", "surprise", "surprise-moi",
-          "propose-moi", "recommande-moi", "aide-moi à choisir",
-          // EN
-          "inspire", "inspire me", "where to go", "which destination",
-          "travel idea", "suggestion", "recommendation", "suggest",
-          "don't know where", "no idea", "surprise", "surprise me",
-          "suggest me", "recommend me", "help me choose"
-        ],
-        widgetType: "destinationSuggestions",
-        priority: 4
-      }
-    ];
+    // ─── Fix 2: Removed COMPREHENSIVE_KEYWORD_TRIGGERS ───
+    // Widget triggering is now handled entirely by:
+    // 1. Backend intent classifier (widgetToShow)
+    // 2. Entity-based fallback (below)
+    // 3. evaluatePhaseTransition() (universal fallback)
     
-    // Sort by priority (highest first)
-    const sortedTriggers = [...COMPREHENSIVE_KEYWORD_TRIGGERS].sort((a, b) => b.priority - a.priority);
-    
-    // Check if user message contains keywords - works for ANY intent now
+    // Check entities from intent classification as fallback
     if (lastUserMessage) {
-      const messageLower = lastUserMessage.toLowerCase();
-      
-      for (const trigger of sortedTriggers) {
-        const matchedKeyword = trigger.keywords.find(kw => messageLower.includes(kw));
-        if (matchedKeyword) {
-          const validation = canShowWidget(trigger.widgetType);
-          if (validation.valid) {
-            console.log(`[UnifiedIntentRouter] Keyword matched: "${matchedKeyword}" → ${trigger.widgetType} (priority ${trigger.priority})`);
-            if (onWidgetTriggered) {
-              onWidgetTriggered(trigger.widgetType);
-            }
-            return {
-              shouldShowWidget: true,
-              widgetType: trigger.widgetType,
-              action: "none",
-              reason: `User mentioned "${matchedKeyword}"`,
-            };
-          }
-        }
-      }
-      
-      // Check entities from intent classification as fallback
       if (intent.entities) {
         const entities = intent.entities as Record<string, unknown>;
         if (entities.dietaryRestrictions && canShowWidget("dietary").valid) {
@@ -835,7 +671,9 @@ export function useUnifiedIntentRouter({
     // Universal fallback that runs for ALL intents.
     // Evaluates flow state to determine if the next phase should start,
     // regardless of what the intent classifier returned.
-    const phaseTransition = evaluatePhaseTransition(flowState, widgetInteractions, canShowWidget);
+    // Pass flightSearchTrigger status to prevent search + widget conflicts
+    const isSearchIntent = intent.primaryIntent === "trigger_search" || intent.primaryIntent === "confirm_selection";
+    const phaseTransition = evaluatePhaseTransition(flowState, widgetInteractions, canShowWidget, isSearchIntent);
     if (phaseTransition) {
       console.log("[UnifiedIntentRouter] Phase transition triggered:", phaseTransition.reason);
       if (phaseTransition.widgetType && onWidgetTriggered) {
