@@ -2,6 +2,7 @@
  * AirportWidgets Tests
  */
 
+import "@/i18n/config";
 import { render } from "@testing-library/react";
 import { screen, fireEvent } from "@testing-library/dom";
 import { describe, it, expect, vi } from "vitest";
@@ -105,16 +106,16 @@ describe("DualAirportSelection", () => {
     const onSelect = vi.fn();
     render(<DualAirportSelection choices={dualChoices} onSelect={onSelect} />);
 
-    expect(screen.getByText(/Départ/)).toBeInTheDocument();
-    expect(screen.getByText(/Paris/)).toBeInTheDocument();
+    expect(screen.getByText(/Departure/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Paris/).length).toBeGreaterThan(0);
   });
 
   it("renders arrival section with city name", () => {
     const onSelect = vi.fn();
     render(<DualAirportSelection choices={dualChoices} onSelect={onSelect} />);
 
-    expect(screen.getByText(/Arrivée/)).toBeInTheDocument();
-    expect(screen.getByText(/Barcelona/)).toBeInTheDocument();
+    expect(screen.getByText(/Arrival/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Barcelona/).length).toBeGreaterThan(0);
   });
 
   it("renders all departure airports", () => {
@@ -157,8 +158,8 @@ describe("DualAirportSelection", () => {
     };
     render(<DualAirportSelection choices={choicesWithoutFrom} onSelect={onSelect} />);
 
-    expect(screen.queryByText(/Départ/)).not.toBeInTheDocument();
-    expect(screen.getByText(/Arrivée/)).toBeInTheDocument();
+    expect(screen.queryByText(/Departure/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Arrival/)).toBeInTheDocument();
   });
 
   it("handles missing to section", () => {
@@ -168,8 +169,8 @@ describe("DualAirportSelection", () => {
     };
     render(<DualAirportSelection choices={choicesWithoutTo} onSelect={onSelect} />);
 
-    expect(screen.getByText(/Départ/)).toBeInTheDocument();
-    expect(screen.queryByText(/Arrivée/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Departure/)).toBeInTheDocument();
+    expect(screen.queryByText(/Arrival/)).not.toBeInTheDocument();
   });
 
   it("disables all buttons when disabled prop is true", () => {

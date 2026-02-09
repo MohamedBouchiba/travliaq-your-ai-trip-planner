@@ -1,7 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-// Mock the axios client used by hotelService
-const postMock = vi.fn();
+// Must use vi.hoisted() for variables used in vi.mock factory
+const { postMock } = vi.hoisted(() => ({
+  postMock: vi.fn(),
+}));
 
 vi.mock('@/services/api/travliaqClient', () => {
   return {

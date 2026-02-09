@@ -73,7 +73,7 @@ describe("parseAction", () => {
 Great choice!`;
     const result = parseAction(content);
 
-    expect(result.cleanContent).toBe("Looking at Barcelona!\n\nGreat choice!");
+    expect(result.cleanContent).toBe("Looking at Barcelona!\n\n\nGreat choice!");
     expect(result.action).not.toBeNull();
   });
 

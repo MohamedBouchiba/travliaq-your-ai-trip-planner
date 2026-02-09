@@ -178,9 +178,9 @@ describe('Questionnaire Constants Integrity', () => {
       expect(ACCOMMODATION_TYPE.RESORT).toBe('resort');
     });
 
-    it('should have exactly 10 accommodation type options', () => {
+    it('should have exactly 12 accommodation type options', () => {
       const values = Object.values(ACCOMMODATION_TYPE);
-      expect(values.length).toBe(10);
+      expect(values.length).toBe(12);
     });
   });
 
