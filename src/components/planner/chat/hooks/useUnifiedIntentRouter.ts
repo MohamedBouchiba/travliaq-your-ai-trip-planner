@@ -214,6 +214,74 @@ const WIDGET_TO_INTERACTION_MAP: Record<string, string[]> = {
 };
 
 /**
+ * ─── PRINCIPLE 1: State-Driven Phase Transitions ───
+ * 
+ * Pure function that evaluates flow state to determine if the next phase
+ * should begin. Runs as a universal fallback regardless of intent type.
+ * 
+ * Phase order (from phased workflow):
+ * 1. Discovery: preferences → destination suggestions
+ * 2. Logistics: dates → travelers
+ * 3. Accommodation, Activities, Recap (future)
+ * 
+ * Each guard checks: "Are the prerequisites for the NEXT step met, 
+ * but that step hasn't started yet?"
+ */
+function evaluatePhaseTransition(
+  flowState: FlowState,
+  widgetInteractions: WidgetInteraction[],
+  canShowWidget: (widgetType: WidgetType) => WidgetValidation
+): IntentProcessResult | null {
+  const hasInteraction = (type: string) => 
+    widgetInteractions.some(i => i.interactionType === type);
+
+  // Guard 1: Preferences filled + no destination → suggest destinations
+  if (!flowState.hasDestination) {
+    const hasStyleOrInterests = hasInteraction("style_configured") || hasInteraction("interests_selected");
+    if (hasStyleOrInterests && canShowWidget("destinationSuggestions").valid) {
+      return {
+        shouldShowWidget: true,
+        widgetType: "destinationSuggestions" as WidgetType,
+        action: "none",
+        reason: "Phase transition: preferences complete → destination suggestions",
+      };
+    }
+  }
+
+  // Guard 2: Destination set + no dates → date picker
+  // (Only if destination was selected via widget, not just mentioned)
+  if (flowState.hasDestinationCity && !flowState.hasDepartureDate) {
+    const hasDestinationInteraction = hasInteraction("destination_selected") || hasInteraction("city_selected");
+    const dateWidget = flowState.tripType === "roundtrip" ? "dateRangePicker" : "datePicker";
+    if (hasDestinationInteraction && canShowWidget(dateWidget).valid) {
+      return {
+        shouldShowWidget: true,
+        widgetType: dateWidget as WidgetType,
+        action: "none",
+        reason: "Phase transition: destination complete → dates",
+      };
+    }
+  }
+
+  // Guard 3: Dates set + travelers not confirmed → travelers selector
+  // (Uses travelersConfirmedRef pattern from memory)
+  if (flowState.hasDepartureDate && !hasInteraction("travelers_selected")) {
+    const hasDateInteraction = hasInteraction("date_selected") || hasInteraction("date_range_selected");
+    if (hasDateInteraction && canShowWidget("travelersSelector").valid) {
+      return {
+        shouldShowWidget: true,
+        widgetType: "travelersSelector" as WidgetType,
+        action: "none",
+        reason: "Phase transition: dates complete → travelers",
+      };
+    }
+  }
+
+  // No transition needed
+  return null;
+}
+
+/**
  * Unified Intent Router Hook
  */
 export function useUnifiedIntentRouter({
@@ -736,19 +804,14 @@ export function useUnifiedIntentRouter({
       }
     }
     
+    // Intent-specific: if this intent triggers widgets AND there's a next required widget, show it
     if (widgetTriggeringIntents.includes(intent.primaryIntent)) {
       const nextRequired = getNextRequiredWidget();
       
       if (nextRequired) {
-        // Build widget data from entities if available
         const widgetData: Record<string, unknown> = {};
-        
-        if (intent.entities.preferredMonth) {
-          widgetData.preferredMonth = intent.entities.preferredMonth;
-        }
-        if (intent.entities.tripDuration) {
-          widgetData.tripDuration = intent.entities.tripDuration;
-        }
+        if (intent.entities.preferredMonth) widgetData.preferredMonth = intent.entities.preferredMonth;
+        if (intent.entities.tripDuration) widgetData.tripDuration = intent.entities.tripDuration;
         if (intent.entities.destinationCountryCode) {
           widgetData.countryCode = intent.entities.destinationCountryCode;
           widgetData.countryName = intent.entities.destinationCountry;
@@ -768,24 +831,17 @@ export function useUnifiedIntentRouter({
       }
     }
     
-    // Proactive destination guard — runs for ALL intents as last resort
-    if (!flowState.hasDestination) {
-      const hasPreferences = widgetInteractions.some(i => 
-        i.interactionType === "style_configured" || i.interactionType === "interests_selected"
-      );
-      if (hasPreferences) {
-        const destValidation = canShowWidget("destinationSuggestions");
-        if (destValidation.valid) {
-          console.log("[UnifiedIntentRouter] Preferences filled, no destination — auto-triggering destinationSuggestions");
-          if (onWidgetTriggered) onWidgetTriggered("destinationSuggestions");
-          return {
-            shouldShowWidget: true,
-            widgetType: "destinationSuggestions" as WidgetType,
-            action: "none",
-            reason: "Preferences filled, no destination — proactive suggestions",
-          };
-        }
+    // ─── PRINCIPLE 1: State-driven phase transitions ───
+    // Universal fallback that runs for ALL intents.
+    // Evaluates flow state to determine if the next phase should start,
+    // regardless of what the intent classifier returned.
+    const phaseTransition = evaluatePhaseTransition(flowState, widgetInteractions, canShowWidget);
+    if (phaseTransition) {
+      console.log("[UnifiedIntentRouter] Phase transition triggered:", phaseTransition.reason);
+      if (phaseTransition.widgetType && onWidgetTriggered) {
+        onWidgetTriggered(phaseTransition.widgetType);
       }
+      return phaseTransition;
     }
     
     return { shouldShowWidget: false, widgetType: null, action: "none" };
