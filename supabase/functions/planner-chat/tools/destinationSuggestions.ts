@@ -8,9 +8,10 @@ export const destinationSuggestionTool = {
   type: "function",
   function: {
     name: "request_destination_suggestions",
-    description: `À utiliser OBLIGATOIREMENT quand l'utilisateur demande des recommandations de destinations.
+    description: `À utiliser OBLIGATOIREMENT quand l'utilisateur demande des recommandations de destinations ou exprime de l'incertitude sur sa destination.
 
-DÉCLENCHEURS (appeler cet outil si l'utilisateur dit) :
+DÉCLENCHEURS - Appeler cet outil si l'utilisateur dit :
+DEMANDES DIRECTES :
 - "Fais-moi X recommandations de destinations"
 - "Suggère-moi des destinations"
 - "Propose-moi des pays"
@@ -20,11 +21,27 @@ DÉCLENCHEURS (appeler cet outil si l'utilisateur dit) :
 - "Recommande-moi X pays/destinations"
 - "Quelles sont les meilleures destinations pour moi ?"
 
+EXPRESSIONS D'INCERTITUDE (TRÈS IMPORTANT) :
+- "je ne sais pas où aller"
+- "je ne sais pas trop où aller"
+- "je ne sais pas trop"
+- "je sais pas où partir"
+- "aucune idée de destination"
+- "pas d'idée de destination"
+- "j'hésite sur la destination"
+- "aide-moi à choisir une destination"
+- "aide-moi à choisir"
+- "inspire-moi"
+- "besoin d'inspiration"
+- "où me conseilles-tu"
+- "des idées ?"
+
 RÈGLES IMPORTANTES :
 1. Le nombre maximum de recommandations est 5 (si l'utilisateur demande plus, expliquer poliment)
 2. Le nombre par défaut est 3
 3. Cet outil déclenche l'appel à l'API de suggestions côté client
-4. Tu dois AUSSI générer un message d'accompagnement chaleureux`,
+4. Tu dois AUSSI générer un message d'accompagnement chaleureux
+5. En cas d'incertitude de l'utilisateur, TOUJOURS appeler cet outil`,
     parameters: {
       type: "object",
       properties: {

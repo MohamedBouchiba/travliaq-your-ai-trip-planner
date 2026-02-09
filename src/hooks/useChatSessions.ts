@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import i18n from "@/i18n/config";
 
@@ -26,6 +26,7 @@ export interface ChatSession {
   createdAt: number;
   updatedAt: number;
   preview: string;
+  titleGenerated?: boolean; // Whether title was AI-generated
 }
 
 const SESSIONS_INDEX_KEY = "travliaq_chat_sessions_index";
@@ -79,7 +80,8 @@ const getEmojiForText = (text: string): string => {
   return "✈️";
 };
 
-const generateTitle = (messages: StoredMessage[], translations = getTranslations()): string => {
+// Generate title from first user message (fallback)
+const generateSimpleTitle = (messages: StoredMessage[], translations = getTranslations()): string => {
   const firstUserMessage = messages.find((m) => m.role === "user");
   if (firstUserMessage) {
     const text = firstUserMessage.text.slice(0, 35);
@@ -88,6 +90,38 @@ const generateTitle = (messages: StoredMessage[], translations = getTranslations
     return `${emoji} ${truncatedText}`;
   }
   return `✈️ ${translations.newConversation}`;
+};
+
+// Count user messages in conversation
+const countUserMessages = (messages: StoredMessage[]): number => {
+  return messages.filter((m) => m.role === "user" && !m.isHidden).length;
+};
+
+// Smart title generation using AI (async, non-blocking)
+const generateSmartTitle = async (messages: StoredMessage[]): Promise<{ title: string; emoji: string } | null> => {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-chat-title`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+      },
+      body: JSON.stringify({
+        messages: messages.map(m => ({ role: m.role, content: m.text })).slice(-6),
+      }),
+    });
+    
+    if (!response.ok) {
+      console.error("[ChatSessions] Smart title generation failed:", response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    return { title: data.title, emoji: data.emoji };
+  } catch (error) {
+    console.error("[ChatSessions] Smart title generation error:", error);
+    return null;
+  }
 };
 
 const generatePreview = (messages: StoredMessage[], translations = getTranslations()): string => {
@@ -125,6 +159,7 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSyncingRef = useRef(false);
   const lastSyncRef = useRef<number>(0);
+  const isGeneratingTitleRef = useRef(false); // Prevent concurrent title generation
 
   // Sync session to database
   const syncToDatabase = useCallback(
@@ -140,13 +175,17 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
 
       try {
         const currentTranslations = getTranslations();
+        
+        // Use existing title if already AI-generated, otherwise use simple title
+        const existingTitle = session?.titleGenerated ? session.title : undefined;
+        
         const payload = {
           chatSessionId: sessionId,
           flightMemory: getFlightMemory?.() || {},
           accommodationMemory: getAccommodationMemory?.() || {},
           travelMemory: getTravelMemory?.() || {},
           chatMessages: sessionMessages,
-          title: session?.title || generateTitle(sessionMessages, currentTranslations),
+          title: existingTitle || session?.title || generateSimpleTitle(sessionMessages, currentTranslations),
           preview: session?.preview || generatePreview(sessionMessages, currentTranslations),
         };
 
@@ -328,13 +367,23 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
         // Save messages
         localStorage.setItem(SESSION_PREFIX + sessionId, JSON.stringify(newMessages));
 
+        // Get current session to check if title was already generated
+        const currentSession = sessionsRef.current.find(s => s.id === sessionId);
+        const userMessageCount = countUserMessages(newMessages);
+        
+        // Determine if we should use simple title or keep AI-generated one
+        const shouldKeepTitle = currentSession?.titleGenerated;
+        const currentTitle = shouldKeepTitle 
+          ? currentSession.title 
+          : generateSimpleTitle(newMessages, currentTranslations);
+
         // Update session metadata in localStorage
         const currentSessions = sessionsRef.current;
         const updated = currentSessions.map((s) =>
           s.id === sessionId
             ? {
                 ...s,
-                title: generateTitle(newMessages, currentTranslations),
+                title: currentTitle,
                 preview: generatePreview(newMessages, currentTranslations),
                 updatedAt: Date.now(),
               }
@@ -350,10 +399,39 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
           isUpdatingRef.current = false;
         }
 
+        // SMART TITLE GENERATION: Trigger after 3 user messages if not already generated
+        if (userMessageCount >= 3 && !currentSession?.titleGenerated && !isGeneratingTitleRef.current) {
+          isGeneratingTitleRef.current = true;
+          
+          // Generate smart title in background (non-blocking)
+          generateSmartTitle(newMessages).then((result) => {
+            isGeneratingTitleRef.current = false;
+            
+            if (result) {
+              const smartTitle = `${result.emoji} ${result.title}`;
+              console.log("[ChatSessions] Smart title generated:", smartTitle);
+              
+              // Update session with smart title
+              setSessions((prev) => {
+                const updatedWithTitle = prev.map((s) =>
+                  s.id === sessionId
+                    ? { ...s, title: smartTitle, titleGenerated: true }
+                    : s
+                );
+                localStorage.setItem(SESSIONS_INDEX_KEY, JSON.stringify(updatedWithTitle));
+                sessionsRef.current = updatedWithTitle;
+                return updatedWithTitle;
+              });
+            }
+          }).catch(() => {
+            isGeneratingTitleRef.current = false;
+          });
+        }
+
         // Schedule database sync
         if (user) {
-          const currentSession = updated.find((s) => s.id === sessionId);
-          scheduleSyncDebounced(sessionId, newMessages, currentSession);
+          const syncSession = updated.find((s) => s.id === sessionId);
+          scheduleSyncDebounced(sessionId, newMessages, syncSession);
         }
       } catch (e) {
         console.error("Error saving messages:", e);

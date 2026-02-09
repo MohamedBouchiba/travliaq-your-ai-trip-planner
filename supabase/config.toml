@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.map-prices]
 verify_jwt = false
+
+[functions.generate-chat-title]
+verify_jwt = false

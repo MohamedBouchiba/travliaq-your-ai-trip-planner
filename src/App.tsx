@@ -26,6 +26,7 @@ const Booking = lazy(() => import("./pages/Booking"));
 const Discover = lazy(() => import("./pages/Discover"));
 const TravelPlanner = lazy(() => import("./pages/TravelPlanner"));
 const WidgetShowcase = lazy(() => import("./pages/WidgetShowcase"));
+const PlannerDebug = lazy(() => import("./pages/PlannerDebug"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -55,6 +56,7 @@ const AppContent = () => {
         <Route path="/trip-details" element={<TripDetails />} />
         <Route path="/booking" element={<Booking />} />
         <Route path="/planner" element={<TravelPlanner />} />
+        <Route path="/planner-debug" element={<PlannerDebug />} />
         <Route path="/widgets" element={<WidgetShowcase />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
