@@ -594,6 +594,15 @@ export function useUnifiedIntentRouter({
       }
     }
     
+    // Conversational intents: never auto-trigger widgets
+    const conversationalIntents = [
+      "other", "ask_question", "ask_recommendations",
+      "compare_options", "greeting", "thank_you"
+    ];
+    if (conversationalIntents.includes(intent.primaryIntent)) {
+      return { shouldShowWidget: false, widgetType: null, action: "none" };
+    }
+    
     // No widget from backend - check if we should show the next required one
     // Only do this for intents that typically need a widget
     const widgetTriggeringIntents = [
@@ -607,7 +616,6 @@ export function useUnifiedIntentRouter({
       "express_preference",
       "express_constraint",
       "ask_inspiration",
-      "ask_recommendations",
       "gather_preferences",
     ];
     
@@ -633,9 +641,9 @@ export function useUnifiedIntentRouter({
           if (onWidgetTriggered) onWidgetTriggered("preferenceInterests");
           return { shouldShowWidget: true, widgetType: "preferenceInterests", action: "none", reason: "Interests detected" };
         }
-        if (entities.budgetLevel && canShowWidget("preferenceStyle").valid) {
-          if (onWidgetTriggered) onWidgetTriggered("preferenceStyle");
-          return { shouldShowWidget: true, widgetType: "preferenceStyle", action: "none", reason: "Budget/style detected" };
+        if (entities.budgetLevel && canShowWidget("budgetRangeSlider").valid) {
+          if (onWidgetTriggered) onWidgetTriggered("budgetRangeSlider");
+          return { shouldShowWidget: true, widgetType: "budgetRangeSlider", action: "none", reason: "Budget level detected" };
         }
       }
     }

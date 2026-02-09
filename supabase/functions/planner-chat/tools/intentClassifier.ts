@@ -55,9 +55,15 @@ Tu DOIS appeler cet outil en PREMIER pour CHAQUE message utilisateur avant de r�
 - FR: "plage", "culture", "nature", "gastronomie", "sport", "aventure", "spa", "wellness", "shopping", "musée", "randonnée", "montagne", "mer", "safari", "plongée", "surf", "ski", "j'aime", "j'adore", "passion", "fan de"
 - EN: "beach", "culture", "nature", "gastronomy", "sport", "adventure", "spa", "shopping", "museum", "hiking", "mountain", "diving", "surfing", "i like", "i love", "passion"
 
-**preferenceStyle** - Style de voyage et budget (PRIORITÉ 6):
-- FR: "luxe", "économique", "pas cher", "budget", "backpacker", "routard", "premium", "haut de gamme", "5 étoiles", "confort", "relax", "zen", "chill", "intensif", "authentique", "romantique"
-- EN: "luxury", "cheap", "budget", "backpacker", "premium", "high-end", "comfort", "relaxing", "chill", "authentic", "romantic"
+**preferenceStyle** - Style de voyage (PRIORITÉ 6):
+- FR: "luxe", "backpacker", "routard", "premium", "haut de gamme", "5 étoiles", "confort", "relax", "zen", "chill", "intensif", "authentique", "romantique"
+- EN: "luxury", "backpacker", "premium", "high-end", "comfort", "relaxing", "chill", "authentic", "romantic"
+- ATTENTION: Si l'utilisateur parle de BUDGET, PRIX ou FOURCHETTE DE PRIX → utiliser budgetRangeSlider (PAS preferenceStyle)
+
+**budgetRangeSlider** - Budget et fourchette de prix (PRIORITÉ 6):
+- FR: "définir mon budget", "quel budget", "combien ça coûte", "pas cher", "économique", "budget", "fourchette de prix", "prix maximum", "dépenser"
+- EN: "set my budget", "how much", "cheap", "affordable", "budget", "price range", "maximum price", "spend"
+- RÈGLE: preferenceStyle = sliders style de voyage (relax/intense, nature/urbain). budgetRangeSlider = sélection de fourchette de prix
 
 **datePicker** - Dates de voyage (PRIORITÉ 5):
 - FR: "quand partir", "quelle date", "quel mois", "janvier" à "décembre", "été", "hiver", "printemps", "automne", "vacances", "pâques", "noël"
@@ -218,6 +224,10 @@ que tout a été dit. Ne PAS classifier comme "other" dans ces cas.
             familyFriendly: {
               type: "boolean",
               description: "'avec enfants', 'adapté aux enfants' = true"
+            },
+            selectedOption: {
+              type: "string",
+              description: "Quand l'utilisateur répond à un choix numéroté (1, 2, 3) ou par le nom d'une option proposée dans le message précédent."
             }
           },
           description: "Entités extraites du message"
@@ -238,7 +248,8 @@ que tout a été dit. Ne PAS classifier comme "other" dans ces cas.
                 "preferenceInterests",
                 "dietary",
                 "mustHaves",
-                "destinationSuggestions"
+                "destinationSuggestions",
+                "budgetRangeSlider"
               ],
               description: "Type de widget à afficher"
             },
@@ -306,6 +317,7 @@ export interface IntentClassificationResult {
     accessibilityRequired?: boolean;
     petFriendly?: boolean;
     familyFriendly?: boolean;
+    selectedOption?: string;
   };
   widgetToShow?: {
     type: string;
