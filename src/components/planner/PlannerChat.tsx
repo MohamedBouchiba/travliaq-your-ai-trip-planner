@@ -292,6 +292,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     widgetTracking.interactions,
     sessionContext.sessionEntities,
     {
+      hasDestination: intentRouter.flowState.hasDestination,
       hasDestinationCity: intentRouter.flowState.hasDestinationCity,
       hasDepartureDate: intentRouter.flowState.hasDepartureDate,
       hasTravelers: intentRouter.flowState.hasTravelers,
@@ -1261,6 +1262,11 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
         const memoryUpdates = flightDataToMemory(flightData, memory);
         updateMemory(memoryUpdates);
         nextMem = { ...nextMem, ...memoryUpdates };
+
+        // Issue 3 fix: Track synthetic destination_selected when LLM picks a destination (delegate_choice)
+        if (flightData.toCountryCode && flightData.toCountryName) {
+          widgetTracking.trackDestinationSelect(flightData.toCountryName, flightData.toCountryCode);
+        }
 
         if (flightData.to) {
           const coords = getCityCoords(flightData.to.toLowerCase().split(",")[0].trim());

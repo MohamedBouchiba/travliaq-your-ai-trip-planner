@@ -12,7 +12,7 @@ export const reasoningTool = {
   type: "function",
   function: {
     name: "plan_response",
-    description: `OBLIGATOIRE: Avant CHAQUE réponse, tu DOIS appeler cet outil pour réfléchir.
+    description: `RECOMMANDÉ: Avant de répondre, tu PEUX appeler cet outil pour structurer ta réflexion.
 
 Cet outil structure ta pensée en 4 étapes:
 1. COMPRENDRE - Quelle est l'intention réelle de l'utilisateur ?

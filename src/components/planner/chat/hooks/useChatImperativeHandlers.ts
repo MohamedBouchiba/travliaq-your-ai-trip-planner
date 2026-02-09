@@ -113,22 +113,42 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
       citySelectionShownRef.current = countryKey;
 
       const countryName = event.country.name;
-      const messageId = `city-select-${Date.now()}`;
       
       const action = event.field === "from" 
         ? t("planner.systemMessage.actionDepart") 
         : t("planner.systemMessage.actionArrive");
 
+      // Check if the latest assistant message was added very recently (within 3 seconds)
+      // and could be an LLM response about the same country — if so, reuse it instead of adding a new message
+      const now = Date.now();
+      const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant" && !m.isTyping);
+      const lastMsgTimestamp = lastAssistantMsg ? new Date(lastAssistantMsg.timestamp || 0).getTime() : 0;
+      const isRecentLLMMessage = lastAssistantMsg && (now - lastMsgTimestamp < 3000 || lastAssistantMsg.id.startsWith("bot-"));
+      const reuseExistingMessage = isRecentLLMMessage && !lastAssistantMsg.widget;
+
+      const messageId = reuseExistingMessage ? lastAssistantMsg.id : `city-select-${Date.now()}`;
+
       setIsLoading(true);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: messageId,
-          role: "assistant",
-          text: t("planner.systemMessage.countrySelected", { country: countryName, action }),
-          isTyping: true,
-        },
-      ]);
+      if (!reuseExistingMessage) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: messageId,
+            role: "assistant",
+            text: t("planner.systemMessage.countrySelected", { country: countryName, action }),
+            isTyping: true,
+          },
+        ]);
+      } else {
+        // Mark the existing message as loading while we fetch cities
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? { ...m, isTyping: true }
+              : m
+          )
+        );
+      }
 
       // Fetch cities
       const cities = await fetchTopCities(countryCode);
