@@ -1,130 +1,187 @@
 
-# Plan d'Amélioration : Widget de Suggestions de Destinations
+# Plan d'Amélioration : Génération de Titre Intelligente + Page Debug Développeur
 
-## Contexte
+## Contexte des Problèmes Identifiés
 
-Tu as identifié deux problèmes dans le widget de suggestions de destinations :
-1. **Profil incomplet sans action** : Quand le chat affiche des destinations avec un profil à 35%, il n'y a aucune incitation à compléter le profil pour obtenir de meilleures recommandations
-2. **Proportions de la carte** : L'image est trop grande et les informations textuelles sont trop petites/difficiles à lire
+### 1. Bug : Destinations Non Affichées
+Quand tu dis "je ne sais pas trop où aller", le chat répond "Voici quelques suggestions de destinations" mais **aucune carte de destination ne s'affiche**. C'est un problème côté backend ou frontend dans le flux `destinationSuggestionRequest`.
 
----
+**Diagnostic probable** : Le tool `request_destination_suggestions` n'a pas été déclenché par l'IA, ou le message de l'utilisateur ne matche pas les déclencheurs dans le système prompt.
 
-## Partie 1 : Suggestion de Compléter le Profil
+### 2. Génération de Titre de Conversation
+Actuellement, le titre est généré à partir du **premier message utilisateur**, tronqué à 35 caractères avec une icône basée sur des mots-clés. Ce n'est pas intelligent :
+- "je ne sais pas trop ou aller" → devient le titre directement
 
-### Modifications du Badge de Profil (DestinationSuggestionsGrid)
+**Solution proposée** : Générer le titre intelligemment après **2-3 échanges** en utilisant l'IA pour résumer la conversation.
 
-**Changement actuel → proposé :**
-- Le badge affiche juste "Recommandations basées sur votre profil (35% complété)"
-- Ajouter une phrase d'incitation sous le badge quand le score < 70%
-- Exemple : "Pour des recommandations plus personnalisées, complétez votre profil"
+### 3. Page Debug pour Développeur
+Tu veux visualiser le workflow complet : intents détectés, tools appelés, reasoning, etc.
 
-### Ajout de Quick Replies Contextuels
-
-**Après l'affichage des destinations :**
-Quand le score de profil < 70%, ajouter automatiquement des quick replies :
-- "Renseigner mes préférences" → Ouvre l'onglet Préférences
-- "Affiner mon style de voyage" → Remplit l'input avec une demande de style
-
-**Fichiers à modifier :**
-- `src/components/planner/chat/widgets/DestinationSuggestionsGrid.tsx`
-- `src/components/planner/PlannerChat.tsx` (pour ajouter les quickReplies au message)
-- `src/i18n/locales/fr/planner.json` et `en/planner.json` (nouvelles traductions)
-- `src/i18n/config.ts` (traductions de fallback)
+**Solution proposée** : Créer une **page dédiée `/planner-debug`** accessible uniquement en développement, qui affiche tout le flux en temps réel.
 
 ---
 
-## Partie 2 : Amélioration de l'Interface de la Carte
+## Partie 1 : Génération de Titre Intelligente
 
-### Ajustements dans DestinationSuggestionCard
+### Logique de Génération
 
-**Image :**
-- Réduire le ratio de `aspect-[16/10]` à `aspect-[16/8]` (plus panoramique, moins haute)
-- Garder le zoom au hover
+| Étape | Titre Affiché |
+|-------|---------------|
+| 0-2 messages utilisateur | `✈️ Nouvelle conversation` |
+| ≥3 messages utilisateur | Titre généré par l'IA basé sur le contenu |
 
-**Textes :**
-- Headline : de `text-sm` à `text-base` et `font-bold`
-- Description : de `text-xs` à `text-sm`
-- Key Factors : de `text-xs` à `text-sm` avec meilleure lisibilité
-- Stats bar (budget/saison/vol) : de `text-xs` à `text-sm`, padding augmenté
-- Activities tags : de `text-xs` à `text-sm`
-- Padding global : de `px-3 py-3` à `px-4 py-4`
+### Modifications Techniques
 
-**Aperçu des changements visuels :**
+**Fichier : `src/hooks/useChatSessions.ts`**
 
-| Élément | Avant | Après |
-|---------|-------|-------|
-| Ratio image | 16:10 | 16:8 |
-| Titre | text-sm font-semibold | text-base font-bold |
-| Description | text-xs | text-sm |
-| Facteurs clés | text-xs | text-sm |
-| Stats | text-xs, py-2 px-3 | text-sm, py-2.5 px-4 |
-| Tags activités | text-xs, py-1 | text-sm, py-1.5 |
+1. Ajouter une fonction `generateSmartTitle()` qui appelle une edge function
+2. Déclencher après le 3ème message utilisateur
+3. Le titre est généré en arrière-plan (non-bloquant)
+4. Fallback sur l'ancien système si l'IA échoue
 
-**Fichier à modifier :**
-- `src/components/planner/chat/widgets/DestinationSuggestionCard.tsx`
+**Nouvelle Edge Function : `supabase/functions/generate-chat-title/index.ts`**
 
----
-
-## Détails Techniques
-
-### 1. Nouvelles traductions à ajouter
-
-```json
-{
-  "planner.suggestions.improveRecommendations": "Pour des recommandations plus personnalisées, complétez votre profil.",
-  "planner.suggestions.fillPreferences": "Renseigner mes préférences",
-  "planner.suggestions.fillPreferencesMessage": "Je veux renseigner mes préférences de voyage"
-}
-```
-
-### 2. Logique de Quick Replies conditionnel
-
-Dans `PlannerChat.tsx`, après avoir reçu les suggestions de destinations :
 ```typescript
-// Si le score de profil < 70%, ajouter un quick reply pour compléter le profil
-if ((response.basedOnProfile?.completionScore || 0) < 70) {
-  quickReplies.push({
-    id: "fill-preferences",
-    label: t("planner.suggestions.fillPreferences"),
-    icon: "✨",
-    action: { type: "navigate", tab: "preferences" },
-    variant: "outline"
-  });
-}
+// Endpoint simple qui prend les 5 derniers messages et génère un titre
+// Utilise Azure OpenAI avec un prompt concis
+// Retourne : { title: "🏖️ Voyage en famille à Bali", emoji: "🏖️" }
 ```
 
-### 3. Badge amélioré avec CTA
+### Format du Titre Généré
 
-Dans `DestinationSuggestionsGrid.tsx` :
-```tsx
-{basedOnProfile && basedOnProfile.completionScore < 70 && (
-  <p className="text-xs text-muted-foreground mt-1">
-    {t("planner.suggestions.improveRecommendations")}
-  </p>
-)}
-```
+- Maximum 40 caractères
+- Emoji pertinent en préfixe
+- Résumé de l'intention principale (destination, style, occasion)
+- Exemples :
+  - `🏝️ Escapade tropicale en février`
+  - `👨‍👩‍👧 Vacances famille Japon`
+  - `💑 Lune de miel destination surprise`
 
 ---
 
-## Résumé des Fichiers Modifiés
+## Partie 2 : Correction du Bug Destinations
 
-1. **`src/components/planner/chat/widgets/DestinationSuggestionCard.tsx`**
-   - Ratio image réduit
-   - Tailles de police augmentées
-   - Meilleurs espacements
+### Diagnostic
 
-2. **`src/components/planner/chat/widgets/DestinationSuggestionsGrid.tsx`**
-   - Message d'incitation sous le badge profil
-   - Callback optionnel pour naviguer vers préférences
+Le flux actuel pour les suggestions de destinations :
+1. Utilisateur envoie "je ne sais pas où aller"
+2. Backend détecte l'intent et appelle le tool `request_destination_suggestions`
+3. Frontend reçoit `destinationSuggestionRequest` dans le stream
+4. Frontend appelle l'API `/destination-fact` pour récupérer les suggestions
+5. Frontend met à jour le message avec le widget `destinationSuggestions`
 
-3. **`src/components/planner/PlannerChat.tsx`**
-   - Ajout des quick replies contextuels pour profil incomplet
+**Problème probable** : L'IA ne déclenche pas le tool car le message "je ne sais pas trop où aller" ne matche pas exactement les déclencheurs.
 
-4. **`src/i18n/locales/fr/planner.json`**
-   - Nouvelles clés de traduction
+### Corrections
 
-5. **`src/i18n/locales/en/planner.json`**
-   - Nouvelles clés de traduction
+**1. Enrichir les déclencheurs dans `destinationSuggestions.ts`** :
+Ajouter des patterns plus naturels :
+- "je ne sais pas où aller"
+- "je ne sais pas trop"
+- "aide-moi à choisir"
+- "aucune idée de destination"
 
-6. **`src/i18n/config.ts`**
-   - Traductions de fallback
+**2. Ajouter un fallback côté frontend** :
+Si le message contient des mots-clés d'inspiration ET que l'IA n'a pas déclenché le tool, le frontend peut forcer l'affichage du widget de style/préférences.
+
+---
+
+## Partie 3 : Page Debug Développeur
+
+### Route : `/planner-debug`
+
+Accessible uniquement en `import.meta.env.DEV`
+
+### Architecture
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    /planner-debug                               │
+├───────────────────────────────┬─────────────────────────────────┤
+│         CHAT ZONE             │        DEBUG PANEL              │
+│   (Copie du PlannerChat)      │                                 │
+│                               │   ┌─────────────────────────┐   │
+│                               │   │ Intent Classification   │   │
+│   [Message utilisateur]       │   │ - primaryIntent         │   │
+│   [Réponse assistant]         │   │ - confidence: 85%       │   │
+│                               │   │ - entities: {...}       │   │
+│                               │   └─────────────────────────┘   │
+│                               │                                 │
+│                               │   ┌─────────────────────────┐   │
+│                               │   │ Tool Executions         │   │
+│                               │   │ ✓ classify_intent 45ms  │   │
+│                               │   │ ✓ plan_response 120ms   │   │
+│                               │   │ ○ request_destinations  │   │
+│                               │   └─────────────────────────┘   │
+│                               │                                 │
+│                               │   ┌─────────────────────────┐   │
+│                               │   │ Flow State              │   │
+│                               │   │ [✓] hasDestination      │   │
+│                               │   │ [ ] hasDepartureDate    │   │
+│                               │   │ [ ] hasTravelers        │   │
+│                               │   └─────────────────────────┘   │
+│                               │                                 │
+│                               │   ┌─────────────────────────┐   │
+│                               │   │ Memory Context          │   │
+│                               │   │ - flightSummary         │   │
+│                               │   │ - blockedWidgets        │   │
+│                               │   │ - widgetHistory         │   │
+│                               │   └─────────────────────────┘   │
+│                               │                                 │
+│                               │   ┌─────────────────────────┐   │
+│                               │   │ Raw API Response        │   │
+│                               │   │ { ... JSON ... }        │   │
+│                               │   └─────────────────────────┘   │
+└───────────────────────────────┴─────────────────────────────────┘
+```
+
+### Fonctionnalités du Panel Debug
+
+1. **Intent Classification** : Affiche l'intent détecté, la confiance, les entités
+2. **Tool Executions** : Timeline des tools appelés avec durée et statut
+3. **Flow State** : État du flux de réservation (destination, dates, voyageurs...)
+4. **Memory Context** : Ce qui est envoyé à l'IA comme contexte
+5. **Widget Decision** : Quel widget l'IA a décidé d'afficher et pourquoi
+6. **Raw Response** : JSON brut de la réponse pour debug approfondi
+7. **Reasoning** : Chain of Thought de l'IA (si activé)
+
+### Composants à Créer
+
+**`src/pages/PlannerDebug.tsx`** : Page principale avec layout split
+**`src/components/planner/debug/DebugPanel.tsx`** : Panel complet de debug
+**`src/components/planner/debug/ToolTimeline.tsx`** : Timeline visuelle des tools
+**`src/components/planner/debug/MemoryInspector.tsx`** : Inspection du contexte mémoire
+**`src/components/planner/debug/RawResponseViewer.tsx`** : Viewer JSON
+
+---
+
+## Résumé des Fichiers à Modifier/Créer
+
+### Fichiers à Modifier
+
+| Fichier | Modification |
+|---------|--------------|
+| `src/hooks/useChatSessions.ts` | Ajouter `generateSmartTitle()` et logique de déclenchement |
+| `src/App.tsx` | Ajouter route `/planner-debug` |
+| `supabase/functions/planner-chat/tools/destinationSuggestions.ts` | Enrichir les déclencheurs |
+| `src/components/planner/PlannerChat.tsx` | Exposer plus de données pour le debug (via context ou props) |
+
+### Fichiers à Créer
+
+| Fichier | Description |
+|---------|-------------|
+| `supabase/functions/generate-chat-title/index.ts` | Edge function pour génération de titre IA |
+| `src/pages/PlannerDebug.tsx` | Page de debug développeur |
+| `src/components/planner/debug/DebugPanel.tsx` | Panel principal de debug |
+| `src/components/planner/debug/ToolTimeline.tsx` | Timeline des tools |
+| `src/components/planner/debug/MemoryInspector.tsx` | Inspecteur de mémoire |
+| `src/components/planner/debug/RawResponseViewer.tsx` | Viewer JSON |
+| `src/hooks/useDebugContext.ts` | Hook pour stocker et partager les données de debug |
+
+---
+
+## Ordre d'Implémentation Recommandé
+
+1. **Correction du bug destinations** (le plus urgent - UX cassée)
+2. **Page debug développeur** (pour faciliter le debugging futur)
+3. **Génération de titre intelligent** (amélioration UX)
