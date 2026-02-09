@@ -414,6 +414,30 @@ function applyPreferenceFirstLogic(
 }
 
 /**
+ * Build a minimal system prompt for the dedicated classification call.
+ * ~100 tokens instead of ~3000 — one task, one tool, clear instructions.
+ */
+function buildClassificationSystemPrompt(
+  preferencesState: { interests: string[]; style: string | null; pace: string | null },
+): string {
+  const interestsStr = preferencesState.interests.length > 0
+    ? preferencesState.interests.join(", ")
+    : "VIDE";
+  const styleStr = preferencesState.style || "NON DÉFINI";
+
+  return `Tu es un classificateur d'intention pour un assistant de voyage. Analyse le message utilisateur et appelle classify_intent.
+
+CONTEXTE PRÉFÉRENCES ACTUELLES:
+- Intérêts: ${interestsStr}
+- Style: ${styleStr}
+
+RÈGLE CRITIQUE: Si l'utilisateur hésite / ne sait pas et que les intérêts sont VIDES, 
+primaryIntent = "gather_preferences", widgetType = "preferenceInterests".
+Si les intérêts existent mais le style est NON DÉFINI,
+primaryIntent = "gather_preferences", widgetType = "preferenceStyle".`;
+}
+
+/**
  * Build the system prompt
  */
 function buildSystemPrompt(phase: TravelPhase, negativeContext: string, widgetContext: string, currentDate: string, widgetsContext: string): string {
@@ -571,7 +595,9 @@ serve(async (req) => {
     );
 
     // ========================================================================
-    // MULTI-TOOL LOOP (ReAct Pattern) with real execution logging
+    // STEP 1: DEDICATED INTENT CLASSIFICATION (Classify First architecture)
+    // Lightweight call: minimal prompt, single tool, forced tool_choice.
+    // Guarantees classify_intent is always called regardless of LLM behavior.
     // ========================================================================
     interface ToolExecutionEntry {
       tool: string;
@@ -583,8 +609,78 @@ serve(async (req) => {
     }
     const toolExecutionLog: ToolExecutionEntry[] = [];
     
-    let loopCount = 0;
     let collectedData = createEmptyCollectedData();
+    
+    // Extract the last user message for classification
+    const lastUserMessage = [...limitedMessages].reverse().find((m: { role: string }) => m.role === "user");
+    
+    if (lastUserMessage) {
+      const classifyStartTime = Date.now();
+      log.info("classify_first", "Starting dedicated intent classification call");
+      
+      try {
+        const classifyResponse = await fetch(url, {
+          method: "POST",
+          headers: {
+            "api-key": AZURE_OPENAI_API_KEY,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messages: [
+              { role: "system", content: buildClassificationSystemPrompt(preferencesState) },
+              lastUserMessage,
+            ],
+            temperature: 0.3,
+            max_tokens: 200,
+            tools: [intentClassifierTool],
+            tool_choice: { type: "function", function: { name: "classify_intent" } },
+            stream: false,
+          }),
+        });
+        
+        const classifyLatency = Date.now() - classifyStartTime;
+        
+        if (classifyResponse.ok) {
+          const classifyData = await classifyResponse.json();
+          const classifyToolCall = classifyData.choices?.[0]?.message?.tool_calls?.[0];
+          
+          if (classifyToolCall?.function?.name === "classify_intent") {
+            const { result, updatedData } = processToolCall(classifyToolCall, requestId, collectedData, log, preferencesState);
+            collectedData = mergeToolData(collectedData, updatedData);
+            
+            toolExecutionLog.push({
+              tool: "classify_intent",
+              status: result.success ? "finished" : "failed",
+              latency_ms: classifyLatency,
+              summary: `Intent: ${collectedData.intentClassification?.primaryIntent || "unknown"}, Widget: ${collectedData.intentClassification?.widgetToShow?.type || "none"}`,
+              timestamp: Date.now(),
+              loopIteration: -1,
+            });
+            
+            log.info("classify_first", "Intent classification completed", {
+              intent: collectedData.intentClassification?.primaryIntent,
+              widget: collectedData.intentClassification?.widgetToShow?.type,
+              confidence: collectedData.intentClassification?.confidence,
+              latency_ms: classifyLatency,
+            });
+          } else {
+            log.warn("classify_first", "Classification call did not return classify_intent tool call");
+          }
+        } else {
+          const errorText = await classifyResponse.text();
+          log.error("classify_first", "Classification call failed", new Error(errorText));
+        }
+      } catch (classifyError) {
+        log.error("classify_first", "Classification call threw", classifyError instanceof Error ? classifyError : undefined);
+      }
+    }
+
+    // ========================================================================
+    // STEP 2: REACT LOOP (without classify_intent — already done above)
+    // ========================================================================
+    const reActTools = ALL_TOOLS.filter(t => t.function.name !== "classify_intent");
+    
+    let loopCount = 0;
     let conversationMessages = [
       { role: "system", content: systemPrompt },
       ...limitedMessages,
@@ -608,9 +704,8 @@ serve(async (req) => {
           messages: conversationMessages,
           temperature: 0.7,
           max_tokens: 600,
-          tools: ALL_TOOLS,
-          // Force tool usage on first iteration to ensure classify_intent is called
-          tool_choice: loopCount === 0 ? "required" : "auto",
+          tools: reActTools,
+          tool_choice: "auto",
           stream: false,
         }),
       });
@@ -629,7 +724,6 @@ serve(async (req) => {
       const choice = data.choices?.[0];
       finalContent = choice?.message?.content || "";
       
-      // If no tool calls, we're done
       if (!choice?.message?.tool_calls || choice.message.tool_calls.length === 0) {
         log.info("multi_tool", "No tool calls, ending loop", { loopCount });
         break;
@@ -640,7 +734,6 @@ serve(async (req) => {
       
       log.info("tool_execution", `Processing ${toolCalls.length} tool calls`, { tools: toolNames });
       
-      // Process each tool call
       const toolResponses: { role: "tool"; tool_call_id: string; content: string }[] = [];
       for (const toolCall of toolCalls) {
         const toolStartTime = Date.now();
@@ -662,9 +755,7 @@ serve(async (req) => {
         toolResponses.push(buildToolResponseMessage(toolCall.id, result));
       }
       
-      // Check if we should continue
       if (!shouldContinueToolLoop(loopCount + 1, true, toolNames, log)) {
-        // Make one final call to get the response
         conversationMessages = [
           ...conversationMessages,
           choice.message,
@@ -674,7 +765,6 @@ serve(async (req) => {
         break;
       }
       
-      // Add tool calls and responses to conversation for next iteration
       conversationMessages = [
         ...conversationMessages,
         choice.message,
@@ -684,43 +774,11 @@ serve(async (req) => {
       loopCount++;
     }
     
-    // Post-loop: If preference-first override was applied, suppress destination suggestions
+    // Post-loop: suppress destination suggestions if preferences override was applied
     if (collectedData.intentClassification?.primaryIntent === "gather_preferences") {
       if (collectedData.destinationSuggestionRequest) {
         log.info("preference_first", "Suppressing destinationSuggestionRequest due to gather_preferences override");
         collectedData.destinationSuggestionRequest = null;
-      }
-    }
-    
-    // Fallback: if classify_intent was never called, detect indecision from user message
-    if (!collectedData.intentClassification) {
-      const lastUserMsg = limitedMessages.filter((m: { role: string }) => m.role === "user").pop();
-      const userText = (lastUserMsg?.content || "").toLowerCase();
-      const indecisionPatterns = ["sais pas", "ne sais pas", "aucune idée", "pas d'idée", "hésite", "aide-moi", "inspire", "où aller"];
-      const isIndecis = indecisionPatterns.some(p => userText.includes(p));
-      
-      if (isIndecis && (!preferencesState.interests || preferencesState.interests.length === 0)) {
-        log.info("preference_first_fallback", "No classify_intent called, but indecision detected. Injecting preferenceInterests.");
-        collectedData.intentClassification = {
-          primaryIntent: "gather_preferences",
-          confidence: 90,
-          entities: {},
-          widgetToShow: {
-            type: "preferenceInterests",
-            reason: "Fallback: indecision detected without preferences",
-          },
-        };
-      } else if (isIndecis && !preferencesState.style) {
-        log.info("preference_first_fallback", "No classify_intent called, indecision detected. Injecting preferenceStyle.");
-        collectedData.intentClassification = {
-          primaryIntent: "gather_preferences",
-          confidence: 90,
-          entities: {},
-          widgetToShow: {
-            type: "preferenceStyle",
-            reason: "Fallback: indecision detected without style",
-          },
-        };
       }
     }
     
