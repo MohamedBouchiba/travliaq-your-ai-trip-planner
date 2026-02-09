@@ -21,6 +21,7 @@
   "planner.preference.anythingElse": "Anything else to mention? (mandatory criteria, dietary restrictions...)",
   "planner.preference.afterMustHaves": "Perfect! Do you have any dietary restrictions?",
   "planner.preference.searchingDestinations": "Searching for the best destinations for you...",
+  "planner.preference.askDepartureCity": "Before suggesting destinations, where are you departing from? ✈️ Enter your departure city.",
   "planner.preference.configureDietary": "Let's configure your dietary restrictions:",
   "planner.preference.configureMustHaves": "Let's configure your mandatory criteria:",
   "planner.preference.configureStyle": "Let's define your travel style:",

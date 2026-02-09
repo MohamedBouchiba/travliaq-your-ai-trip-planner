@@ -29,8 +29,8 @@ export const ProfileCompletionBanner = memo(function ProfileCompletionBanner({
     emitTabChange("preferences");
   };
 
-  // >= 70%: Green success
-  if (score >= 70) {
+  // >= 80%: Green success
+  if (score >= 80) {
     return (
       <motion.div
         initial={{ opacity: 0, x: -10 }}
@@ -51,7 +51,7 @@ export const ProfileCompletionBanner = memo(function ProfileCompletionBanner({
     );
   }
 
-  // 50-69%: Blue info
+  // 50-79%: Blue info with CTA
   if (score >= 50) {
     return (
       <motion.div
@@ -72,6 +72,15 @@ export const ProfileCompletionBanner = memo(function ProfileCompletionBanner({
           <Progress value={score} className="h-1.5 flex-1" />
           <span className="text-xs font-medium text-muted-foreground">{score}%</span>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleCompleteProfile}
+          className="ml-9 w-fit border-primary/30 text-primary hover:bg-primary/10 hover:border-primary/50"
+        >
+          {t("planner.suggestions.completeProfile")}
+          <ArrowRight className="h-3.5 w-3.5 ml-1" />
+        </Button>
       </motion.div>
     );
   }
