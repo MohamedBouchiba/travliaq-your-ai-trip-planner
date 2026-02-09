@@ -201,7 +201,7 @@ export interface MemoryContext {
   // Anti-loop: widgets already shown/confirmed that should not be re-proposed
   blockedWidgets?: string[];
   // Deterministic preference-first logic: structured preferences state
-  preferencesState?: { interests: string[]; style: string | null; pace: string | null };
+  preferencesState?: { interests: string[]; style: string | null; pace: string | null; styleAxesConfigured: boolean };
 }
 
 /**
