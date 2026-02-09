@@ -1,0 +1,146 @@
+/**
+ * Debug Store - Zustand store for debug panel state
+ * 
+ * Stores debug information that persists across component re-renders
+ * and can be accessed from anywhere in the app.
+ */
+
+import { create } from "zustand";
+
+export interface IntentClassification {
+  primaryIntent: string;
+  confidence: number;
+  entities: Record<string, unknown>;
+  widgetToShow?: {
+    type: string;
+    reason: string;
+    data?: Record<string, unknown>;
+  };
+  nextExpectedIntent?: string;
+  requiresClarification?: boolean;
+}
+
+export interface ToolExecution {
+  tool: string;
+  status: "started" | "finished" | "failed";
+  reason?: string;
+  summary?: string;
+  latency_ms?: number;
+  timestamp: number;
+}
+
+export interface ReasoningData {
+  understanding: string;
+  contextAnalysis: string;
+  responseStrategy: string;
+  keyInsights?: string[];
+  anticipatedNextSteps?: string[];
+  widgetDecision?: {
+    shouldShow: boolean;
+    widgetType?: string;
+    reason?: string;
+  };
+  confidence: number;
+}
+
+export interface FlowState {
+  hasDestinationCity?: boolean;
+  hasDestinationCountry?: boolean;
+  hasDepartureCity?: boolean;
+  hasDepartureDate?: boolean;
+  hasReturnDate?: boolean;
+  hasTravelers?: boolean;
+  isReadyToSearch?: boolean;
+}
+
+export interface SessionEntities {
+  destinations?: string[];
+  dates?: string[];
+  budgets?: string[];
+  constraints?: string[];
+}
+
+export interface MemoryContext {
+  flightSummary?: string;
+  activityContext?: string;
+  preferenceContext?: string;
+  widgetHistory?: string;
+  blockedWidgets?: string[];
+  basketSummary?: string;
+  conversationSummary?: string;
+  currentPhase?: string;
+  missingFields?: string[];
+  sessionEntities?: SessionEntities;
+}
+
+export interface RawResponse {
+  requestId: string;
+  timestamp: number;
+  data: unknown;
+}
+
+interface DebugState {
+  // Intent classification
+  lastIntent: IntentClassification | null;
+  setLastIntent: (intent: IntentClassification | null) => void;
+  
+  // Tool executions
+  toolExecutions: ToolExecution[];
+  addToolExecution: (execution: ToolExecution) => void;
+  clearToolExecutions: () => void;
+  
+  // Flow state
+  flowState: FlowState | null;
+  setFlowState: (state: FlowState | null) => void;
+  
+  // Memory context
+  memoryContext: MemoryContext | null;
+  setMemoryContext: (context: MemoryContext | null) => void;
+  
+  // Raw responses
+  rawResponses: RawResponse[];
+  addRawResponse: (response: RawResponse) => void;
+  clearRawResponses: () => void;
+  
+  // Reasoning
+  reasoning: ReasoningData | null;
+  setReasoning: (reasoning: ReasoningData | null) => void;
+  
+  // Clear all
+  clearAll: () => void;
+}
+
+export const useDebugStore = create<DebugState>((set) => ({
+  lastIntent: null,
+  setLastIntent: (intent) => set({ lastIntent: intent }),
+  
+  toolExecutions: [],
+  addToolExecution: (execution) => set((state) => ({
+    toolExecutions: [...state.toolExecutions.slice(-50), execution], // Keep last 50
+  })),
+  clearToolExecutions: () => set({ toolExecutions: [] }),
+  
+  flowState: null,
+  setFlowState: (state) => set({ flowState: state }),
+  
+  memoryContext: null,
+  setMemoryContext: (context) => set({ memoryContext: context }),
+  
+  rawResponses: [],
+  addRawResponse: (response) => set((state) => ({
+    rawResponses: [...state.rawResponses.slice(-10), response], // Keep last 10
+  })),
+  clearRawResponses: () => set({ rawResponses: [] }),
+  
+  reasoning: null,
+  setReasoning: (reasoning) => set({ reasoning: reasoning }),
+  
+  clearAll: () => set({
+    lastIntent: null,
+    toolExecutions: [],
+    flowState: null,
+    memoryContext: null,
+    rawResponses: [],
+    reasoning: null,
+  }),
+}));

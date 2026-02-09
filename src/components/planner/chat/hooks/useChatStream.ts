@@ -13,6 +13,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import type { FlightFormData } from "@/types/flight";
 import type { MissingField } from "@/stores/hooks";
+import { useDebugStore } from "@/stores/debugStore";
 import { getMissingFieldLabel } from "../utils/flightDataToMemory";
 import { plannerLogger } from "@/utils/logger";
 
@@ -423,6 +424,9 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<StreamError | null>(null);
 
+  // Debug store for developer insights
+  const debugStore = useDebugStore();
+
   // Track mounted state for cleanup
   const isMountedRef = useRef(true);
 
@@ -603,9 +607,13 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
                       confidence: reasoning.confidence,
                       keyInsights: reasoning.keyInsights,
                     });
+                    // Update debug store
+                    debugStore.setReasoning(reasoning);
                   } else if (parsed.type === "intentClassification" && parsed.intentClassification) {
                     intentClassification = parsed.intentClassification;
                     console.log("[Stream] Intent classified:", intentClassification.primaryIntent, "confidence:", intentClassification.confidence);
+                    // Update debug store
+                    debugStore.setLastIntent(intentClassification);
                   } else if (parsed.type === "flightData" && parsed.flightData) {
                     flightData = parsed.flightData;
                   } else if (parsed.type === "accommodationData" && parsed.accommodationData) {
@@ -631,6 +639,13 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
                       reason: parsed.reason,
                       timestamp: parsed.timestamp || Date.now(),
                     });
+                    // Update debug store
+                    debugStore.addToolExecution({
+                      tool: parsed.tool,
+                      status: "started",
+                      reason: parsed.reason,
+                      timestamp: parsed.timestamp || Date.now(),
+                    });
                   } else if (parsed.type === "tool_finished" && parsed.tool) {
                     // Handle tool finished event
                     const status = parsed.success ? "finished" : "failed";
@@ -639,6 +654,14 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
                       summary: parsed.summary,
                     });
                     options.onToolStatus?.({
+                      tool: parsed.tool,
+                      status,
+                      latency_ms: parsed.latency_ms,
+                      summary: parsed.summary,
+                      timestamp: parsed.timestamp || Date.now(),
+                    });
+                    // Update debug store
+                    debugStore.addToolExecution({
                       tool: parsed.tool,
                       status,
                       latency_ms: parsed.latency_ms,
@@ -656,6 +679,37 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
               }
             }
           }
+
+          // Store raw response in debug store
+          debugStore.addRawResponse({
+            requestId,
+            timestamp: Date.now(),
+            data: {
+              content: fullContent,
+              flightData,
+              accommodationData,
+              preferencesData,
+              quickReplies,
+              destinationSuggestionRequest,
+              intentClassification,
+              reasoning,
+              flightSearchTrigger,
+            },
+          });
+
+          // Update memory context in debug store
+          debugStore.setMemoryContext({
+            flightSummary: memoryContext.flightSummary,
+            activityContext: memoryContext.activityContext,
+            preferenceContext: memoryContext.preferenceContext,
+            widgetHistory: memoryContext.widgetHistory,
+            blockedWidgets: memoryContext.blockedWidgets,
+            basketSummary: memoryContext.basketSummary,
+            conversationSummary: memoryContext.conversationSummary,
+            currentPhase: memoryContext.currentPhase,
+            missingFields: memoryContext.missingFields?.map(getMissingFieldLabel),
+            sessionEntities: memoryContext.sessionEntities,
+          });
 
           // Success - mark streaming as complete
           if (isMountedRef.current) {
