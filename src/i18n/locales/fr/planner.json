@@ -267,5 +267,9 @@
   "planner.suggestionPreset.earlyBookingTitle": "Réservez tôt",
   "planner.suggestionPreset.earlyBookingMessage": "Réserver 6-8 semaines à l'avance offre souvent les meilleurs prix",
   "planner.suggestionPreset.compareHotelsTitle": "Comparez",
-  "planner.suggestionPreset.compareHotelsMessage": "Comparez plusieurs hôtels pour trouver le meilleur rapport qualité-prix"
+  "planner.suggestionPreset.compareHotelsMessage": "Comparez plusieurs hôtels pour trouver le meilleur rapport qualité-prix",
+
+  "planner.suggestions.improveRecommendations": "Pour des recommandations plus personnalisées, complétez votre profil.",
+  "planner.suggestions.fillPreferences": "Renseigner mes préférences",
+  "planner.suggestions.fillPreferencesMessage": "Je veux renseigner mes préférences de voyage"
 }
