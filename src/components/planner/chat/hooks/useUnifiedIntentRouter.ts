@@ -739,27 +739,6 @@ export function useUnifiedIntentRouter({
     if (widgetTriggeringIntents.includes(intent.primaryIntent)) {
       const nextRequired = getNextRequiredWidget();
       
-      // If no required widget AND no destination AND preferences are partially filled,
-      // proactively trigger destination suggestions
-      if (!nextRequired && !flowState.hasDestination) {
-        const hasPreferences = widgetInteractions.some(i => 
-          i.interactionType === "style_configured" || i.interactionType === "interests_selected"
-        );
-        if (hasPreferences) {
-          const destValidation = canShowWidget("destinationSuggestions");
-          if (destValidation.valid) {
-            console.log("[UnifiedIntentRouter] Preferences filled, no destination — auto-triggering destinationSuggestions");
-            if (onWidgetTriggered) onWidgetTriggered("destinationSuggestions");
-            return {
-              shouldShowWidget: true,
-              widgetType: "destinationSuggestions" as WidgetType,
-              action: "none",
-              reason: "Preferences filled, no destination — proactive suggestions",
-            };
-          }
-        }
-      }
-      
       if (nextRequired) {
         // Build widget data from entities if available
         const widgetData: Record<string, unknown> = {};
@@ -786,6 +765,26 @@ export function useUnifiedIntentRouter({
           action: "none",
           reason: `Next required: ${nextRequired}`,
         };
+      }
+    }
+    
+    // Proactive destination guard — runs for ALL intents as last resort
+    if (!flowState.hasDestination) {
+      const hasPreferences = widgetInteractions.some(i => 
+        i.interactionType === "style_configured" || i.interactionType === "interests_selected"
+      );
+      if (hasPreferences) {
+        const destValidation = canShowWidget("destinationSuggestions");
+        if (destValidation.valid) {
+          console.log("[UnifiedIntentRouter] Preferences filled, no destination — auto-triggering destinationSuggestions");
+          if (onWidgetTriggered) onWidgetTriggered("destinationSuggestions");
+          return {
+            shouldShowWidget: true,
+            widgetType: "destinationSuggestions" as WidgetType,
+            action: "none",
+            reason: "Preferences filled, no destination — proactive suggestions",
+          };
+        }
       }
     }
     
