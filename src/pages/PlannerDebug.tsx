@@ -13,6 +13,8 @@
 import { lazy, Suspense } from "react";
 import { Navigate } from "react-router-dom";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Lazy load the debug panel only
 const DebugPanel = lazy(() => import("@/components/planner/debug/DebugPanel"));
@@ -21,8 +23,20 @@ const DebugPanel = lazy(() => import("@/components/planner/debug/DebugPanel"));
 import TravelPlanner from "./TravelPlanner";
 
 export default function PlannerDebug() {
-  // Only allow access in development mode
-  if (import.meta.env.PROD) {
+  const { user, loading: authLoading } = useAuth();
+  const { isAdmin, loading: roleLoading } = useUserRole();
+
+  // Show loading while checking auth/role
+  if (authLoading || roleLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Only allow access to admins (Mohamed Bouchiba)
+  if (!user || !isAdmin) {
     return <Navigate to="/planner" replace />;
   }
 
