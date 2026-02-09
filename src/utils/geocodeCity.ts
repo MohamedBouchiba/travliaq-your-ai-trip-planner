@@ -1,9 +1,8 @@
 /**
- * Geocode a city name to coordinates using the Mapbox Geocoding API.
- * Returns lat, lng, country, and countryCode if found.
+ * Geocode a city name using the cities table in Supabase.
  */
 
-const MAPBOX_TOKEN = "pk.eyJ1IjoibW9oYW1lZGJvdWNoaWJhIiwiYSI6ImNtZ2t3dHZ0MzAyaDAya3NldXJ1dTkxdTAifQ.vYCeVngdG4_B0Zpms0dQNA";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface GeocodeCityResult {
   lat: number;
@@ -14,27 +13,29 @@ export interface GeocodeCityResult {
 
 export async function geocodeCity(cityName: string): Promise<GeocodeCityResult | null> {
   try {
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cityName)}.json?access_token=${MAPBOX_TOKEN}&types=place&limit=1`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
+    const { data, error } = await supabase
+      .from("cities")
+      .select("latitude, longitude, country, country_code")
+      .ilike("name", cityName)
+      .not("latitude", "is", null)
+      .not("longitude", "is", null)
+      .order("population", { ascending: false, nullsFirst: false })
+      .limit(1)
+      .single();
 
-    const data = await res.json();
-    const feature = data.features?.[0];
-    if (!feature) return null;
+    if (error || !data) {
+      console.warn("[geocodeCity] City not found in DB:", cityName, error?.message);
+      return null;
+    }
 
-    const [lng, lat] = feature.center;
-    
-    // Extract country info from context
-    const countryContext = feature.context?.find((c: { id: string }) => c.id?.startsWith("country."));
-    
     return {
-      lat,
-      lng,
-      country: countryContext?.text,
-      countryCode: countryContext?.short_code?.toUpperCase(),
+      lat: data.latitude!,
+      lng: data.longitude!,
+      country: data.country,
+      countryCode: data.country_code,
     };
   } catch (e) {
-    console.warn("[geocodeCity] Failed to geocode:", cityName, e);
+    console.warn("[geocodeCity] Failed:", cityName, e);
     return null;
   }
 }
