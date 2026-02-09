@@ -271,5 +271,10 @@
 
   "planner.suggestions.improveRecommendations": "Pour des recommandations plus personnalisées, complétez votre profil.",
   "planner.suggestions.fillPreferences": "Renseigner mes préférences",
-  "planner.suggestions.fillPreferencesMessage": "Je veux renseigner mes préférences de voyage"
+  "planner.suggestions.fillPreferencesMessage": "Je veux renseigner mes préférences de voyage",
+  "planner.suggestions.lowProfileWarning": "Ces suggestions sont basées sur un profil à {{score}}%. Affine tes préférences pour des recommandations sur mesure !",
+  "planner.suggestions.mediumProfileInfo": "Bon début ! Complète ton profil pour des suggestions encore plus précises.",
+  "planner.suggestions.highProfileSuccess": "Suggestions hautement personnalisées",
+  "planner.suggestions.completeProfile": "Compléter mon profil",
+  "planner.suggestions.keepGoing": "Ça me va comme ça"
 }

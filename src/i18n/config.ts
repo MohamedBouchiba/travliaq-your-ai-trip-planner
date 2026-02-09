@@ -2585,6 +2585,11 @@ const resources = {
       "planner.suggestions.improveRecommendations": "Pour des recommandations plus personnalisées, complétez votre profil.",
       "planner.suggestions.fillPreferences": "Renseigner mes préférences",
       "planner.suggestions.fillPreferencesMessage": "Je veux renseigner mes préférences de voyage",
+      "planner.suggestions.lowProfileWarning": "Ces suggestions sont basées sur un profil à {{score}}%. Affine tes préférences pour des recommandations sur mesure !",
+      "planner.suggestions.mediumProfileInfo": "Bon début ! Complète ton profil pour des suggestions encore plus précises.",
+      "planner.suggestions.highProfileSuccess": "Suggestions hautement personnalisées",
+      "planner.suggestions.completeProfile": "Compléter mon profil",
+      "planner.suggestions.keepGoing": "Ça me va comme ça",
       
       // Planner - Airport Widgets
       "planner.airport.departure": "Départ",
@@ -5501,6 +5506,11 @@ const resources = {
       "planner.suggestions.improveRecommendations": "For better recommendations, complete your profile.",
       "planner.suggestions.fillPreferences": "Set my preferences",
       "planner.suggestions.fillPreferencesMessage": "I want to set my travel preferences",
+      "planner.suggestions.lowProfileWarning": "These suggestions are based on a {{score}}% profile. Refine your preferences for tailored recommendations!",
+      "planner.suggestions.mediumProfileInfo": "Good start! Complete your profile for even better suggestions.",
+      "planner.suggestions.highProfileSuccess": "Highly personalized suggestions",
+      "planner.suggestions.completeProfile": "Complete my profile",
+      "planner.suggestions.keepGoing": "That works for me",
       
       // Planner - Airport Widgets
       "planner.airport.departure": "Departure",

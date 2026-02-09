@@ -271,5 +271,10 @@
 
   "planner.suggestions.improveRecommendations": "For better recommendations, complete your profile.",
   "planner.suggestions.fillPreferences": "Set my preferences",
-  "planner.suggestions.fillPreferencesMessage": "I want to set my travel preferences"
+  "planner.suggestions.fillPreferencesMessage": "I want to set my travel preferences",
+  "planner.suggestions.lowProfileWarning": "These suggestions are based on a {{score}}% profile. Refine your preferences for tailored recommendations!",
+  "planner.suggestions.mediumProfileInfo": "Good start! Complete your profile for even better suggestions.",
+  "planner.suggestions.highProfileSuccess": "Highly personalized suggestions",
+  "planner.suggestions.completeProfile": "Complete my profile",
+  "planner.suggestions.keepGoing": "That works for me"
 }
