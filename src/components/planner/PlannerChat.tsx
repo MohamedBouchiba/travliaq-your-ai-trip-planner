@@ -81,6 +81,39 @@ import { useLocale } from "@/hooks/useLocale";
 import { eventBus, emitTabChange, emitTabAndZoom } from "@/lib/eventBus";
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 
+/**
+ * ─── PRINCIPLE 2: Unified Entity Pipeline ───
+ * 
+ * Single point of entry for persisting extracted entities from ANY source.
+ * Merges entities from intent classification and flight data with priority:
+ * flightData > intent entities (flightData is more precise when available).
+ * 
+ * This ensures no entity is ever lost regardless of which tool produced it.
+ */
+function persistExtractedEntities(
+  intentEntities: Record<string, unknown> | undefined,
+  flightData: Record<string, unknown> | null,
+  widgetFlow: {
+    setPendingTripDuration: (d: string) => void;
+    setPendingPreferredMonth: (m: string) => void;
+  }
+) {
+  // Merge: flightData values override intent entities when both exist
+  const tripDuration = 
+    (flightData?.tripDuration as string | undefined) || 
+    (intentEntities?.tripDuration as string | undefined);
+  const preferredMonth = 
+    (flightData?.preferredMonth as string | undefined) || 
+    (intentEntities?.preferredMonth as string | undefined);
+
+  if (tripDuration && typeof tripDuration === 'string') {
+    widgetFlow.setPendingTripDuration(tripDuration);
+  }
+  if (preferredMonth && typeof preferredMonth === 'string') {
+    widgetFlow.setPendingPreferredMonth(preferredMonth);
+  }
+}
+
 // Re-export types for external consumers
 export type {
   ChatQuickAction,
@@ -1265,16 +1298,14 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
       let showDateWidget = false;
       let showTravelersWidget = false;
 
-      // Persist tripDuration/preferredMonth from intent entities even without flightData
-      if (intentClassification?.entities) {
-        const ent = intentClassification.entities as Record<string, unknown>;
-        if (ent.tripDuration && typeof ent.tripDuration === 'string') {
-          widgetFlow.setPendingTripDuration(ent.tripDuration);
-        }
-        if (ent.preferredMonth && typeof ent.preferredMonth === 'string') {
-          widgetFlow.setPendingPreferredMonth(ent.preferredMonth);
-        }
-      }
+      // ─── PRINCIPLE 2: Unified Entity Pipeline ───
+      // Single point of entry for persisting entities from ANY source.
+      // Sources are merged with priority: flightData > intent entities (more precise).
+      persistExtractedEntities(
+        intentClassification?.entities as Record<string, unknown> | undefined,
+        flightData as unknown as Record<string, unknown> | null,
+        widgetFlow
+      );
 
       if (flightData && Object.keys(flightData).length > 0) {
         const needsDestinationCity = flightData.needsCitySelection && flightData.toCountryCode;
@@ -1286,14 +1317,6 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
 
         if (showDateWidget && showTravelersWidget) {
           widgetFlow.setPendingTravelersWidget(true);
-        }
-
-        if (flightData.tripDuration) {
-          widgetFlow.setPendingTripDuration(flightData.tripDuration);
-        }
-
-        if (flightData.preferredMonth) {
-          widgetFlow.setPendingPreferredMonth(flightData.preferredMonth);
         }
 
         const memoryUpdates = flightDataToMemory(flightData, memory);

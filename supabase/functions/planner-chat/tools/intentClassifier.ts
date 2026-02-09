@@ -79,10 +79,14 @@ Tu DOIS appeler cet outil en PREMIER pour CHAQUE message utilisateur avant de r�
 - SI préférences complètes → primaryIntent: "ask_inspiration", widgetType: "destinationSuggestions" (maintenant pertinent car basé sur les préférences)
 - IMPORTANT: L'utilisateur indécis doit d'abord exprimer ses envies AVANT de recevoir des suggestions de destinations
 
-### CONFIRMATION DE FIN DE PHASE
-- "non", "rien d'autre", "c'est tout", "pas de restriction", "non merci", "non rien d'autre", "pas besoin", "ça me va"
-  → primaryIntent: "confirm_selection" (PAS "other")
-- L'utilisateur confirme qu'il n'a plus de critères/préférences à ajouter
+### CONFIRMATION / FIN DE PHASE (RÈGLE SÉMANTIQUE)
+Quand l'utilisateur indique qu'il n'a plus rien à ajouter, qu'il a terminé, 
+ou qu'il confirme implicitement la fin d'une étape de collecte d'informations 
+(quelle que soit la langue ou la formulation), classifie comme:
+→ primaryIntent: "confirm_selection"
+Cette règle s'applique à toute expression de satisfaction avec l'état actuel,
+de négation indiquant l'absence d'information supplémentaire, ou de confirmation
+que tout a été dit. Ne PAS classifier comme "other" dans ces cas.
 
 ### ACTIONS SPÉCIALES
 - "choisis pour moi" → primaryIntent: "delegate_choice"
