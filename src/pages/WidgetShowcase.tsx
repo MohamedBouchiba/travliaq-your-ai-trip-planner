@@ -1,172 +1,223 @@
 /**
- * WidgetShowcase - Catalog page for all chat widgets
+ * WidgetShowcase - Live catalog page for all chat widgets
+ * Renders actual widgets with mock data for visual reference
  */
 
+import { useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import { ArrowLeft, Calendar, Users, Plane, MapPin, Settings, AlertCircle, Clock, TrendingUp, Navigation, Filter, Bell } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ArrowLeft, Calendar, Users, Plane, MapPin, Settings, Filter, Clock, TrendingUp, Bell, AlertCircle, Navigation, Eye, EyeOff } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-interface WidgetInfo {
-  name: string;
-  description: string;
-  file: string;
-  status: "stable" | "beta";
-}
+// Core widgets
+import { DatePickerWidget } from "@/components/planner/chat/widgets/DatePickerWidget";
+import { TravelersWidget } from "@/components/planner/chat/widgets/TravelersWidget";
+import { PreferenceStyleWidget } from "@/components/planner/chat/widgets/PreferenceStyleWidget";
+import { PreferenceInterestsWidget } from "@/components/planner/chat/widgets/PreferenceInterestsWidget";
+import { MustHavesWidget } from "@/components/planner/chat/widgets/MustHavesWidget";
+import { DietaryWidget } from "@/components/planner/chat/widgets/DietaryWidget";
+import { ConfirmedWidget } from "@/components/planner/chat/widgets/ConfirmedWidget";
 
-interface WidgetCategory {
+// Selection widgets
+import { StarRatingSelector } from "@/components/planner/chat/widgets/selection/StarRatingSelector";
+import { BudgetRangeSlider } from "@/components/planner/chat/widgets/selection/BudgetRangeSlider";
+import { CabinClassSelector } from "@/components/planner/chat/widgets/selection/CabinClassSelector";
+import { DirectFlightToggle } from "@/components/planner/chat/widgets/selection/DirectFlightToggle";
+import { DurationChips } from "@/components/planner/chat/widgets/selection/DurationChips";
+import { QuickFilterChips } from "@/components/planner/chat/widgets/selection/QuickFilterChips";
+
+// Noop handlers
+const noop = () => {};
+const noopDate = (_d: Date) => {};
+const noopTravelers = (_t: { adults: number; children: number; infants: number }) => {};
+
+interface ShowcaseSection {
   id: string;
   title: string;
   icon: React.ReactNode;
   description: string;
-  widgets: WidgetInfo[];
+  widgets: Array<{
+    name: string;
+    description: string;
+    status: "stable" | "beta";
+    render: () => React.ReactNode;
+  }>;
 }
 
-const widgetCategories: WidgetCategory[] = [
-  {
-    id: "core",
-    title: "Widgets de base",
-    icon: <Calendar className="h-5 w-5" />,
-    description: "Widgets fondamentaux pour la sélection de dates, voyageurs et confirmations",
-    widgets: [
-      { name: "DatePickerWidget", description: "Calendrier inline pour sélection de date", file: "DatePickerWidget.tsx", status: "stable" },
-      { name: "DateRangePickerWidget", description: "Sélection de plage de dates aller-retour", file: "DateRangePickerWidget.tsx", status: "stable" },
-      { name: "TravelersWidget", description: "Compteur adultes/enfants/bébés", file: "TravelersWidget.tsx", status: "stable" },
-      { name: "TripTypeConfirmWidget", description: "Confirmation aller simple/retour", file: "TripTypeWidget.tsx", status: "stable" },
-      { name: "CitySelectionWidget", description: "Sélection de ville parmi plusieurs options", file: "CitySelectionWidget.tsx", status: "stable" },
-      { name: "ConfirmedWidget", description: "Affichage d'une sélection confirmée", file: "ConfirmedWidget.tsx", status: "stable" },
-    ],
-  },
-  {
-    id: "airports",
-    title: "Widgets Aéroports",
-    icon: <Plane className="h-5 w-5" />,
-    description: "Sélection et confirmation des aéroports",
-    widgets: [
-      { name: "AirportButton", description: "Bouton de sélection d'aéroport unique", file: "AirportWidgets.tsx", status: "stable" },
-      { name: "DualAirportSelection", description: "Sélection aéroport départ + arrivée", file: "AirportWidgets.tsx", status: "stable" },
-      { name: "AirportConfirmationWidget", description: "Confirmation multi-destination", file: "AirportWidgets.tsx", status: "stable" },
-    ],
-  },
-  {
-    id: "preferences",
-    title: "Widgets Préférences",
-    icon: <Settings className="h-5 w-5" />,
-    description: "Collecte des préférences de voyage",
-    widgets: [
-      { name: "PreferenceStyleWidget", description: "Curseurs style (relax/intense, ville/nature)", file: "PreferenceStyleWidget.tsx", status: "stable" },
-      { name: "PreferenceInterestsWidget", description: "Sélection centres d'intérêt", file: "PreferenceInterestsWidget.tsx", status: "stable" },
-      { name: "MustHavesWidget", description: "Critères indispensables", file: "MustHavesWidget.tsx", status: "stable" },
-      { name: "DietaryWidget", description: "Restrictions alimentaires", file: "DietaryWidget.tsx", status: "stable" },
-    ],
-  },
-  {
-    id: "destinations",
-    title: "Widgets Destinations",
-    icon: <MapPin className="h-5 w-5" />,
-    description: "Suggestions et cartes de destinations",
-    widgets: [
-      { name: "DestinationSuggestionCard", description: "Carte premium avec image, score, budget", file: "DestinationSuggestionCard.tsx", status: "stable" },
-      { name: "DestinationSuggestionsGrid", description: "Grille de suggestions", file: "DestinationSuggestionsGrid.tsx", status: "stable" },
-    ],
-  },
-  {
-    id: "selection",
-    title: "Widgets Sélection",
-    icon: <Filter className="h-5 w-5" />,
-    description: "Filtres rapides et sélecteurs",
-    widgets: [
-      { name: "QuickFilterChips", description: "Chips de filtres configurables", file: "selection/QuickFilterChips.tsx", status: "stable" },
-      { name: "StarRatingSelector", description: "Sélecteur d'étoiles hôtel", file: "selection/StarRatingSelector.tsx", status: "stable" },
-      { name: "CabinClassSelector", description: "Classe de cabine vol", file: "selection/CabinClassSelector.tsx", status: "stable" },
-      { name: "DirectFlightToggle", description: "Toggle vols directs", file: "selection/DirectFlightToggle.tsx", status: "stable" },
-      { name: "BudgetRangeSlider", description: "Curseur plage de budget", file: "selection/BudgetRangeSlider.tsx", status: "stable" },
-      { name: "DurationChips", description: "Filtres durée activité", file: "selection/DurationChips.tsx", status: "stable" },
-    ],
-  },
-  {
-    id: "progress",
-    title: "Widgets Progression",
-    icon: <TrendingUp className="h-5 w-5" />,
-    description: "Suivi progression et budget",
-    widgets: [
-      { name: "MissingFieldsCard", description: "Champs manquants pour recherche", file: "progress/MissingFieldsCard.tsx", status: "stable" },
-      { name: "ChecklistWidget", description: "Checklist interactive du voyage", file: "progress/ChecklistWidget.tsx", status: "stable" },
-      { name: "BudgetProgressWidget", description: "Barres budget par catégorie", file: "progress/BudgetProgressWidget.tsx", status: "stable" },
-    ],
-  },
-  {
-    id: "interactive",
-    title: "Widgets Interactifs",
-    icon: <Clock className="h-5 w-5" />,
-    description: "Timeline, météo et cartes",
-    widgets: [
-      { name: "TimelineWidget", description: "Timeline jour par jour", file: "interactive/TimelineWidget.tsx", status: "stable" },
-      { name: "WeatherWidget", description: "Prévisions météo", file: "interactive/WeatherWidget.tsx", status: "stable" },
-      { name: "MapPreviewWidget", description: "Aperçu carte avec marqueurs", file: "interactive/MapPreviewWidget.tsx", status: "stable" },
-    ],
-  },
-  {
-    id: "alerts",
-    title: "Widgets Alertes",
-    icon: <Bell className="h-5 w-5" />,
-    description: "Alertes prix et conflits",
-    widgets: [
-      { name: "PriceAlertBanner", description: "Bannière changement de prix", file: "alerts/PriceAlertBanner.tsx", status: "stable" },
-      { name: "ConflictAlert", description: "Alerte conflits planning", file: "alerts/ConflictAlertWidget.tsx", status: "stable" },
-    ],
-  },
-  {
-    id: "results",
-    title: "Widgets Résultats",
-    icon: <Plane className="h-5 w-5" />,
-    description: "Cartes de résultats compactes",
-    widgets: [
-      { name: "CompactFlightCard", description: "Carte vol avec aller-retour", file: "results/CompactFlightCard.tsx", status: "stable" },
-    ],
-  },
-  {
-    id: "navigation",
-    title: "Widgets Navigation",
-    icon: <Navigation className="h-5 w-5" />,
-    description: "Boutons et actions rapides",
-    widgets: [
-      { name: "TabSwitcher", description: "Navigation entre onglets", file: "navigation/TabSwitcher.tsx", status: "stable" },
-      { name: "BackButton / SearchAgainButton", description: "Boutons d'action", file: "navigation/NavigationButtons.tsx", status: "stable" },
-      { name: "QuickEditChips", description: "Édition rapide paramètres", file: "navigation/QuickEditChips.tsx", status: "stable" },
-    ],
-  },
-  {
-    id: "comparison",
-    title: "Widgets Comparaison",
-    icon: <TrendingUp className="h-5 w-5" />,
-    description: "Comparaison côte à côte",
-    widgets: [
-      { name: "ComparisonWidget", description: "Comparaison multi-options", file: "comparison/ComparisonWidget.tsx", status: "stable" },
-    ],
-  },
-  {
-    id: "booking",
-    title: "Widgets Réservation",
-    icon: <AlertCircle className="h-5 w-5" />,
-    description: "Flux de réservation",
-    widgets: [
-      { name: "BookingFlowWidget", description: "Flux complet de réservation", file: "booking/BookingFlowWidget.tsx", status: "beta" },
-      { name: "BookingSummaryCard", description: "Résumé de réservation", file: "booking/BookingFlowWidget.tsx", status: "beta" },
-    ],
-  },
-];
-
 const WidgetShowcase = () => {
-  const totalWidgets = widgetCategories.reduce((acc, c) => acc + c.widgets.length, 0);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+
+  const toggleSection = useCallback((id: string) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const sections: ShowcaseSection[] = [
+    {
+      id: "core",
+      title: "Widgets de base",
+      icon: <Calendar className="h-5 w-5" />,
+      description: "Widgets fondamentaux pour la sélection de dates, voyageurs et confirmations",
+      widgets: [
+        {
+          name: "DatePickerWidget",
+          description: "Calendrier inline pour sélection de date",
+          status: "stable",
+          render: () => (
+            <DatePickerWidget
+              label="Date de départ"
+              value={null}
+              onChange={noopDate}
+              skipStoreSync
+            />
+          ),
+        },
+        {
+          name: "TravelersWidget",
+          description: "Compteur adultes/enfants/bébés",
+          status: "stable",
+          render: () => (
+            <TravelersWidget
+              initialValues={{ adults: 2, children: 1, infants: 0 }}
+              onConfirm={noopTravelers}
+              skipStoreSync
+            />
+          ),
+        },
+        {
+          name: "ConfirmedWidget",
+          description: "Affichage d'une sélection confirmée",
+          status: "stable" as const,
+          render: () => (
+            <ConfirmedWidget widgetType="dateRangePicker" selectedValue={{ departureDate: "2026-03-15", returnDate: "2026-03-22" }} displayLabel="15 mars → 22 mars 2026" />
+          ),
+        },
+      ],
+    },
+    {
+      id: "preferences",
+      title: "Widgets Préférences",
+      icon: <Settings className="h-5 w-5" />,
+      description: "Collecte des préférences de voyage",
+      widgets: [
+        {
+          name: "PreferenceStyleWidget",
+          description: "Curseurs style (relax/intense, ville/nature, budget/luxe, touriste/authentique)",
+          status: "stable",
+          render: () => <PreferenceStyleWidget onContinue={noop} />,
+        },
+        {
+          name: "PreferenceInterestsWidget",
+          description: "Sélection centres d'intérêt (max 5)",
+          status: "stable",
+          render: () => <PreferenceInterestsWidget onContinue={noop} />,
+        },
+        {
+          name: "MustHavesWidget",
+          description: "Critères indispensables (accessibilité, animaux, etc.)",
+          status: "stable",
+          render: () => <MustHavesWidget onContinue={noop} />,
+        },
+        {
+          name: "DietaryWidget",
+          description: "Restrictions alimentaires",
+          status: "stable",
+          render: () => <DietaryWidget onContinue={noop} />,
+        },
+      ],
+    },
+    {
+      id: "selection",
+      title: "Widgets Sélection",
+      icon: <Filter className="h-5 w-5" />,
+      description: "Filtres rapides et sélecteurs",
+      widgets: [
+        {
+          name: "StarRatingSelector",
+          description: "Sélecteur d'étoiles hôtel",
+          status: "stable",
+          render: () => (
+            <StarRatingSelector
+              onRatingChange={noop}
+              initialRatings={[3, 4]}
+              showAnyOption
+            />
+          ),
+        },
+        {
+          name: "BudgetRangeSlider",
+          description: "Curseur plage de budget",
+          status: "stable",
+          render: () => (
+            <BudgetRangeSlider
+              onBudgetChange={noop}
+              currency="€"
+            />
+          ),
+        },
+        {
+          name: "CabinClassSelector",
+          description: "Classe de cabine vol",
+          status: "stable",
+          render: () => (
+            <CabinClassSelector onCabinChange={noop} />
+          ),
+        },
+        {
+          name: "DirectFlightToggle",
+          description: "Toggle vols directs / escales",
+          status: "stable",
+          render: () => (
+            <DirectFlightToggle onChange={noop} />
+          ),
+        },
+        {
+          name: "DurationChips",
+          description: "Filtres durée activité",
+          status: "stable",
+          render: () => (
+            <DurationChips onDurationChange={noop} />
+          ),
+        },
+        {
+          name: "QuickFilterChips",
+          description: "Chips de filtres configurables",
+          status: "stable",
+          render: () => (
+            <QuickFilterChips
+              groups={[
+                {
+                  id: "amenities",
+                  label: "Équipements",
+                  chips: [
+                    { id: "wifi", label: "WiFi", value: "wifi", icon: "📶" },
+                    { id: "pool", label: "Piscine", value: "pool", icon: "🏊" },
+                    { id: "spa", label: "Spa", value: "spa", icon: "💆" },
+                    { id: "gym", label: "Salle sport", value: "gym", icon: "🏋️" },
+                    { id: "parking", label: "Parking", value: "parking", icon: "🅿️" },
+                  ],
+                },
+              ]}
+              onFilterChange={noop}
+            />
+          ),
+        },
+      ],
+    },
+  ];
+
+  const totalWidgets = sections.reduce((acc, s) => acc + s.widgets.length, 0);
 
   return (
     <>
       <Helmet>
         <title>Widget Showcase | Travliaq</title>
-        <meta name="description" content="Catalogue des widgets chat Travliaq" />
+        <meta name="description" content="Catalogue visuel des widgets chat Travliaq" />
         <meta name="robots" content="noindex" />
       </Helmet>
 
@@ -178,43 +229,55 @@ const WidgetShowcase = () => {
             </Link>
             <div>
               <h1 className="text-xl font-bold">Widget Showcase</h1>
-              <p className="text-sm text-muted-foreground">{totalWidgets} widgets dans {widgetCategories.length} catégories</p>
+              <p className="text-sm text-muted-foreground">{totalWidgets} widgets affichés en live</p>
             </div>
           </div>
         </header>
 
         <main className="container mx-auto px-4 py-8 space-y-8">
-          {widgetCategories.map((category) => (
-            <Card key={category.id}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3">
-                  {category.icon}
-                  {category.title}
-                  <Badge variant="secondary">{category.widgets.length}</Badge>
-                </CardTitle>
-                <CardDescription>{category.description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {category.widgets.map((widget) => (
-                    <div
-                      key={widget.name}
-                      className="p-3 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <code className="text-sm font-semibold text-foreground">{widget.name}</code>
-                        <Badge variant={widget.status === "stable" ? "default" : "outline"} className="text-xs">
-                          {widget.status}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{widget.description}</p>
-                      <p className="text-xs text-muted-foreground/60 mt-1 font-mono">{widget.file}</p>
+          {sections.map((section) => {
+            const isCollapsed = collapsedSections.has(section.id);
+            return (
+              <Card key={section.id}>
+                <CardHeader
+                  className="cursor-pointer select-none"
+                  onClick={() => toggleSection(section.id)}
+                >
+                  <CardTitle className="flex items-center gap-3">
+                    {section.icon}
+                    {section.title}
+                    <Badge variant="secondary">{section.widgets.length}</Badge>
+                    <span className="ml-auto text-muted-foreground">
+                      {isCollapsed ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                    </span>
+                  </CardTitle>
+                  <CardDescription>{section.description}</CardDescription>
+                </CardHeader>
+                {!isCollapsed && (
+                  <CardContent>
+                    <div className="space-y-8">
+                      {section.widgets.map((widget) => (
+                        <div key={widget.name} className="space-y-2">
+                          {/* Widget label */}
+                          <div className="flex items-center gap-2">
+                            <code className="text-sm font-semibold text-primary">{widget.name}</code>
+                            <Badge variant={widget.status === "stable" ? "default" : "outline"} className="text-xs">
+                              {widget.status}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">— {widget.description}</span>
+                          </div>
+                          {/* Live widget render */}
+                          <div className="max-w-md rounded-xl border border-dashed border-border/60 bg-muted/20 p-4">
+                            {widget.render()}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  </CardContent>
+                )}
+              </Card>
+            );
+          })}
         </main>
       </div>
     </>
