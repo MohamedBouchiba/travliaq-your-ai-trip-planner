@@ -115,17 +115,25 @@ export function useSessionContext({
    * Extract session entities from all messages
    */
   const sessionEntities = useMemo<SessionEntities>(() => {
-    // Combine all user message text
-    const userText = messages
-      .filter((m) => m.role === "user" && m.text)
-      .map((m) => m.text)
-      .join(" ");
+    // Extract entities per-message to avoid cross-boundary regex matches
+    const userMessages = messages.filter((m) => m.role === "user" && m.text);
 
-    // Extract entities
-    const destinations = extractEntities(userText, ENTITY_PATTERNS.destinations);
-    const dates = extractEntities(userText, ENTITY_PATTERNS.dates);
-    const budgets = extractEntities(userText, ENTITY_PATTERNS.budgets);
-    const constraints = extractEntities(userText, ENTITY_PATTERNS.constraints);
+    const destinationsSet = new Set<string>();
+    const datesSet = new Set<string>();
+    const budgetsSet = new Set<string>();
+    const constraintsSet = new Set<string>();
+
+    for (const msg of userMessages) {
+      for (const d of extractEntities(msg.text, ENTITY_PATTERNS.destinations)) destinationsSet.add(d);
+      for (const d of extractEntities(msg.text, ENTITY_PATTERNS.dates)) datesSet.add(d);
+      for (const b of extractEntities(msg.text, ENTITY_PATTERNS.budgets)) budgetsSet.add(b);
+      for (const c of extractEntities(msg.text, ENTITY_PATTERNS.constraints)) constraintsSet.add(c);
+    }
+
+    const destinations = Array.from(destinationsSet);
+    const dates = Array.from(datesSet);
+    const budgets = Array.from(budgetsSet);
+    const constraints = Array.from(constraintsSet);
 
     // Also extract from widget interactions
     for (const interaction of widgetInteractions) {
