@@ -1,199 +1,141 @@
 
+# Plan : Suggestions Intelligentes + Debug des Suggestions
 
-# Plan : Debug Enrichi + Fix Bug Auto-Selection + Axes d'Amelioration Chat
+## Probleme Identifie
 
-## Bug Identifie : Auto-Selection "Oman"
+### 1. Suggestions generiques "Recapitule" et "Aide"
+Dans le fichier `messageAnalyzer.ts` (lignes 672-681), quand le message de l'assistant n'est pas reconnu par les patterns (type `unknown`), le fallback est `SUGGESTION_TEMPLATES.default_mid` qui montre systematiquement "Recapitule" et "Aide". C'est le cas pour des messages comme "Parfait, je note 2 voyageurs..." ou "Pour continuer, voici ce qu'il reste a preciser..." qui ne matchent aucun pattern existant.
 
-**Cause racine** : Le LLM a genere une balise `<action>{"type":"chooseWidget","widgetType":"destinationSuggestions","option":"Oman",...}</action>` dans sa reponse alors que l'utilisateur n'a **jamais** dit "choisis pour moi". Le frontend a parse cette action et execute le choix automatiquement via `executeChooseWidgetAction`.
+Resultat : des suggestions inutiles et du bruit visuel, comme visible sur le screenshot.
 
-Le probleme est double :
-1. **Backend** : Le system prompt autorise le `chooseWidget` de maniere trop large, le LLM l'utilise meme quand ce n'est pas demande
-2. **Frontend** : Aucune verification que l'utilisateur a explicitement demande un choix automatique avant d'executer `chooseWidget`
+### 2. Pas de visibilite sur les suggestions dans le debug
+Le debug panel ne trace pas quelles suggestions (SmartSuggestions / dynamicSuggestions) sont proposees a l'utilisateur a chaque etape. Cela empeche de diagnostiquer pourquoi des suggestions inappropriees apparaissent.
 
 ---
 
-## Partie 1 : Fix du Bug chooseWidget
+## Solution
 
-### 1.1 Frontend - Guard de securite dans `parseAction.ts`
+### Partie 1 : Rendre les suggestions beaucoup plus intelligentes
 
-Ajouter un mecanisme de confirmation : le `chooseWidget` ne s'execute que si le **dernier message utilisateur** contient explicitement une demande de delegation ("choisis pour moi", "decide pour moi", "a toi de choisir", etc.).
+#### 1.1 Ajouter de nouveaux patterns dans `messageAnalyzer.ts`
 
-**Fichier** : `src/components/planner/PlannerChat.tsx` (lignes 1172-1179)
+Le message "Parfait, je note 2 voyageurs..." contient un pattern de confirmation + question suivante. On doit ajouter des patterns pour detecter :
 
-Au lieu d'executer directement `chooseWidget`, verifier le contexte :
+- **"Depuis quelle ville" / "departure city"** --> nouveau type `departure_question`
+- **"Il reste a preciser" / "what's left"** --> nouveau type `next_steps` (liste de choses restantes)
+- **"Je note X voyageurs"** --> reconnu comme `confirmation` (deja existant, mais le pattern ne matche pas car "je note" n'est pas dans `CONFIRMATION_PATTERNS`)
+
+Ajouts dans `CONFIRMATION_PATTERNS` :
+```
+/je\s+note/i,
+/bien\s+noté/i,
+/enregistré/i,
+/i('ll)?\s+note/i,
+```
+
+Nouveaux patterns :
+```typescript
+const DEPARTURE_QUESTION_PATTERNS = [
+  /depuis\s+quelle\s+ville/i,
+  /ville\s+de\s+départ/i,
+  /d'où\s+(souhaitez-vous|souhaites-tu|veux-tu)\s+partir/i,
+  /from\s+which\s+city/i,
+  /departure\s+city/i,
+  /where\s+(would you like|do you want)\s+to\s+(depart|leave)\s+from/i,
+];
+
+const NEXT_STEPS_PATTERNS = [
+  /il\s+reste\s+à\s+préciser/i,
+  /voici\s+ce\s+qu'il\s+reste/i,
+  /ce\s+que\s+nous\s+devons\s+préciser/i,
+  /what('s|\s+is)\s+(left|remaining)\s+to/i,
+  /here('s|\s+is)\s+what\s+we\s+(still\s+)?need/i,
+];
+```
+
+#### 1.2 Ajouter des templates de suggestions pour ces nouveaux types
 
 ```typescript
-} else if (action) {
-  if (action.type === "chooseWidget") {
-    // GUARD: Only execute if user explicitly asked
-    const lastUserMsg = messages.filter(m => m.role === "user").pop();
-    const delegationPatterns = /choisis|decide|a toi|fais confiance|prends le|meilleur pour moi/i;
-    const userAskedForChoice = lastUserMsg && delegationPatterns.test(lastUserMsg.text);
-    
-    if (userAskedForChoice) {
-      const executed = widgetActionExecutor.executeChooseWidgetAction(action);
-      // ...
-    } else {
-      console.warn("[PlannerChat] Blocked auto-chooseWidget - user did not ask for delegation");
-    }
+departure_question: {
+  fr: [
+    { id: 'brussels', label: 'Bruxelles', message: 'Je pars de Bruxelles', emoji: '✈️' },
+    { id: 'paris', label: 'Paris', message: 'Je pars de Paris', emoji: '✈️' },
+    { id: 'other', label: 'Autre ville', message: 'Je pars de ', emoji: '📍' },
+  ],
+  en: [
+    { id: 'london', label: 'London', message: 'I depart from London', emoji: '✈️' },
+    { id: 'paris', label: 'Paris', message: 'I depart from Paris', emoji: '✈️' },
+    { id: 'other', label: 'Other city', message: 'I depart from ', emoji: '📍' },
+  ],
+},
+```
+
+Pour `next_steps` : parser le texte pour identifier quels champs manquent et proposer des suggestions ciblees (ex: si "Nombre de voyageurs" est mentionne, proposer "Seul" / "En couple" / "En famille").
+
+#### 1.3 Ameliorer le fallback `default_mid`
+
+Au lieu d'afficher systematiquement "Recapitule" / "Aide", le fallback devrait :
+1. **Verifier le flowState** : proposer des suggestions basees sur les champs manquants (destination, dates, voyageurs)
+2. **Si rien ne manque** : ne pas afficher de suggestions du tout (retourner un tableau vide)
+3. **En dernier recours seulement** : garder "Recapitule" uniquement si le voyage a assez de donnees (destination + dates au minimum)
+
+Modification dans `getAnticipatedSuggestions` (lignes 803-809) :
+
+```typescript
+default:
+  if (conversationTurn === 0) {
+    return SUGGESTION_TEMPLATES.default_start[lang];
   }
-  // ... rest of actions
-}
+  // Don't show generic "Recap/Help" unless trip has meaningful data
+  // Return empty to let the static suggestion engine handle it contextually
+  return [];
 ```
 
-### 1.2 Backend - Renforcer le system prompt
-
-**Fichier** : `supabase/functions/planner-chat/prompts/phasePrompts.ts` (lignes 162-210)
-
-Ajouter une regle negative explicite :
-
-```
-### INTERDICTIONS ABSOLUES
-- Ne JAMAIS generer une balise <action> avec chooseWidget SAUF si l'utilisateur 
-  a EXPLICITEMENT dit "choisis pour moi", "decide pour moi", etc.
-- Proposer des destinations n'est PAS la meme chose que choisir pour l'utilisateur
-- Si l'utilisateur demande "d'autres destinations", ne PAS choisir pour lui
-```
+Cela permet au `getSuggestions()` dans `suggestionEngine.ts` de prendre le relais avec des suggestions contextuelles basees sur le workflow step (etapes 4-8 du switch), qui sont beaucoup plus pertinentes.
 
 ---
 
-## Partie 2 : Debug Panel Enrichi
+### Partie 2 : Tracker les suggestions dans le Debug Panel
 
-### 2.1 Timestamps et chronologie des messages
-
-Ajouter un champ `timestamp` dans le type `ChatMessage` pour tracer quand chaque message est cree.
-
-**Fichier** : `src/components/planner/chat/types.ts`
-
-```typescript
-export interface ChatMessage {
-  id: string;
-  role: "assistant" | "user" | "system";
-  text: string;
-  timestamp?: number; // Date.now() when message was created
-  // ... rest
-}
-```
-
-**Fichier** : `src/components/planner/PlannerChat.tsx`
-
-A chaque creation de message (utilisateur ou assistant), ajouter `timestamp: Date.now()`.
-
-### 2.2 Copie debug enrichie avec chronologie
-
-**Fichier** : `src/components/planner/debug/DebugPanel.tsx`
-
-Enrichir `handleCopyDebugInfo` pour inclure :
-- **Chronologie des messages** : texte tronque + timestamp + role + widget attache
-- **Interactions** : actions chooseWidget bloquees ou executees
-- **Version du debug** pour tracabilite
-
-```typescript
-const handleCopyDebugInfo = () => {
-  const debugData = {
-    debugVersion: "2.0",
-    timestamp: new Date().toISOString(),
-    // Nouveau : chronologie complete des messages
-    messageTimeline: messages.map(m => ({
-      id: m.id,
-      role: m.role,
-      text: m.text.substring(0, 100) + (m.text.length > 100 ? "..." : ""),
-      timestamp: m.timestamp ? new Date(m.timestamp).toISOString() : null,
-      widget: m.widget || null,
-      widgetConfirmed: m.widgetConfirmed || false,
-      isAutoGenerated: m.isAutoGenerated || false,
-      hasQuickReplies: (m.quickReplies?.length || 0) > 0,
-    })),
-    // Nouveau : actions bloquees
-    blockedActions: blockedActionsRef.current,
-    intent: lastIntent,
-    reasoning,
-    flowState,
-    toolExecutions: toolExecutions.map(t => ({
-      tool: t.tool,
-      status: t.status,
-      reason: t.reason,
-      summary: t.summary,
-      latency_ms: t.latency_ms,
-      timestamp: new Date(t.timestamp).toISOString(),
-    })),
-    memoryContext,
-    rawResponses: rawResponses.map(r => r.data),
-  };
-  // ...
-};
-```
-
-### 2.3 Nouvel onglet "Timeline" dans le Debug Panel
-
-Ajouter un 5eme onglet dans le debug panel qui montre la chronologie visuelle des messages avec :
-- Timestamp de chaque message
-- Role (user/assistant/system)
-- Widget attache et son etat (pending/confirmed/dismissed)
-- Actions executees ou bloquees
-
-**Fichier** : `src/components/planner/debug/DebugPanel.tsx` - Nouvel onglet
-**Fichier** : `src/components/planner/debug/MessageTimeline.tsx` - Nouveau composant
-
----
-
-## Partie 3 : Rendre le Debug Panel conscient des messages
-
-Le Debug Panel n'a actuellement pas acces aux messages du chat. Il faut soit :
-- Passer les messages via le store Zustand (ajouter un champ `messages` au debugStore)
-- Ou passer les messages en props via le `PlannerDebug.tsx`
-
-**Approche choisie** : Ajouter au `debugStore` un champ `messageTimeline` (version legere des messages) mis a jour a chaque changement.
-
-**Fichier** : `src/stores/debugStore.ts`
+#### 2.1 Ajouter les suggestions au `DebugMessageSnapshot` dans `debugStore.ts`
 
 ```typescript
 export interface DebugMessageSnapshot {
   id: string;
   role: "user" | "assistant" | "system";
-  textPreview: string; // first 100 chars
+  textPreview: string;
   timestamp: number;
   widget?: string;
   widgetConfirmed?: boolean;
   isAutoGenerated?: boolean;
+  // NEW: Track suggestions shown after this message
+  suggestionsShown?: string[]; // labels of suggestions displayed
 }
-
-// Add to store:
-messageTimeline: DebugMessageSnapshot[];
-setMessageTimeline: (timeline: DebugMessageSnapshot[]) => void;
 ```
 
-**Fichier** : `src/components/planner/PlannerChat.tsx`
+#### 2.2 Synchroniser les suggestions dans `PlannerChat.tsx`
 
-Synchroniser le `messageTimeline` dans le debug store a chaque mise a jour des messages.
+Quand `setDynamicSuggestions` est appele ou quand les suggestions statiques changent, mettre a jour le `messageTimeline` du dernier message assistant avec les labels des suggestions.
 
----
+#### 2.3 Ajouter les suggestions a l'export debug dans `DebugPanel.tsx`
 
-## Partie 4 : Axes d'Amelioration du Chat
-
-### 4.1 Tracker les actions bloquees
-
-Quand un `chooseWidget` est bloque par le guard, le logger dans le debug store pour visibilite.
-
-**Fichier** : `src/stores/debugStore.ts`
+Dans `handleCopyDebugInfo`, ajouter les suggestions pour chaque message :
 
 ```typescript
-export interface BlockedAction {
-  type: string;
-  widgetType: string;
-  option: string;
-  reason: string;
-  timestamp: number;
-}
-// blockedActions: BlockedAction[];
-// addBlockedAction: (action: BlockedAction) => void;
+messageTimeline: messageTimeline.map(m => ({
+  ...existingFields,
+  suggestionsShown: m.suggestionsShown || [],
+})),
 ```
 
-### 4.2 Amelioration du conversationSummary
+#### 2.4 Afficher les suggestions dans `MessageTimeline.tsx`
 
-Le `conversationSummary` dans le memory context montre encore l'ancien texte systeme ("Voici 3 destinations parfaites pour vous, basees sur votre profil (35% de completion)"). Il faut s'assurer que le resume utilise le texte reel du message AI, pas le texte systeme.
+Sous chaque message assistant dans la timeline, afficher les suggestions proposees sous forme de petits badges :
 
-Ce changement est cote backend dans la construction du memory context - verifier que le texte passe au resume est bien le `content` du stream et non le texte remplace.
+```
+[AI] 12:28:15 "Parfait, je note 2 voyageurs..."
+     Suggestions: [Recapitule] [Aide]    <-- visible en debug
+```
 
 ---
 
@@ -201,18 +143,15 @@ Ce changement est cote backend dans la construction du memory context - verifier
 
 | Fichier | Changement |
 |---------|------------|
-| `src/components/planner/PlannerChat.tsx` | Guard chooseWidget + timestamps messages + sync debug store |
-| `src/components/planner/chat/types.ts` | Ajouter `timestamp` a `ChatMessage` |
-| `src/components/planner/chat/utils/parseAction.ts` | Aucun changement (le guard est dans PlannerChat) |
-| `src/stores/debugStore.ts` | `messageTimeline` + `blockedActions` |
-| `src/components/planner/debug/DebugPanel.tsx` | Copie enrichie + onglet Timeline |
-| `src/components/planner/debug/MessageTimeline.tsx` | Nouveau composant chronologie |
-| `supabase/functions/planner-chat/prompts/phasePrompts.ts` | Renforcer interdiction chooseWidget |
+| `src/components/planner/chat/services/messageAnalyzer.ts` | Nouveaux patterns (departure, next_steps, confirmation elargi) + templates + suppression fallback generique |
+| `src/stores/debugStore.ts` | Ajouter `suggestionsShown` a `DebugMessageSnapshot` |
+| `src/components/planner/PlannerChat.tsx` | Synchroniser les suggestions dans le debug store |
+| `src/components/planner/debug/DebugPanel.tsx` | Inclure suggestions dans l'export debug |
+| `src/components/planner/debug/MessageTimeline.tsx` | Afficher les suggestions sous chaque message |
 
 ## Resultat attendu
 
-1. **Le bug "Oman auto-selectionne" ne se reproduira plus** : guard frontend + prompt renforce
-2. **Le debug copie inclura la chronologie complete** des messages avec timestamps
-3. **Un nouvel onglet Timeline** montrera visuellement les interactions
-4. **Les actions bloquees seront visibles** dans le debug pour diagnostiquer les hallucinations du LLM
-
+1. **Apres "Parfait, je note 2 voyageurs... Depuis quelle ville ?"** : suggestions = "Bruxelles" / "Paris" / "Autre ville" (au lieu de "Recapitule" / "Aide")
+2. **Apres un message non reconnu** : pas de suggestions generiques, le systeme contextuel prend le relais selon l'etape du workflow
+3. **Dans le debug copie** : chaque message inclut les suggestions affichees a l'utilisateur
+4. **Dans l'onglet Timeline** : les suggestions sont visibles sous chaque message assistant
