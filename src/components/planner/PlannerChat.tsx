@@ -188,6 +188,24 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     );
   }, [messages]);
 
+  // Sync current suggestions to the last assistant message in debug store
+  useEffect(() => {
+    if (dynamicSuggestions.length === 0) return;
+    const { messageTimeline, setMessageTimeline } = useDebugStore.getState();
+    if (messageTimeline.length === 0) return;
+    
+    // Find the last assistant message and attach suggestion labels
+    const labels = dynamicSuggestions.map(s => s.label);
+    const updated = [...messageTimeline];
+    for (let i = updated.length - 1; i >= 0; i--) {
+      if (updated[i].role === "assistant") {
+        updated[i] = { ...updated[i], suggestionsShown: labels };
+        break;
+      }
+    }
+    setMessageTimeline(updated);
+  }, [dynamicSuggestions]);
+
   // Prevent repeated airport fetch loops (same inputs => only fetch once)
   const airportFetchKeyRef = useRef<string | null>(null);
 

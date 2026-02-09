@@ -424,7 +424,7 @@ export function getSuggestions(context: SuggestionContext): Suggestion[] {
       ? detectLanguage(context.lastUserMessage) 
       : currentLang;
     
-    const anticipated = getAnticipatedSuggestions(lastContent, userIntent, conversationTurn, detectedLang);
+    const anticipated = getAnticipatedSuggestions(lastContent, userIntent, conversationTurn, detectedLang, context.lastAssistantMessage);
     
     if (anticipated.length > 0) {
       return anticipated.map(convertAnticipatedToSuggestion).slice(0, 4);

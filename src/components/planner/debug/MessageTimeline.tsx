@@ -114,6 +114,16 @@ function MessageTimelineComponent() {
                 )}
               </div>
               <p className="text-xs mt-0.5 text-foreground/80 line-clamp-2">{m.textPreview}</p>
+              {m.role === "assistant" && m.suggestionsShown && m.suggestionsShown.length > 0 && (
+                <div className="flex items-center gap-1 mt-1 flex-wrap">
+                  <span className="text-[10px] text-muted-foreground">Suggestions:</span>
+                  {m.suggestionsShown.map((s, idx) => (
+                    <Badge key={idx} variant="outline" className="text-[9px] px-1 py-0 h-3.5 bg-primary/5 text-primary/70 border-primary/20">
+                      {s}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         );
