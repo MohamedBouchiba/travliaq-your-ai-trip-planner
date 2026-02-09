@@ -1,58 +1,62 @@
 
 
-## Plan: Fix Suggestions (Fill Input) + Auto Route on City Selection
+## Plan: Fix Style-First Priority + Widget Rendering for Dietary/MustHaves
 
-### Problem 1: Suggestions auto-submit instead of filling input
-The last change replaced `setInput(message)` with `sendText(message)` in the DEFAULT case of the suggestion click handler. The user explicitly wants suggestions to **fill the input field only**, letting them review and send manually. The message flow must always be: user reads suggestion in input -> user presses send -> backend analyzes -> widget triggered if needed.
+### Root Cause 1: Style widget never shows first
 
-### Problem 2: Map route not drawn when city selected via chat
-When the chat detects a destination city (e.g., "Wellington" or "Agadir"), it calls `updateMemory({ arrival: { city: destinationCity } })`. But the map's `getRoutePoints()` requires `lat` and `lng` coordinates to draw routes. Since only the city name is stored (no coordinates), the route line never appears. Previously, this worked because the city was selected through the FlightRouteBuilder widget which geocodes the location and stores coordinates.
+**Problem**: The backend override at `planner-chat/index.ts` line 414 checks `!preferencesState.style`, but `preferencesState.style` maps to `travelStyle` (e.g., "couple"), which **defaults to "couple"** in `DEFAULT_PREFERENCES`. So it's ALWAYS truthy. The override never fires.
 
----
+**Fix**: Instead of checking `travelStyle`, send a new `styleAxesConfigured` boolean from the frontend. This flag should be `false` when all styleAxes are still at their defaults (50, 50, 50, 50) and `true` after the user interacts with the sliders.
 
-### Fix 1: Revert suggestion auto-submit to fill-input
+**Files**:
+- `src/components/planner/PlannerChat.tsx` (~line 982-984): Change `style` to track whether styleAxes were manually configured, not just `travelStyle`.
+- `supabase/functions/planner-chat/index.ts` (~line 414): Check `!preferencesState.styleAxesConfigured` instead of `!preferencesState.style`.
+- `supabase/functions/planner-chat/index.ts` (~line 553-556): Parse the new field from request body.
+- `src/components/planner/chat/hooks/useChatStream.ts` (~line 204): Update the type to include `styleAxesConfigured`.
 
-**File**: `src/components/planner/PlannerChat.tsx` (~line 1964-1966)
+### Root Cause 2: Dietary/MustHaves widgets not rendering
 
-Change the DEFAULT case back from:
+**Problem**: The intent router correctly returns `shouldShowWidget: true, widgetType: "dietary"` and `setMessages` at line 1022 adds the widget. BUT then at line 1304-1311, a SECOND `setMessages` runs:
+
+```typescript
+const finalWidget = widget || m.widget;
+return { ...m, text: cleanContent, widget: finalWidget, widgetData: finalWidgetData };
 ```
-sendText(message);
+
+`widget` comes from `widgetFlow.determineNextWidget()` which returns `undefined` when there's no flight data. Then `finalWidget = undefined || m.widget`. This SHOULD work because React processes functional updates in order... but the defensive approach is to NOT overwrite `widget` when there's no flight-flow widget to set.
+
+**Fix**: Change line 1309 to be more explicit:
+
+```typescript
+// Only override widget if flight-flow determined one; otherwise keep whatever was set by intent router
+const finalWidget = widget ? widget : m.widget;
+const finalWidgetData = widget ? widgetData : (m.widgetData || undefined);
 ```
-to:
+
+This is functionally the same as `||` for non-empty strings but is clearer and avoids potential issues with falsy values. More importantly, when `widget` is `undefined` AND `m.widget` is also `undefined` (due to React batching timing), we need an additional safeguard.
+
+**Additional safeguard**: Store the intent-router widget result in a `ref` and use it as a final fallback:
+
+```typescript
+// Before intent processing
+const intentWidgetRef = useRef<WidgetType | null>(null);
+
+// In intent processing (line 1019)
+intentWidgetRef.current = widgetType;
+
+// In final message update (line 1309)
+const finalWidget = widget || m.widget || intentWidgetRef.current;
 ```
-setInput(message);
-setTimeout(() => inputRef.current?.focus(), 0);
-```
 
-This restores the expected behavior: suggestion fills input, user reviews, user sends.
+**File**: `src/components/planner/PlannerChat.tsx`
 
----
+### Summary of changes
 
-### Fix 2: Geocode destination city when set via chat
+| File | Change |
+|------|--------|
+| `src/components/planner/PlannerChat.tsx` | 1. Send `styleAxesConfigured` boolean in preferencesState. 2. Add `intentWidgetRef` to ensure widget is never lost between setMessages calls. 3. Use ref as fallback in final message update. |
+| `src/components/planner/chat/hooks/useChatStream.ts` | Add `styleAxesConfigured` to the `preferencesState` type. |
+| `supabase/functions/planner-chat/index.ts` | 1. Parse `styleAxesConfigured` from request. 2. Use it instead of `style` in the preference-first override check. |
+| `supabase/functions/planner-chat/tools/intentClassifier.ts` | Update prompt description to mention styleAxes vs travelStyle distinction. |
+| `supabase/functions/planner-chat/tools/reasoningEngine.ts` | Update CoT instructions to mention styleAxes check. |
 
-**File**: `src/components/planner/PlannerChat.tsx` (around line 1045-1048, the `provide_destination` handler)
-
-When `destinationCity` is detected from the intent:
-1. Call a geocoding function to resolve the city name to coordinates (lat/lng)
-2. Store the full location data (city + lat + lng + country) in flight memory
-3. This will make `getRoutePoints()` return valid points, and the map will automatically draw the route
-
-The geocoding can use the existing `useLocationAutocomplete` hook or a simpler approach: call the Mapbox geocoding API directly (already used elsewhere in the app) to get coordinates for the city name.
-
-Concretely:
-- Create a small helper function `geocodeCity(cityName: string): Promise<{lat, lng, country?, countryCode?}>`
-- In the `provide_destination` handler, call this function
-- Update memory with full coordinates: `updateMemory({ arrival: { city, lat, lng, country, countryCode } })`
-- The existing map effect watching `getRoutePoints()` will automatically pick up the new coordinates and draw the route
-
----
-
-### Technical Details
-
-**Geocoding approach**: Use the Mapbox Geocoding API (already available via the project's Mapbox token) to resolve city names. A simple fetch to `https://api.mapbox.com/geocoding/v5/mapbox.places/{city}.json?access_token={token}&limit=1` returns coordinates.
-
-**Files to modify**:
-1. `src/components/planner/PlannerChat.tsx` - Revert DEFAULT suggestion case to `setInput()` + add geocoding in `provide_destination` handler
-2. Optionally extract geocoding helper to a utility file for reuse
-
-**No backend changes needed** - this is purely frontend.
