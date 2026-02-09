@@ -1026,6 +1026,26 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
             );
           }
         }
+        
+        // FIX #2 & #3: When provide_destination is detected with a destinationCity,
+        // mark any pending citySelector widget as confirmed AND update flight memory
+        if (intentClassification.primaryIntent === "provide_destination" && intentClassification.entities?.destinationCity) {
+          const destinationCity = intentClassification.entities.destinationCity as string;
+          console.log("[PlannerChat] provide_destination: Confirming citySelector and updating flight memory for:", destinationCity);
+          
+          // Mark any pending citySelector as confirmed
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.widget === "citySelector" && !m.widgetConfirmed
+                ? { ...m, widgetConfirmed: true, widgetDisplayLabel: destinationCity }
+                : m
+            )
+          );
+          
+          // Update flight memory with destination city (FIX #3: ensures missingFields updates)
+          updateMemory({ arrival: { city: destinationCity } });
+          eventBus.emit("flight:updateFormData", { to: destinationCity });
+        }
       }
 
       // Handle detected preferences from chat (dietary restrictions, travel style, etc.)

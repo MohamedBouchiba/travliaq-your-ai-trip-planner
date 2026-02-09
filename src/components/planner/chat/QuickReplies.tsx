@@ -386,8 +386,9 @@ export function useDynamicQuickReplies(
       });
     }
 
-    // If user configured style/interests, offer destination suggestions
-    if (recentTypes.has("style_configured") || recentTypes.has("interests_selected")) {
+    // If user configured style/interests BUT hasn't chosen a destination yet, offer suggestions
+    if ((recentTypes.has("style_configured") || recentTypes.has("interests_selected")) && 
+        flowState && !flowState.hasDestinationCity) {
       replies.push({
         id: "suggest-destinations",
         label: t("planner.quickReplies.suggestForMe", "Suggère-moi des destinations"),
