@@ -60,7 +60,7 @@ import { QuickReplies, useDynamicQuickReplies } from "./chat/QuickReplies";
 import { useChatStream, useChatWidgetFlow, useChatImperativeHandlers, useWidgetTracking, useWidgetActionExecutor, usePreferenceWidgetCallbacks, useUnifiedIntentRouter, useSessionContext, useThinkingState, useWidgetCooldown } from "./chat/hooks";
 import { ThinkingIndicator } from "./chat/ThinkingIndicator";
 import { IntentDebugPanel } from "./chat/IntentDebugPanel";
-import { parseAction, flightDataToMemory } from "./chat/utils";
+import { parseAction, flightDataToMemory, getMissingFieldLabel } from "./chat/utils";
 import type { ChatMessage } from "./chat/types";
 import { getCityCoords } from "./chat/types";
 import { MemoizedSmartSuggestions, type InspireFlowStep } from "./chat/MemoizedSmartSuggestions";
@@ -191,6 +191,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     );
   }, [messages]);
 
+
+
   // Sync current suggestions to the last assistant message in debug store
   useEffect(() => {
     if (dynamicSuggestions.length === 0) return;
@@ -286,6 +288,27 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     messages,
     widgetInteractions: widgetTracking.interactions,
   });
+
+  // Sync memory context to debug store in real-time (not just during LLM calls)
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") {
+      const { setMemoryContext } = useDebugStore.getState();
+      const prefState = getPreferenceMemory();
+      const prefCtx = prefState
+        ? `\n[PRÉFÉRENCES] Rythme: ${prefState.pace}, Style: ${prefState.travelStyle}, Confort: ${prefState.comfortLabel}, Intérêts: ${(prefState.interests as string[])?.join(", ") || ""}`
+        : "";
+      setMemoryContext({
+        flightSummary: getMemorySummary(),
+        preferenceContext: prefCtx,
+        widgetHistory: widgetTracking.getContextForLLM(),
+        blockedWidgets: widgetCooldown.getBlockedWidgets(),
+        basketSummary: getBasketSummary(),
+        conversationSummary: sessionContext.buildConversationSummary(5),
+        sessionEntities: sessionContext.sessionEntities,
+        missingFields: missingFields?.map(getMissingFieldLabel),
+      });
+    }
+  }, [getMemorySummary, getPreferenceMemory, widgetTracking, widgetCooldown, getBasketSummary, sessionContext, missingFields]);
 
   // Dynamic quick replies based on widget interactions and flow state (Phase 3)
   const { generateContextualReplies } = useDynamicQuickReplies(

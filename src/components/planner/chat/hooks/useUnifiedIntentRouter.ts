@@ -486,7 +486,22 @@ export function useUnifiedIntentRouter({
       }
       
       // Widget can't be shown, use suggested fallback or next required
-      const fallbackWidget = validation.suggestedWidget || getNextRequiredWidget();
+      let fallbackWidget = validation.suggestedWidget || getNextRequiredWidget();
+
+      // Guard: don't fallback to citySelector if no country is selected
+      if (fallbackWidget === "citySelector" && !flowState.hasDestination) {
+        console.log("[UnifiedIntentRouter] Fallback citySelector blocked — no country selected");
+        const hasPreferences = widgetInteractions.some(i => 
+          i.interactionType === "style_configured" || i.interactionType === "interests_selected"
+        );
+        if (hasPreferences) {
+          const destValidation = canShowWidget("destinationSuggestions");
+          fallbackWidget = destValidation.valid ? "destinationSuggestions" : null;
+        } else {
+          fallbackWidget = null;
+        }
+      }
+
       if (fallbackWidget) {
         if (onWidgetTriggered) {
           onWidgetTriggered(fallbackWidget);
