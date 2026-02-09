@@ -85,6 +85,19 @@ export const flightExtractionTool = {
         budgetHint: {
           type: "string",
           description: "Budget preference mentioned: 'pas cher', 'économique', 'luxe', 'budget serré'."
+        },
+        legs: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              from: { type: "string", description: "Departure city for this leg" },
+              to: { type: "string", description: "Arrival city for this leg" },
+              date: { type: "string", description: "Date for this leg (YYYY-MM-DD) if known" },
+            },
+            required: ["from", "to"],
+          },
+          description: "For multi-destination trips: ordered list of legs. E.g., 'Brussels->Istanbul->Doha->Oman->Bangkok->Brussels' = 5 legs. Use this INSTEAD of from/to when tripType is 'multi'."
         }
       },
       required: []
@@ -111,4 +124,5 @@ export type FlightExtractionResult = {
   needsCitySelection?: boolean;
   tripType?: "roundtrip" | "oneway" | "multi";
   budgetHint?: string;
+  legs?: Array<{ from: string; to: string; date?: string }>;
 };

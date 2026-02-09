@@ -192,12 +192,25 @@ export function useFlightMemoryStore(): FlightMemoryStoreValue {
     parts.push(`Type: ${tripLabel}`);
 
     if (memory.tripType === "multi") {
-      memory.legs.forEach((leg, i) => {
+      // Build a compact route chain: BRU → Istanbul → Doha → Muscat → Bangkok → BRU
+      const cities: string[] = [];
+      memory.legs.forEach((leg) => {
         const dep = leg.departure?.iata || leg.departure?.city || "?";
+        if (cities.length === 0 || cities[cities.length - 1] !== dep) {
+          cities.push(dep);
+        }
         const arr = leg.arrival?.iata || leg.arrival?.city || "?";
-        const date = leg.date ? leg.date.toLocaleDateString("fr-FR") : "?";
-        parts.push(`Étape ${i + 1}: ${dep} → ${arr} (${date})`);
+        cities.push(arr);
       });
+      if (cities.length > 0) {
+        parts.push(cities.join(" → "));
+      }
+      // Also show dates if any legs have them
+      const datesStr = memory.legs
+        .filter(l => l.date)
+        .map((l, i) => `Étape ${i + 1}: ${l.date!.toLocaleDateString("fr-FR")}`)
+        .join(", ");
+      if (datesStr) parts.push(datesStr);
     } else {
       if (memory.departure?.city || memory.departure?.iata) {
         let depStr = memory.departure.airport || memory.departure.city || "";

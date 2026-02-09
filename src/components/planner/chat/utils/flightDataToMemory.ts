@@ -18,6 +18,7 @@ export interface FlightMemoryUpdate {
   returnDate?: Date | null;
   passengers?: { adults: number; children: number; infants: number };
   tripType?: "roundtrip" | "oneway" | "multi";
+  legs?: Array<{ departure: AirportInfo | null; arrival: AirportInfo | null; date: Date | null; id: string }>;
 }
 
 /**
@@ -87,6 +88,27 @@ export function flightDataToMemory(
 
   if (flightData.tripType) {
     updates.tripType = flightData.tripType;
+  }
+
+  // Handle multi-destination legs
+  if (flightData.legs && flightData.legs.length > 0 && flightData.tripType === "multi") {
+    updates.legs = flightData.legs.map((leg, i) => ({
+      departure: leg.from ? { city: leg.from } : null,
+      arrival: leg.to ? { city: leg.to } : null,
+      date: leg.date ? new Date(leg.date) : null,
+      id: `leg-${i}-${Date.now()}`,
+    }));
+    // For multi-dest, set departure/arrival from first/last leg for backwards compat
+    if (flightData.legs.length > 0) {
+      const firstLeg = flightData.legs[0];
+      const lastLeg = flightData.legs[flightData.legs.length - 1];
+      if (firstLeg.from && !updates.departure) {
+        updates.departure = { city: firstLeg.from };
+      }
+      if (lastLeg.to && !updates.arrival) {
+        updates.arrival = { city: lastLeg.to };
+      }
+    }
   }
 
   return updates;

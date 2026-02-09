@@ -37,6 +37,9 @@ export interface FlightFormData {
   // Trip configuration
   tripType?: "roundtrip" | "oneway" | "multi";
   
+  // Multi-destination legs
+  legs?: Array<{ from: string; to: string; date?: string }>;
+  
   // UI hints for widgets
   needsTravelersWidget?: boolean;
   needsDateWidget?: boolean;
