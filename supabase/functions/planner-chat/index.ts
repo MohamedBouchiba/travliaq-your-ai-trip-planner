@@ -2,7 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildPhaseSystemPrompt, normalizeTravelPhase, type TravelPhase } from "./prompts/phasePrompts.ts";
-import { detectLanguage, type SupportedLanguage } from "./prompts/systemPrompts.ts";
+import { detectLanguage, getLocalizedContent, type SupportedLanguage } from "./prompts/systemPrompts.ts";
 import { createRequestLogger, extractRequestId, type RequestLogger } from "../_shared/logger.ts";
 import {
   FlightDataSchema,
@@ -469,11 +469,30 @@ Si l'utilisateur répond négativement (non, pas spécialement, rien, etc.), pri
 
 /**
  * Build the system prompt
+ * Language parameter controls the response language.
+ * The LLM is also instructed to mirror the user's language dynamically.
  */
-function buildSystemPrompt(phase: TravelPhase, negativeContext: string, widgetContext: string, currentDate: string, widgetsContext: string): string {
+function buildSystemPrompt(phase: TravelPhase, negativeContext: string, widgetContext: string, currentDate: string, widgetsContext: string, language: SupportedLanguage = "fr"): string {
   const phasePrompt = buildPhaseSystemPrompt(phase, negativeContext, widgetContext, currentDate, widgetsContext);
+  const content = getLocalizedContent(language);
   
-  return `Tu es un assistant de voyage bienveillant pour Travliaq. Tu guides l'utilisateur pas à pas, UNE QUESTION À LA FOIS, pour l'aider à planifier son voyage idéal.
+  // Language-specific response instruction
+  const languageInstructions: Record<SupportedLanguage, string> = {
+    fr: "Réponds en français",
+    en: "Respond in English",
+    es: "Responde en español",
+  };
+  const responseLanguage = languageInstructions[language] || languageInstructions.en;
+  
+  return `${content.persona} Tu guides l'utilisateur pas à pas, UNE QUESTION À LA FOIS, pour l'aider à planifier son voyage idéal.
+
+## RÈGLE CRITIQUE : LANGUE DE RÉPONSE
+${responseLanguage}.
+IMPORTANT : Si l'utilisateur écrit dans une langue différente de celle configurée, 
+tu DOIS répondre dans la langue utilisée par l'utilisateur. 
+La langue de l'utilisateur prime toujours sur la configuration.
+Exemples : si l'utilisateur écrit en anglais → réponds en anglais, 
+si en espagnol → réponds en espagnol, si en arabe → réponds en arabe, etc.
 
 ## RÈGLE D'OR : CONTEXTE ET MÉMOIRE
 Tu disposes du contexte complet de la conversation incluant :
@@ -538,8 +557,8 @@ Exemples INTERDITS (NE FAIS JAMAIS ÇA) :
 
 ## INFOS TECHNIQUES
 - Date actuelle : ${currentDate}
-- Année par défaut : 2025
-- Réponds en français
+- ${content.defaultYear}
+- ${responseLanguage}
 
 ${phasePrompt}
 
@@ -640,7 +659,8 @@ serve(async (req) => {
       negativePreferences || "",
       widgetHistory || "",
       currentDate,
-      activeWidgetsContext || ""
+      activeWidgetsContext || "",
+      language
     );
 
     // ========================================================================
