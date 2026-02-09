@@ -1,131 +1,180 @@
 
 
-# Scalable Fix Plan: Multi-Destination Pipeline + State Guards
+# Plan: 5 Fixes Scalables pour le Chat Planner
 
-## Problems identified from the debug trace
+## Problemes identifies (depuis le debug trace)
 
-1. **Multi-destination routes are lost**: User says "istanbul doha oman et bankok puis retour a brussell" but the flight extractor only captures `from: "Bruxelles"` and `to: "Istanbul"`. The other 4 legs vanish.
-2. **Dates confirmed but re-asked**: After the user confirms dates (12 feb - 26 feb), `evaluatePhaseTransition` still triggers `datePicker` because `flowState` doesn't distinguish "dates set by user" from "dates pre-filled".
-3. **Flight search + datePicker conflict**: The system triggers `flightSearchTrigger: true` AND a `datePicker` widget in the same response. These are mutually exclusive.
-4. **`flightSummary` truncated**: Only shows "Etape 1: BRU -> Istanbul" when 5 legs exist.
-5. **COMPREHENSIVE_KEYWORD_TRIGGERS (lines 606-757)**: 150+ hardcoded keywords in the intent router -- the exact anti-pattern you want to eliminate. This duplicates the LLM classifier's job and breaks the "contextual classification" principle.
+1. **Rigidite des phases** : Le prompt systeme contient "NE SAUTE PAS de phase" / "Si l'utilisateur pose une question hors-phase, reponds brievement puis recentre". Resultat : le LLM refuse de repondre a "Peux-tu comparer ces destinations ?" ou "cite moi 10 choses wow" car il est en phase LOGISTICS.
+2. **Budget mappe sur preferenceStyle** : L'intent classifier retourne `widgetToShow: preferenceStyle` pour une demande de budget, alors qu'un widget `budgetRangeSlider` existe deja mais n'est jamais utilise via l'intent.
+3. **Fallback d'activites force** : Quand le LLM repond avec un intent `other` ou `ask_question`, le frontend force quand meme le prochain widget requis via `widgetTriggeringIntents` (qui inclut `ask_question`). Resultat : une question libre ("cite moi 10 choses") declenche `preferenceStyle`.
+4. **Flight search "no-op"** : `trigger_flight_search` emet `eventBus.emit("flight:triggerSearch")` qui active le `FlightsPanel` et met `triggerFlightSearch=true`. Mais dans le panel, la recherche echoue silencieusement car les legs multi-destination ne sont pas synchronises vers le formulaire de recherche.
+5. **Desambiguisation des nombres** : "2" en reponse a un choix numerote (1. Continuer / 2. Revenir) est classe comme `provide_travelers` avec `adults: 2` au lieu de `confirm_selection` avec `selectedOption: "2"`.
 
-## Architectural fixes (4 changes, all scalable)
+---
 
-### Fix 1: Multi-destination leg extraction (Backend + Frontend)
+## Fix 1 : Flexibilite cross-phase (Backend - prompt)
 
-**Problem**: `FlightFormData` and `flightExtractionTool` only have `from`/`to` (single pair). Multi-leg routes are structurally impossible to express.
+**Fichier** : `supabase/functions/planner-chat/index.ts` (buildSystemPrompt, lignes ~520-523)
 
-**Solution**: Add a `legs` array to both the tool schema and the type.
+**Changement** : Remplacer la regle rigide par une regle flexible :
 
-**Files**:
-- `supabase/functions/planner-chat/tools/flightExtractor.ts` -- add `legs` parameter to the tool
-- `src/types/flight.ts` -- add `legs` field to `FlightFormData`
-- `src/components/planner/chat/utils/flightDataToMemory.ts` -- handle `legs` in `flightDataToMemory()`
-- `src/components/planner/PlannerChat.tsx` -- extend `persistExtractedEntities()` to persist legs
+Avant :
+```
+NE SAUTE PAS de phase. NE MELANGE PAS les phases.
+Si l'utilisateur pose une question hors-phase, reponds brievement puis recentre sur la phase en cours.
+```
 
-**Schema addition to `flightExtractionTool`**:
-```text
-legs: {
-  type: "array",
-  items: {
-    type: "object",
-    properties: {
-      from: { type: "string", description: "Departure city for this leg" },
-      to: { type: "string", description: "Arrival city for this leg" },
-      date: { type: "string", description: "Date for this leg (YYYY-MM-DD) if known" },
-    },
-    required: ["from", "to"],
-  },
-  description: "For multi-destination trips: ordered list of legs. E.g., 'Brussels->Istanbul->Doha->Oman->Bangkok->Brussels' = 5 legs. Use this INSTEAD of from/to when tripType is 'multi'."
+Apres :
+```
+Suis la phase en cours EN PRIORITE. Cependant, si l'utilisateur pose une question 
+hors-phase (activites, comparaison, budget, informations generales sur une destination), 
+reponds COMPLETEMENT a sa question sans la bloquer. 
+Apres avoir repondu, rappelle brievement ou vous en etes dans le processus 
+et propose de continuer. Ne refuse JAMAIS de repondre a une question pertinente au voyage.
+```
+
+**Fichier** : `supabase/functions/planner-chat/prompts/phasePrompts.ts`
+
+Meme changement dans chaque phase : modifier les `doNot` pour remplacer les interdictions rigides par des guidances souples. Par exemple dans `logistics.doNot`, supprimer "Ne pas revenir sur la destination sauf si l'utilisateur le demande" et ajouter "Si l'utilisateur pose une question sur les activites ou la destination, reponds-y avant de recentrer sur la logistique."
+
+---
+
+## Fix 2 : Budget mappe sur budgetRangeSlider (Backend + Frontend)
+
+**Fichier** : `supabase/functions/planner-chat/tools/intentClassifier.ts`
+
+Ajouter `budgetRangeSlider` dans le enum `widgetToShow.type` (ligne 230-241). Ajouter une section dans la description du tool :
+
+```
+### BUDGET (REGLE SPECIALE)
+Si l'utilisateur mentionne un budget, un prix, ou veut definir son budget :
+- "definir mon budget", "quel budget", "combien ca coute", "pas cher", "economique"
+→ widgetType: "budgetRangeSlider" (PAS preferenceStyle)
+preferenceStyle = sliders style de voyage (relax/intense, nature/urbain)
+budgetRangeSlider = selection de fourchette de prix
+```
+
+**Fichier** : `src/components/planner/chat/hooks/useUnifiedIntentRouter.ts`
+
+Dans le bloc entity-based fallback (lignes 636-639), changer :
+```typescript
+if (entities.budgetLevel && canShowWidget("preferenceStyle").valid) {
+```
+en :
+```typescript
+if (entities.budgetLevel && canShowWidget("budgetRangeSlider").valid) {
+  if (onWidgetTriggered) onWidgetTriggered("budgetRangeSlider");
+  return { shouldShowWidget: true, widgetType: "budgetRangeSlider", action: "none", reason: "Budget level detected" };
 }
 ```
 
-**`FlightFormData` addition**:
-```text
-legs?: Array<{ from: string; to: string; date?: string }>;
+---
+
+## Fix 3 : Supprimer ask_question et other des widget-triggering intents (Frontend)
+
+**Fichier** : `src/components/planner/chat/hooks/useUnifiedIntentRouter.ts`
+
+Lignes 599-612 : Supprimer `ask_question` de la liste `widgetTriggeringIntents`. Cet intent correspond a des questions libres qui ne devraient JAMAIS forcer l'affichage d'un widget.
+
+Aussi ajouter un guard explicite : si `intent.primaryIntent === "other"` ou `"ask_question"` ou `"ask_recommendations"` ou `"compare_options"`, retourner directement `{ shouldShowWidget: false, widgetType: null, action: "none" }` AVANT le bloc `widgetTriggeringIntents`. Ces intents sont conversationnels et ne doivent jamais declencher de widget automatiquement.
+
+```typescript
+// Conversational intents: never auto-trigger widgets
+const conversationalIntents = [
+  "other", "ask_question", "ask_recommendations", 
+  "compare_options", "greeting", "thank_you"
+];
+if (conversationalIntents.includes(intent.primaryIntent)) {
+  return { shouldShowWidget: false, widgetType: null, action: "none" };
+}
 ```
 
-**`flightDataToMemory` update**: When `flightData.legs` exists AND `tripType === "multi"`, convert each leg to a `FlightLegMemory` and return them as a `legs` field in the update. The store's `setTripType("multi")` already creates legs structure -- we just need to populate them.
-
-**`persistExtractedEntities` update**: Add legs merge logic. This follows Principle 2 -- single pipeline for all entities.
-
 ---
 
-### Fix 2: Remove hardcoded keyword triggers (Frontend)
+## Fix 4 : Flight search multi-destination sync (Frontend)
 
-**Problem**: `COMPREHENSIVE_KEYWORD_TRIGGERS` (lines 606-757 in `useUnifiedIntentRouter.ts`) is 150 lines of hardcoded keywords that duplicate the LLM classifier. It contradicts Principle 3 (contextual classification) and will grow forever as languages are added.
+**Probleme** : Quand `flight:triggerSearch` est emis, le `FlightsPanel` se met en mode recherche mais les legs multi-destination du store ne sont pas synchronises vers le formulaire de recherche du panel.
 
-**Solution**: Delete the entire `COMPREHENSIVE_KEYWORD_TRIGGERS` block and its matching loop. Instead, rely on what already exists:
-1. **Backend intent classifier** (Pass 1) -- already classifies intent AND sets `widgetToShow`
-2. **Entity-based fallback** (lines 786-804) -- already checks `intent.entities` for dietary, accessibility, interests, budget
-3. **`evaluatePhaseTransition()`** (Principle 1) -- already handles "what's next?" as a universal fallback
+**Fichier** : `src/hooks/useFlightState.ts`
 
-The entity-based fallback (lines 786-804) stays because it's semantic (reads structured entities from the LLM), not keyword-based.
+Ajouter la synchronisation des legs depuis le flight memory store quand `triggerFlightSearch` passe a `true` :
 
-**File**: `src/components/planner/chat/hooks/useUnifiedIntentRouter.ts`
-- Delete lines 603-783 (the entire COMPREHENSIVE_KEYWORD_TRIGGERS block + matching loop)
-- Keep the entity-based fallback (lines 786-804)
-- Keep `widgetTriggeringIntents` check + `getNextRequiredWidget()` (lines 808-832)
-- Keep `evaluatePhaseTransition()` (lines 834-845)
-
----
-
-### Fix 3: State-aware phase guards (Frontend)
-
-**Problem**: `evaluatePhaseTransition()` doesn't know if dates/travelers have been CONFIRMED via widgets. It only checks `flowState.hasDepartureDate`, which can be true from a pre-fill. This causes re-asking.
-
-**Solution**: Extend guards to check `widgetInteractions` for confirmation signals, not just `flowState` fields.
-
-**File**: `src/components/planner/chat/hooks/useUnifiedIntentRouter.ts`
-
-Update `evaluatePhaseTransition()`:
-```text
-// Guard 2: Destination + no dates → date picker
-// BUT skip if dates already confirmed via widget OR if flight search was triggered
-if (flowState.hasDestinationCity && !flowState.hasDepartureDate) {
-  const hasDateConfirmation = hasInteraction("date_selected") || hasInteraction("date_range_selected");
-  if (!hasDateConfirmation) {
-    // ... show datePicker
+```typescript
+usePlannerEvent("flight:triggerSearch", useCallback(() => {
+  setActiveTab("flights");
+  setIsPanelVisible(true);
+  
+  // Sync multi-destination legs from memory store to flight form
+  const memoryLegs = useFlightMemoryStore.getState().legs;
+  const tripType = useFlightMemoryStore.getState().tripType;
+  if (tripType === "multi" && memoryLegs.length > 0) {
+    // Convert memory legs to FlightFormData format
+    setFlightFormData({
+      tripType: "multi",
+      legs: memoryLegs.map(leg => ({
+        from: leg.departure || "",
+        to: leg.arrival || "",
+        date: leg.departureDate ? leg.departureDate.toISOString().split("T")[0] : undefined,
+      })),
+    });
   }
+  
+  setTriggerFlightSearch(true);
+}, [setActiveTab, setIsPanelVisible, setFlightFormData]));
+```
+
+**Fichier** : `src/components/planner/PlannerPanel.tsx`
+
+Dans le `FlightsPanel`, ajouter la gestion du cas `flightFormData.legs` pour les multi-destinations. Quand `triggerSearch` est `true` et que des `legs` existent dans le `flightFormData`, populer le formulaire multi-destination du panel avec ces legs avant de lancer la recherche.
+
+---
+
+## Fix 5 : Desambiguisation contextuelle des nombres (Backend)
+
+**Fichier** : `supabase/functions/planner-chat/index.ts` (buildClassificationSystemPrompt)
+
+Ajouter une regle contextuelle dans le prompt du classificateur :
+
+```
+REGLE CRITIQUE : NOMBRES EN CONTEXTE
+Si le dernier message assistant contenait une liste numerotee (1. Option A / 2. Option B) 
+et que l'utilisateur repond uniquement par un nombre ("2", "1", "3") :
+→ primaryIntent: "confirm_selection"
+→ entities.selectedOption: "[le numero]"
+→ NE PAS interpreter comme provide_travelers ou adults
+
+Un nombre SEUL n'est JAMAIS un nombre de voyageurs sauf si le contexte 
+parle explicitement de voyageurs/passagers/personnes.
+```
+
+**Fichier** : `supabase/functions/planner-chat/tools/intentClassifier.ts`
+
+Ajouter `selectedOption` dans les entities du schema :
+
+```typescript
+selectedOption: {
+  type: "string",
+  description: "Quand l'utilisateur repond a un choix numerote (1, 2, 3) ou par le nom d'une option proposee dans le message precedent."
 }
 ```
 
-Same logic for Guard 3 (travelers).
-
-Also add a **new guard** (Guard 0): If `flightSearchTrigger` is active (detected from intent), skip ALL transitions. This prevents the search + datePicker conflict.
-
-**How Guard 0 works**: Add `flightSearchTriggered?: boolean` parameter to `evaluatePhaseTransition()`. When true, return `null` immediately (no transition needed -- we're searching).
-
 ---
 
-### Fix 4: Multi-leg flight summary (Frontend)
+## Resume des fichiers modifies
 
-**Problem**: `getMemorySummary()` only shows the first leg.
+| Fix | Fichier(s) | Type |
+|-----|-----------|------|
+| 1 - Cross-phase flexibility | `planner-chat/index.ts`, `phasePrompts.ts` | Backend prompt |
+| 2 - Budget widget mapping | `intentClassifier.ts`, `useUnifiedIntentRouter.ts` | Backend + Frontend |
+| 3 - Conversational intent guard | `useUnifiedIntentRouter.ts` | Frontend |
+| 4 - Multi-dest search sync | `useFlightState.ts`, `PlannerPanel.tsx` | Frontend |
+| 5 - Number disambiguation | `planner-chat/index.ts`, `intentClassifier.ts` | Backend |
 
-**File**: `src/stores/hooks/useFlightMemoryStore.ts`
+## Pourquoi c'est scalable
 
-Update `getMemorySummary()` to iterate over `legs` when `tripType === "multi"`:
-```text
-// Current: "Type: Multi-destinations | Etape 1: BRU -> Istanbul (12/02/2026) | 2 voyageurs"
-// After:   "Type: Multi-destinations | BRU -> Istanbul -> Doha -> Muscat -> Bangkok -> BRU | 2 voyageurs"
-```
-
----
-
-## Summary
-
-| # | Fix | Type | Files | Principle |
-|---|-----|------|-------|-----------|
-| 1 | Multi-dest leg extraction | Backend + Frontend | flightExtractor.ts, flight.ts, flightDataToMemory.ts, PlannerChat.tsx | P2 (Entity Pipeline) |
-| 2 | Remove keyword triggers | Frontend | useUnifiedIntentRouter.ts | P3 (Contextual Classification) |
-| 3 | State-aware phase guards | Frontend | useUnifiedIntentRouter.ts | P1 (State-Driven Transitions) |
-| 4 | Multi-leg flight summary | Frontend | useFlightMemoryStore.ts | P2 (Entity Pipeline) |
-
-## What this prevents long-term
-
-- **Fix 1**: Any future route type (stopovers, open-jaw) uses the same `legs[]` pipeline. No new fields needed.
-- **Fix 2**: No more keyword maintenance. New languages work automatically via the LLM. New widget types only need an entity mapping (3 lines), not a keyword list (30 lines).
-- **Fix 3**: Any future phase (Accommodation, Activities) can add its own guard to `evaluatePhaseTransition()` with the same pattern: check `flowState` field + check `widgetInteraction` confirmation. No new widget type needs to be hardcoded.
-- **Fix 4**: Summary is derived from the store's `legs[]` array. Any change to legs is automatically reflected.
+- **Fix 1** : Tout ajout de phase future beneficie de la meme regle souple. Pas de listes d'exceptions a maintenir.
+- **Fix 2** : Le mapping `budgetLevel -> budgetRangeSlider` est declaratif dans l'intent classifier. Ajouter un nouveau widget = 1 ligne dans l'enum + 1 regle dans la description.
+- **Fix 3** : La liste `conversationalIntents` est semantique. Ajouter un nouvel intent conversationnel = 1 string dans le tableau.
+- **Fix 4** : La synchronisation utilise le store existant (`useFlightMemoryStore`) comme source de verite. Tout ajout de champ au store est automatiquement disponible.
+- **Fix 5** : La regle est semantique (basee sur le contexte du dernier message), pas sur des mots-cles. Fonctionne dans toutes les langues.
 
