@@ -1014,14 +1014,15 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
         if (intentResult.widgetType) {
           setLastWidgetTriggered(intentResult.widgetType);
           
-          // CRITICAL: For gather_preferences, add the widget directly to the message
-          if (intentClassification.primaryIntent === "gather_preferences" && intentResult.widgetType) {
+          // CRITICAL: When intent router validates a widget, attach it to the message
+          // This covers gather_preferences, express_constraint, and any other intent with a valid widget
+          if (intentResult.shouldShowWidget && intentResult.widgetType) {
             const widgetType = intentResult.widgetType as import("@/types/flight").WidgetType;
-            console.log("[PlannerChat] gather_preferences: Adding widget to message:", widgetType);
+            console.log("[PlannerChat] Intent", intentClassification.primaryIntent, ": Adding widget to message:", widgetType);
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === messageId
-                  ? { ...m, widget: widgetType, widgetConfirmed: false }
+                  ? { ...m, widget: widgetType, widgetData: intentResult.widgetData, widgetConfirmed: false }
                   : m
               )
             );
