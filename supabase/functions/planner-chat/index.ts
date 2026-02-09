@@ -411,6 +411,16 @@ function applyPreferenceFirstLogic(
     intentClassification.widgetToShow?.type === "destinationSuggestions" ||
     intentClassification.primaryIntent === "ask_inspiration";
 
+  if ((isIndecisIntent || isDestinationSuggestion) && !preferencesState.style) {
+    log.info("preference_first", "Overriding to preferenceStyle (missing style)");
+    intentClassification.primaryIntent = "gather_preferences";
+    intentClassification.widgetToShow = {
+      type: "preferenceStyle",
+      reason: "Travel style needed before suggesting destinations",
+    };
+    return intentClassification;
+  }
+
   if ((isIndecisIntent || isDestinationSuggestion) && 
       (!preferencesState.interests || preferencesState.interests.length === 0)) {
     log.info("preference_first", "Overriding to preferenceInterests (empty interests)");
@@ -418,16 +428,6 @@ function applyPreferenceFirstLogic(
     intentClassification.widgetToShow = {
       type: "preferenceInterests",
       reason: "Preferences must be collected before suggesting destinations",
-    };
-    return intentClassification;
-  }
-
-  if ((isIndecisIntent || isDestinationSuggestion) && !preferencesState.style) {
-    log.info("preference_first", "Overriding to preferenceStyle (missing style)");
-    intentClassification.primaryIntent = "gather_preferences";
-    intentClassification.widgetToShow = {
-      type: "preferenceStyle",
-      reason: "Travel style needed before suggesting destinations",
     };
     return intentClassification;
   }
@@ -453,10 +453,10 @@ CONTEXTE PRÉFÉRENCES ACTUELLES:
 - Intérêts: ${interestsStr}
 - Style: ${styleStr}
 
-RÈGLE CRITIQUE: Si l'utilisateur hésite / ne sait pas et que les intérêts sont VIDES, 
-primaryIntent = "gather_preferences", widgetType = "preferenceInterests".
-Si les intérêts existent mais le style est NON DÉFINI,
-primaryIntent = "gather_preferences", widgetType = "preferenceStyle".`;
+RÈGLE CRITIQUE: Si l'utilisateur hésite / ne sait pas et que le style est NON DÉFINI, 
+primaryIntent = "gather_preferences", widgetType = "preferenceStyle".
+Si le style existe mais les intérêts sont VIDES,
+primaryIntent = "gather_preferences", widgetType = "preferenceInterests".`;
 }
 
 /**

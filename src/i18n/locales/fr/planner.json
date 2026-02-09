@@ -277,5 +277,8 @@
   "planner.suggestions.mediumProfileInfo": "Bon début ! Complète ton profil pour des suggestions encore plus précises.",
   "planner.suggestions.highProfileSuccess": "Suggestions hautement personnalisées",
   "planner.suggestions.completeProfile": "Compléter mon profil",
-  "planner.suggestions.keepGoing": "Ça me va comme ça"
+  "planner.suggestions.keepGoing": "Ça me va comme ça",
+
+  "planner.suggestion.configureMustHaves": "Je veux définir mes critères obligatoires",
+  "planner.suggestion.configureDietary": "Je veux définir mes restrictions alimentaires"
 }
