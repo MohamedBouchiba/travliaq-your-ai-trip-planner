@@ -89,6 +89,7 @@ export function useChatWidgetFlow(options: UseChatWidgetFlowOptions) {
 
   // Refs for tracking flow state
   const pendingTravelersWidgetRef = useRef(false);
+  const travelersConfirmedRef = useRef(false);
   const pendingTripDurationRef = useRef<string | null>(null);
   const pendingPreferredMonthRef = useRef<string | null>(null);
   const citySelectionShownForCountryRef = useRef<string | null>(null);
@@ -101,6 +102,7 @@ export function useChatWidgetFlow(options: UseChatWidgetFlowOptions) {
    */
   const resetFlowState = useCallback(() => {
     pendingTravelersWidgetRef.current = false;
+    travelersConfirmedRef.current = false;
     pendingTripDurationRef.current = null;
     pendingPreferredMonthRef.current = null;
     citySelectionShownForCountryRef.current = null;
@@ -358,7 +360,7 @@ export function useChatWidgetFlow(options: UseChatWidgetFlowOptions) {
       setMessages((prev) => [...prev, userChoiceMessage]);
 
       const needsTravelersWidget =
-        pendingTravelersWidgetRef.current || memory.passengers.adults < 1;
+        pendingTravelersWidgetRef.current || !travelersConfirmedRef.current;
       pendingTravelersWidgetRef.current = false;
 
       if (needsTravelersWidget) {
@@ -388,7 +390,7 @@ export function useChatWidgetFlow(options: UseChatWidgetFlowOptions) {
         ]);
       }
     },
-    [memory.passengers.adults, updateMemory, setMessages, tracking]
+    [updateMemory, setMessages, tracking]
   );
 
   /**
@@ -400,6 +402,7 @@ export function useChatWidgetFlow(options: UseChatWidgetFlowOptions) {
       travelers: { adults: number; children: number; infants: number }
     ) => {
       updateMemory({ passengers: travelers });
+      travelersConfirmedRef.current = true;
 
       // Update travel memory for accommodation suggestions
       updateTravelers({

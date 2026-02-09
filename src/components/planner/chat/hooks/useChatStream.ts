@@ -488,6 +488,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       if (isMountedRef.current) {
         setIsStreaming(true);
         setError(null);
+        // Clear stale reasoning from previous stream
+        debugStore.setReasoning(null);
       }
 
       let fullContent = "";

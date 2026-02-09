@@ -63,6 +63,18 @@ export type AccommodationData = z.infer<typeof AccommodationDataSchema>;
 // ============================================================================
 // PREFERENCES DATA SCHEMA
 // ============================================================================
+// Helper: coerce LLM "true"/"false" strings to booleans
+const coerceBool = z.preprocess(
+  (val) => {
+    if (typeof val === "string") {
+      if (val.toLowerCase() === "true") return true;
+      if (val.toLowerCase() === "false") return false;
+    }
+    return val;
+  },
+  z.boolean().optional()
+);
+
 export const PreferencesDataSchema = z.object({
   travelStyle: z.enum(["solo", "couple", "family", "friends"]).optional(),
   pace: z.enum(["relaxed", "moderate", "intense"]).optional(),
@@ -72,12 +84,12 @@ export const PreferencesDataSchema = z.object({
   touristVsLocal: z.number().min(0).max(100).optional(),
   interests: z.array(z.string().max(50)).optional(),
   occasion: z.enum(["honeymoon", "anniversary", "birthday", "vacation", "workation"]).optional(),
-  needsWifi: z.boolean().optional(),
-  petFriendly: z.boolean().optional(),
-  accessibilityRequired: z.boolean().optional(),
-  familyFriendly: z.boolean().optional(),
+  needsWifi: coerceBool,
+  petFriendly: coerceBool,
+  accessibilityRequired: coerceBool,
+  familyFriendly: coerceBool,
   dietaryRestrictions: z.array(z.string().max(50)).optional(),
-}).strict();
+}).passthrough();
 
 export type PreferencesData = z.infer<typeof PreferencesDataSchema>;
 
