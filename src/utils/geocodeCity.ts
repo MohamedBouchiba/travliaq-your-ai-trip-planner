@@ -21,7 +21,7 @@ export async function geocodeCity(cityName: string): Promise<GeocodeCityResult |
       .not("longitude", "is", null)
       .order("population", { ascending: false, nullsFirst: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       console.warn("[geocodeCity] City not found in DB:", cityName, error?.message);
