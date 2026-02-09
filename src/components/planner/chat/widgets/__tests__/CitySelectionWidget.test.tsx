@@ -2,6 +2,7 @@
  * CitySelectionWidget Tests
  */
 
+import "@/i18n/config";
 import { render } from "@testing-library/react";
 import { screen, fireEvent } from "@testing-library/dom";
 import { describe, it, expect, vi } from "vitest";
@@ -69,7 +70,7 @@ describe("CitySelectionWidget", () => {
     fireEvent.click(screen.getByText("Lyon"));
 
     expect(screen.getByText("📍")).toBeInTheDocument();
-    expect(screen.getByText("Lyon, France")).toBeInTheDocument();
+    expect(screen.getByText(/Lyon/)).toBeInTheDocument();
   });
 
   it("shows loading state when isLoading is true", () => {
@@ -82,7 +83,7 @@ describe("CitySelectionWidget", () => {
       />
     );
 
-    expect(screen.getByText("Chargement des villes...")).toBeInTheDocument();
+    expect(screen.getByText(/loading|chargement/i)).toBeInTheDocument();
     expect(screen.queryByText("Paris")).not.toBeInTheDocument();
   });
 

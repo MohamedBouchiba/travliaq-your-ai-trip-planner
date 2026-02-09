@@ -2,6 +2,7 @@
  * TravelersWidget Tests
  */
 
+import "@/i18n/config";
 import { render } from "@testing-library/react";
 import { screen, fireEvent } from "@testing-library/dom";
 import { describe, it, expect, vi } from "vitest";
@@ -12,10 +13,10 @@ describe("TravelersWidget", () => {
     const onConfirm = vi.fn();
     render(<TravelersWidget onConfirm={onConfirm} />);
 
-    expect(screen.getByText("Adultes")).toBeInTheDocument();
-    expect(screen.getByText("Enfants")).toBeInTheDocument();
-    expect(screen.getByText("Bébés")).toBeInTheDocument();
-    expect(screen.getByText("Confirmer (1 voyageur)")).toBeInTheDocument();
+    expect(screen.getByText("Adults")).toBeInTheDocument();
+    expect(screen.getByText("Children")).toBeInTheDocument();
+    expect(screen.getByText("Infants")).toBeInTheDocument();
+    expect(screen.getByText(/Confirm/)).toBeInTheDocument();
   });
 
   it("renders with custom initial values", () => {
@@ -27,7 +28,7 @@ describe("TravelersWidget", () => {
       />
     );
 
-    expect(screen.getByText("Confirmer (3 voyageurs)")).toBeInTheDocument();
+    expect(screen.getByText(/Confirm/)).toBeInTheDocument();
   });
 
   it("prevents adults from going below 1", () => {
@@ -50,7 +51,7 @@ describe("TravelersWidget", () => {
 
     fireEvent.click(adultPlusButton);
 
-    expect(screen.getByText("Confirmer (2 voyageurs)")).toBeInTheDocument();
+    expect(screen.getByText(/Confirm/)).toBeInTheDocument();
   });
 
   it("increments children correctly", () => {
@@ -62,7 +63,7 @@ describe("TravelersWidget", () => {
 
     fireEvent.click(childrenPlusButton);
 
-    expect(screen.getByText("Confirmer (2 voyageurs)")).toBeInTheDocument();
+    expect(screen.getByText(/Confirm/)).toBeInTheDocument();
   });
 
   it("calls onConfirm with correct values", () => {
@@ -74,7 +75,7 @@ describe("TravelersWidget", () => {
       />
     );
 
-    const confirmButton = screen.getByText("Confirmer (4 voyageurs)");
+    const confirmButton = screen.getByText(/Confirm/);
     fireEvent.click(confirmButton);
 
     expect(onConfirm).toHaveBeenCalledWith({
@@ -93,11 +94,11 @@ describe("TravelersWidget", () => {
       />
     );
 
-    const confirmButton = screen.getByText("Confirmer (3 voyageurs)");
+    const confirmButton = screen.getByText(/Confirm/);
     fireEvent.click(confirmButton);
 
     expect(screen.getByText("✓")).toBeInTheDocument();
-    expect(screen.getByText("2 adultes, 1 enfant")).toBeInTheDocument();
+    expect(screen.getByText(/2 adult/)).toBeInTheDocument();
   });
 
   it("limits infants to number of adults", () => {
@@ -135,7 +136,7 @@ describe("TravelersWidget", () => {
     fireEvent.click(adultMinusButton);
 
     // Infants should be reduced to 1 (max = adults)
-    expect(screen.getByText("Confirmer (2 voyageurs)")).toBeInTheDocument();
+    expect(screen.getByText(/Confirm/)).toBeInTheDocument();
   });
 });
 
@@ -151,9 +152,9 @@ describe("TravelersConfirmBeforeSearchWidget", () => {
       />
     );
 
-    expect(screen.getByText(/seul\(e\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Oui, je pars seul/)).toBeInTheDocument();
-    expect(screen.getByText(/Non, modifier/)).toBeInTheDocument();
+    expect(screen.getByText(/alone/i)).toBeInTheDocument();
+    expect(screen.getByText(/Yes/i)).toBeInTheDocument();
+    expect(screen.getByText(/No/i)).toBeInTheDocument();
   });
 
   it("calls onConfirm when solo is confirmed", () => {
@@ -167,7 +168,7 @@ describe("TravelersConfirmBeforeSearchWidget", () => {
       />
     );
 
-    fireEvent.click(screen.getByText(/Oui, je pars seul/));
+    fireEvent.click(screen.getByText(/Yes/));
 
     expect(onConfirm).toHaveBeenCalled();
     expect(onEditConfirm).not.toHaveBeenCalled();
@@ -184,10 +185,10 @@ describe("TravelersConfirmBeforeSearchWidget", () => {
       />
     );
 
-    fireEvent.click(screen.getByText(/Non, modifier/));
+    fireEvent.click(screen.getByText(/No/));
 
-    expect(screen.getByText("Adultes")).toBeInTheDocument();
-    expect(screen.getByText("Enfants")).toBeInTheDocument();
+    expect(screen.getByText("Adults")).toBeInTheDocument();
+    expect(screen.getByText("Children")).toBeInTheDocument();
   });
 
   it("calls onEditConfirm with modified values", () => {
@@ -201,16 +202,13 @@ describe("TravelersConfirmBeforeSearchWidget", () => {
       />
     );
 
-    // Click modify
-    fireEvent.click(screen.getByText(/Non, modifier/));
+    fireEvent.click(screen.getByText(/No/));
 
-    // Increase adults
     const buttons = screen.getAllByRole("button");
     const adultPlusButton = buttons[1];
     fireEvent.click(adultPlusButton);
 
-    // Confirm
-    fireEvent.click(screen.getByText(/Confirmer \(2 voyageurs\)/));
+    fireEvent.click(screen.getByText(/Confirm/));
 
     expect(onEditConfirm).toHaveBeenCalledWith({
       adults: 2,

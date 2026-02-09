@@ -47,7 +47,7 @@ type QuestionnaireAnswers = {
   constraints?: string[];
 };
 
-// Fonction helper pour calculer le nombre total d'étapes (logique extraite de Questionnaire.tsx)
+// Fonction helper pour calculer le nombre total d'étapes (logique synchronisée avec Questionnaire.tsx getTotalSteps)
 function calculateTotalSteps(answers: QuestionnaireAnswers): number {
   let total = 1; // Step 1: Groupe de voyage
   
@@ -56,39 +56,48 @@ function calculateTotalSteps(answers: QuestionnaireAnswers): number {
                           answers.travelGroup === TRAVEL_GROUPS.GROUP35;
   if (isFamilyOrGroup) total++;
   
-  total++; // Step 2: Destination en tête
-  total++; // Step 2b: Comment aider
+  // Step 1c: Détails enfants (famille uniquement)
+  if (answers.travelGroup === TRAVEL_GROUPS.FAMILY) total++;
+  
+  total++; // Step 2: Comment Travliaq peut aider (aide)
+  total++; // Step 3: Destination en tête
   
   const hasDestination = answers.hasDestination === YES_NO.YES;
   if (hasDestination) {
-    total++; // Step 2c: Quelle destination
-  } else {
-    total++; // Step 2d: Climat
-    total++; // Step 2e: Affinités
-    total++; // Step 2f: Ambiance
-    total++; // Step 2g: Ville de départ
+    total++; // Step 3b: Quelle destination
+  } else if (answers.hasDestination === YES_NO.NO) {
+    total++; // Step 3c: Climat
+    total++; // Step 3d: Affinités
+    total++; // Step 3e: Ambiance
+    total++; // Step 3f: Ville de départ
   }
   
-  total++; // Step 3: Dates
+  total++; // Step 4: Dates
   
-  const isFlexible = answers.datesType === DATES_TYPE.FLEXIBLE;
   if (answers.datesType === DATES_TYPE.FIXED) {
-    total++; // Step 3b: Dates précises
-  } else if (isFlexible) {
-    total++; // Step 3c: Flexibilité
-    total++; // Step 3d: Question période approximative
+    total++; // Step 4b: Dates précises
+  } else if (answers.datesType === DATES_TYPE.FLEXIBLE) {
+    total++; // Step 4c: Flexibilité
+    total++; // Step 4d: Question période approximative
     if (answers.hasApproximateDepartureDate === YES_NO.YES) {
-      total++; // Step 3e: Saisie date
+      total++; // Step 4e: Saisie date
     }
-    total++; // Step 4: Durée
-    if (answers.duration?.includes('14') || answers.duration?.toLowerCase().includes('more')) {
-      total++; // Step 4b: Nombre exact
+    total++; // Step 5: Durée
+    // Check for ">14 nuits" only
+    if (answers.duration && (
+      answers.duration.includes('14') && (
+        answers.duration.includes('>') || 
+        answers.duration.toLowerCase().includes('more') ||
+        answers.duration.toLowerCase().includes('plus')
+      )
+    )) {
+      total++; // Step 5b: Nombre exact (>14)
     }
   }
   
-  total++; // Step 5: Budget
-  if (answers.budgetType?.includes('précis') || answers.budgetType?.includes('1800')) {
-    total++; // Step 5b: Montant exact
+  total++; // Step 6: Budget
+  if (answers.budgetType && answers.budgetType.toLowerCase().includes('précis')) {
+    total++; // Step 6b: Montant exact
   }
   
   const helpWith = answers.helpWith || [];
@@ -96,64 +105,49 @@ function calculateTotalSteps(answers: QuestionnaireAnswers): number {
   const needsAccommodation = helpWith.includes(HELP_WITH.ACCOMMODATION);
   const needsActivities = helpWith.includes(HELP_WITH.ACTIVITIES);
   
-  // Step 6: Style (si destination précise ET activités)
-  if (hasDestination && needsActivities) {
-    total++;
-  }
-  
-  // Step 8-9: Vols et bagages
+  // Vols et bagages
   if (needsFlights) {
     total += 2;
   }
   
-  // Step 10: Mobilité (pas si uniquement vols ou uniquement hébergement)
-  const onlyFlights = helpWith.length === 1 && needsFlights;
-  const onlyAccommodation = helpWith.length === 1 && needsAccommodation;
-  if (!onlyFlights && !onlyAccommodation) {
+  // Style (si destination précise ET activités)
+  if (hasDestination && needsActivities) {
     total++;
   }
   
-  // Step 11-14: Hébergement
+  // Activités: Mobilité, Sécurité, Rythme
+  if (needsActivities) {
+    total++; // Mobilité
+    total++; // Sécurité
+    total++; // Rythme
+  }
+  
+  // Hébergement
   if (needsAccommodation) {
     total++; // Type hébergement
-    // Préférences hôtel si hôtel sélectionné
     if (answers.accommodationType?.some(type => 
       type.toLowerCase().includes('hôtel') || type.toLowerCase().includes('hotel')
     )) {
-      total++;
+      total++; // Préférences hôtel
     }
     total++; // Confort
     total++; // Quartier
     total++; // Équipements
   }
   
-  // Step 15: Sécurité (seulement si activités)
-  if (needsActivities) {
-    total++;
-  }
-  
-  // Step 16: Horloge biologique (seulement si activités)
-  if (needsActivities) {
-    total++;
-  }
-  
-  // Step 17: Contraintes (si hébergement + hôtel + repas)
+  // Contraintes (si hébergement + hôtel + repas avec codes internes)
+  const MEAL_CODES = ['breakfast', 'half_board', 'full_board', 'all_inclusive'];
   const hasHotelWithMeals = needsAccommodation && 
     answers.accommodationType?.some(type => 
       type.toLowerCase().includes('hôtel') || type.toLowerCase().includes('hotel')
     ) &&
-    answers.hotelPreferences?.some(pref => 
-      pref.toLowerCase().includes('breakfast') || 
-      pref.toLowerCase().includes('half') ||
-      pref.toLowerCase().includes('full') ||
-      pref.toLowerCase().includes('inclusive')
-    );
+    answers.hotelPreferences?.some(pref => MEAL_CODES.includes(pref));
   if (hasHotelWithMeals) {
     total++;
   }
   
-  total++; // Step 18: Zone ouverte
-  total++; // Step final: Review
+  total++; // Zone ouverte
+  total++; // Review
   
   return total;
 }
@@ -173,15 +167,15 @@ describe('Questionnaire - Tests de cohérence et logique', () => {
         returnDate: '2024-06-15',
         budgetPerPerson: '500-1000€',
         accommodationType: ['Hôtel'],
-        hotelPreferences: ['Petit-déjeuner', 'All-inclusive'],
+        hotelPreferences: ['breakfast', 'all_inclusive'],
       };
       
       const totalSteps = calculateTotalSteps(answers);
       
-      // Solo (1) + Destination(1) + Aide(1) + Trajet(1) + Dates(1) + Dates précises(1) 
-      // + Budget(1) + Style(1) + Vols(1) + Bagages(1) + Mobilité(1)
+      // Solo(1) + Aide(1) + Destination?(1) + Destination(1) + Dates(1) + Dates précises(1) 
+      // + Budget(1) + Vols(1) + Bagages(1) + Style(1) + Mobilité(1) + Sécurité(1) + Rythme(1)
       // + Type hébergement(1) + Préf hôtel(1) + Confort(1) + Quartier(1) + Équipements(1)
-      // + Sécurité(1) + Horloge(1) + Contraintes(1) + Zone ouverte(1) + Review(1) = 21
+      // + Contraintes(1) + Zone ouverte(1) + Review(1) = 21
       expect(totalSteps).toBe(21);
     });
   });
@@ -237,11 +231,11 @@ describe('Questionnaire - Tests de cohérence et logique', () => {
       
       const totalSteps = calculateTotalSteps(answers);
       
-      // Famille(1) + Nb voyageurs(1) + Destination(1) + Aide(1) + Trajet(1)
+      // Famille(1) + Nb voyageurs(1) + Enfants(1) + Aide(1) + Destination?(1) + Destination(1)
       // + Dates(1) + Dates précises(1) + Budget(1)
       // + Type hébergement(1) + Confort(1) + Quartier(1) + Équipements(1)
-      // + Zone ouverte(1) + Review(1) = 14
-      expect(totalSteps).toBe(14);
+      // + Zone ouverte(1) + Review(1) = 15
+      expect(totalSteps).toBe(15);
     });
   });
   
@@ -257,7 +251,7 @@ describe('Questionnaire - Tests de cohérence et logique', () => {
         datesType: DATES_TYPE.FIXED,
         departureDate: '2024-10-01',
         returnDate: '2024-10-15',
-        budgetType: '>1800€',
+        budgetType: 'Budget précis',
         budgetAmount: 3000,
         budgetCurrency: 'EUR',
         accommodationType: ['Hôtel'],
@@ -265,12 +259,12 @@ describe('Questionnaire - Tests de cohérence et logique', () => {
       
       const totalSteps = calculateTotalSteps(answers);
       
-      // Groupe(1) + Nb(1) + Destination(1) + Aide(1) + Trajet(1)
+      // Groupe(1) + Nb(1) + Aide(1) + Destination?(1) + Destination(1)
       // + Dates(1) + Dates précises(1) + Budget(1) + Montant exact(1)
-      // + Vols(1) + Bagages(1) + Mobilité(1)
+      // + Vols(1) + Bagages(1)
       // + Type hébergement(1) + Préf hôtel(1) + Confort(1) + Quartier(1) + Équipements(1)
-      // + Zone ouverte(1) + Review(1) = 19
-      expect(totalSteps).toBe(19);
+      // + Zone ouverte(1) + Review(1) = 18
+      expect(totalSteps).toBe(18);
     });
   });
   
@@ -364,12 +358,12 @@ describe('Questionnaire - Tests de cohérence et logique', () => {
         returnDate: '2024-11-08',
         budgetPerPerson: '900-1200€',
         accommodationType: ['Hôtel'],
-        hotelPreferences: ['Demi-pension', 'Vue'],
+        hotelPreferences: ['half_board', 'view'],
       };
       
       const totalSteps = calculateTotalSteps(answers);
       
-      // Duo(1) + Destination(1) + Aide(1) + Trajet(1)
+      // Duo(1) + Aide(1) + Destination?(1) + Destination(1)
       // + Dates(1) + Dates précises(1) + Budget(1)
       // + Type hébergement(1) + Préf hôtel(1) + Confort(1) + Quartier(1) + Équipements(1)
       // + Contraintes(1) + Zone ouverte(1) + Review(1) = 15
@@ -433,7 +427,7 @@ describe('Questionnaire - Tests de cohérence et logique', () => {
         luggage: { 0: 'Cabine', 1: 'Cabine + Soute', 2: 'Cabine', 3: 'Cabine', 4: 'Objet personnel' },
         mobility: ['Marche', 'Métro/Train', 'Taxi/VTC'],
         accommodationType: ['Hôtel'],
-        hotelPreferences: ['Pension complète', 'Piscine', 'Salle de sport'],
+        hotelPreferences: ['full_board', 'view', 'room_service'],
         comfort: '8.5/10+',
         neighborhood: 'Centre animé',
         amenities: ['Wifi fiable', 'Climatisation', 'Chambre familiale'],
@@ -445,14 +439,13 @@ describe('Questionnaire - Tests de cohérence et logique', () => {
       
       const totalSteps = calculateTotalSteps(answers);
       
-      // Famille(1) + Nb voyageurs(1) + Destination(1) + Aide(1) + Trajet(1)
+      // Famille(1) + Nb voyageurs(1) + Enfants(1) + Aide(1) + Destination?(1) + Destination(1)
       // + Dates(1) + Flexibilité(1) + Période?(1) + Saisie date(1) + Durée(1) + Nb exact(1)
       // + Budget(1) + Montant(1)
-      // + Style(1) + Vols(1) + Bagages(1) + Mobilité(1)
+      // + Vols(1) + Bagages(1) + Style(1) + Mobilité(1) + Sécurité(1) + Rythme(1)
       // + Type hébergement(1) + Préf hôtel(1) + Confort(1) + Quartier(1) + Équipements(1)
-      // + Sécurité(1) + Horloge(1) + Contraintes(1)
-      // + Zone ouverte(1) + Review(1) = 27
-      expect(totalSteps).toBe(27);
+      // + Contraintes(1) + Zone ouverte(1) + Review(1) = 28
+      expect(totalSteps).toBe(28);
     });
   });
   
@@ -731,7 +724,7 @@ describe('Questionnaire - Tests de synchronisation logique', () => {
         luggage: { 0: 'Cabine + Soute' },
         mobility: ['Marche', 'Métro/Train'],
         accommodationType: ['Hôtel'],
-        hotelPreferences: ['Petit-déjeuner', 'Wifi fiable'],
+        hotelPreferences: ['breakfast', 'view'],
         comfort: '7/10',
         neighborhood: 'Centre historique',
         amenities: ['Wifi fiable', 'Climatisation'],
@@ -742,12 +735,11 @@ describe('Questionnaire - Tests de synchronisation logique', () => {
       
       const totalSteps = calculateTotalSteps(answers);
       
-      // Solo(1) + Destination(1) + Aide(1) + Trajet(1)
+      // Solo(1) + Aide(1) + Destination?(1) + Destination(1)
       // + Dates(1) + Dates précises(1) + Budget(1)
-      // + Style(1) + Vols(1) + Bagages(1) + Mobilité(1)
+      // + Vols(1) + Bagages(1) + Style(1) + Mobilité(1) + Sécurité(1) + Rythme(1)
       // + Type hébergement(1) + Préf hôtel(1) + Confort(1) + Quartier(1) + Équipements(1)
-      // + Sécurité(1) + Horloge(1) + Contraintes(1)
-      // + Zone ouverte(1) + Review(1) = 21
+      // + Contraintes(1) + Zone ouverte(1) + Review(1) = 21
       expect(totalSteps).toBe(21);
     });
   });
@@ -796,12 +788,12 @@ describe('Questionnaire - Tests de synchronisation logique', () => {
       // Vérifier que activités n'est PAS inclus
       expect(needsActivities).toBe(false);
       
-      // Duo(1) + Destination(1) + Aide(1) + Trajet(1)
+      // Duo(1) + Aide(1) + Destination?(1) + Destination(1)
       // + Dates(1) + Dates précises(1) + Budget(1)
-      // + Vols(1) + Bagages(1) + Mobilité(1)
+      // + Vols(1) + Bagages(1)
       // + Type hébergement(1) + Préf hôtel(1) + Confort(1) + Quartier(1) + Équipements(1)
-      // + Zone ouverte(1) + Review(1) = 17 (PAS de style, sécurité, horloge)
-      expect(totalSteps).toBe(17);
+      // + Zone ouverte(1) + Review(1) = 16 (PAS de style, mobilité, sécurité, rythme)
+      expect(totalSteps).toBe(16);
     });
   });
 });

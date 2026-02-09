@@ -27,6 +27,7 @@ const Discover = lazy(() => import("./pages/Discover"));
 const TravelPlanner = lazy(() => import("./pages/TravelPlanner"));
 const WidgetShowcase = lazy(() => import("./pages/WidgetShowcase"));
 const PlannerDebug = lazy(() => import("./pages/PlannerDebug"));
+const TestRunner = lazy(() => import("./pages/TestRunner"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -58,6 +59,7 @@ const AppContent = () => {
         <Route path="/planner" element={<TravelPlanner />} />
         <Route path="/planner-debug" element={<PlannerDebug />} />
         <Route path="/widgets" element={<WidgetShowcase />} />
+        <Route path="/test-runner" element={<TestRunner />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>

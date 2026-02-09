@@ -249,7 +249,7 @@ describe('Questionnaire Data Normalization & Submission', () => {
     it('should normalize all schedule preferences', () => {
       const prefs = [
         'Je suis plutôt matinal',
-        'Je me couche tard',
+        'Je suis couche-tard',
         'J\'ai besoin de sieste',
         'J\'ai besoin de pauses'
       ];
