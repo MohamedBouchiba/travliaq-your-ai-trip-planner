@@ -39,6 +39,16 @@ function ToolTimelineComponent({ executions }: ToolTimelineProps) {
       }));
   }, [executions]);
 
+  // Show pending (started but not finished) tools
+  // A "started" entry is pending only if no "finished"/"failed" entry exists with a later timestamp for the same tool
+  const pending = useMemo(() => {
+    const started = executions.filter(e => e.status === "started");
+    const completed = executions.filter(e => e.status === "finished" || e.status === "failed");
+    return started.filter(s => 
+      !completed.some(c => c.tool === s.tool && c.timestamp >= s.timestamp)
+    );
+  }, [executions]);
+
   if (executions.length === 0) {
     return (
       <div className="text-center text-muted-foreground text-sm py-8">
@@ -48,9 +58,6 @@ function ToolTimelineComponent({ executions }: ToolTimelineProps) {
       </div>
     );
   }
-
-  // Show pending (started but not finished) tools
-  const pending = executions.filter(e => e.status === "started");
 
   return (
     <div className="space-y-3">
