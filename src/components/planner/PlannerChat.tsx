@@ -390,6 +390,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     updateMemory,
     updateTravelers,
     setMessages,
+    t,
+    dateFnsLocale,
   });
 
   // Widget action executor for LLM "choose for me" functionality
@@ -399,6 +401,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
   const widgetActionExecutor = useWidgetActionExecutor({
     messages,
     setMessages,
+    t,
     handleCitySelect: widgetFlow.handleCitySelect,
     handleTripTypeConfirm: widgetFlow.handleTripTypeConfirm,
     handleTravelersSelect: widgetFlow.handleTravelersSelect,
@@ -896,49 +899,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
       return m;
     }));
 
-    // Detect "inspire" intent for preference widgets flow
-    const isInspireIntent = /inspire|inspiration|idée|voyage|destination.*propos|suggest|recommend/i.test(userText);
-    
-    // If it's an "inspire" intent, show a beautiful message with the travel style widget directly
-    if (isInspireIntent) {
-      const inspireMessages = [
-        t("planner.inspire.title1"),
-        t("planner.inspire.title2"),
-        t("planner.inspire.title3"),
-        t("planner.inspire.title4"),
-        t("planner.inspire.title5"),
-      ];
-      const randomMessage = inspireMessages[Math.floor(Math.random() * inspireMessages.length)];
-      
-      const userMessage: ChatMessage = {
-        id: `user-${Date.now()}`,
-        role: "user",
-        text: userText,
-      };
-      
-      userMessageCountRef.current += 1;
-      eventBus.emit("chat:userMessage", { text: userText, messageCount: userMessageCountRef.current });
-      
-      const inspireMessageId = `inspire-${Date.now()}`;
-      setMessages((prev) => [
-        // CRITICAL: Do NOT clear widgets - they must remain visible in chat history
-        ...prev,
-        userMessage,
-        {
-          id: inspireMessageId,
-          role: "assistant",
-          text: randomMessage,
-          widget: "preferenceStyle" as import("@/types/flight").WidgetType,
-        },
-      ]);
-      
-      // Clear input and exit - no need to call the API
-      setInput("");
-      if (inputRef.current) {
-        inputRef.current.style.height = "auto";
-      }
-      return;
-    }
+    // NOTE: Inspire intent detection removed (CR3) — now handled by LLM classifier pipeline
+    // This prevents cooldown bypass and infinite preferenceStyle loops
     
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,

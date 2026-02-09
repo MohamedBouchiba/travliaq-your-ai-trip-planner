@@ -8,7 +8,8 @@ export const flightSearchTriggerTool = {
   type: "function",
   function: {
     name: "trigger_flight_search",
-    description: `À utiliser quand l'utilisateur confirme vouloir lancer la recherche de vols.
+    description: `Pré-remplit le formulaire de recherche de vols dans l'onglet Vols avec l'itinéraire configuré.
+NE LANCE PAS de recherche automatique. L'utilisateur devra vérifier le formulaire et lancer manuellement.
 
 DÉCLENCHEURS (appeler cet outil si l'utilisateur dit) :
 - "oui" (en réponse à "Souhaitez-vous que je lance la recherche des vols ?")
@@ -26,7 +27,7 @@ NE PAS UTILISER SI:
 - L'utilisateur pose une question
 - L'utilisateur veut modifier quelque chose
 
-Cet outil déclenche la recherche de vols côté client et affiche les résultats.`,
+IMPORTANT : Dans ta réponse, dis que le formulaire est prêt dans l'onglet Vols et que l'utilisateur peut vérifier les détails et lancer la recherche. NE DIS JAMAIS "je recherche" ou "les résultats arrivent".`,
     parameters: {
       type: "object",
       properties: {

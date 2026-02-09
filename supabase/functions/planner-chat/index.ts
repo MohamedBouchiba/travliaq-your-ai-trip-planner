@@ -140,9 +140,7 @@ function processToolCall(
       case "classify_intent": {
         let intentClassification = parseIntentClassification(toolCall.function.arguments);
         if (intentClassification) {
-          // Apply keyword-based widget forcing logic
-          intentClassification = applyWidgetForcingLogic(intentClassification, log);
-          // Apply deterministic preference-first override
+          // Apply deterministic preference-first override (CR2: applyWidgetForcingLogic removed)
           intentClassification = applyPreferenceFirstLogic(intentClassification, preferencesState, log);
           updatedData.intentClassification = intentClassification;
           result = { success: true, data: { message: "Intent classified", intent: intentClassification } };
@@ -322,62 +320,37 @@ function processToolCall(
 }
 
 /**
- * Apply keyword-based widget forcing logic to intent classification
- */
-function applyWidgetForcingLogic(
-  intentClassification: IntentClassificationResult,
-  log: RequestLogger
-): IntentClassificationResult {
-  const entities = intentClassification.entities;
-  
-  // Map intent entities to flightData for backward compatibility
-  if (entities.destinationCity || entities.destinationCountryCode || entities.preferredMonth || entities.adults) {
-    // This data will be extracted via update_flight_widget tool
-  }
-  
-  // Keyword-based widget forcing
-  const userMessage = intentClassification.detectedEntities?.join(" ") || "";
-  const messageLower = userMessage.toLowerCase();
-  
-  // Skip if widget already assigned
-  if (intentClassification.widgetToShow) {
-    return intentClassification;
-  }
-  
-  // Priority keywords for widget forcing
-  const keywordChecks = [
-    { keywords: ["régime", "végétarien", "végan", "halal", "casher", "gluten", "allergi"], widget: "dietary" },
-    { keywords: ["accessib", "fauteuil", "handicap", "mobilité réduite", "animal", "chien", "chat"], widget: "mustHaves" },
-    { keywords: ["intérêt", "activité", "plage", "musée", "nature", "culture", "sport", "randonnée"], widget: "preferenceInterests" },
-    { keywords: ["style", "luxe", "confort", "relax", "intensif", "authentique"], widget: "preferenceStyle" },
-    { keywords: ["date", "quand", "février", "mars", "avril", "weekend", "semaine"], widget: "datePicker" },
-    { keywords: ["famille", "potes", "amis", "couple", "seul", "solo", "groupe", "combien"], widget: "travelersSelector" },
-    { keywords: ["inspire", "où aller", "destination", "idée", "recommand", "suggère", "propose"], widget: "destinationSuggestions" },
-  ];
-  
-  for (const check of keywordChecks) {
-    if (check.keywords.some(kw => messageLower.includes(kw))) {
-      intentClassification.widgetToShow = {
-        type: check.widget,
-        reason: `Keyword match for ${check.widget}`,
-      };
-      log.info("widget_forcing", `Forced ${check.widget} widget based on keywords`);
-      break;
-    }
-  }
-  
-  return intentClassification;
-}
-
-/**
  * Deterministic preference-first override logic
  * Overrides LLM intent when user is indecisive and preferences are missing
+ * 
+ * CR2: applyWidgetForcingLogic removed (dead code: detectedEntities never existed,
+ * keywords were French-only). Guards added to protect conversational intents.
  */
 function applyPreferenceFirstLogic(
   intentClassification: IntentClassificationResult,
   preferencesState: { interests: string[]; style: string | null },
   log: RequestLogger
 ): IntentClassificationResult {
+  // GUARD: Never override conversational intents (CR2)
+  const CONVERSATIONAL_INTENTS = [
+    "greeting", "thank_you", "other", "ask_question",
+    "compare_options", "ask_recommendations",
+    "confirm_selection", "modify_selection", "cancel_or_restart",
+  ];
+  if (CONVERSATIONAL_INTENTS.includes(intentClassification.primaryIntent)) {
+    return intentClassification;
+  }
+
+  // GUARD: Never override when LLM already assigned a specific non-preference widget (CR2)
+  const NON_PREFERENCE_WIDGETS = [
+    "budgetRangeSlider", "dietary", "mustHaves",
+    "citySelector", "datePicker", "dateRangePicker",
+    "travelersSelector", "tripTypeConfirm",
+  ];
+  if (intentClassification.widgetToShow?.type &&
+      NON_PREFERENCE_WIDGETS.includes(intentClassification.widgetToShow.type)) {
+    return intentClassification;
+  }
   // Normalize: LLM sometimes returns widget types as primaryIntent (e.g. "preferenceInterests")
   const WIDGET_TYPE_AS_INTENT = [
     "preferenceInterests", "preferenceStyle", "dietary", "mustHaves",
@@ -451,7 +424,11 @@ function buildClassificationSystemPrompt(
     ? blockedWidgets.join(", ")
     : "aucun";
 
-  return `Tu es un classificateur d'intention pour un assistant de voyage. Analyse le message utilisateur et appelle classify_intent.
+  return `Tu es un classificateur d'intention pour un assistant de voyage.
+Analyse le DERNIER message utilisateur en tenant compte du contexte conversationnel fourni.
+Les messages précédents te donnent le contexte de la conversation.
+Utilise-les pour désambiguïser les intentions (ex: "2" = sélection si liste proposée, "Valentine's trip" = style de voyage si pas de contexte de dates explicite).
+Le DERNIER message utilisateur est celui à classifier. Appelle classify_intent.
 
 CONTEXTE PRÉFÉRENCES ACTUELLES:
 - Intérêts: ${interestsStr}
@@ -569,6 +546,12 @@ Exemples INTERDITS (NE FAIS JAMAIS ÇA) :
 - ${responseLanguage}
 
 ${phasePrompt}
+
+## RECHERCHE DE VOLS - COMPORTEMENT ATTENDU
+Quand trigger_flight_search est appelé, le formulaire de recherche est PRÉ-REMPLI dans l'onglet Vols.
+L'utilisateur doit VÉRIFIER le formulaire et lancer la recherche manuellement.
+NE DIS JAMAIS "je recherche" ou "les résultats arrivent".
+DIS : "J'ai pré-rempli le formulaire de recherche dans l'onglet Vols. Vérifiez les détails et lancez la recherche quand vous êtes prêt."
 
 ${CHAIN_OF_THOUGHT_INSTRUCTIONS}`;
 }
@@ -688,12 +671,13 @@ serve(async (req) => {
     
     let collectedData = createEmptyCollectedData();
     
-    // Extract the last user message for classification
-    const lastUserMessage = [...limitedMessages].reverse().find((m: { role: string }) => m.role === "user");
+    // CR4: Send last 4 messages (2 user/assistant pairs) for contextual classification
+    const recentMessages = limitedMessages.slice(-4);
+    const hasUserMessage = recentMessages.some((m: { role: string }) => m.role === "user");
     
-    if (lastUserMessage) {
+    if (hasUserMessage) {
       const classifyStartTime = Date.now();
-      log.info("classify_first", "Starting dedicated intent classification call");
+      log.info("classify_first", "Starting dedicated intent classification call", { contextMessages: recentMessages.length });
       
       try {
         const classifyResponse = await fetch(url, {
@@ -705,7 +689,7 @@ serve(async (req) => {
           body: JSON.stringify({
             messages: [
               { role: "system", content: buildClassificationSystemPrompt(preferencesState, blockedWidgets) },
-              lastUserMessage,
+              ...recentMessages,
             ],
             temperature: 0.3,
             max_tokens: 200,
