@@ -103,7 +103,8 @@ function processToolCall(
   toolCall: { id: string; function: { name: string; arguments: string } },
   requestId: string,
   collectedData: CollectedToolData,
-  log: RequestLogger
+  log: RequestLogger,
+  preferencesState: { interests: string[]; style: string | null; pace: string | null },
 ): { result: ToolExecutionResult; updatedData: Partial<CollectedToolData> } {
   const toolRunId = generateToolRunId(requestId, toolCall.id);
   const toolName = toolCall.function?.name || "unknown";
@@ -141,6 +142,8 @@ function processToolCall(
         if (intentClassification) {
           // Apply keyword-based widget forcing logic
           intentClassification = applyWidgetForcingLogic(intentClassification, log);
+          // Apply deterministic preference-first override
+          intentClassification = applyPreferenceFirstLogic(intentClassification, preferencesState, log);
           updatedData.intentClassification = intentClassification;
           result = { success: true, data: { message: "Intent classified", intent: intentClassification } };
         }
@@ -361,7 +364,51 @@ function applyWidgetForcingLogic(
       log.info("widget_forcing", `Forced ${check.widget} widget based on keywords`);
       break;
     }
+}
+
+/**
+ * Deterministic preference-first override logic
+ * Overrides LLM intent when user is indecisive and preferences are missing
+ */
+function applyPreferenceFirstLogic(
+  intentClassification: IntentClassificationResult,
+  preferencesState: { interests: string[]; style: string | null },
+  log: RequestLogger
+): IntentClassificationResult {
+  const isIndecisIntent = [
+    "gather_preferences", "ask_inspiration", "search_destination"
+  ].includes(intentClassification.primaryIntent);
+  
+  const isDestinationSuggestion = 
+    intentClassification.widgetToShow?.type === "destinationSuggestions" ||
+    intentClassification.primaryIntent === "ask_inspiration";
+
+  // If user is indecis OR system wants to show destinations
+  // BUT preferences are empty -> override to preferenceInterests
+  if ((isIndecisIntent || isDestinationSuggestion) && 
+      (!preferencesState.interests || preferencesState.interests.length === 0)) {
+    log.info("preference_first", "Overriding to preferenceInterests (empty interests)");
+    intentClassification.primaryIntent = "gather_preferences";
+    intentClassification.widgetToShow = {
+      type: "preferenceInterests",
+      reason: "Preferences must be collected before suggesting destinations",
+    };
+    return intentClassification;
   }
+
+  // If interests exist but no style -> preferenceStyle
+  if ((isIndecisIntent || isDestinationSuggestion) && !preferencesState.style) {
+    log.info("preference_first", "Overriding to preferenceStyle (missing style)");
+    intentClassification.primaryIntent = "gather_preferences";
+    intentClassification.widgetToShow = {
+      type: "preferenceStyle",
+      reason: "Travel style needed before suggesting destinations",
+    };
+    return intentClassification;
+  }
+
+  return intentClassification;
+}
   
   return intentClassification;
 }
@@ -443,8 +490,16 @@ serve(async (req) => {
       activeWidgetsContext, 
       language: requestLanguage, 
       blockedWidgets = [], 
-      requestId: bodyRequestId 
+      requestId: bodyRequestId,
+      preferencesState: rawPreferencesState,
     } = body;
+    
+    // Parse preferences state for deterministic override logic
+    const preferencesState = {
+      interests: Array.isArray(rawPreferencesState?.interests) ? rawPreferencesState.interests as string[] : [],
+      style: typeof rawPreferencesState?.style === "string" ? rawPreferencesState.style : null,
+      pace: typeof rawPreferencesState?.pace === "string" ? rawPreferencesState.pace : null,
+    };
     
     const requestId = extractRequestId(req, { requestId: bodyRequestId });
     
@@ -588,7 +643,7 @@ serve(async (req) => {
       const toolResponses: { role: "tool"; tool_call_id: string; content: string }[] = [];
       for (const toolCall of toolCalls) {
         const toolStartTime = Date.now();
-        const { result, updatedData } = processToolCall(toolCall, requestId, collectedData, log);
+        const { result, updatedData } = processToolCall(toolCall, requestId, collectedData, log, preferencesState);
         const toolLatency = Date.now() - toolStartTime;
         
         toolExecutionLog.push({
