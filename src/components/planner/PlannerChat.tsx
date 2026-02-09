@@ -976,6 +976,12 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
           basketSummary: getBasketSummary(),
           // Anti-loop: blocked widgets that should not be re-proposed
           blockedWidgets: widgetCooldown.getBlockedWidgets(),
+          // Deterministic preference-first logic: send current preferences state
+          preferencesState: {
+            interests: (Array.isArray(preferenceMemoryState?.interests) ? preferenceMemoryState.interests as string[] : []),
+            style: (typeof preferenceMemoryState?.travelStyle === "string" ? preferenceMemoryState.travelStyle : null),
+            pace: (typeof preferenceMemoryState?.pace === "string" ? preferenceMemoryState.pace : null),
+          },
         },
         (id, text, isComplete) => {
           // CRITICAL: Prevent late updates from resetting isStreaming after message is complete

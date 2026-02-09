@@ -200,6 +200,8 @@ export interface MemoryContext {
   basketSummary?: string;
   // Anti-loop: widgets already shown/confirmed that should not be re-proposed
   blockedWidgets?: string[];
+  // Deterministic preference-first logic: structured preferences state
+  preferencesState?: { interests: string[]; style: string | null; pace: string | null };
 }
 
 /**
@@ -534,6 +536,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
                 activeWidgetsContext: memoryContext.activeWidgetsContext || "",
                 // Anti-loop: blocked widgets that should not be re-proposed
                 blockedWidgets: memoryContext.blockedWidgets || [],
+                // Deterministic preference-first logic: send current preferences state
+                preferencesState: memoryContext.preferencesState || { interests: [], style: null, pace: null },
               }),
               signal: abortController.signal,
             }

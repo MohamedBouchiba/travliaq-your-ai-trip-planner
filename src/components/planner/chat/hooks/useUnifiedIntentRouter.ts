@@ -508,6 +508,7 @@ export function useUnifiedIntentRouter({
       "express_constraint",
       "ask_inspiration",
       "ask_recommendations",
+      "gather_preferences",
     ];
     
     // ============================================================================
