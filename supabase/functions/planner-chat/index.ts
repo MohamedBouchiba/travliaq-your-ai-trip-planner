@@ -411,8 +411,8 @@ function applyPreferenceFirstLogic(
     intentClassification.widgetToShow?.type === "destinationSuggestions" ||
     intentClassification.primaryIntent === "ask_inspiration";
 
-  if ((isIndecisIntent || isDestinationSuggestion) && !preferencesState.style) {
-    log.info("preference_first", "Overriding to preferenceStyle (missing style)");
+  if ((isIndecisIntent || isDestinationSuggestion) && !preferencesState.styleAxesConfigured) {
+    log.info("preference_first", "Overriding to preferenceStyle (styleAxes not configured)");
     intentClassification.primaryIntent = "gather_preferences";
     intentClassification.widgetToShow = {
       type: "preferenceStyle",
@@ -554,6 +554,7 @@ serve(async (req) => {
       interests: Array.isArray(rawPreferencesState?.interests) ? rawPreferencesState.interests as string[] : [],
       style: typeof rawPreferencesState?.style === "string" ? rawPreferencesState.style : null,
       pace: typeof rawPreferencesState?.pace === "string" ? rawPreferencesState.pace : null,
+      styleAxesConfigured: rawPreferencesState?.styleAxesConfigured === true,
     };
     
     const requestId = extractRequestId(req, { requestId: bodyRequestId });

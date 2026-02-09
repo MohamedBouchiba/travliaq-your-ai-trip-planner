@@ -161,6 +161,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
   const lastIntentRef = useRef<string | null>(null);
   // Hard reset guard (new conversation / delete all): suppress auto-effects that can spam messages
   const isHardResetRef = useRef(false);
+  // Safeguard: store intent-router widget to prevent loss between setMessages calls
+  const intentWidgetRef = useRef<import("@/types/flight").WidgetType | null>(null);
   
   // Inspire flow state: idle → style → interests → extra → loading → results
   // Uses InspireFlowStep type from MemoizedSmartSuggestions
@@ -983,6 +985,12 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
             interests: (Array.isArray(preferenceMemoryState?.interests) ? preferenceMemoryState.interests as string[] : []),
             style: (typeof preferenceMemoryState?.travelStyle === "string" ? preferenceMemoryState.travelStyle : null),
             pace: (typeof preferenceMemoryState?.pace === "string" ? preferenceMemoryState.pace : null),
+            styleAxesConfigured: (() => {
+              const axes = preferenceMemoryState?.styleAxes as import("@/stores/hooks").StyleAxes | undefined;
+              if (!axes) return false;
+              // Style is configured if ANY axis has been moved from the default (50)
+              return axes.chillVsIntense !== 50 || axes.cityVsNature !== 50 || axes.ecoVsLuxury !== 50 || axes.touristVsLocal !== 50;
+            })(),
           },
         },
         (id, text, isComplete) => {
@@ -1018,6 +1026,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
           // This covers gather_preferences, express_constraint, and any other intent with a valid widget
           if (intentResult.shouldShowWidget && intentResult.widgetType) {
             const widgetType = intentResult.widgetType as import("@/types/flight").WidgetType;
+            intentWidgetRef.current = widgetType; // Safeguard: store in ref for fallback
             console.log("[PlannerChat] Intent", intentClassification.primaryIntent, ": Adding widget to message:", widgetType);
             setMessages((prev) =>
               prev.map((m) =>
@@ -1306,8 +1315,11 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
           if (m.id !== messageId) return m;
           // CRITICAL: Preserve widget if already set by intent router (e.g. gather_preferences → preferenceInterests)
           // Only override with flight-flow widget if one was determined
-          const finalWidget = widget || m.widget;
-          const finalWidgetData = widget ? widgetData : m.widgetData;
+          // Only override widget if flight-flow determined one; otherwise keep whatever was set by intent router
+          const finalWidget = widget ? widget : (m.widget || intentWidgetRef.current);
+          const finalWidgetData = widget ? widgetData : (m.widgetData || undefined);
+          // Clear the ref after use
+          if (intentWidgetRef.current) intentWidgetRef.current = null;
           return { ...m, text: cleanContent, isTyping: false, isStreaming: false, widget: finalWidget, widgetData: finalWidgetData };
         })
       );
