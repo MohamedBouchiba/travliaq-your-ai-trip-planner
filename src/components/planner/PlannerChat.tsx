@@ -70,6 +70,7 @@ import { getDestinationSuggestions } from "@/services/destinations";
 import type { DestinationSuggestRequest, DestinationSuggestion } from "@/types/destinations";
 import { ScrollToBottomButton } from "./chat/ScrollToBottomButton";
 import { FLIGHTS_ZOOM } from "@/constants/mapSettings";
+import { geocodeCity } from "@/utils/geocodeCity";
 
 // Context imports
 import type { CountrySelectionEvent } from "@/types/flight";
@@ -1042,9 +1043,25 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
             )
           );
           
-          // Update flight memory with destination city (FIX #3: ensures missingFields updates)
+          // Update flight memory with destination city + geocoded coordinates
           updateMemory({ arrival: { city: destinationCity } });
           eventBus.emit("flight:updateFormData", { to: destinationCity });
+          
+          // Geocode city to get coordinates for map route
+          geocodeCity(destinationCity).then((coords) => {
+            if (coords) {
+              console.log("[PlannerChat] Geocoded destination:", destinationCity, coords);
+              updateMemory({
+                arrival: {
+                  city: destinationCity,
+                  lat: coords.lat,
+                  lng: coords.lng,
+                  country: coords.country,
+                  countryCode: coords.countryCode,
+                },
+              });
+            }
+          });
         }
       }
 
@@ -1961,9 +1978,10 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                   return;
                 }
                 
-                // === DEFAULT: Auto-submit the suggestion as a user message ===
+                // === DEFAULT: Fill input only, let user review & send ===
                 setDynamicSuggestions([]);
-                sendText(message);
+                setInput(message);
+                setTimeout(() => inputRef.current?.focus(), 0);
               }}
               isLoading={isLoading}
             />
