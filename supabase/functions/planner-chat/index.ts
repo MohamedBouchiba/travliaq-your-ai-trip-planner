@@ -378,6 +378,31 @@ function applyPreferenceFirstLogic(
   preferencesState: { interests: string[]; style: string | null },
   log: RequestLogger
 ): IntentClassificationResult {
+  // Normalize: LLM sometimes returns widget types as primaryIntent (e.g. "preferenceInterests")
+  const WIDGET_TYPE_AS_INTENT = [
+    "preferenceInterests", "preferenceStyle", "dietary", "mustHaves",
+    "citySelector", "datePicker", "dateRangePicker", "travelersSelector",
+    "destinationSuggestions", "tripTypeConfirm",
+  ];
+  if (WIDGET_TYPE_AS_INTENT.includes(intentClassification.primaryIntent)) {
+    log.info("preference_first", `Normalizing widget-as-intent: ${intentClassification.primaryIntent}`);
+    // Set the widget if not already set
+    if (!intentClassification.widgetToShow) {
+      intentClassification.widgetToShow = {
+        type: intentClassification.primaryIntent,
+        reason: "Extracted from primaryIntent (LLM used widget type as intent)",
+      };
+    }
+    // Map to proper intent
+    if (["preferenceInterests", "preferenceStyle", "dietary", "mustHaves"].includes(intentClassification.primaryIntent)) {
+      intentClassification.primaryIntent = "gather_preferences";
+    } else if (intentClassification.primaryIntent === "destinationSuggestions") {
+      intentClassification.primaryIntent = "ask_inspiration";
+    } else {
+      intentClassification.primaryIntent = "other";
+    }
+  }
+
   const isIndecisIntent = [
     "gather_preferences", "ask_inspiration", "search_destination"
   ].includes(intentClassification.primaryIntent);
