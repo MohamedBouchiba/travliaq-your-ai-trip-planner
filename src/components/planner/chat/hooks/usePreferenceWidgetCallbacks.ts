@@ -184,7 +184,7 @@ export function usePreferenceWidgetCallbacks({
         id: "must-haves",
         label: t("planner.mustHaves.title"),
         emoji: "⚠️",
-        message: "__WIDGET__mustHaves",
+        message: t("planner.suggestion.configureMustHaves"),
       });
     }
     
@@ -193,7 +193,7 @@ export function usePreferenceWidgetCallbacks({
         id: "dietary",
         label: t("planner.dietary.title"),
         emoji: "🍽️",
-        message: "__WIDGET__dietary",
+        message: t("planner.suggestion.configureDietary"),
       });
     }
     
@@ -259,7 +259,7 @@ export function usePreferenceWidgetCallbacks({
         id: "dietary",
         label: t("planner.dietary.title"),
         emoji: "🍽️",
-        message: "__WIDGET__dietary",
+        message: t("planner.suggestion.configureDietary"),
       });
     }
     

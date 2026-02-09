@@ -74,8 +74,8 @@ Tu DOIS appeler cet outil en PREMIER pour CHAQUE message utilisateur avant de r�
 ### INDÉCISION / AIDE (PRIORITÉ 11 - LA PLUS HAUTE)
 - FR: "je sais pas", "je ne sais pas", "j'hésite", "aide-moi", "aucune idée", "pas d'idée", "je sais pas trop"
 - EN: "I don't know", "no idea", "help me decide", "not sure", "I'm unsure"
-- SI préférences vides (pas d'intérêts, pas de style) → primaryIntent: "gather_preferences", widgetType: "preferenceInterests"
-- SI préférences partielles (intérêts mais pas de style) → primaryIntent: "gather_preferences", widgetType: "preferenceStyle"
+- SI style non défini → primaryIntent: "gather_preferences", widgetType: "preferenceStyle"
+- SI style défini mais intérêts vides → primaryIntent: "gather_preferences", widgetType: "preferenceInterests"
 - SI préférences complètes → primaryIntent: "ask_inspiration", widgetType: "destinationSuggestions" (maintenant pertinent car basé sur les préférences)
 - IMPORTANT: L'utilisateur indécis doit d'abord exprimer ses envies AVANT de recevoir des suggestions de destinations
 

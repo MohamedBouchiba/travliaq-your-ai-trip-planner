@@ -147,8 +147,8 @@ AVANT chaque réponse, tu DOIS OBLIGATOIREMENT appeler l'outil "plan_response" p
 ### RÈGLE CRITIQUE: PARCOURS INDÉCISION
 Si l'utilisateur est indécis (comprendre: "il ne sait pas où aller", "je sais pas trop", "aide-moi"):
 - Vérifier le [CONTEXTE PRÉFÉRENCES] dans la mémoire
-- Si intérêts = vide → stratégie = "collecter les intérêts via widget preferenceInterests"
-- Si intérêts remplis mais pas de style → stratégie = "collecter le style via widget preferenceStyle"
+- Si style = NON DÉFINI → stratégie = "collecter le style via widget preferenceStyle"
+- Si style défini mais intérêts = vide → stratégie = "collecter les intérêts via widget preferenceInterests"
 - Si tout est rempli → stratégie = "proposer des destinations basées sur ses préférences"
 - JAMAIS proposer des destinations quand les préférences sont vides
 

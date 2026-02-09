@@ -1961,16 +1961,9 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                   return;
                 }
                 
-                // === DEFAULT: Fill input with the message ===
-                setInput(message);
+                // === DEFAULT: Auto-submit the suggestion as a user message ===
                 setDynamicSuggestions([]);
-                setTimeout(() => {
-                  inputRef.current?.focus();
-                  if (inputRef.current) {
-                    inputRef.current.style.height = "auto";
-                    inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 120) + "px";
-                  }
-                }, 0);
+                sendText(message);
               }}
               isLoading={isLoading}
             />
