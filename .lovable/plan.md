@@ -1,67 +1,88 @@
 
 
-## Plan: 3 Improvements to the Preference/Destination Flow
+## Plan: Style-First Flow + Suggestion Buttons Fix
 
-### 1. Shorter AI text when a widget is displayed
+### Problem 1: Wrong widget order
+Currently when a user is indecisive ("je sais pas trop"), the backend override logic (lines 414-422 in `planner-chat/index.ts`) checks interests FIRST and shows `preferenceInterests` if empty. The user wants **style first** (the slider widget), then optionally interests.
 
-**Problem**: When the `preferenceInterests` widget appears, the AI generates a long text listing the same options the widget shows (beach, culture, adventure, etc.), creating redundancy.
-
-**Solution**: Add an instruction in the system prompt (`planner-chat/index.ts`) telling the LLM to keep its text very short (1-2 sentences max) when a widget is about to be displayed. The widget itself is the main UI -- the text should just be a brief intro like "Pour mieux te conseiller, dis-moi ce qui te fait envie :"
-
-**Files to modify**:
-- `supabase/functions/planner-chat/index.ts` -- Add rule in classify_intent system prompt and main system prompt: "When widgetToShow is set, keep your text response to 1-2 short sentences maximum. The widget handles the interaction -- do NOT list the options in text."
+### Problem 2: Suggestion buttons trigger widgets directly
+Some suggestion buttons use `__WIDGET__` prefix which bypasses the message pipeline and triggers the widget directly. The user expects: click button -> message appears in chat -> message is processed -> widget triggered as a result.
 
 ---
 
-### 2. Profile completion CTA button up to 80% (not just < 50%)
+### Change 1: Reverse the preference-first priority (Backend)
 
-**Problem**: The "Complete my profile" button only shows below 50%. At 55%, the user sees a blue info banner with no CTA button, making it impossible to improve their profile from the destination suggestions screen.
+**File**: `supabase/functions/planner-chat/index.ts` (lines 414-435)
 
-**Solution**: Change the threshold tiers in `ProfileCompletionBanner.tsx`:
-- Less than 80%: Show the CTA button ("Completer mon profil") alongside the progress bar
-- 80% and above: Green success badge (no CTA needed)
+Swap the two checks so **style is checked FIRST**, interests second:
 
-Specifically:
-- Raise the green success threshold from 70% to 80%
-- Add the CTA button to the blue/mid-tier banner (50-79%)
-- Keep the orange warning with CTA for below 50%
-
-**File to modify**:
-- `src/components/planner/chat/widgets/ProfileCompletionBanner.tsx`
-
----
-
-### 3. Ask departure city before destination suggestions
-
-**Problem**: When fetching destinations after completing preferences, the system doesn't ask for the departure city first, even though it's a missing field. Knowing the departure city helps provide better destination suggestions (proximity, flight availability).
-
-**Solution**: In `usePreferenceWidgetCallbacks.ts`, before triggering `handleFetchDestinations`, check if `memory.departure?.city` is set. If not, inject a message asking the user for their departure city and show a departure city input/widget. Only after the departure city is confirmed should destinations be fetched.
-
-Concretely, in the `onDietaryContinue` callback (and the `__FETCH_DESTINATIONS__` path), add a check:
-- If departure city is missing, show a message "D'ou partez-vous ?" and trigger an airport/city search widget (reusing the existing departure flow)
-- If departure city is set, proceed directly to fetching destinations
-
-**Files to modify**:
-- `src/components/planner/chat/hooks/usePreferenceWidgetCallbacks.ts` -- Add departure check before fetching
-- `src/components/planner/PlannerChat.tsx` -- Handle the `__FETCH_DESTINATIONS__` path with same departure check
-
----
-
-### Technical Details
-
-```text
-Current thresholds:              New thresholds:
-< 50%  -> Orange + CTA           < 50%  -> Orange + CTA
-50-69% -> Blue (no CTA)          50-79% -> Blue + CTA  
->= 70% -> Green badge            >= 80% -> Green badge
+```
+Current order:                    New order:
+1. interests empty? -> interests  1. style missing? -> preferenceStyle
+2. style missing? -> style        2. interests empty? -> preferenceInterests
 ```
 
-Departure city check flow:
-```text
-User completes preferences
-  -> Is departure city set?
-     -> YES: Fetch destinations immediately
-     -> NO:  Show "D'ou partez-vous?" + airport search widget
-             -> User selects city -> THEN fetch destinations
-```
+Also update `buildClassificationSystemPrompt` (lines 456-459) to match:
+- "Si le style est NON DEFINI -> preferenceStyle"
+- "Si les interets sont VIDES -> preferenceInterests"
+
+**File**: `supabase/functions/planner-chat/tools/intentClassifier.ts` (lines 77-78)
+
+Update the priority description to match (style first, then interests).
+
+**File**: `supabase/functions/planner-chat/tools/reasoningEngine.ts` (lines 150-151)
+
+Same: swap order of style vs interests check.
+
+---
+
+### Change 2: Frontend inspire flow also starts with style (already correct)
+
+The frontend `PlannerChat.tsx` line 855 already shows `preferenceStyle` for the inspire intent. And `onStyleContinue` already transitions to interests. So the frontend flow is already correct: Style -> Interests -> Extra. No change needed here.
+
+---
+
+### Change 3: Remove `__WIDGET__` direct triggers from suggestion buttons
+
+**File**: `src/components/planner/chat/hooks/usePreferenceWidgetCallbacks.ts`
+
+In `onInterestsContinue` (around line 175-195) and `onMustHavesContinue` (around line 245-265):
+- Change `message: "__WIDGET__mustHaves"` to a natural language message like the translated text for "Je veux configurer mes criteres obligatoires"
+- Change `message: "__WIDGET__dietary"` to "Je veux configurer mes restrictions alimentaires"
+
+These natural messages will be sent to the chat, processed by the backend, which will detect the intent and trigger the appropriate widget via the normal pipeline.
+
+**File**: `src/i18n/locales/fr/planner.json` and `en/planner.json`
+
+Add translation keys:
+- `planner.suggestion.configureMustHaves`: "Je veux definir mes criteres obligatoires"
+- `planner.suggestion.configureDietary`: "Je veux definir mes restrictions alimentaires"
+
+**File**: `src/components/planner/PlannerChat.tsx` (lines 1887-1921)
+
+The `__WIDGET__` case in the suggestion click handler can remain as a fallback but should no longer be the primary path. Since we're changing the messages to natural language, these suggestions will now fall through to the DEFAULT case (line 1964) which fills the input and lets the user send it.
+
+However, to make it seamless (one click = message sent), we should auto-submit when a suggestion is clicked with a natural language message. Currently the DEFAULT case just fills the input. We need to check: does the existing flow auto-submit?
+
+Looking at line 1964-1973, the DEFAULT case only fills the input -- it does NOT auto-submit. We should change this so that non-special-token messages are auto-submitted (call `handleSubmit` or the send function directly).
+
+---
+
+### Change 4: Auto-submit natural language suggestions
+
+**File**: `src/components/planner/PlannerChat.tsx` (DEFAULT case, ~line 1964)
+
+Instead of just filling the input, trigger the send flow directly. This means calling the `handleSendMessage` function with the suggestion text. The message will appear as a user message, get processed by the backend, and trigger the appropriate widget.
+
+---
+
+### Summary of files to modify
+
+1. `supabase/functions/planner-chat/index.ts` -- Swap style/interests priority order
+2. `supabase/functions/planner-chat/tools/intentClassifier.ts` -- Update priority docs
+3. `supabase/functions/planner-chat/tools/reasoningEngine.ts` -- Update priority docs
+4. `src/components/planner/chat/hooks/usePreferenceWidgetCallbacks.ts` -- Replace `__WIDGET__` messages with natural language
+5. `src/components/planner/PlannerChat.tsx` -- Auto-submit natural language suggestions
+6. `src/i18n/locales/fr/planner.json` -- Add suggestion message translations
+7. `src/i18n/locales/en/planner.json` -- Add suggestion message translations
 
