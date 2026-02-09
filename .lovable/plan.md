@@ -1,76 +1,114 @@
 
+# Fix 3 Issues from Debug Trace Analysis
 
-## Debug Trace Analysis - 3 Issues Found
+## Issue 1 (HIGH): citySelector fallback path bypass
 
-### Issue 1 (HIGH): `getNextRequiredWidget` returns `citySelector` when no country is selected
+**Root cause**: When the backend suggests `preferenceInterests` (blocked by cooldown), the fallback at line 489 does `validation.suggestedWidget || getNextRequiredWidget()`. While our previous fix made `getNextRequiredWidget()` return `null` when no country is selected, `validation.suggestedWidget` from other widget prerequisites (e.g., `tripTypeConfirm` suggests `travelersSelector`, `dateRangePicker` suggests `citySelector` in `useIntentRouter.ts`) could still inject `citySelector`. We need to guard the fallback result itself.
 
-**Problem**: When the user says "non pas specialement" (no dietary restrictions), the backend returns `widgetToShow: preferenceInterests`. But `preferenceInterests` is in `blockedWidgets` (already confirmed), so `canShowWidget` rejects it. The fallback calls `getNextRequiredWidget()` which returns `citySelector` as the first priority (line 384). However, `citySelector` requires a country to populate its city list -- and no country has been selected yet. The result: a `citySelector` widget is attached to the message but it can't display meaningful content.
+**File**: `src/components/planner/chat/hooks/useUnifiedIntentRouter.ts` (lines 488-500)
 
-**What should happen**: When there's no destination AND the user was initially indecisive ("je ne sais pas trop ou aller"), the system should proactively trigger destination suggestions instead of showing an empty city selector.
+**Change**: After computing `fallbackWidget`, check if it's `citySelector` and `!flowState.hasDestination`. If so, try `destinationSuggestions` instead (if preferences are filled), or set to `null`.
 
-**Fix**: In `getNextRequiredWidget()` (line 380-413 of `useUnifiedIntentRouter.ts`), add a check for `flowState.hasDestination` before returning `citySelector`. If no country is selected, return `null` instead (let the LLM handle asking about destinations, or trigger `destinationSuggestions` if preferences are complete).
+```typescript
+// Replace lines 488-500:
+// Widget can't be shown, use suggested fallback or next required
+let fallbackWidget = validation.suggestedWidget || getNextRequiredWidget();
 
-```
-// Before (line 384):
-if (!flowState.hasDestinationCity && !hasAlreadyProvided("citySelector")) {
-  return "citySelector";
-}
-
-// After:
-if (!flowState.hasDestinationCity && !hasAlreadyProvided("citySelector")) {
-  // Only show citySelector if a country is already selected
-  // Otherwise, the user needs to pick a destination first
-  if (flowState.hasDestination) {
-    return "citySelector";
+// Guard: don't fallback to citySelector if no country is selected
+if (fallbackWidget === "citySelector" && !flowState.hasDestination) {
+  console.log("[UnifiedIntentRouter] Fallback citySelector blocked — no country selected");
+  const hasPreferences = widgetInteractions.some(i => 
+    i.interactionType === "style_configured" || i.interactionType === "interests_selected"
+  );
+  if (hasPreferences) {
+    const destValidation = canShowWidget("destinationSuggestions");
+    fallbackWidget = destValidation.valid ? "destinationSuggestions" : null;
+  } else {
+    fallbackWidget = null;
   }
-  // No country selected - don't force citySelector, let LLM guide destination discovery
-  return null;
+}
+
+if (fallbackWidget) {
+  if (onWidgetTriggered) onWidgetTriggered(fallbackWidget);
+  return {
+    shouldShowWidget: true,
+    widgetType: fallbackWidget,
+    action: "none",
+    reason: validation.reason || "Fallback to required widget",
+  };
 }
 ```
 
-| File | Change |
-|------|--------|
-| `src/components/planner/chat/hooks/useUnifiedIntentRouter.ts` line 384-386 | Guard `citySelector` behind `flowState.hasDestination` check |
+---
+
+## Issue 2 (MEDIUM): Debug panel shows stale flightSummary ("1 voyageur")
+
+**Root cause**: `debugStore.setMemoryContext()` is only called inside `useChatStream.ts` (line 723) during LLM calls. Widget-only flows (city, dates, travelers, tripType) never call the LLM, so the debug panel keeps showing old context.
+
+**File**: `src/components/planner/PlannerChat.tsx`
+
+**Change**: Add a `useEffect` that watches key memory values and syncs the debug store whenever they change (not just during LLM calls).
+
+```typescript
+// Add near the other useEffect hooks in PlannerChat:
+useEffect(() => {
+  if (process.env.NODE_ENV !== "production") {
+    const { setMemoryContext } = useDebugStore.getState();
+    setMemoryContext({
+      flightSummary: getMemorySummary(),
+      preferenceContext: preferenceContext,
+      widgetHistory: widgetTracking.getContextForLLM(),
+      blockedWidgets: widgetCooldown.getBlockedWidgets(),
+      basketSummary: getBasketSummary(),
+      conversationSummary: sessionContext.buildConversationSummary(5),
+      sessionEntities: sessionContext.sessionEntities,
+      missingFields: missingFields?.map(getMissingFieldLabel),
+    });
+  }
+}, [getMemorySummary, preferenceContext, widgetTracking, widgetCooldown, getBasketSummary, sessionContext, missingFields]);
+```
+
+This ensures the debug panel always reflects the real-time state, even after widget-only interactions.
 
 ---
 
-### Issue 2 (MEDIUM): No proactive destination suggestions after preferences are complete
+## Issue 3 (LOW): sessionEntities.constraints concatenates unrelated messages
 
-**Problem**: After the user finishes all preference steps (style, interests, mustHaves) and declines dietary restrictions, there's no automatic trigger for destination suggestions. The user originally said "je ne sais pas trop ou aller" (indecisive), so the system should proactively offer destination suggestions once preferences are gathered. Instead, the LLM just asks "ou aimerais-tu partir ?" with no widget.
+**Root cause**: `useSessionContext.ts` (line 119-122) joins ALL user message text with `.join(" ")` before running regex extraction. Two separate messages ("Je veux definir mes criteres obligatoires" + "non pas specialement") get merged, and the constraint regex matches across the boundary, producing "definir mes criteres obligatoires non pas specialement".
 
-**What should happen**: When all preferences are gathered and the user was initially indecisive (no destination mentioned), the system should automatically request destination suggestions -- the same behavior as clicking the "Rien d'autre" suggestion chip which sends `__FETCH_DESTINATIONS__`.
+**File**: `src/components/planner/chat/hooks/useSessionContext.ts` (lines 117-128)
 
-**Fix**: In `usePreferenceWidgetCallbacks.ts`, when the flow detects that the user declined dietary ("non rien de special") AND all preferences are gathered AND no destination is set, proactively trigger destination suggestions instead of just asking the question.
+**Change**: Extract entities per-message individually, then merge/deduplicate.
 
-Alternatively, add a check in `useChatWidgetFlow.ts` or in the intent router's `processIntent`: when intent is `gather_preferences` with no widget to show, preferences are filled, and no destination is set, return a signal to trigger destination suggestions.
+```typescript
+// Replace lines 117-128:
+const sessionEntities = useMemo<SessionEntities>(() => {
+  const userMessages = messages.filter((m) => m.role === "user" && m.text);
 
-The simplest approach: in the `processIntent` fallback path (around line 497-510 of `useUnifiedIntentRouter.ts`), when `getNextRequiredWidget()` returns `null` AND `!flowState.hasDestination` AND preferences are partially filled (interests exist), auto-return `destinationSuggestions` as the widget.
+  const destinationsSet = new Set<string>();
+  const datesSet = new Set<string>();
+  const budgetsSet = new Set<string>();
+  const constraintsSet = new Set<string>();
 
-| File | Change |
-|------|--------|
-| `src/components/planner/chat/hooks/useUnifiedIntentRouter.ts` ~line 497-510 | After `getNextRequiredWidget()` returns null, check if `!flowState.hasDestination` and preferences are filled -- if so, trigger `destinationSuggestions` widget |
+  for (const msg of userMessages) {
+    for (const d of extractEntities(msg.text, ENTITY_PATTERNS.destinations)) destinationsSet.add(d);
+    for (const d of extractEntities(msg.text, ENTITY_PATTERNS.dates)) datesSet.add(d);
+    for (const b of extractEntities(msg.text, ENTITY_PATTERNS.budgets)) budgetsSet.add(b);
+    for (const c of extractEntities(msg.text, ENTITY_PATTERNS.constraints)) constraintsSet.add(c);
+  }
+
+  const destinations = Array.from(destinationsSet);
+  const dates = Array.from(datesSet);
+  const budgets = Array.from(budgetsSet);
+  const constraints = Array.from(constraintsSet);
+```
 
 ---
 
-### Issue 3 (LOW): Intent classification returns `preferenceInterests` for "non pas specialement"
+## Summary
 
-**Problem**: The user says "non pas specialement" in response to "Avez-vous des restrictions alimentaires ?". The backend classifies this as `gather_preferences` with `widgetToShow: preferenceInterests`. This is wrong -- interests are already configured (`blockedWidgets: ["preferenceInterests"]`). The backend should classify this as a simple negative answer or `other` intent, not suggest a widget that's already been completed.
-
-**Root cause**: The backend system prompt doesn't have visibility into `blockedWidgets`. It sees the conversation and thinks interests haven't been explicitly discussed, so it suggests them.
-
-**Fix**: Include `blockedWidgets` in the memory context sent to the backend, so the intent classifier knows not to suggest already-confirmed widgets. Add a line in the system prompt context like: `[WIDGETS DEJA CONFIRMES] preferenceInterests, preferenceStyle, mustHaves`.
-
-| File | Change |
-|------|--------|
-| `supabase/functions/planner-chat/index.ts` (system prompt construction) | Add blocked/confirmed widgets to the context sent to the LLM so it doesn't suggest already-completed widgets |
-
----
-
-### Summary
-
-| # | Issue | File(s) | Type | Priority |
-|---|-------|---------|------|----------|
-| 1 | citySelector shown without country | `useUnifiedIntentRouter.ts` | Logic guard | High |
-| 2 | No proactive destination suggestions | `useUnifiedIntentRouter.ts` | Flow gap | Medium |
-| 3 | Backend suggests blocked widget | `planner-chat/index.ts` | Context gap | Low |
-
+| # | Issue | File | Change |
+|---|-------|------|--------|
+| 1 | citySelector fallback bypass | `useUnifiedIntentRouter.ts` L488-500 | Guard fallback result against citySelector when no country |
+| 2 | Stale debug memoryContext | `PlannerChat.tsx` | Add useEffect to sync debug store on memory changes |
+| 3 | Constraint concatenation | `useSessionContext.ts` L117-128 | Per-message entity extraction instead of joined text |
