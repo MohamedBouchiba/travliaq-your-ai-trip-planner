@@ -103,6 +103,7 @@ export interface FlightActions {
   addLeg: () => void;
   removeLeg: (legId: string) => void;
   updateLeg: (legId: string, update: Partial<FlightLegMemory>) => void;
+  setLegs: (legs: FlightLegMemory[]) => void;
   resetFlight: () => void;
 }
 

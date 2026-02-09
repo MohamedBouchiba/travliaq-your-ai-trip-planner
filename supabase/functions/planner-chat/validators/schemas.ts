@@ -40,6 +40,13 @@ export const FlightDataSchema = z.object({
   // Trip details
   tripType: z.enum(["roundtrip", "oneway", "multi"]).optional(),
   budgetHint: z.string().max(100).optional(),
+  
+  // Multi-destination legs
+  legs: z.array(z.object({
+    from: z.string().max(100),
+    to: z.string().max(100),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD format").optional(),
+  })).optional(),
 }).strict();
 
 export type FlightData = z.infer<typeof FlightDataSchema>;
