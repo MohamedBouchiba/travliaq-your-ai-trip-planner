@@ -2582,6 +2582,9 @@ const resources = {
       "planner.suggestions.nextDestination": "Destination suivante",
       "planner.suggestions.goToDestination": "Aller à la destination {{index}}",
       "planner.suggestions.swipeHint": "← Glissez pour voir plus de destinations →",
+      "planner.suggestions.improveRecommendations": "Pour des recommandations plus personnalisées, complétez votre profil.",
+      "planner.suggestions.fillPreferences": "Renseigner mes préférences",
+      "planner.suggestions.fillPreferencesMessage": "Je veux renseigner mes préférences de voyage",
       
       // Planner - Airport Widgets
       "planner.airport.departure": "Départ",
@@ -5495,6 +5498,9 @@ const resources = {
       "planner.suggestions.nextDestination": "Next destination",
       "planner.suggestions.goToDestination": "Go to destination {{index}}",
       "planner.suggestions.swipeHint": "← Swipe to see more destinations →",
+      "planner.suggestions.improveRecommendations": "For better recommendations, complete your profile.",
+      "planner.suggestions.fillPreferences": "Set my preferences",
+      "planner.suggestions.fillPreferencesMessage": "I want to set my travel preferences",
       
       // Planner - Airport Widgets
       "planner.airport.departure": "Departure",

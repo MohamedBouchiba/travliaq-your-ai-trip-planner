@@ -133,8 +133,8 @@ export const DestinationSuggestionCard = memo(function DestinationSuggestionCard
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {/* IMAGE HERO */}
-        <div className="relative aspect-[16/10] overflow-hidden bg-muted">
+        {/* IMAGE HERO - Reduced height for better text visibility */}
+        <div className="relative aspect-[16/8] overflow-hidden bg-muted">
           {!imageLoaded && (
             <div className="absolute inset-0 flex items-center justify-center">
               <Skeleton className="w-full h-full" />
@@ -171,41 +171,41 @@ export const DestinationSuggestionCard = memo(function DestinationSuggestionCard
 
         </div>
 
-        <CardContent className="px-3 py-3 space-y-2.5 flex-1">
-          {/* Headline */}
-          <h3 className="font-semibold text-sm leading-snug text-foreground">
+        <CardContent className="px-4 py-4 space-y-3 flex-1">
+          {/* Headline - Larger and bolder */}
+          <h3 className="font-bold text-base leading-snug text-foreground">
             {headline}
           </h3>
 
-          {/* Description */}
-          <p className="text-xs text-muted-foreground">
+          {/* Description - Larger for readability */}
+          <p className="text-sm text-muted-foreground">
             {description}
           </p>
 
-          {/* Key Factors - Inline compact */}
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+          {/* Key Factors - Inline compact with better visibility */}
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
             {keyFactors.slice(0, 3).map((factor, i) => (
-              <div key={i} className="flex items-center gap-1 text-xs">
-                <Check className="h-3 w-3 text-green-500 shrink-0" />
+              <div key={i} className="flex items-center gap-1 text-sm">
+                <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />
                 <span className="text-muted-foreground">{factor}</span>
               </div>
             ))}
           </div>
 
-          {/* Stats - One stable line with compact text */}
-          <div className="flex items-center justify-center gap-2.5 text-xs text-muted-foreground bg-muted/60 rounded-lg py-2 px-3">
+          {/* Stats - Larger text with better padding */}
+          <div className="flex items-center justify-center gap-3 text-sm text-muted-foreground bg-muted/60 rounded-lg py-2.5 px-4">
             <div className="flex items-center gap-1">
-              <Wallet className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+              <Wallet className="h-4 w-4 text-amber-500 shrink-0" />
               <span>{estimatedBudgetPerPerson.min}-{estimatedBudgetPerPerson.max}€/j</span>
             </div>
             <span className="text-border/60">|</span>
             <div className="flex items-center gap-1">
-              <Calendar className="h-3.5 w-3.5 text-purple-500 shrink-0" />
+              <Calendar className="h-4 w-4 text-purple-500 shrink-0" />
               <span>{bestSeasons.slice(0, 2).join(", ")}</span>
             </div>
             <span className="text-border/60">|</span>
             <div className="flex items-center gap-1">
-              <Plane className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+              <Plane className="h-4 w-4 text-blue-500 shrink-0" />
               <span>
                 ~{flightPriceEstimate || "—"}€
                 {sourceAirportIata && (
@@ -217,12 +217,12 @@ export const DestinationSuggestionCard = memo(function DestinationSuggestionCard
             </div>
           </div>
 
-          {/* Activities - Full names visible */}
+          {/* Activities - Larger tags */}
           <div className="flex flex-wrap gap-1.5">
             {topActivities.slice(0, 4).map((activity, i) => (
               <span
                 key={i}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted text-xs text-muted-foreground"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-muted text-sm text-muted-foreground"
               >
                 <span>{getActivityEmoji(activity.emoji)}</span>
                 <span>{activity.name}</span>
