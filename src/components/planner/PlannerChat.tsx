@@ -1258,16 +1258,19 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
         }
       }
 
-      // Determine widget
+      // Determine widget from flight flow
       widget = widgetFlow.determineNextWidget(showDateWidget, showTravelersWidget, nextMem);
       const widgetData = widget ? widgetFlow.getWidgetData() : undefined;
 
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId
-            ? { ...m, text: cleanContent, isTyping: false, isStreaming: false, widget, widgetData }
-            : m
-        )
+        prev.map((m) => {
+          if (m.id !== messageId) return m;
+          // CRITICAL: Preserve widget if already set by intent router (e.g. gather_preferences → preferenceInterests)
+          // Only override with flight-flow widget if one was determined
+          const finalWidget = widget || m.widget;
+          const finalWidgetData = widget ? widgetData : m.widgetData;
+          return { ...m, text: cleanContent, isTyping: false, isStreaming: false, widget: finalWidget, widgetData: finalWidgetData };
+        })
       );
     } catch (err) {
       console.error("Failed to get chat response:", err);
