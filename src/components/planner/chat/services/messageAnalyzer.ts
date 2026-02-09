@@ -19,6 +19,8 @@ export type ProposedContentType =
   | 'activities'
   | 'destination_info'
   | 'confirmation'
+  | 'departure_question'
+  | 'next_steps'
   | 'open_question'
   | 'greeting'
   | 'unknown';
@@ -185,13 +187,38 @@ const CONFIRMATION_PATTERNS = [
   /excellent\s+choix/i,
   /j'ai\s+bien\s+enregistré/i,
   /on\s+récapitule/i,
+  /je\s+note/i,
+  /bien\s+noté/i,
+  /enregistré/i,
   // English
   /noted/i,
   /perfect\s*!/i,
   /excellent\s+choice/i,
   /i('ve)?\s+(saved|recorded|noted)/i,
+  /i('ll)?\s+note/i,
   /let('s)?\s+recap/i,
   /got\s+it/i,
+];
+
+const DEPARTURE_QUESTION_PATTERNS = [
+  // French
+  /depuis\s+quelle\s+ville/i,
+  /ville\s+de\s+départ/i,
+  /d'où\s+(souhaitez-vous|souhaites-tu|veux-tu)\s+partir/i,
+  // English
+  /from\s+which\s+city/i,
+  /departure\s+city/i,
+  /where\s+(would you like|do you want)\s+to\s+(depart|leave)\s+from/i,
+];
+
+const NEXT_STEPS_PATTERNS = [
+  // French
+  /il\s+reste\s+à\s+préciser/i,
+  /voici\s+ce\s+qu'il\s+reste/i,
+  /ce\s+que\s+nous\s+devons\s+préciser/i,
+  // English
+  /what('s|\s+is)\s+(left|remaining)\s+to/i,
+  /here('s|\s+is)\s+what\s+we\s+(still\s+)?need/i,
 ];
 
 const GREETING_PATTERNS = [
@@ -320,6 +347,20 @@ export function analyzeLastAssistantMessage(text: string | undefined): LastPropo
     }
   }
   
+  // Check for departure question (before confirmation, since messages can contain both)
+  for (const pattern of DEPARTURE_QUESTION_PATTERNS) {
+    if (pattern.test(text)) {
+      return { type: 'departure_question', questionTopic: 'departure_city' };
+    }
+  }
+
+  // Check for next steps / remaining fields
+  for (const pattern of NEXT_STEPS_PATTERNS) {
+    if (pattern.test(text)) {
+      return { type: 'next_steps', questionTopic: 'missing_fields' };
+    }
+  }
+
   // Check for confirmations
   for (const pattern of CONFIRMATION_PATTERNS) {
     if (pattern.test(text)) {
@@ -679,7 +720,57 @@ const SUGGESTION_TEMPLATES = {
       { id: 'help', label: 'Help', message: 'What do you need to continue?', emoji: '❓', priority: 2 },
     ],
   },
+  departure_question: {
+    fr: [
+      { id: 'brussels', label: 'Bruxelles', message: 'Je pars de Bruxelles', emoji: '✈️', priority: 1 },
+      { id: 'paris', label: 'Paris', message: 'Je pars de Paris', emoji: '✈️', priority: 2 },
+      { id: 'other', label: 'Autre ville', message: 'Je pars de ', emoji: '📍', priority: 3 },
+    ],
+    en: [
+      { id: 'london', label: 'London', message: 'I depart from London', emoji: '✈️', priority: 1 },
+      { id: 'paris', label: 'Paris', message: 'I depart from Paris', emoji: '✈️', priority: 2 },
+      { id: 'other', label: 'Other city', message: 'I depart from ', emoji: '📍', priority: 3 },
+    ],
+  },
+  next_steps: {
+    fr: [
+      { id: 'solo', label: 'Seul', message: 'Je pars seul', emoji: '🧳', priority: 1 },
+      { id: 'couple', label: 'En couple', message: 'En couple, nous sommes 2', emoji: '💑', priority: 2 },
+      { id: 'family', label: 'En famille', message: 'En famille', emoji: '👨‍👩‍👧', priority: 3 },
+    ],
+    en: [
+      { id: 'solo', label: 'Solo', message: 'I\'m traveling solo', emoji: '🧳', priority: 1 },
+      { id: 'couple', label: 'Couple', message: 'As a couple, 2 adults', emoji: '💑', priority: 2 },
+      { id: 'family', label: 'Family', message: 'Family trip', emoji: '👨‍👩‍👧', priority: 3 },
+    ],
+  },
 };
+
+/**
+ * Parse next_steps message to detect which fields are missing and return targeted suggestions
+ */
+function getNextStepsSuggestions(text: string, lang: 'fr' | 'en'): AnticipatedSuggestion[] {
+  const textLower = text.toLowerCase();
+  
+  // Check what's mentioned as missing
+  const mentionsTravelers = /nombre\s+de\s+voyageurs?|combien|how\s+many\s+(people|travelers)/i.test(textLower);
+  const mentionsDeparture = /ville\s+de\s+départ|depuis\s+quelle\s+ville|departure|where.*from/i.test(textLower);
+  const mentionsDates = /dates?|quand|when|période|period/i.test(textLower);
+  
+  // If travelers is the first item mentioned, prioritize travelers suggestions
+  if (mentionsTravelers) {
+    return SUGGESTION_TEMPLATES.travelers_question[lang];
+  }
+  if (mentionsDeparture) {
+    return SUGGESTION_TEMPLATES.departure_question[lang];
+  }
+  if (mentionsDates) {
+    return SUGGESTION_TEMPLATES.dates_question[lang];
+  }
+  
+  // Generic next_steps fallback
+  return SUGGESTION_TEMPLATES.next_steps[lang];
+}
 
 /**
  * Generate anticipated suggestions based on conversation analysis (bilingual)
@@ -688,7 +779,8 @@ export function getAnticipatedSuggestions(
   lastAssistantContent: LastProposedContent,
   userIntent: UserIntent,
   conversationTurn: number,
-  detectedLang?: 'fr' | 'en'
+  detectedLang?: 'fr' | 'en',
+  lastAssistantText?: string
 ): AnticipatedSuggestion[] {
   // Use provided lang or current i18n language
   const currentLang = i18n.language?.split('-')[0] as 'fr' | 'en';
@@ -796,16 +888,22 @@ export function getAnticipatedSuggestions(
       
     case 'confirmation':
       return SUGGESTION_TEMPLATES.confirmation[lang];
+
+    case 'departure_question':
+      return SUGGESTION_TEMPLATES.departure_question[lang];
+
+    case 'next_steps':
+      return getNextStepsSuggestions(lastAssistantText || '', lang);
       
     case 'open_question':
       return SUGGESTION_TEMPLATES.open_question[lang];
       
     default:
-      // Unknown or first message - general suggestions
+      // Unknown type - don't show generic suggestions
+      // Let the static suggestion engine handle it contextually
       if (conversationTurn === 0) {
         return SUGGESTION_TEMPLATES.default_start[lang];
-      } else {
-        return SUGGESTION_TEMPLATES.default_mid[lang];
       }
+      return [];
   }
 }
