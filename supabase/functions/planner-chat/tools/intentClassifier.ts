@@ -71,6 +71,14 @@ Tu DOIS appeler cet outil en PREMIER pour CHAQUE message utilisateur avant de r�
 - FR: "inspire-moi", "où aller", "quelle destination", "idée de voyage", "suggestion", "recommandation", "conseille-moi", "je ne sais pas où", "surprise-moi"
 - EN: "inspire me", "where to go", "travel idea", "suggestion", "recommend", "don't know where", "surprise me"
 
+### INDÉCISION / AIDE (PRIORITÉ 11 - LA PLUS HAUTE)
+- FR: "je sais pas", "je ne sais pas", "j'hésite", "aide-moi", "aucune idée", "pas d'idée", "je sais pas trop"
+- EN: "I don't know", "no idea", "help me decide", "not sure", "I'm unsure"
+- SI préférences vides (pas d'intérêts, pas de style) → primaryIntent: "gather_preferences", widgetType: "preferenceInterests"
+- SI préférences partielles (intérêts mais pas de style) → primaryIntent: "gather_preferences", widgetType: "preferenceStyle"
+- SI préférences complètes → primaryIntent: "ask_inspiration", widgetType: "destinationSuggestions" (maintenant pertinent car basé sur les préférences)
+- IMPORTANT: L'utilisateur indécis doit d'abord exprimer ses envies AVANT de recevoir des suggestions de destinations
+
 ### ACTIONS SPÉCIALES
 - "choisis pour moi" → primaryIntent: "delegate_choice"
 - "lance la recherche" → primaryIntent: "trigger_search"
@@ -99,6 +107,7 @@ Tu DOIS appeler cet outil en PREMIER pour CHAQUE message utilisateur avant de r�
             "trigger_search",
             "delegate_choice",
             "cancel_or_restart",
+            "gather_preferences",
             "ask_question",
             "greeting",
             "thank_you",

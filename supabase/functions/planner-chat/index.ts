@@ -1,7 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buildPhaseSystemPrompt, type TravelPhase } from "./prompts/phasePrompts.ts";
+import { buildPhaseSystemPrompt, normalizeTravelPhase, type TravelPhase } from "./prompts/phasePrompts.ts";
 import { detectLanguage, type SupportedLanguage } from "./prompts/systemPrompts.ts";
 import { createRequestLogger, extractRequestId, type RequestLogger } from "../_shared/logger.ts";
 import {
@@ -372,7 +372,7 @@ function applyWidgetForcingLogic(
 function buildSystemPrompt(phase: TravelPhase, negativeContext: string, widgetContext: string, currentDate: string, widgetsContext: string): string {
   const phasePrompt = buildPhaseSystemPrompt(phase, negativeContext, widgetContext, currentDate, widgetsContext);
   
-  return `Tu es un assistant de voyage bienveillant pour Travliaq. Tu guides l'utilisateur pas à pas, UNE QUESTION À LA FOIS, pour l'aider à trouver son vol idéal.
+  return `Tu es un assistant de voyage bienveillant pour Travliaq. Tu guides l'utilisateur pas à pas, UNE QUESTION À LA FOIS, pour l'aider à planifier son voyage idéal.
 
 ## RÈGLE D'OR : CONTEXTE ET MÉMOIRE
 Tu disposes du contexte complet de la conversation incluant :
@@ -389,8 +389,28 @@ Si l'utilisateur mentionne un PAYS :
 2. Mettre toCountryCode avec le code ISO2
 3. NE PAS mettre de valeur dans "to"
 
-## ORDRE STRICT DES ÉTAPES
-1. DESTINATION → 2. DATE → 3. DURÉE → 4. VOYAGEURS → 5. VILLE DÉPART → 6. CONFIRMATION
+## WORKFLOW PAR PHASES
+Le voyage se planifie en 5 phases :
+1. DISCOVERY → Préférences puis destination
+2. LOGISTICS → Dates, voyageurs, ville départ, vols
+3. ACCOMMODATION → Type, critères, comparaison, sélection hôtel
+4. ACTIVITIES → Rythme, intérêts spécifiques, planning jour par jour
+5. RECAP → Résumé complet, ajustements, export
+
+Tu es actuellement en PHASE ci-dessous.
+Suis les instructions spécifiques de la phase active.
+NE SAUTE PAS de phase. NE MÉLANGE PAS les phases.
+Si l'utilisateur pose une question hors-phase, réponds brièvement puis recentre sur la phase en cours.
+
+## RÈGLE CRITIQUE : PRÉFÉRENCES AVANT DESTINATIONS
+Si l'utilisateur dit "je sais pas", "je ne sais pas où aller", "aide-moi", "j'hésite" :
+1. Vérifie si les préférences sont renseignées (interests, travelStyle, pace, etc.)
+2. Si les préférences sont VIDES ou INCOMPLÈTES :
+   - NE PAS proposer de destinations tout de suite
+   - D'abord demander les préférences via le widget preferenceInterests ou preferenceStyle
+   - Utiliser l'outil update_preferences pour extraire les indices
+   - Poser UNE question sur les envies : "Qu'est-ce qui te fait rêver ? Plage, culture, aventure ?"
+3. SEULEMENT après avoir collecté au moins les intérêts, proposer des destinations adaptées
 
 ## STYLE
 - Chaleureux et bienveillant
@@ -486,7 +506,7 @@ serve(async (req) => {
 
     const url = `${AZURE_OPENAI_ENDPOINT}openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=${AZURE_OPENAI_API_VERSION}`;
     const currentDate = new Date().toISOString().split('T')[0];
-    const phase: TravelPhase = currentPhase || "research";
+    const phase: TravelPhase = normalizeTravelPhase(currentPhase);
     const systemPrompt = buildSystemPrompt(
       phase,
       negativePreferences || "",
@@ -496,8 +516,18 @@ serve(async (req) => {
     );
 
     // ========================================================================
-    // MULTI-TOOL LOOP (ReAct Pattern)
+    // MULTI-TOOL LOOP (ReAct Pattern) with real execution logging
     // ========================================================================
+    interface ToolExecutionEntry {
+      tool: string;
+      status: "finished" | "failed";
+      latency_ms: number;
+      summary: string;
+      timestamp: number;
+      loopIteration: number;
+    }
+    const toolExecutionLog: ToolExecutionEntry[] = [];
+    
     let loopCount = 0;
     let collectedData = createEmptyCollectedData();
     let conversationMessages = [
@@ -557,7 +587,21 @@ serve(async (req) => {
       // Process each tool call
       const toolResponses: { role: "tool"; tool_call_id: string; content: string }[] = [];
       for (const toolCall of toolCalls) {
+        const toolStartTime = Date.now();
         const { result, updatedData } = processToolCall(toolCall, requestId, collectedData, log);
+        const toolLatency = Date.now() - toolStartTime;
+        
+        toolExecutionLog.push({
+          tool: toolCall.function?.name || "unknown",
+          status: result.success ? "finished" : "failed",
+          latency_ms: toolLatency,
+          summary: result.success 
+            ? (typeof result.data?.message === "string" ? result.data.message : "OK")
+            : (typeof result.error?.message === "string" ? result.error.message : "Failed"),
+          timestamp: Date.now(),
+          loopIteration: loopCount,
+        });
+        
         collectedData = mergeToolData(collectedData, updatedData);
         toolResponses.push(buildToolResponseMessage(toolCall.id, result));
       }
@@ -606,7 +650,7 @@ serve(async (req) => {
         finalContent = "J'ai mis à jour les informations.";
       } else if (stream) {
         // Return streaming response
-        return createStreamingResponse(finalResponse, collectedData, log, requestId);
+        return createStreamingResponse(finalResponse, collectedData, log, requestId, toolExecutionLog);
       } else {
         const finalData = await finalResponse.json();
         finalContent = finalData.choices?.[0]?.message?.content || "J'ai mis à jour les informations.";
@@ -619,7 +663,7 @@ serve(async (req) => {
 
     // Handle streaming for collected data
     if (stream && finalContent) {
-      return createSimulatedStreamingResponse(finalContent, collectedData, log);
+      return createSimulatedStreamingResponse(finalContent, collectedData, log, toolExecutionLog);
     }
 
     log.info("response", "Sending final response", {
@@ -641,6 +685,7 @@ serve(async (req) => {
       intentClassification: collectedData.intentClassification,
       reasoning: collectedData.reasoningData,
       flightSearchTrigger: collectedData.flightSearchTrigger,
+      toolExecutions: toolExecutionLog,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -660,14 +705,15 @@ function createStreamingResponse(
   azureResponse: Response,
   collectedData: CollectedToolData,
   log: RequestLogger,
-  requestId: string
+  requestId: string,
+  toolLog: { tool: string; status: string; latency_ms: number; summary: string; timestamp: number; loopIteration: number }[] = []
 ): Response {
   const encoder = new TextEncoder();
   
   const readableStream = new ReadableStream({
     async start(controller) {
       // Emit collected data first
-      emitCollectedDataEvents(controller, encoder, collectedData);
+      emitCollectedDataEvents(controller, encoder, collectedData, toolLog);
       
       const reader = azureResponse.body!.getReader();
       const decoder = new TextDecoder();
@@ -723,14 +769,15 @@ function createStreamingResponse(
 function createSimulatedStreamingResponse(
   content: string,
   collectedData: CollectedToolData,
-  log: RequestLogger
+  log: RequestLogger,
+  toolLog: { tool: string; status: string; latency_ms: number; summary: string; timestamp: number; loopIteration: number }[] = []
 ): Response {
   const encoder = new TextEncoder();
   
   const readableStream = new ReadableStream({
     async start(controller) {
       // Emit collected data first
-      emitCollectedDataEvents(controller, encoder, collectedData);
+      emitCollectedDataEvents(controller, encoder, collectedData, toolLog);
       
       // Stream content character by character
       for (const char of content) {
@@ -759,69 +806,59 @@ function createSimulatedStreamingResponse(
 function emitCollectedDataEvents(
   controller: ReadableStreamDefaultController,
   encoder: TextEncoder,
-  data: CollectedToolData
+  data: CollectedToolData,
+  toolLog: { tool: string; status: string; latency_ms: number; summary: string; timestamp: number; loopIteration: number }[] = []
 ): void {
-  // Emit tool status events
-  const toolsProcessed = [];
-  
-  if (data.reasoningData) {
-    toolsProcessed.push({ name: "plan_response", summary: `Confidence: ${(data.reasoningData as { confidence?: number }).confidence || 0}%` });
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "reasoning", reasoning: data.reasoningData })}\n\n`));
-  }
-  
-  if (data.intentClassification) {
-    toolsProcessed.push({ name: "classify_intent", summary: `Intent: ${(data.intentClassification as { primaryIntent?: string }).primaryIntent || "unknown"}` });
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "intentClassification", intentClassification: data.intentClassification })}\n\n`));
-  }
-  
-  if (data.flightData) {
-    const dest = (data.flightData as { to?: string; toCountryName?: string }).to || (data.flightData as { to?: string; toCountryName?: string }).toCountryName;
-    toolsProcessed.push({ name: "update_flight_widget", summary: dest ? `Destination: ${dest}` : "Flight updated" });
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "flightData", flightData: data.flightData })}\n\n`));
-  }
-  
-  if (data.accommodationData) {
-    toolsProcessed.push({ name: "update_accommodation_widget", summary: "Accommodation updated" });
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "accommodationData", accommodationData: data.accommodationData })}\n\n`));
-  }
-  
-  if (data.preferencesData) {
-    toolsProcessed.push({ name: "update_preferences", summary: "Preferences updated" });
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "preferencesData", preferencesData: data.preferencesData })}\n\n`));
-  }
-  
-  if (data.destinationSuggestionRequest) {
-    toolsProcessed.push({ name: "request_destination_suggestions", summary: "Suggestions requested" });
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "destinationSuggestionRequest", destinationSuggestionRequest: data.destinationSuggestionRequest })}\n\n`));
-  }
-  
-  if (data.quickRepliesData) {
-    const count = (data.quickRepliesData as { replies?: unknown[] }).replies?.length || 0;
-    toolsProcessed.push({ name: "generate_quick_replies", summary: `${count} suggestions` });
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "quickReplies", quickReplies: data.quickRepliesData })}\n\n`));
-  }
-  
-  if (data.flightSearchTrigger) {
-    toolsProcessed.push({ name: "trigger_flight_search", summary: "Search triggered" });
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "flightSearchTrigger", trigger: true })}\n\n`));
-  }
-  
-  // Emit tool_started and tool_finished events
-  for (const tool of toolsProcessed) {
+  // 1. Emit REAL tool executions from the log (replaces fake random latencies)
+  for (const entry of toolLog) {
     controller.enqueue(encoder.encode(`data: ${JSON.stringify({
       type: "tool_started",
-      tool: tool.name,
-      reason: `Processing ${tool.name}...`,
-      timestamp: Date.now() - 100,
+      tool: entry.tool,
+      reason: `Processing ${entry.tool}...`,
+      timestamp: entry.timestamp - entry.latency_ms,
     })}\n\n`));
     
     controller.enqueue(encoder.encode(`data: ${JSON.stringify({
       type: "tool_finished",
-      tool: tool.name,
-      success: true,
-      latency_ms: Math.round(Math.random() * 100 + 50),
-      summary: tool.summary,
-      timestamp: Date.now(),
+      tool: entry.tool,
+      success: entry.status === "finished",
+      latency_ms: entry.latency_ms,
+      summary: entry.summary,
+      timestamp: entry.timestamp,
+      loopIteration: entry.loopIteration,
     })}\n\n`));
+  }
+  
+  // 2. Emit data events for the frontend to consume
+  if (data.reasoningData) {
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "reasoning", reasoning: data.reasoningData })}\n\n`));
+  }
+  
+  if (data.intentClassification) {
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "intentClassification", intentClassification: data.intentClassification })}\n\n`));
+  }
+  
+  if (data.flightData) {
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "flightData", flightData: data.flightData })}\n\n`));
+  }
+  
+  if (data.accommodationData) {
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "accommodationData", accommodationData: data.accommodationData })}\n\n`));
+  }
+  
+  if (data.preferencesData) {
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "preferencesData", preferencesData: data.preferencesData })}\n\n`));
+  }
+  
+  if (data.destinationSuggestionRequest) {
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "destinationSuggestionRequest", destinationSuggestionRequest: data.destinationSuggestionRequest })}\n\n`));
+  }
+  
+  if (data.quickRepliesData) {
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "quickReplies", quickReplies: data.quickRepliesData })}\n\n`));
+  }
+  
+  if (data.flightSearchTrigger) {
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "flightSearchTrigger", trigger: true })}\n\n`));
   }
 }

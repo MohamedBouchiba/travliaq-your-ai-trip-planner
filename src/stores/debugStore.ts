@@ -27,6 +27,7 @@ export interface ToolExecution {
   summary?: string;
   latency_ms?: number;
   timestamp: number;
+  loopIteration?: number;
 }
 
 export interface ReasoningData {
