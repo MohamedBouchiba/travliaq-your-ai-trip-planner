@@ -58,6 +58,7 @@ import {
 } from "./chat/widgets";
 import { QuickReplies, useDynamicQuickReplies } from "./chat/QuickReplies";
 import { useChatStream, useChatWidgetFlow, useChatImperativeHandlers, useWidgetTracking, useWidgetActionExecutor, usePreferenceWidgetCallbacks, useUnifiedIntentRouter, useSessionContext, useThinkingState, useWidgetCooldown } from "./chat/hooks";
+import { useChatDestinationFlow } from "./chat/hooks/useChatDestinationFlow";
 import { ThinkingIndicator } from "./chat/ThinkingIndicator";
 import { IntentDebugPanel } from "./chat/IntentDebugPanel";
 import { parseAction, flightDataToMemory, getMissingFieldLabel } from "./chat/utils";
@@ -66,9 +67,7 @@ import { getCityCoords } from "./chat/types";
 import { MemoizedSmartSuggestions, type InspireFlowStep } from "./chat/MemoizedSmartSuggestions";
 import { MessageBubble } from "./chat/MessageBubble";
 import { MessageActions } from "./chat/MessageActions";
-import { getDestinationSuggestions } from "@/services/destinations";
-import type { DestinationSuggestRequest, DestinationSuggestion } from "@/types/destinations";
-import { buildDestinationPayload } from "./chat/utils/buildDestinationPayload";
+import type { DestinationSuggestion } from "@/types/destinations";
 import { ScrollToBottomButton } from "./chat/ScrollToBottomButton";
 import { FLIGHTS_ZOOM } from "@/constants/mapSettings";
 import { geocodeCity } from "@/utils/geocodeCity";
@@ -80,7 +79,7 @@ import { useFlightMemoryStore, useTravelMemoryStore, useAccommodationMemoryStore
 import { useDebugStore } from "@/stores/debugStore";
 import { useLocale } from "@/hooks/useLocale";
 import { eventBus, emitTabChange, emitTabAndZoom } from "@/lib/eventBus";
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
+
 
 /**
  * ─── PRINCIPLE 2: Unified Entity Pipeline ───
@@ -211,12 +210,10 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
   // Safeguard: store intent-router widget to prevent loss between setMessages calls
   const intentWidgetRef = useRef<import("@/types/flight").WidgetType | null>(null);
   
-  // Inspire flow state: idle → style → interests → extra → loading → results
-  // Uses InspireFlowStep type from MemoizedSmartSuggestions
-  const [inspireFlowStep, setInspireFlowStep] = useState<InspireFlowStep>("idle");
-  const [destinationSuggestions, setDestinationSuggestions] = useState<DestinationSuggestion[]>([]);
-  const [destinationProfileScore, setDestinationProfileScore] = useState<number>(0);
-  const [isLoadingDestinations, setIsLoadingDestinations] = useState(false);
+  // Destination flow is managed by a dedicated hook (extracted from this component)
+  // State variables: inspireFlowStep, destinationSuggestions, destinationProfileScore, isLoadingDestinations
+  // are now managed inside useChatDestinationFlow — see below.
+  
   
   // Intent classification debug state
   const [lastIntentClassification, setLastIntentClassification] = useState<import("./chat/hooks/useChatStream").IntentClassification | null>(null);
@@ -435,81 +432,31 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     citySelectionShownRef: widgetFlow.citySelectionShownRef,
   });
 
-  // Handler to fetch destination suggestions from API
-  // Use primitive dependencies to avoid infinite loops
+  // Destination flow hook (extracted from this component)
   const departureCity = memory.departure?.city;
   const departureCountry = memory.departure?.country;
   const departureDateValue = memory.departureDate?.getTime();
-  
-  const handleFetchDestinations = useCallback(async (loadingMessageId: string) => {
-    setIsLoadingDestinations(true);
-    setInspireFlowStep("loading");
-    
-    try {
-      // Build preferences payload from memory using shared utility
-      const prefs = getPreferences();
-      
-      const payload = buildDestinationPayload({
-        preferences: prefs,
-        departure: { city: departureCity, country: departureCountry },
-        departureDateMs: departureDateValue,
-      });
-      
-      const response = await getDestinationSuggestions(payload, { limit: 3 });
-      
-      if (response.success && response.suggestions.length > 0) {
-        setDestinationSuggestions(response.suggestions);
-        setDestinationProfileScore(response.basedOnProfile?.completionScore || 0);
-        
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === loadingMessageId
-              ? {
-                  ...m,
-                  text: t(response.suggestions.length > 1 ? "planner.messages.destinationsFoundPlural" : "planner.messages.destinationsFound", { count: response.suggestions.length, score: response.basedOnProfile?.completionScore || 0 }),
-                  isTyping: false,
-                  widget: "destinationSuggestions" as import("@/types/flight").WidgetType,
-                  widgetData: {
-                    suggestions: response.suggestions,
-                    basedOnProfile: response.basedOnProfile,
-                  },
-                }
-              : m
-          )
-        );
-        setInspireFlowStep("results");
-      } else {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === loadingMessageId
-              ? {
-                  ...m,
-                  text: t("planner.messages.noDestinations"),
-                  isTyping: false,
-                }
-              : m
-          )
-        );
-        setInspireFlowStep("idle");
-      }
-    } catch (error) {
-      console.error("Error fetching destination suggestions:", error);
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === loadingMessageId
-            ? {
-                ...m,
-                text: t("planner.messages.errorDestinations"),
-                isTyping: false,
-              }
-            : m
-        )
-      );
-      setInspireFlowStep("idle");
-    } finally {
-      setIsLoadingDestinations(false);
-    }
-  }, [departureCity, departureCountry, departureDateValue, getPreferences]);
+
+  const destinationFlow = useChatDestinationFlow({
+    getPreferences,
+    departureCity,
+    departureCountry,
+    departureDateMs: departureDateValue,
+    updateMemory: updateMemory as (partial: Record<string, unknown>) => void,
+    setMessages,
+    widgetTracking,
+  });
+
+  const {
+    destinationSuggestions,
+    destinationProfileScore,
+    isLoadingDestinations,
+    inspireFlowStep,
+    setInspireFlowStep,
+    handleFetchDestinations,
+    handleLLMDestinationRequest,
+    handleDestinationSelect,
+  } = destinationFlow;
 
   // Preference widget callbacks (encapsulated for maintainability)
   // Now includes widget cooldown for anti-loop protection
@@ -1089,101 +1036,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
 
       if (destinationSuggestionRequest) {
         if (import.meta.env.DEV) console.log("[PlannerChat] LLM destination suggestions requested");
-        
-        // Keep the AI's natural text, just show loading state
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === messageId
-              ? { ...m, isStreaming: false, isTyping: true }
-              : m
-          )
-        );
-        
-        // Fetch destinations from API
-        try {
-          const prefs = getPreferences();
-          const payload = buildDestinationPayload({
-            preferences: prefs,
-            departure: { city: departureCity, country: departureCountry },
-            departureDateMs: departureDateValue,
-          });
-          
-          const limit = Math.min(destinationSuggestionRequest.requestedCount, 5);
-          const response = await getDestinationSuggestions(payload, { limit });
-          
-          if (response.success && response.suggestions.length > 0) {
-            // Store suggestions in memory for context
-            setDestinationSuggestions(response.suggestions);
-            const completionScore = response.basedOnProfile?.completionScore || 0;
-            setDestinationProfileScore(completionScore);
-            
-            // Build conditional quick replies for low profile scores
-            const profileQuickReplies: import("./chat/types").QuickReply[] = completionScore < 50 ? [
-              {
-                id: `profile-prefs-${Date.now()}`,
-                label: t("planner.suggestions.fillPreferences"),
-                icon: "⚙️",
-                action: { type: "navigate" as const, tab: "preferences" as const },
-                variant: "primary" as const,
-              },
-              {
-                id: `profile-ok-${Date.now()}`,
-                label: t("planner.suggestions.keepGoing"),
-                icon: "👍",
-                action: { type: "sendMessage" as const, message: t("planner.suggestions.keepGoing") },
-              },
-            ] : [];
-            
-            // Update message: keep AI natural text, attach widget + quick replies
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === messageId
-                  ? {
-                      ...m,
-                      // Keep the original AI text (content), don't overwrite with system text
-                      isTyping: false,
-                      isStreaming: false,
-                      widget: "destinationSuggestions" as import("@/types/flight").WidgetType,
-                      widgetData: {
-                        suggestions: response.suggestions,
-                        basedOnProfile: response.basedOnProfile,
-                      },
-                      quickReplies: profileQuickReplies.length > 0 ? profileQuickReplies : m.quickReplies,
-                    }
-                  : m
-              )
-            );
-            setInspireFlowStep("results");
-          } else {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === messageId
-                  ? {
-                      ...m,
-                      text: t("planner.messages.noDestinationsHint"),
-                      isTyping: false,
-                      isStreaming: false,
-                    }
-                  : m
-              )
-            );
-          }
-        } catch (apiError) {
-          console.error("Error fetching destination suggestions:", apiError);
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === messageId
-                ? {
-                    ...m,
-                    text: t("planner.messages.errorDestinations"),
-                    isTyping: false,
-                    isStreaming: false,
-                  }
-                : m
-            )
-          );
-        }
-        
+        await handleLLMDestinationRequest(messageId, destinationSuggestionRequest.requestedCount);
         setIsLoading(false);
         return; // Early return - we handled the message
       }
@@ -1676,123 +1529,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                       <DestinationSuggestionsGrid
                         suggestions={m.widgetData.suggestions as DestinationSuggestion[]}
                         basedOnProfile={m.widgetData.basedOnProfile as { completionScore: number; keyFactors: string[] } | undefined}
-                        onSelect={async (destination) => {
-                          // Track destination selection
-                          widgetTracking.trackDestinationSelect(destination.countryName, destination.countryCode);
-
-                          // Mark widget as confirmed with selected destination
-                          setMessages((prev) =>
-                            prev.map((msg) =>
-                              msg.id === m.id
-                                ? {
-                                    ...msg,
-                                    widgetConfirmed: true,
-                                    widgetSelectedValue: destination,
-                                    widgetDisplayLabel: destination.countryName,
-                                  }
-                                : msg
-                            )
-                          );
-
-                          // Store only country info - explicitly clear city to avoid airport search with country name
-                          updateMemory({
-                            arrival: {
-                              city: undefined, // CRITICAL: Clear city to prevent old country name from being used
-                              iata: undefined, // Also clear any old airport selection
-                              airport: undefined,
-                              countryCode: destination.countryCode,
-                              country: destination.countryName,
-                            },
-                          });
-
-                          // Reset inspire flow
-                          setInspireFlowStep("idle");
-                          setDestinationSuggestions([]);
-                          
-                          // Add loading message
-                          const loadingId = `city-loading-${Date.now()}`;
-                          setMessages((prev) => [
-                            ...prev,
-                            {
-                              id: loadingId,
-                              role: "assistant",
-                              text: `${t("planner.chat.excellentChoice", { country: destination.countryName })}\n\n${t("planner.chat.searchingCities")}`,
-                              isTyping: true,
-                            },
-                          ]);
-                          
-                          // Fetch cities for the selected country
-                          try {
-                            const response = await fetch(
-                              `${SUPABASE_URL}/functions/v1/top-cities-by-country?country_code=${destination.countryCode}&limit=5`,
-                              {
-                                method: "GET",
-                                headers: {
-                                  "Content-Type": "application/json",
-                                  apikey: SUPABASE_PUBLISHABLE_KEY,
-                                },
-                              }
-                            );
-                            
-                            const data = await response.json();
-                            
-                            if (data.cities && data.cities.length > 0) {
-                              const cities = data.cities.map((c: { name: string; description?: string; population?: number }) => ({
-                                name: c.name,
-                                description: c.description || t("planner.chat.importantCity"),
-                                population: c.population,
-                              }));
-                              
-                              // Update message with city selection widget
-                              setMessages((prev) =>
-                                prev.map((m) =>
-                                  m.id === loadingId
-                                    ? {
-                                        ...m,
-                                        text: `${t("planner.chat.excellentChoice", { country: destination.countryName })}\n\n${destination.description}\n\n${t("planner.chat.whichCityToVisit")}`,
-                                        isTyping: false,
-                                        widget: "citySelector" as import("@/types/flight").WidgetType,
-                                        widgetData: {
-                                          citySelection: {
-                                            countryCode: destination.countryCode,
-                                            countryName: destination.countryName,
-                                            cities,
-                                          },
-                                          isDeparture: false,
-                                        },
-                                      }
-                                    : m
-                                )
-                              );
-                            } else {
-                              // No cities found - ask user to type city name
-                              setMessages((prev) =>
-                                prev.map((m) =>
-                                  m.id === loadingId
-                                    ? {
-                                        ...m,
-                                        text: `${t("planner.chat.excellentChoice", { country: destination.countryName })}\n\n${destination.description}\n\n${t("planner.chat.whichCityToVisit")} ${t("planner.chat.typeInChat")}`,
-                                        isTyping: false,
-                                      }
-                                    : m
-                                )
-                              );
-                            }
-                          } catch (error) {
-                            console.error("Error fetching cities:", error);
-                            setMessages((prev) =>
-                              prev.map((m) =>
-                                m.id === loadingId
-                                  ? {
-                                      ...m,
-                                      text: `${t("planner.chat.excellentChoice", { country: destination.countryName })}\n\n${t("planner.chat.whichCityToVisit")} ${t("planner.chat.typeInChat")}`,
-                                      isTyping: false,
-                                    }
-                                  : m
-                              )
-                            );
-                          }
-                        }}
+                        onSelect={(destination) => handleDestinationSelect(m.id, destination)}
                         isLoading={isLoadingDestinations}
                       />
                       )
