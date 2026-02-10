@@ -96,6 +96,12 @@ export const TEST_CATEGORIES: CategoryInfo[] = [
     emoji: "🔎",
     description: "Parsing NL de filtres : prix, durée, étoiles, amenities, classe",
   },
+  {
+    id: "chatCoherence",
+    label: "Chat Coherence",
+    emoji: "🔗",
+    description: "Cohérence linguistique, flow multi-étapes, suggestions contextuelles, phases",
+  },
 ];
 
 // ─── Registration ───
@@ -161,5 +167,9 @@ export async function registerAllBrowserTests(categories?: string[]) {
   if (all || categories?.includes("filterParser")) {
     const { registerFilterParserTests } = await import("./suites/filterParser.suite");
     registerFilterParserTests();
+  }
+  if (all || categories?.includes("chatCoherence")) {
+    const { registerChatCoherenceTests } = await import("./suites/chatCoherence.suite");
+    registerChatCoherenceTests();
   }
 }
