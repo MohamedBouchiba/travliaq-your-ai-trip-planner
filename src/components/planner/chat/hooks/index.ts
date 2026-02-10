@@ -53,6 +53,25 @@ export {
 // Preference widget callbacks (Phase 2.1 optimization)
 export { usePreferenceWidgetCallbacks } from "./usePreferenceWidgetCallbacks";
 
+// Intent Router Core - Pure testable functions
+export {
+  computeFlowState,
+  computeUserBehavior,
+  hasAlreadyProvided,
+  validateWidget,
+  getNextRequiredWidget,
+  evaluatePhaseTransition,
+  isConversationalIntent,
+  isWidgetTriggeringIntent,
+  isCriticalWidget,
+  CONFIDENCE_THRESHOLDS,
+  CRITICAL_WIDGETS,
+  CONVERSATIONAL_INTENTS,
+  WIDGET_TRIGGERING_INTENTS,
+  WIDGET_PREREQUISITES,
+  WIDGET_TO_INTERACTION_MAP,
+} from "./intentRouterCore";
+
 // Unified Intent Router (Phase 2 - replaces useIntentHandler + useIntentRouter)
 export {
   useUnifiedIntentRouter,
