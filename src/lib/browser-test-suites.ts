@@ -102,6 +102,12 @@ export const TEST_CATEGORIES: CategoryInfo[] = [
     emoji: "🔗",
     description: "Cohérence linguistique, flow multi-étapes, suggestions contextuelles, phases",
   },
+  {
+    id: "chatConversationSim",
+    label: "Chat Conversation Sim",
+    emoji: "🎭",
+    description: "Simulations de conversations réelles multi-tours avec validation pipeline complète",
+  },
 ];
 
 // ─── Registration ───
@@ -171,5 +177,9 @@ export async function registerAllBrowserTests(categories?: string[]) {
   if (all || categories?.includes("chatCoherence")) {
     const { registerChatCoherenceTests } = await import("./suites/chatCoherence.suite");
     registerChatCoherenceTests();
+  }
+  if (all || categories?.includes("chatConversationSim")) {
+    const { registerChatConversationSimTests } = await import("./suites/chatConversationSim.suite");
+    registerChatConversationSimTests();
   }
 }
