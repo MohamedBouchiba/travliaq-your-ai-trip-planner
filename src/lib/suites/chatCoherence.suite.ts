@@ -29,7 +29,21 @@ import {
 } from "@/components/planner/chat/services/phaseDetector";
 import {
   getNextRequiredWidget,
+  computeFlowState,
+  computeUserBehavior,
+  validateWidget,
+  hasAlreadyProvided,
+  evaluatePhaseTransition,
+  isConversationalIntent,
+  isWidgetTriggeringIntent,
+  isCriticalWidget,
+  CONVERSATIONAL_INTENTS,
+  WIDGET_TRIGGERING_INTENTS,
+  CRITICAL_WIDGETS,
+  WIDGET_PREREQUISITES,
+  WIDGET_TO_INTERACTION_MAP,
   type FlowState,
+  type WidgetValidation,
 } from "@/components/planner/chat/hooks/intentRouterCore";
 
 // ─── Helpers ───
@@ -48,6 +62,11 @@ function baseSuggestionContext(overrides: Partial<SuggestionContext> = {}): Sugg
     visibleActivitiesCount: 0,
     ...overrides,
   };
+}
+
+let _interactionId = 0;
+function wi(widgetType: string, interactionType: import("@/contexts/WidgetHistoryContext").WidgetInteractionType, data: Record<string, unknown> = {}): import("@/contexts/WidgetHistoryContext").WidgetInteraction {
+  return { id: `test-${++_interactionId}`, widgetType, interactionType, timestamp: Date.now(), data, summary: "" };
 }
 
 function emptyFlowState(overrides: Partial<FlowState> = {}): FlowState {
@@ -812,6 +831,586 @@ export function registerChatCoherenceTests() {
           })
         )
       ).toBe("compare");
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // 11. computeFlowState COHERENCE
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("computeFlowState from memory", () => {
+    it("empty memory → all false", () => {
+      const fs = computeFlowState({});
+      expect(fs.hasDestination).toBe(false);
+      expect(fs.hasDestinationCity).toBe(false);
+      expect(fs.hasDepartureCity).toBe(false);
+      expect(fs.hasDepartureDate).toBe(false);
+      expect(fs.hasReturnDate).toBe(false);
+      expect(fs.hasTravelers).toBe(false);
+      expect(fs.isReadyToSearch).toBe(false);
+    });
+
+    it("country only → hasDestination true, hasDestinationCity false", () => {
+      const fs = computeFlowState({ arrival: { country: "Thailand", countryCode: "TH" } });
+      expect(fs.hasDestination).toBe(true);
+      expect(fs.hasDestinationCity).toBe(false);
+    });
+
+    it("country + city → both true", () => {
+      const fs = computeFlowState({ arrival: { country: "Thailand", city: "Bangkok" } });
+      expect(fs.hasDestination).toBe(true);
+      expect(fs.hasDestinationCity).toBe(true);
+    });
+
+    it("full memory → isReadyToSearch true", () => {
+      const fs = computeFlowState({
+        arrival: { country: "Japan", city: "Tokyo" },
+        departure: { city: "Paris" },
+        departureDate: new Date("2025-06-01"),
+        returnDate: new Date("2025-06-15"),
+        passengers: { adults: 2 },
+        tripType: "roundtrip",
+      });
+      expect(fs.isReadyToSearch).toBe(true);
+      expect(fs.hasTripType).toBe(true);
+    });
+
+    it("one-way trip without return date → isReadyToSearch true", () => {
+      const fs = computeFlowState({
+        arrival: { country: "Spain", city: "Barcelona" },
+        departureDate: new Date("2025-07-01"),
+        passengers: { adults: 1 },
+        tripType: "oneway",
+      });
+      expect(fs.isReadyToSearch).toBe(true);
+      expect(fs.hasReturnDate).toBe(false);
+    });
+
+    it("roundtrip without return → NOT ready to search", () => {
+      const fs = computeFlowState({
+        arrival: { country: "Italy", city: "Rome" },
+        departureDate: new Date("2025-08-01"),
+        passengers: { adults: 2 },
+        tripType: "roundtrip",
+      });
+      expect(fs.isReadyToSearch).toBe(false);
+    });
+
+    it("0 adults → hasTravelers false", () => {
+      const fs = computeFlowState({ passengers: { adults: 0 } });
+      expect(fs.hasTravelers).toBe(false);
+    });
+
+    it("null passengers → hasTravelers false", () => {
+      const fs = computeFlowState({ passengers: null });
+      expect(fs.hasTravelers).toBe(false);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // 12. WIDGET PREREQUISITE VALIDATION
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Widget prerequisites", () => {
+    it("returnDatePicker requires departure date", () => {
+      const result = validateWidget("returnDatePicker", emptyFlowState());
+      expect(result.valid).toBe(false);
+    });
+
+    it("returnDatePicker valid when departure date set", () => {
+      const result = validateWidget("returnDatePicker", emptyFlowState({ hasDepartureDate: true }));
+      expect(result.valid).toBe(true);
+    });
+
+    it("tripTypeConfirm requires travelers", () => {
+      const result = validateWidget("tripTypeConfirm", emptyFlowState());
+      expect(result.valid).toBe(false);
+      expect(result.suggestedWidget).toBe("travelersSelector");
+    });
+
+    it("tripTypeConfirm valid with travelers", () => {
+      const result = validateWidget("tripTypeConfirm", emptyFlowState({ hasTravelers: true }));
+      expect(result.valid).toBe(true);
+    });
+
+    it("travelersConfirmBeforeSearch requires full info", () => {
+      const result = validateWidget("travelersConfirmBeforeSearch", emptyFlowState());
+      expect(result.valid).toBe(false);
+    });
+
+    it("travelersConfirmBeforeSearch valid when ready", () => {
+      const result = validateWidget(
+        "travelersConfirmBeforeSearch",
+        emptyFlowState({
+          hasDestinationCity: true,
+          hasDepartureDate: true,
+          hasTravelers: true,
+          isReadyToSearch: true,
+        })
+      );
+      expect(result.valid).toBe(true);
+    });
+
+    it("citySelector always valid (no prereqs)", () => {
+      expect(validateWidget("citySelector", emptyFlowState()).valid).toBe(true);
+    });
+
+    it("datePicker always valid (no prereqs)", () => {
+      expect(validateWidget("datePicker", emptyFlowState()).valid).toBe(true);
+    });
+
+    it("preferenceStyle always valid", () => {
+      expect(validateWidget("preferenceStyle", emptyFlowState()).valid).toBe(true);
+    });
+
+    it("budgetRangeSlider always valid", () => {
+      expect(validateWidget("budgetRangeSlider", emptyFlowState()).valid).toBe(true);
+    });
+
+    it("cooldown blocks widget even if prereqs met", () => {
+      const fakeCooldown = {
+        canShowWidget: () => false,
+        getBlockReason: () => "recently_shown",
+      };
+      const result = validateWidget("citySelector", emptyFlowState({ hasDestination: true }), fakeCooldown);
+      expect(result.valid).toBe(false);
+      expect(result.reason).toBe("recently_shown");
+    });
+
+    it("cooldown allows widget when not blocked", () => {
+      const fakeCooldown = {
+        canShowWidget: () => true,
+        getBlockReason: () => null,
+      };
+      const result = validateWidget("citySelector", emptyFlowState(), fakeCooldown);
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // 13. CONVERSATIONAL vs WIDGET-TRIGGERING INTENTS
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Intent classification: conversational vs widget-triggering", () => {
+    it("greeting is conversational", () => {
+      expect(isConversationalIntent("greeting")).toBe(true);
+    });
+
+    it("thank_you is conversational", () => {
+      expect(isConversationalIntent("thank_you")).toBe(true);
+    });
+
+    it("ask_question is conversational", () => {
+      expect(isConversationalIntent("ask_question")).toBe(true);
+    });
+
+    it("compare_options is conversational", () => {
+      expect(isConversationalIntent("compare_options")).toBe(true);
+    });
+
+    it("other is conversational", () => {
+      expect(isConversationalIntent("other")).toBe(true);
+    });
+
+    it("provide_destination triggers widgets", () => {
+      expect(isWidgetTriggeringIntent("provide_destination")).toBe(true);
+    });
+
+    it("provide_dates triggers widgets", () => {
+      expect(isWidgetTriggeringIntent("provide_dates")).toBe(true);
+    });
+
+    it("provide_travelers triggers widgets", () => {
+      expect(isWidgetTriggeringIntent("provide_travelers")).toBe(true);
+    });
+
+    it("ask_inspiration triggers widgets", () => {
+      expect(isWidgetTriggeringIntent("ask_inspiration")).toBe(true);
+    });
+
+    it("express_preference triggers widgets", () => {
+      expect(isWidgetTriggeringIntent("express_preference")).toBe(true);
+    });
+
+    it("conversational intents never overlap with widget intents", () => {
+      for (const ci of CONVERSATIONAL_INTENTS) {
+        expect(isWidgetTriggeringIntent(ci)).toBe(false);
+      }
+    });
+
+    it("widget intents never overlap with conversational", () => {
+      for (const wi of WIDGET_TRIGGERING_INTENTS) {
+        expect(isConversationalIntent(wi)).toBe(false);
+      }
+    });
+
+    it("unknown intent is neither", () => {
+      expect(isConversationalIntent("some_random_thing")).toBe(false);
+      expect(isWidgetTriggeringIntent("some_random_thing")).toBe(false);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // 14. CRITICAL WIDGETS
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Critical widgets always shown", () => {
+    it("citySelector is critical", () => {
+      expect(isCriticalWidget("citySelector")).toBe(true);
+    });
+
+    it("dateRangePicker is critical", () => {
+      expect(isCriticalWidget("dateRangePicker")).toBe(true);
+    });
+
+    it("datePicker is critical", () => {
+      expect(isCriticalWidget("datePicker")).toBe(true);
+    });
+
+    it("travelersSelector is critical", () => {
+      expect(isCriticalWidget("travelersSelector")).toBe(true);
+    });
+
+    it("preferenceStyle is NOT critical", () => {
+      expect(isCriticalWidget("preferenceStyle")).toBe(false);
+    });
+
+    it("budgetRangeSlider is NOT critical", () => {
+      expect(isCriticalWidget("budgetRangeSlider")).toBe(false);
+    });
+
+    it("destinationSuggestions is NOT critical", () => {
+      expect(isCriticalWidget("destinationSuggestions")).toBe(false);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // 15. PHASE TRANSITIONS (evaluatePhaseTransition)
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Phase transitions coherence", () => {
+    const alwaysValid = () => ({ valid: true } as WidgetValidation);
+    const alwaysBlocked = () => ({ valid: false, reason: "blocked" } as WidgetValidation);
+
+    it("no destination + style configured → destinationSuggestions", () => {
+      const flow = emptyFlowState();
+      const result = evaluatePhaseTransition(flow, [wi("preferenceStyle", "style_configured")], alwaysValid);
+      expect(result).not.toBe(null);
+      expect(result!.widgetType).toBe("destinationSuggestions");
+      expect(result!.shouldShowWidget).toBe(true);
+    });
+
+    it("no destination + interests selected → destinationSuggestions", () => {
+      const flow = emptyFlowState();
+      const result = evaluatePhaseTransition(flow, [wi("preferenceInterests", "interests_selected")], alwaysValid);
+      expect(result).not.toBe(null);
+      expect(result!.widgetType).toBe("destinationSuggestions");
+    });
+
+    it("destination city set + destination interaction → date widget", () => {
+      const flow = emptyFlowState({ hasDestination: true, hasDestinationCity: true });
+      const result = evaluatePhaseTransition(flow, [wi("citySelector", "city_selected")], alwaysValid);
+      expect(result).not.toBe(null);
+      expect(["datePicker", "dateRangePicker"]).toContain(result!.widgetType);
+    });
+
+    it("dates set + date interaction → travelersSelector", () => {
+      const flow = emptyFlowState({ hasDestination: true, hasDestinationCity: true, hasDepartureDate: true });
+      const result = evaluatePhaseTransition(flow, [wi("dateRangePicker", "date_range_selected")], alwaysValid);
+      expect(result).not.toBe(null);
+      expect(result!.widgetType).toBe("travelersSelector");
+    });
+
+    it("flight search triggered → no transition", () => {
+      const flow = emptyFlowState();
+      const result = evaluatePhaseTransition(flow, [], alwaysValid, true);
+      expect(result).toBe(null);
+    });
+
+    it("widget blocked by cooldown → no transition", () => {
+      const flow = emptyFlowState();
+      const result = evaluatePhaseTransition(flow, [wi("preferenceStyle", "style_configured")], alwaysBlocked);
+      expect(result).toBe(null);
+    });
+
+    it("travelers already selected → no travelers transition", () => {
+      const flow = emptyFlowState({ hasDestination: true, hasDestinationCity: true, hasDepartureDate: true });
+      const interactions = [wi("dateRangePicker", "date_range_selected"), wi("travelersSelector", "travelers_selected")];
+      const result = evaluatePhaseTransition(flow, interactions, alwaysValid);
+      expect(result).toBe(null);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // 16. hasAlreadyProvided GUARD
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("hasAlreadyProvided prevents duplicate widgets", () => {
+    it("no interactions → not provided", () => {
+      expect(hasAlreadyProvided("citySelector", [])).toBe(false);
+    });
+
+    it("city_selected → citySelector already provided", () => {
+      expect(hasAlreadyProvided("citySelector", [wi("citySelector", "city_selected")])).toBe(true);
+    });
+
+    it("destination_selected → citySelector already provided", () => {
+      expect(hasAlreadyProvided("citySelector", [wi("citySelector", "destination_selected")])).toBe(true);
+    });
+
+    it("date_range_selected → dateRangePicker already provided", () => {
+      expect(hasAlreadyProvided("dateRangePicker", [wi("dateRangePicker", "date_range_selected")])).toBe(true);
+    });
+
+    it("travelers_selected → travelersSelector already provided", () => {
+      expect(hasAlreadyProvided("travelersSelector", [wi("travelersSelector", "travelers_selected")])).toBe(true);
+    });
+
+    it("unrelated interaction → not provided", () => {
+      expect(hasAlreadyProvided("citySelector", [wi("datePicker", "date_selected")])).toBe(false);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // 17. USER BEHAVIOR DETECTION
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("computeUserBehavior coherence", () => {
+    it("no interactions → guided, full completion rate", () => {
+      const behavior = computeUserBehavior([]);
+      expect(behavior.style).toBe("guided");
+      expect(behavior.completionRate).toBe(1);
+      expect(behavior.prefersWidgets).toBe(true);
+    });
+
+    it("all completed interactions → guided", () => {
+      const behavior = computeUserBehavior([
+        wi("citySelector", "city_selected"),
+        wi("dateRangePicker", "date_range_selected"),
+        wi("travelersSelector", "travelers_selected"),
+      ]);
+      expect(behavior.style).toBe("guided");
+      expect(behavior.completionRate).toBe(1);
+    });
+
+    it("no completed interactions → expert", () => {
+      // Use a non-matching interactionType to simulate dismissed widgets
+      const dismissed = [
+        { id: "d1", widgetType: "citySelector", interactionType: "widget_dismissed" as any, timestamp: Date.now(), data: {}, summary: "" },
+        { id: "d2", widgetType: "dateRangePicker", interactionType: "widget_dismissed" as any, timestamp: Date.now(), data: {}, summary: "" },
+      ] as any;
+      const behavior = computeUserBehavior(dismissed);
+      expect(behavior.style).toBe("expert");
+      expect(behavior.prefersWidgets).toBe(false);
+    });
+
+    it("mixed interactions → completion rate between 0 and 1", () => {
+      const mixed = [
+        wi("citySelector", "city_selected"),
+        { id: "d3", widgetType: "dateRangePicker", interactionType: "widget_dismissed" as any, timestamp: Date.now(), data: {}, summary: "" } as any,
+      ];
+      const behavior = computeUserBehavior(mixed);
+      expect(behavior.completionRate).toBe(0.5);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // 18. WIDGET→INTERACTION MAPPING CONSISTENCY
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Widget-to-interaction mapping consistency", () => {
+    it("every critical widget has an interaction mapping", () => {
+      for (const w of CRITICAL_WIDGETS) {
+        const mapping = WIDGET_TO_INTERACTION_MAP[w];
+        expect(mapping).toBeDefined();
+        expect(mapping.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("preferenceStyle maps to style_configured", () => {
+      expect(WIDGET_TO_INTERACTION_MAP["preferenceStyle"]).toContain("style_configured");
+    });
+
+    it("preferenceInterests maps to interests_selected", () => {
+      expect(WIDGET_TO_INTERACTION_MAP["preferenceInterests"]).toContain("interests_selected");
+    });
+
+    it("citySelector maps to both city_selected and destination_selected", () => {
+      const mapping = WIDGET_TO_INTERACTION_MAP["citySelector"];
+      expect(mapping).toContain("city_selected");
+      expect(mapping).toContain("destination_selected");
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // 19. ANTICIPATED SUGGESTIONS CONTEXT-AWARE (deeper)
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Anticipated suggestions context-aware", () => {
+    it("departure question FR → suggestions mention French cities", () => {
+      const content: LastProposedContent = { type: "departure_question", questionTopic: "departure_city" };
+      const suggestions = getAnticipatedSuggestions(content, {}, 3, "fr");
+      expect(suggestions.length).toBeGreaterThan(0);
+      const mentionsCities = suggestions.some(
+        (s) => /paris|lyon|marseille|toulouse|nice|bordeaux/i.test(s.label + " " + s.message)
+      );
+      expect(mentionsCities).toBe(true);
+    });
+
+    it("confirmation content → next step suggestions", () => {
+      const content: LastProposedContent = { type: "confirmation" };
+      const suggestions = getAnticipatedSuggestions(content, {}, 4, "fr");
+      expect(suggestions.length).toBeGreaterThan(0);
+    });
+
+    it("activities content → activity suggestions", () => {
+      const content: LastProposedContent = { type: "activities" };
+      const suggestions = getAnticipatedSuggestions(content, {}, 6, "fr");
+      expect(suggestions.length).toBeGreaterThan(0);
+    });
+
+    it("destination_info with items → interested suggestion", () => {
+      const content: LastProposedContent = { type: "destination_info", items: ["Bali"] };
+      const suggestions = getAnticipatedSuggestions(content, {}, 3, "fr");
+      const hasInterested = suggestions.some((s) => /intéress|bali/i.test(s.label + " " + s.message));
+      expect(hasInterested).toBe(true);
+    });
+
+    it("EN departure question → EN content", () => {
+      const content: LastProposedContent = { type: "departure_question", questionTopic: "departure_city" };
+      const suggestions = getAnticipatedSuggestions(content, {}, 3, "en");
+      expect(suggestions.length).toBeGreaterThan(0);
+    });
+
+    it("max 4 suggestions for destinations", () => {
+      const content: LastProposedContent = { type: "destinations", items: ["A", "B", "C", "D", "E"] };
+      const suggestions = getAnticipatedSuggestions(content, {}, 3, "fr");
+      expect(suggestions.length).toBeLessThanOrEqual(4);
+    });
+
+    it("open question → generic suggestions", () => {
+      const content: LastProposedContent = { type: "open_question" };
+      const suggestions = getAnticipatedSuggestions(content, {}, 3, "fr");
+      expect(suggestions.length).toBeGreaterThan(0);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // 20. END-TO-END: memory → flowState → widget → phase
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("End-to-end: memory → flowState → next widget → phase alignment", () => {
+    it("empty memory → inspiration, no widget", () => {
+      const fs = computeFlowState({});
+      const widget = getNextRequiredWidget(fs, []);
+      const phase = getSimplePhase(false, false, false, false, false, false);
+      expect(widget).toBe(null);
+      expect(phase).toBe("inspiration");
+    });
+
+    it("country selected → citySelector next", () => {
+      const fs = computeFlowState({ arrival: { country: "Thailand", countryCode: "TH" } });
+      const widget = getNextRequiredWidget(fs, []);
+      expect(widget).toBe("citySelector");
+    });
+
+    it("city selected → date widget next", () => {
+      const fs = computeFlowState({ arrival: { country: "Thailand", city: "Bangkok" } });
+      const widget = getNextRequiredWidget(fs, [wi("citySelector", "city_selected")]);
+      expect(["datePicker", "dateRangePicker"]).toContain(widget);
+    });
+
+    it("dates set → travelers next", () => {
+      const fs = computeFlowState({
+        arrival: { country: "Thailand", city: "Bangkok" },
+        departureDate: new Date("2025-06-01"),
+        returnDate: new Date("2025-06-15"),
+      });
+      expect(getNextRequiredWidget(fs, [
+        wi("citySelector", "city_selected"),
+        wi("dateRangePicker", "date_range_selected"),
+      ])).toBe("travelersSelector");
+    });
+
+    it("all provided + all interactions → null (complete)", () => {
+      const fs = computeFlowState({
+        arrival: { country: "Thailand", city: "Bangkok" },
+        departure: { city: "Paris" },
+        departureDate: new Date("2025-06-01"),
+        returnDate: new Date("2025-06-15"),
+        passengers: { adults: 2 },
+        tripType: "roundtrip",
+      });
+      expect(getNextRequiredWidget(fs, [
+        wi("citySelector", "city_selected"),
+        wi("dateRangePicker", "date_range_selected"),
+        wi("travelersSelector", "travelers_selected"),
+        wi("tripTypeConfirm", "trip_type_selected"),
+        wi("travelersConfirmBeforeSearch", "travelers_selected"),
+      ])).toBe(null);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // 21. SUGGESTION ENGINE + ASSISTANT ANALYSIS COHERENCE
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("SuggestionEngine anticipated vs workflow-based", () => {
+    it("assistant greeting → anticipated suggestions with emoji", () => {
+      const ctx = baseSuggestionContext({
+        lastAssistantMessage: "Bonjour ! Comment puis-je t'aider ?",
+        conversationTurn: 0,
+      });
+      const suggestions = getSuggestions(ctx);
+      expect(suggestions.length).toBeGreaterThan(0);
+      expect(suggestions.some((s) => s.emoji)).toBe(true);
+    });
+
+    it("assistant asks dates → date suggestions", () => {
+      const ctx = baseSuggestionContext({
+        lastAssistantMessage: "Quand souhaitez-vous partir ?",
+        conversationTurn: 2,
+      });
+      expect(getSuggestions(ctx).length).toBeGreaterThan(0);
+    });
+
+    it("assistant proposes flights → flight suggestions", () => {
+      const ctx = baseSuggestionContext({
+        lastAssistantMessage: "Voici les vols disponibles pour Tokyo",
+        conversationTurn: 5,
+        hasDestination: true,
+        hasDates: true,
+        hasTravelers: true,
+      });
+      expect(getSuggestions(ctx).length).toBeGreaterThan(0);
+    });
+
+    it("no assistant message → workflow-based, no emoji", () => {
+      const ctx = baseSuggestionContext();
+      const suggestions = getSuggestions(ctx);
+      expect(suggestions.length).toBeGreaterThan(0);
+      expect(suggestions.every((s) => !s.emoji)).toBe(true);
+    });
+
+    it("inspire results → destination choice suggestions", () => {
+      const ctx = baseSuggestionContext({
+        inspireFlowStep: "results",
+        hasProposedDestinations: true,
+        proposedDestinationNames: ["Bali", "Thailand"],
+      });
+      expect(getSuggestions(ctx).length).toBeGreaterThan(0);
+    });
+
+    it("during inspire style step → empty (widgets take over)", () => {
+      expect(getSuggestions(baseSuggestionContext({ inspireFlowStep: "style" })).length).toBe(0);
+    });
+
+    it("during inspire interests → empty", () => {
+      expect(getSuggestions(baseSuggestionContext({ inspireFlowStep: "interests" })).length).toBe(0);
+    });
+
+    it("during inspire loading → empty", () => {
+      expect(getSuggestions(baseSuggestionContext({ inspireFlowStep: "loading" })).length).toBe(0);
     });
   });
 }
