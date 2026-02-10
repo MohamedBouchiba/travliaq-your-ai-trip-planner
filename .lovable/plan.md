@@ -1,314 +1,199 @@
 
+# Audit complet du systeme de chat Travliaq
 
-# Plan d'Expert : Correction des 6 Causes Racines
+## 1. Architecture globale
 
-## Architecture de la solution
+Le chat est construit sur une architecture sophistiquee en 3 couches :
 
-Chaque fix est concu pour etre **sans hardcoding**, en utilisant les systemes existants (i18n, cooldown, stores) comme source de verite unique.
-
----
-
-## CR1 : Internationaliser tous les messages auto-generes
-
-**Probleme** : `useChatWidgetFlow.ts` importe `{ fr }` en dur et ecrit tous les labels/messages en francais. Meme chose dans `useWidgetActionExecutor.ts`.
-
-**Solution** : Le hook `useLocale()` existe deja dans `src/hooks/useLocale.ts` et fournit `dateFnsLocale` + `language`. Les cles i18n `planner.widget.*` existent deja dans les deux langues (fr/en). Il faut :
-
-### Etape 1a : Ajouter les cles i18n manquantes
-
-**Fichiers** : `src/i18n/locales/fr/planner.json` et `src/i18n/locales/en/planner.json`
-
-Ajouter les cles pour les messages auto-generes des widgets :
-
-```json
-// fr
-"planner.widget.userChoice.departOn": "Je pars le {{date}}",
-"planner.widget.userChoice.returnOn": "Je reviens le {{date}}",
-"planner.widget.userChoice.dateRange": "Je pars du {{from}} au {{to}}",
-"planner.widget.userChoice.travelers": "Nous sommes {{label}}",
-"planner.widget.userChoice.selectCity": "Je choisis {{city}}, {{country}}",
-"planner.widget.userChoice.roundtrip": "Oui, c'est un aller-retour",
-"planner.widget.userChoice.oneway": "Non, c'est un aller simple",
-"planner.widget.userChoice.multi": "C'est un voyage multi-destinations",
-"planner.widget.userChoice.validateStyle": "Je valide le style de voyage",
-"planner.widget.userChoice.validateInterests": "Je valide les centres d'intérêt",
-"planner.widget.userChoice.selectDestination": "Je choisis **{{country}}**",
-"planner.widget.confirm.date": "✓ Date de départ : **{{date}}**",
-"planner.widget.confirm.returnDate": "✓ Date de retour : **{{date}}**",
-"planner.widget.confirm.dateRange": "✓ **{{from}}** → **{{to}}**",
-"planner.widget.confirm.dateRangeWithTravelers": "✓ **{{from}}** → **{{to}}**. {{travelersQuestion}}",
-"planner.widget.confirm.travelersWithTripType": "Parfait, {{label}} ! {{tripTypeQuestion}}",
-"planner.widget.confirm.departure": "✓ Départ : **{{airport}}**",
-"planner.widget.confirm.arrival": "✓ Arrivée : **{{airport}}**",
-"planner.widget.label.adult": "adulte",
-"planner.widget.label.adults": "adultes",
-"planner.widget.label.child": "enfant",
-"planner.widget.label.children": "enfants",
-"planner.widget.label.infant": "bébé",
-"planner.widget.label.infants": "bébés",
-"planner.widget.tripType.roundtrip": "Aller-retour",
-"planner.widget.tripType.oneway": "Aller simple",
-"planner.widget.tripType.multi": "Multi-destinations",
-"planner.widget.ask.travelers": "Combien êtes-vous ?",
-"planner.widget.ask.tripType": "C'est bien un aller-retour ?",
-"planner.widget.ask.multiSteps": "Pour un voyage multi-destinations, indiquez-moi toutes vos étapes.",
-"planner.widget.ask.dateChoice": "Choisis tes dates de voyage :",
-"planner.widget.ask.departureDateChoice": "Quand souhaites-tu partir ?",
-"planner.widget.confirm.tripType": "**{{type}}** confirmé ! Cliquez ci-dessous pour lancer la recherche.",
-
-// en (equivalents)
-"planner.widget.userChoice.departOn": "I depart on {{date}}",
-"planner.widget.userChoice.returnOn": "I return on {{date}}",
-"planner.widget.userChoice.dateRange": "I travel from {{from}} to {{to}}",
-"planner.widget.userChoice.travelers": "We are {{label}}",
-"planner.widget.userChoice.selectCity": "I choose {{city}}, {{country}}",
-"planner.widget.userChoice.roundtrip": "Yes, it's a round trip",
-"planner.widget.userChoice.oneway": "No, it's a one-way trip",
-"planner.widget.userChoice.multi": "It's a multi-destination trip",
-"planner.widget.userChoice.validateStyle": "I confirm the travel style",
-"planner.widget.userChoice.validateInterests": "I confirm interests",
-"planner.widget.userChoice.selectDestination": "I choose **{{country}}**",
-"planner.widget.confirm.date": "✓ Departure: **{{date}}**",
-... (meme structure)
-```
-
-### Etape 1b : Refactorer `useChatWidgetFlow.ts`
-
-Le hook ne peut pas appeler `useTranslation()` directement car il est deja un hook. La solution : **ajouter `t` et `dateFnsLocale` dans `UseChatWidgetFlowOptions`** (les composants parents les passent deja via `useTranslation` et `useLocale`).
-
-**Modifications** :
-- Supprimer `import { fr } from "date-fns/locale"` (ligne 17)
-- Ajouter dans `UseChatWidgetFlowOptions` : `t: TFunction` et `dateFnsLocale: Locale`
-- Remplacer chaque `{ locale: fr }` par `{ locale: dateFnsLocale }`
-- Remplacer chaque string francaise par `t("planner.widget.xxx", { param })` 
-
-**Exemple concret** (handleDateSelect, lignes 258-278) :
-```typescript
-// AVANT
-const dateLabel = format(date, "d MMMM yyyy", { locale: fr });
-text: `Je pars le ${dateLabel}`
-
-// APRES
-const dateLabel = format(date, "d MMMM yyyy", { locale: dateFnsLocale });
-text: t("planner.widget.userChoice.departOn", { date: dateLabel })
-```
-
-Meme pattern pour **chaque** handler : `handleDateRangeSelect`, `handleTravelersSelect`, `handleTripTypeConfirm`, `handleCitySelect`, `handleAirportSelect`.
-
-### Etape 1c : Refactorer `useWidgetActionExecutor.ts`
-
-Meme approche : passer `t` en parametre dans les options du hook. Remplacer les ~10 strings francaises (`"Je choisis..."`, `"Je configure..."`, etc.) par des cles i18n. Les regex de parsing (`/(\d+)\s*adulte/i`) doivent aussi matcher les variantes anglaises (`/(\d+)\s*(adult|adulte)/i`).
-
-### Etape 1d : Passer t et locale depuis le composant parent
-
-**Fichier** : `src/components/planner/PlannerChat.tsx`
-
-A l'endroit ou `useChatWidgetFlow` est appele, passer les 2 nouvelles props :
-
-```typescript
-const { t } = useTranslation();
-const { dateFnsLocale } = useLocale();
-
-const widgetFlow = useChatWidgetFlow({
-  memory, updateMemory, updateTravelers, setMessages,
-  t, dateFnsLocale, // nouvelles props
-});
-```
+- **Backend (Edge Function `planner-chat`)** : Architecture "Classify First" a deux passes LLM (Azure OpenAI). Pass 1 = classification d'intention forcee. Pass 2 = boucle ReAct multi-tool avec streaming SSE.
+- **Hooks React (couche logique)** : ~17 hooks specialises gerant streaming, widgets, cooldowns, intent routing, session, etc.
+- **Composant principal (`PlannerChat.tsx`)** : 2126 lignes -- composant monolithique qui orchestre toutes les couches.
 
 ---
 
-## CR2 : Supprimer `applyWidgetForcingLogic` + proteger `applyPreferenceFirstLogic`
+## 2. Points forts
 
-**Probleme** : `applyWidgetForcingLogic` (lignes 327-370) lit `detectedEntities` qui n'existe pas -> toujours une chaine vide -> mort-ne. `applyPreferenceFirstLogic` override les intents conversationnels.
-
-### Etape 2a : Supprimer `applyWidgetForcingLogic`
-
-**Fichier** : `supabase/functions/planner-chat/index.ts`
-
-Supprimer entierement la fonction `applyWidgetForcingLogic` (lignes 327-370). Elle est inutile car :
-- La source de donnees (`detectedEntities`) n'existe pas
-- Les keywords sont en francais uniquement (pas scalable)
-- Le LLM intent classifier fait deja ce travail (avec plus de contexte)
-
-Supprimer aussi son appel dans la pipeline (chercher `applyWidgetForcingLogic(` et retirer la ligne).
-
-### Etape 2b : Proteger `applyPreferenceFirstLogic` contre les intents conversationnels
-
-**Fichier** : `supabase/functions/planner-chat/index.ts`, lignes 406-421
-
-Ajouter un guard en debut de fonction :
-
-```typescript
-function applyPreferenceFirstLogic(...) {
-  // GUARD: Never override conversational intents
-  const CONVERSATIONAL_INTENTS = [
-    "greeting", "thank_you", "other", "ask_question",
-    "compare_options", "ask_recommendations",
-    "confirm_selection", "modify_selection", "cancel_or_restart"
-  ];
-  if (CONVERSATIONAL_INTENTS.includes(intentClassification.primaryIntent)) {
-    return intentClassification; // ne touche pas
-  }
-
-  // GUARD: Never override when LLM already assigned a specific non-preference widget
-  const NON_PREFERENCE_WIDGETS = [
-    "budgetRangeSlider", "dietary", "mustHaves",
-    "citySelector", "datePicker", "dateRangePicker",
-    "travelersSelector", "tripTypeConfirm"
-  ];
-  if (intentClassification.widgetToShow?.type &&
-      NON_PREFERENCE_WIDGETS.includes(intentClassification.widgetToShow.type)) {
-    return intentClassification; // le LLM a deja choisi un widget specifique
-  }
-  
-  // ... reste de la logique existante
-}
-```
+| Domaine | Detail |
+|---|---|
+| Classification intent | Deux passes LLM avec `tool_choice` force -- garantit une classification coherente |
+| Anti-boucle widget | Systeme de cooldown (`useWidgetCooldown`) avec max attempts, penalite "user typed instead", et liste de blocage injectee dans le prompt |
+| Preference-first | Logique deterministe backend qui force style > interests > destinations |
+| Contexte enrichi | Session entities, conversation summary, widget history, basket summary -- tout est injecte dans le prompt |
+| Validation robuste | Schemas Zod avec `.passthrough()` pour tolerer les hallucinations LLM |
+| Streaming SSE | Retry avec backoff exponentiel, classification d'erreurs, annulation via AbortController |
+| I18n | Support FR/EN/ES avec detection automatique de langue |
 
 ---
 
-## CR3 : Supprimer le bypass regex dans PlannerChat.tsx
+## 3. Problemes identifies et ameliorations proposees
 
-**Probleme** : Lignes 900-941 dans `sendText()` -- une regex intercepte "inspire/recommend/suggest" et injecte `preferenceStyle` directement, sans cooldown, sans API.
+### 3.1 `PlannerChat.tsx` -- Composant monolithique (CRITIQUE)
 
-### Etape 3a : Supprimer le bloc regex
+**Probleme** : 2126 lignes dans un seul composant. Le `handleSubmit` seul fait ~400 lignes avec de la logique business melee au rendu.
 
-**Fichier** : `src/components/planner/PlannerChat.tsx`, lignes 899-941
+**Amelioration** : Extraire en sous-hooks :
+- `useChatSubmit` -- logique de soumission + traitement de la reponse
+- `useChatDestinationFlow` -- logique de suggestions de destinations (dupliquee 2x dans le fichier)
+- `useChatSessionSync` -- synchronisation messages <> stockage
 
-Supprimer entierement ce bloc :
-```typescript
-// Detect "inspire" intent for preference widgets flow
-const isInspireIntent = /inspire|...|recommend/i.test(userText);
-if (isInspireIntent) { ... return; }
-```
+### 3.2 Duplication du payload de destination
 
-Le message sera traite par le pipeline normal : envoi a l'API -> classification par le LLM -> `processIntent` -> cooldown check. Le LLM sait deja gerer les demandes d'inspiration (intent `ask_inspiration` ou `gather_preferences`).
+**Probleme** : Le payload `DestinationSuggestRequest` est construit de maniere identique a 2 endroits (lignes ~450 et ~1140).
 
-**Aucune fonctionnalite perdue** : le LLM intent classifier a deja les regles pour detecter "inspire-moi", "suggest", "recommend" et retourner le bon widget.
+**Amelioration** : Extraire une fonction `buildDestinationPayload(prefs, departure)` reutilisable.
+
+### 3.3 Widget selection guard -- Regex fragile
+
+**Probleme** : La garde de selection de widget repose sur des regex (`choisis`, `decide`, `a toi`) pour detecter la delegation. C'est fragile face aux variations de langue et aux fautes.
+
+**Amelioration** : Deleguer cette detection au classificateur d'intention backend plutot qu'un regex frontend.
+
+### 3.4 Absence de timeout sur le streaming SSE
+
+**Probleme** : Si le serveur envoie des chunks tres lentement sans jamais fermer la connexion, aucun timeout global n'interrompt le stream. Le retry ne couvre que les echecs de connexion.
+
+**Amelioration** : Ajouter un `setTimeout` global (ex: 60s) qui appelle `abortController.abort()` si le stream n'est pas termine.
+
+### 3.5 Rate limiting en memoire seulement
+
+**Probleme** : Le rate limiter dans l'edge function utilise un `Map` en memoire qui se reinitialise a chaque cold start. Un utilisateur peut contourner la limite en attendant un redemarrage.
+
+**Amelioration** : Migrer vers un rate limiter base sur Supabase (table `rate_limits` avec TTL) ou Redis/Upstash.
+
+### 3.6 Cache d'outils sans persistance
+
+**Probleme** : `toolResultCache` dans `toolExecutor.ts` est un `Map` en memoire avec les memes limites que le rate limiter.
+
+**Impact** : Faible en pratique car l'idempotence est surtout utile au sein d'une meme requete.
+
+### 3.7 Gestion d'erreur dans les callbacks de preference
+
+**Probleme** : Les callbacks `onStyleConfirm`, `onInterestsConfirm` dans `usePreferenceWidgetCallbacks` n'ont pas de try/catch -- une erreur dans `handleFetchDestinations` crash silencieusement.
+
+**Amelioration** : Wrapper en try/catch avec toast d'erreur.
+
+### 3.8 Console.log excessifs en production
+
+**Probleme** : Nombreux `console.log` non gardes par `process.env.NODE_ENV` dans les hooks (cooldown, intent router, widget flow).
+
+**Amelioration** : Utiliser le `plannerLogger` existant ou un guard `if (DEV)` systematique.
+
+### 3.9 Absence de test unitaire sur le intent router
+
+**Probleme** : `useUnifiedIntentRouter` (708 lignes) est la piece maitresse de la logique de declenchement de widgets mais n'a aucun test unitaire. Les tests E2E couvrent le comportement mais pas les cas limites.
+
+**Amelioration** : Extraire la logique pure (`evaluatePhaseTransition`, `processIntent` core logic) en fonctions testables.
+
+### 3.10 Pas de test sur l'annulation de stream
+
+**Probleme** : `cancelStream` existe mais n'est teste ni en unitaire ni en E2E.
 
 ---
 
-## CR4 : Envoyer le contexte conversationnel au classificateur
+## 4. Tests E2E existants (20 fichiers)
 
-**Probleme** : Le classificateur ne recoit qu'un seul message (lignes 706-709), donc pas de contexte pour desambiguiser les nombres, les references anaphoriques, ou les intents contextuels.
+| Fichier | Couverture |
+|---|---|
+| `chat-conversation-flow.spec.ts` | 5 phases, cross-phase, messages courts, multilangue |
+| `preference-first-workflow.spec.ts` | Style > Interests > Destinations |
+| `widget-cooldown-system.spec.ts` | Max attempts, penalty, confirmed widgets |
+| `widget-selection-guard.spec.ts` | Guard "choisis pour moi" |
+| `full-user-journey.spec.ts` | Parcours complet |
+| `cr1-cr5` | Regressions specifiques (i18n, overrides, regex bypass, context, search realism) |
+| `memory-persistence.spec.ts` | Persistence de la memoire |
+| Divers | Hotels, budget, accommodation, multi-destination |
 
-### Etape 4a : Envoyer les 3 derniers messages au classificateur
+### Lacunes identifiees dans la couverture E2E :
 
-**Fichier** : `supabase/functions/planner-chat/index.ts`, lignes 692-710
+1. **Aucun test de streaming/annulation** -- le bouton d'annulation pendant le streaming n'est pas teste
+2. **Aucun test de reprise apres erreur** -- que se passe-t-il si le backend renvoie une 500 ou un timeout ?
+3. **Aucun test de session** -- creation, switch, suppression de sessions n'est pas couvert
+4. **Aucun test de "choose for me"** -- le flux "choisis pour moi" avec execution d'action n'est pas teste
+5. **Aucun test mobile** -- la vue responsive du chat n'est pas testee
+6. **Aucun test de geocodage** -- le flux destination > geocode > map route n'est pas verifie
+7. **Aucun test d'historique de conversation** -- re-ouvrir un ancien chat et verifier la restauration
+8. **Aucun test de rate limiting** -- envoyer de nombreux messages rapidement
 
-Remplacer l'extraction d'un seul message par les N derniers :
+---
 
-```typescript
-// AVANT
-const lastUserMessage = [...limitedMessages].reverse().find(m => m.role === "user");
-// ...
-messages: [
-  { role: "system", content: buildClassificationSystemPrompt(...) },
-  lastUserMessage,
-],
+## 5. Tests E2E proposes
 
-// APRES
-// Prendre les 4 derniers messages (2 paires user/assistant) pour le contexte
-const recentMessages = limitedMessages.slice(-4);
-// ...
-messages: [
-  { role: "system", content: buildClassificationSystemPrompt(...) },
-  ...recentMessages,
-],
+### 5.1 Session management
+```text
+- Creer une conversation, envoyer des messages
+- Creer une nouvelle session
+- Verifier que l'ancienne session est listee dans l'historique
+- Revenir a l'ancienne session, verifier la restauration des messages
+- Supprimer une session
 ```
 
-**Pourquoi 4** : 2 paires (assistant + user) donnent assez de contexte pour :
-- Desambiguiser "2" (CR6 corrige automatiquement)
-- Detecter "Valentine's trip" comme style (contexte de la conversation)
-- Comprendre "with my husband" = 2 adultes (contexte familial)
-- Identifier les references a des listes numerotees
+### 5.2 Error resilience (backend down)
+```text
+- Envoyer un message quand le backend est indisponible
+- Verifier le message d'erreur affiche
+- Verifier que le retry automatique fonctionne
+- Verifier que l'input reste editable apres l'erreur
+```
 
-**Impact sur les couts** : Passage de ~50 tokens a ~200 tokens en input pour la classification. Cout negligeable (~0.001$ par requete supplementaire).
+### 5.3 Stream cancellation
+```text
+- Envoyer un message
+- Pendant le streaming, cliquer sur le bouton d'annulation
+- Verifier que le message partiel est affiche
+- Verifier que l'input redevient actif
+```
 
-### Etape 4b : Mettre a jour `buildClassificationSystemPrompt`
+### 5.4 "Choose for me" flow
+```text
+- Configurer les preferences (style + interests)
+- Obtenir des suggestions de destination
+- Envoyer "choisis pour moi"
+- Verifier qu'une destination est selectionnee automatiquement
+- Verifier que le widget est marque comme confirme
+```
 
-Ajouter une instruction pour utiliser le contexte :
+### 5.5 Mobile responsive
+```text
+- Ouvrir le planner en viewport 390x844
+- Verifier le chat input, le scroll, l'envoi de messages
+- Verifier la barre du bas et le collapse du chat
+```
 
-```typescript
-return `Tu es un classificateur d'intention pour un assistant de voyage.
-Analyse le DERNIER message utilisateur en tenant compte du contexte conversationnel fourni.
+### 5.6 Rate limiting
+```text
+- Envoyer 20+ messages rapidement
+- Verifier le message "trop de requetes"
+- Attendre 60s et reverifier que ca fonctionne
+```
 
-CONTEXTE:
-- Les messages precedents te donnent le contexte de la conversation
-- Utilise-les pour desambiguiser les intentions (ex: "2" = selection si liste proposee)
-- Le dernier message utilisateur est celui a classifier
+### 5.7 Conversation history persistence
+```text
+- Envoyer 5 messages, rafraichir la page
+- Verifier que les messages sont restaures
+- Verifier que les widgets confirmes restent confirmes
+- Verifier que le welcome message est dans la bonne langue
+```
 
-... (reste identique)`;
+### 5.8 Destination geocoding flow
+```text
+- Dire "je veux aller a Tokyo"
+- Verifier que la memoire flight a les coordonnees
+- Verifier que la carte est centree sur la destination
 ```
 
 ---
 
-## CR5 : Flight search - promesse realiste
+## 6. Recapitulatif des priorites
 
-**Probleme** : `trigger_flight_search` emet un event mais aucune API de recherche reelle n'est connectee. Le LLM promet des resultats.
-
-### Etape 5a : Modifier le prompt systeme pour refletir la realite
-
-**Fichier** : `supabase/functions/planner-chat/index.ts`, dans `buildSystemPrompt`
-
-Ajouter une regle :
-
-```
-## RECHERCHE DE VOLS - COMPORTEMENT ATTENDU
-Quand trigger_flight_search est appele, le formulaire de recherche est PRE-REMPLI dans l'onglet Vols.
-L'utilisateur doit VERIFIER le formulaire et lancer la recherche manuellement.
-NE DIS JAMAIS "je recherche" ou "les resultats arrivent". 
-DIS : "J'ai pre-rempli le formulaire de recherche dans l'onglet Vols. 
-Verifiez les details et lancez la recherche quand vous etes pret."
-```
-
-### Etape 5b : Mettre a jour la description du tool `trigger_flight_search`
-
-**Fichier** : `supabase/functions/planner-chat/tools/flightSearchTrigger.ts`
-
-Modifier la description pour refleter la realite :
-
-```typescript
-description: `Pre-remplit le formulaire de recherche de vols avec l'itineraire configure.
-NE LANCE PAS de recherche automatique. L'utilisateur devra verifier et lancer manuellement.
-Dans ta reponse, dis que le formulaire est pret dans l'onglet Vols.`
-```
-
-### Note sur l'API de vol
-
-Si tu veux connecter une vraie API de recherche de vols (ex: Amadeus, Kiwi, Duffel), c'est un travail cote API/backend. L'architecture est prete : le `FlightsPanel` recoit deja `triggerFlightSearch=true` et `flightFormData`. Il suffirait d'ajouter un appel API dans le panel quand ces deux conditions sont remplies. **Dis-moi si tu veux que je prepare l'interface pour ca** -- je peux definir le contrat (types de requete/reponse) pour que tu l'implementes dans ton API.
-
----
-
-## CR6 : Desambiguisation des nombres (corrigee par CR4)
-
-La correction CR4 (envoi de 4 messages au classificateur) corrige automatiquement ce probleme. Le classificateur verra le message precedent de l'assistant avec la liste numerotee et pourra interpreter "2" comme `confirm_selection` + `selectedOption: "2"`.
-
-La regle textuelle ajoutee precedemment dans `buildClassificationSystemPrompt` (lignes 469-476) est deja correcte. Elle sera maintenant **fonctionnelle** car le contexte sera present.
-
----
-
-## Resume des modifications
-
-| CR | Fichier(s) | Action |
-|----|-----------|--------|
-| CR1 | `fr/planner.json`, `en/planner.json` | Ajouter ~30 cles i18n pour les messages widgets |
-| CR1 | `useChatWidgetFlow.ts` | Remplacer `fr` et strings par `t()` + `dateFnsLocale` |
-| CR1 | `useWidgetActionExecutor.ts` | Remplacer strings par `t()` |
-| CR1 | `PlannerChat.tsx` | Passer `t` et `dateFnsLocale` aux hooks |
-| CR2 | `planner-chat/index.ts` | Supprimer `applyWidgetForcingLogic`, ajouter guards dans `applyPreferenceFirstLogic` |
-| CR3 | `PlannerChat.tsx` | Supprimer le bloc regex inspire (lignes 899-941) |
-| CR4 | `planner-chat/index.ts` | Envoyer 4 derniers messages au classificateur, maj du prompt |
-| CR5 | `planner-chat/index.ts` + `flightSearchTrigger.ts` | Prompt realiste pour la recherche de vols |
-| CR6 | (aucun) | Corrige automatiquement par CR4 |
-
-## Ordre d'implementation
-
-1. **CR3** (5 min) -- suppression du regex, zero risque de regression
-2. **CR2** (10 min) -- suppression de `applyWidgetForcingLogic` + guards
-3. **CR4** (5 min) -- contexte conversationnel au classificateur (corrige aussi CR6)
-4. **CR5** (5 min) -- prompt realiste flight search
-5. **CR1** (30 min) -- i18n de tous les messages (le plus gros, mais mecanique)
-
-Total : ~55 min de modifications, 0 feature perdue, 16 anomalies corrigees.
-
+| Priorite | Action | Impact |
+|---|---|---|
+| P0 | Refactorer `PlannerChat.tsx` en sous-hooks | Maintenabilite |
+| P0 | Ajouter un timeout global au streaming SSE | Fiabilite |
+| P1 | Tests unitaires pour `useUnifiedIntentRouter` | Qualite |
+| P1 | Tests E2E session management + error resilience | Couverture |
+| P1 | Supprimer la duplication du payload destination | DRY |
+| P2 | Migrer le rate limiter vers Supabase/Redis | Securite |
+| P2 | Nettoyer les console.log en production | Performance |
+| P2 | Tests E2E "choose for me" + mobile | Couverture |
+| P3 | Remplacer le regex de delegation par intent backend | Robustesse |
+| P3 | Tests E2E rate limiting + stream cancellation | Couverture |
