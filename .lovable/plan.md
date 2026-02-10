@@ -185,15 +185,15 @@ Le chat est construit sur une architecture sophistiquee en 3 couches :
 
 ## 6. Recapitulatif des priorites
 
-| Priorite | Action | Impact |
-|---|---|---|
-| P0 | Refactorer `PlannerChat.tsx` en sous-hooks | Maintenabilite |
-| P0 | Ajouter un timeout global au streaming SSE | Fiabilite |
-| P1 | Tests unitaires pour `useUnifiedIntentRouter` | Qualite |
-| P1 | Tests E2E session management + error resilience | Couverture |
-| P1 | Supprimer la duplication du payload destination | DRY |
-| P2 | Migrer le rate limiter vers Supabase/Redis | Securite |
-| P2 | Nettoyer les console.log en production | Performance |
-| P2 | Tests E2E "choose for me" + mobile | Couverture |
-| P3 | Remplacer le regex de delegation par intent backend | Robustesse |
-| P3 | Tests E2E rate limiting + stream cancellation | Couverture |
+| Priorite | Action | Impact | Statut |
+|---|---|---|---|
+| P0 | Refactorer `PlannerChat.tsx` en sous-hooks | Maintenabilite | ✅ FAIT |
+| P0 | Ajouter un timeout global au streaming SSE | Fiabilite | ✅ FAIT |
+| P1 | Tests unitaires pour `useUnifiedIntentRouter` | Qualite | ✅ FAIT (45 tests) |
+| P1 | Tests E2E session management + error resilience | Couverture | ⏳ TODO |
+| P1 | Supprimer la duplication du payload destination | DRY | ✅ FAIT |
+| P2 | Migrer le rate limiter vers Supabase/Redis | Securite | ✅ FAIT (6 edge functions) |
+| P2 | Nettoyer les console.log en production | Performance | ✅ FAIT |
+| P2 | Tests E2E "choose for me" + mobile | Couverture | ⏳ TODO |
+| P3 | Remplacer le regex de delegation par intent backend | Robustesse | ✅ FAIT |
+| P3 | Tests E2E rate limiting + stream cancellation | Couverture | ⏳ TODO |
