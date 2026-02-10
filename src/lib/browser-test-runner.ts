@@ -116,6 +116,10 @@ function createExpect(actual: unknown) {
       if ((actual as number) >= expected)
         throw new AssertionError(`Expected ${actual} < ${expected}`);
     },
+    toBeLessThanOrEqual(expected: number) {
+      if ((actual as number) > expected)
+        throw new AssertionError(`Expected ${actual} <= ${expected}`);
+    },
     toBeCloseTo(expected: number, precision = 2) {
       const pow = Math.pow(10, -precision) / 2;
       if (Math.abs((actual as number) - expected) >= pow)
