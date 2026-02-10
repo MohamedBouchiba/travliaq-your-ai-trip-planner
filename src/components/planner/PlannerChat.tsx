@@ -68,6 +68,7 @@ import { MessageBubble } from "./chat/MessageBubble";
 import { MessageActions } from "./chat/MessageActions";
 import { getDestinationSuggestions } from "@/services/destinations";
 import type { DestinationSuggestRequest, DestinationSuggestion } from "@/types/destinations";
+import { buildDestinationPayload } from "./chat/utils/buildDestinationPayload";
 import { ScrollToBottomButton } from "./chat/ScrollToBottomButton";
 import { FLIGHTS_ZOOM } from "@/constants/mapSettings";
 import { geocodeCity } from "@/utils/geocodeCity";
@@ -321,11 +322,11 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     widgetInteractions: widgetTracking.interactions,
     widgetCooldown, // Pass cooldown system for validation
     onWidgetTriggered: useCallback((widgetType, data) => {
-      console.log("[PlannerChat] Unified intent router triggered widget:", widgetType, data);
+      if (import.meta.env.DEV) console.log("[PlannerChat] Intent router triggered widget:", widgetType);
       setLastWidgetTriggered(widgetType);
     }, []),
     onSearchTriggered: useCallback(() => {
-      console.log("[PlannerChat] Unified intent router triggered search");
+      if (import.meta.env.DEV) console.log("[PlannerChat] Intent router triggered search");
     }, []),
   });
 
@@ -445,50 +446,14 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     setInspireFlowStep("loading");
     
     try {
-      // Build preferences payload from memory - use getPreferences() for typed access
+      // Build preferences payload from memory using shared utility
       const prefs = getPreferences();
       
-      const payload: DestinationSuggestRequest = {
-        // User location from departure if available
-        userLocation: departureCity ? { city: departureCity, country: departureCountry } : undefined,
-        
-        // Style axes
-        styleAxes: {
-          chillVsIntense: prefs.styleAxes.chillVsIntense ?? 50,
-          cityVsNature: prefs.styleAxes.cityVsNature ?? 50,
-          ecoVsLuxury: prefs.styleAxes.ecoVsLuxury ?? 50,
-          touristVsLocal: prefs.styleAxes.touristVsLocal ?? 50,
-        },
-        
-        // Interests (max 5)
-        interests: prefs.interests.slice(0, 5) as DestinationSuggestRequest["interests"],
-        
-        // Must-haves
-        mustHaves: {
-          accessibilityRequired: prefs.mustHaves.accessibilityRequired || false,
-          petFriendly: prefs.mustHaves.petFriendly || false,
-          familyFriendly: prefs.mustHaves.familyFriendly || false,
-          highSpeedWifi: prefs.mustHaves.highSpeedWifi || false,
-        },
-        
-        // Dietary restrictions
-        dietaryRestrictions: prefs.dietaryRestrictions.length > 0 ? prefs.dietaryRestrictions : undefined,
-        
-        // Travel style mapping
-        travelStyle: prefs.travelStyle as DestinationSuggestRequest["travelStyle"],
-        
-        // Occasion
-        occasion: prefs.tripContext.occasion as DestinationSuggestRequest["occasion"],
-        
-        // Budget level from comfort (ecoVsLuxury 0-100 to budget levels)
-        budgetLevel: prefs.styleAxes.ecoVsLuxury < 25 ? "budget" 
-          : prefs.styleAxes.ecoVsLuxury < 50 ? "comfort" 
-          : prefs.styleAxes.ecoVsLuxury < 75 ? "premium" 
-          : "luxury",
-        
-        // Travel month from departure date if set
-        travelMonth: departureDateValue ? new Date(departureDateValue).getMonth() + 1 : new Date().getMonth() + 1,
-      };
+      const payload = buildDestinationPayload({
+        preferences: prefs,
+        departure: { city: departureCity, country: departureCountry },
+        departureDateMs: departureDateValue,
+      });
       
       const response = await getDestinationSuggestions(payload, { limit: 3 });
       
@@ -1049,7 +1014,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
 
       // Process intent classification for debug and potential widget triggering
       if (intentClassification) {
-        console.log("[PlannerChat] Intent classification received:", intentClassification);
+        if (import.meta.env.DEV) console.log("[PlannerChat] Intent:", intentClassification.primaryIntent);
         setLastIntentClassification(intentClassification);
         
         // Process through unified intent router for validation and potential widget triggering
@@ -1062,7 +1027,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
           if (intentResult.shouldShowWidget && intentResult.widgetType) {
             const widgetType = intentResult.widgetType as import("@/types/flight").WidgetType;
             intentWidgetRef.current = widgetType; // Safeguard: store in ref for fallback
-            console.log("[PlannerChat] Intent", intentClassification.primaryIntent, ": Adding widget to message:", widgetType);
+            if (import.meta.env.DEV) console.log("[PlannerChat] Intent widget:", widgetType);
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === messageId
@@ -1077,7 +1042,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
         // mark any pending citySelector widget as confirmed AND update flight memory
         if (intentClassification.primaryIntent === "provide_destination" && intentClassification.entities?.destinationCity) {
           const destinationCity = intentClassification.entities.destinationCity as string;
-          console.log("[PlannerChat] provide_destination: Confirming citySelector and updating flight memory for:", destinationCity);
+          if (import.meta.env.DEV) console.log("[PlannerChat] provide_destination:", destinationCity);
           
           // Mark any pending citySelector as confirmed
           setMessages((prev) =>
@@ -1095,7 +1060,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
           // Geocode city to get coordinates for map route
           geocodeCity(destinationCity).then((coords) => {
             if (coords) {
-              console.log("[PlannerChat] Geocoded destination:", destinationCity, coords);
+              if (import.meta.env.DEV) console.log("[PlannerChat] Geocoded:", destinationCity, coords);
               updateMemory({
                 arrival: {
                   city: destinationCity,
@@ -1112,18 +1077,18 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
 
       // Handle detected preferences from chat (dietary restrictions, travel style, etc.)
       if (preferencesData && Object.keys(preferencesData).length > 0) {
-        console.log("[PlannerChat] Preferences detected from chat:", preferencesData);
+        if (import.meta.env.DEV) console.log("[PlannerChat] Preferences detected:", preferencesData);
         imperativeHandlers.handlePreferencesDetection(preferencesData);
       }
 
       // Handle flight search trigger from AI
       if (flightSearchTrigger) {
-        console.log("[PlannerChat] AI triggered flight search");
+        if (import.meta.env.DEV) console.log("[PlannerChat] AI triggered flight search");
         eventBus.emit("flight:triggerSearch");
       }
 
       if (destinationSuggestionRequest) {
-        console.log("[PlannerChat] LLM requested destination suggestions:", destinationSuggestionRequest);
+        if (import.meta.env.DEV) console.log("[PlannerChat] LLM destination suggestions requested");
         
         // Keep the AI's natural text, just show loading state
         setMessages((prev) =>
@@ -1137,30 +1102,11 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
         // Fetch destinations from API
         try {
           const prefs = getPreferences();
-          const payload: DestinationSuggestRequest = {
-            userLocation: departureCity ? { city: departureCity, country: departureCountry } : undefined,
-            styleAxes: {
-              chillVsIntense: prefs.styleAxes.chillVsIntense ?? 50,
-              cityVsNature: prefs.styleAxes.cityVsNature ?? 50,
-              ecoVsLuxury: prefs.styleAxes.ecoVsLuxury ?? 50,
-              touristVsLocal: prefs.styleAxes.touristVsLocal ?? 50,
-            },
-            interests: prefs.interests.slice(0, 5) as DestinationSuggestRequest["interests"],
-            mustHaves: {
-              accessibilityRequired: prefs.mustHaves.accessibilityRequired || false,
-              petFriendly: prefs.mustHaves.petFriendly || false,
-              familyFriendly: prefs.mustHaves.familyFriendly || false,
-              highSpeedWifi: prefs.mustHaves.highSpeedWifi || false,
-            },
-            dietaryRestrictions: prefs.dietaryRestrictions.length > 0 ? prefs.dietaryRestrictions : undefined,
-            travelStyle: prefs.travelStyle as DestinationSuggestRequest["travelStyle"],
-            occasion: prefs.tripContext.occasion as DestinationSuggestRequest["occasion"],
-            budgetLevel: prefs.styleAxes.ecoVsLuxury < 25 ? "budget" 
-              : prefs.styleAxes.ecoVsLuxury < 50 ? "comfort" 
-              : prefs.styleAxes.ecoVsLuxury < 75 ? "premium" 
-              : "luxury",
-            travelMonth: departureDateValue ? new Date(departureDateValue).getMonth() + 1 : new Date().getMonth() + 1,
-          };
+          const payload = buildDestinationPayload({
+            preferences: prefs,
+            departure: { city: departureCity, country: departureCountry },
+            departureDateMs: departureDateValue,
+          });
           
           const limit = Math.min(destinationSuggestionRequest.requestedCount, 5);
           const response = await getDestinationSuggestions(payload, { limit });
@@ -1322,13 +1268,11 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
           const userAskedForChoice = lastUserMsg && delegationPatterns.test(lastUserMsg.text);
           
           if (userAskedForChoice) {
-            console.log("[PlannerChat] LLM chooseWidget action (user delegated):", action);
+            if (import.meta.env.DEV) console.log("[PlannerChat] chooseWidget (delegated):", action);
             const executed = widgetActionExecutor.executeChooseWidgetAction(action);
-            if (executed) {
-              console.log("[PlannerChat] Widget action executed successfully");
-            }
+            if (import.meta.env.DEV && executed) console.log("[PlannerChat] Widget action executed");
           } else {
-            console.warn("[PlannerChat] Blocked auto-chooseWidget - user did not ask for delegation:", action);
+            if (import.meta.env.DEV) console.warn("[PlannerChat] Blocked auto-chooseWidget:", action);
             // Track blocked action in debug store
             const { addBlockedAction } = useDebugStore.getState();
             addBlockedAction({

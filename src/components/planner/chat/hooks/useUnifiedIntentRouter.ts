@@ -236,7 +236,7 @@ function evaluatePhaseTransition(
   // Guard 0: If flight search is triggered, skip ALL phase transitions
   // This prevents the search + datePicker conflict
   if (flightSearchTriggered) {
-    console.log("[evaluatePhaseTransition] Skipped — flight search active");
+    if (import.meta.env.DEV) console.log("[evaluatePhaseTransition] Skipped — flight search active");
     return null;
   }
 
@@ -394,7 +394,7 @@ export function useUnifiedIntentRouter({
       // FIRST: Check cooldown system (prevents infinite loops)
       if (widgetCooldown && !widgetCooldown.canShowWidget(widgetType)) {
         const reason = widgetCooldown.getBlockReason(widgetType);
-        console.log(`[UnifiedIntentRouter] Widget ${widgetType} blocked by cooldown: ${reason}`);
+        if (import.meta.env.DEV) console.log(`[UnifiedIntentRouter] Widget ${widgetType} blocked by cooldown: ${reason}`);
         return { valid: false, reason: reason || 'blocked_by_cooldown' };
       }
       
@@ -440,9 +440,7 @@ export function useUnifiedIntentRouter({
 
       // For expert users, skip non-critical widgets
       if (userBehavior.style === "expert") {
-        console.log(
-          `[UnifiedIntentRouter] Skipping non-critical widget "${widgetType}" for expert user`
-        );
+        if (import.meta.env.DEV) console.log(`[UnifiedIntentRouter] Skipping non-critical widget "${widgetType}" for expert user`);
         return false;
       }
 
@@ -514,9 +512,8 @@ export function useUnifiedIntentRouter({
     const boostResult = boostIntentConfidence(intent, lastUserMessage || '', lastAssistantMessage);
     const effectiveConfidence = boostResult.boostedConfidence;
     
-    console.log("[UnifiedIntentRouter] Processing intent:", intent.primaryIntent, 
-      "original:", intent.confidence, "boosted:", effectiveConfidence,
-      "lang:", boostResult.detectedLanguage);
+    if (import.meta.env.DEV) console.log("[UnifiedIntentRouter] Processing intent:", intent.primaryIntent, 
+      "original:", intent.confidence, "boosted:", effectiveConfidence);
     
     // Handle undecided users with delegate suggestion
     if (boostResult.suggestedIntent === 'delegate_choice' && boostResult.frontendSignals.isUndecided) {
@@ -526,7 +523,7 @@ export function useUnifiedIntentRouter({
     
     // Check boosted confidence level (not original)
     if (effectiveConfidence < CONFIDENCE_THRESHOLDS.LOW && boostResult.shouldClarify) {
-      console.log("[UnifiedIntentRouter] Low confidence after boost, requesting clarification");
+      if (import.meta.env.DEV) console.log("[UnifiedIntentRouter] Low confidence after boost, requesting clarification");
       return { 
         shouldShowWidget: false, 
         widgetType: null, 
@@ -569,7 +566,7 @@ export function useUnifiedIntentRouter({
 
       // Guard: don't fallback to citySelector if no country is selected
       if (fallbackWidget === "citySelector" && !flowState.hasDestination) {
-        console.log("[UnifiedIntentRouter] Fallback citySelector blocked — no country selected");
+        if (import.meta.env.DEV) console.log("[UnifiedIntentRouter] Fallback citySelector blocked — no country selected");
         const hasPreferences = widgetInteractions.some(i => 
           i.interactionType === "style_configured" || i.interactionType === "interests_selected"
         );
@@ -683,7 +680,7 @@ export function useUnifiedIntentRouter({
     const isSearchIntent = intent.primaryIntent === "trigger_search" || intent.primaryIntent === "confirm_selection";
     const phaseTransition = evaluatePhaseTransition(flowState, widgetInteractions, canShowWidget, isSearchIntent);
     if (phaseTransition) {
-      console.log("[UnifiedIntentRouter] Phase transition triggered:", phaseTransition.reason);
+      if (import.meta.env.DEV) console.log("[UnifiedIntentRouter] Phase transition triggered:", phaseTransition.reason);
       if (phaseTransition.widgetType && onWidgetTriggered) {
         onWidgetTriggered(phaseTransition.widgetType);
       }
