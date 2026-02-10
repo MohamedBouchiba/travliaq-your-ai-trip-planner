@@ -59,6 +59,43 @@ export const TEST_CATEGORIES: CategoryInfo[] = [
     emoji: "📡",
     description: "Communication inter-composants, émission et écoute d'événements",
   },
+  // ─── Chat-Specific Categories ───
+  {
+    id: "messageAnalyzer",
+    label: "Message Analyzer",
+    emoji: "💬",
+    description: "Analyse des messages assistant/user, détection d'intent, langue",
+  },
+  {
+    id: "suggestionEngine",
+    label: "Suggestion Engine",
+    emoji: "💡",
+    description: "Suggestions contextuelles, workflow step, anticipated chips",
+  },
+  {
+    id: "chatTypes",
+    label: "Chat Types",
+    emoji: "📝",
+    description: "parsePreferredMonth, getCityCoords, MONTH_MAP, CITY_COORDINATES",
+  },
+  {
+    id: "widgetCooldown",
+    label: "Widget Cooldown",
+    emoji: "⏱️",
+    description: "Anti-loop cooldown, max attempts, user-typed penalty, block reasons",
+  },
+  {
+    id: "phaseDetector",
+    label: "Phase Detector",
+    emoji: "🔍",
+    description: "Détection de phase voyage : inspiration, research, comparison, booking",
+  },
+  {
+    id: "filterParser",
+    label: "Filter Parser",
+    emoji: "🔎",
+    description: "Parsing NL de filtres : prix, durée, étoiles, amenities, classe",
+  },
 ];
 
 // ─── Registration ───
@@ -99,5 +136,30 @@ export async function registerAllBrowserTests(categories?: string[]) {
   if (all || categories?.includes("eventBus")) {
     const { registerEventBusTests } = await import("./suites/eventBus.suite");
     registerEventBusTests();
+  }
+  // ─── Chat-Specific Suites ───
+  if (all || categories?.includes("messageAnalyzer")) {
+    const { registerMessageAnalyzerTests } = await import("./suites/messageAnalyzer.suite");
+    registerMessageAnalyzerTests();
+  }
+  if (all || categories?.includes("suggestionEngine")) {
+    const { registerSuggestionEngineTests } = await import("./suites/suggestionEngine.suite");
+    registerSuggestionEngineTests();
+  }
+  if (all || categories?.includes("chatTypes")) {
+    const { registerChatTypesTests } = await import("./suites/chatTypes.suite");
+    registerChatTypesTests();
+  }
+  if (all || categories?.includes("widgetCooldown")) {
+    const { registerWidgetCooldownTests } = await import("./suites/widgetCooldown.suite");
+    registerWidgetCooldownTests();
+  }
+  if (all || categories?.includes("phaseDetector")) {
+    const { registerPhaseDetectorTests } = await import("./suites/phaseDetector.suite");
+    registerPhaseDetectorTests();
+  }
+  if (all || categories?.includes("filterParser")) {
+    const { registerFilterParserTests } = await import("./suites/filterParser.suite");
+    registerFilterParserTests();
   }
 }

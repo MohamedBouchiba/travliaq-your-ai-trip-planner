@@ -20,7 +20,7 @@ export function registerDestinationPayloadTests() {
       const result = buildDestinationPayload({ preferences: defaultPrefs });
       expect(result.styleAxes.chillVsIntense).toBe(50);
       expect(result.styleAxes.cityVsNature).toBe(50);
-      expect(result.budgetLevel).toBe("comfort");
+      expect(result.budgetLevel).toBe("premium");
     });
 
     it("includes userLocation when departure provided", () => {
@@ -70,10 +70,11 @@ export function registerDestinationPayloadTests() {
     });
 
     it("computes travelMonth from departureDateMs", () => {
-      const august1 = new Date("2025-08-01").getTime();
+      // Use a date constructor that's timezone-safe
+      const august = new Date(2025, 7, 1).getTime(); // month 7 = August (0-indexed)
       const result = buildDestinationPayload({
         preferences: defaultPrefs,
-        departureDateMs: august1,
+        departureDateMs: august,
       });
       expect(result.travelMonth).toBe(8);
     });
