@@ -19,7 +19,9 @@ import {
   ChevronRight,
   RotateCcw,
   Filter,
+  ClipboardCopy,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -112,6 +114,31 @@ const TestRunner = () => {
   const totalPassed = results?.reduce((a, s) => a + s.passed, 0) ?? 0;
   const totalFailed = results?.reduce((a, s) => a + s.failed, 0) ?? 0;
   const totalTests = totalPassed + totalFailed;
+
+  const copyFailedTests = () => {
+    if (!results) return;
+    const failed: { suite: string; category: string; test: string; error: string }[] = [];
+    results.forEach((suite) => {
+      suite.tests.filter((t) => !t.passed).forEach((t) => {
+        failed.push({
+          suite: suite.name,
+          category: suite.category,
+          test: t.name.split(" > ").pop() || t.name,
+          error: t.error || "No error message",
+        });
+      });
+    });
+    if (failed.length === 0) {
+      toast.success("Aucun test échoué !");
+      return;
+    }
+    const text = failed
+      .map((f, i) => `${i + 1}. [${f.category}] ${f.suite} > ${f.test}\n   ❌ ${f.error}`)
+      .join("\n\n");
+    navigator.clipboard.writeText(text).then(() => {
+      toast.success(`${failed.length} échec(s) copié(s) dans le presse-papier`);
+    });
+  };
 
   // Group results by category
   const resultsByCategory = results
@@ -298,11 +325,24 @@ const TestRunner = () => {
                   </CardContent>
                 </Card>
               </div>
-              {lastRunCategories && (
-                <p className="text-xs text-muted-foreground">
-                  Filtré : {lastRunCategories.map((c) => getCategoryMeta(c)?.label || c).join(", ")}
-                </p>
-              )}
+              <div className="flex items-center gap-3">
+                {totalFailed > 0 && (
+                  <Button
+                    onClick={copyFailedTests}
+                    variant="destructive"
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <ClipboardCopy className="h-4 w-4" />
+                    Copier les {totalFailed} échec(s)
+                  </Button>
+                )}
+                {lastRunCategories && (
+                  <p className="text-xs text-muted-foreground">
+                    Filtré : {lastRunCategories.map((c) => getCategoryMeta(c)?.label || c).join(", ")}
+                  </p>
+                )}
+              </div>
             </>
           )}
 
