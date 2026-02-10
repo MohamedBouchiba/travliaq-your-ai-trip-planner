@@ -106,7 +106,7 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
           (m) => m.widget === "citySelector" && !m.isTyping
         );
         if (hasActiveCitySelector) {
-          console.log("[Chat] City selector already visible for", countryKey);
+          if (import.meta.env.DEV) console.log("[Chat] City selector already visible for", countryKey);
           return;
         }
       }
@@ -279,7 +279,7 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
       }
 
       updateAccommodation(accommodation.id, updates);
-      console.log(`[Chat] Updated accommodation for ${city}:`, updates);
+      if (import.meta.env.DEV) console.log(`[Chat] Updated accommodation for ${city}:`, updates);
 
       toastSuccess(
         t("planner.toast.accommodationUpdated"), 
@@ -339,7 +339,7 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
         updateActivity(activity.id, updates);
       });
 
-      console.log(`[Chat] Updated ${activities.length} activity(ies) for ${city}:`, updates);
+      if (import.meta.env.DEV) console.log(`[Chat] Updated ${activities.length} activity(ies) for ${city}:`, updates);
 
       toastSuccess(
         t("planner.toast.activityUpdated"),
@@ -375,7 +375,7 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
         ...activity,
       });
 
-      console.log(`[Chat] Added activity for ${city}:`, activity);
+      if (import.meta.env.DEV) console.log(`[Chat] Added activity for ${city}:`, activity);
 
       toastSuccess(
         t("planner.toast.activityAdded"), 
@@ -449,7 +449,7 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
    */
   const handlePreferencesDetection = useCallback(
     (detectedPrefs: AIPreferencesData): void => {
-      console.log("[handlePreferencesDetection] Raw input:", detectedPrefs);
+      if (import.meta.env.DEV) console.log("[handlePreferencesDetection] Raw input:", detectedPrefs);
       
       // Build properly structured preferences for the store
       const storeUpdates: Partial<TripPreferences> = {};
@@ -538,7 +538,7 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
       }
 
       if (summary.length > 0) {
-        console.log(`[Chat] Detected preferences:`, storeUpdates);
+        if (import.meta.env.DEV) console.log(`[Chat] Detected preferences:`, storeUpdates);
         toastSuccess(
           t("planner.toast.preferencesDetected"),
           t("planner.toast.preferencesDetectedDesc", { summary: summary.join(", ") })

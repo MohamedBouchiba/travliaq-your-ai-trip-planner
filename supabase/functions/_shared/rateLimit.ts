@@ -16,18 +16,20 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
  * Check if a request is within rate limits.
  * Uses UPSERT with a 1-hour sliding window.
  * 
- * @param ip - Client IP address
- * @param maxRequests - Maximum requests allowed per hour
+ * @param ip - Client IP or user identifier
+ * @param maxRequests - Maximum requests allowed per window
  * @param functionName - Edge function name (for per-function limits)
+ * @param windowMs - Window duration in milliseconds (default: 1 hour)
  * @returns true if request is allowed, false if rate limited
  */
 export async function checkRateLimit(
   ip: string,
   maxRequests: number,
-  functionName: string = "default"
+  functionName: string = "default",
+  windowMs: number = 3600000
 ): Promise<boolean> {
   const now = new Date();
-  const windowStart = new Date(now.getTime() - 3600000); // 1 hour ago
+  const windowStart = new Date(now.getTime() - windowMs);
 
   try {
     // First, try to get the existing record

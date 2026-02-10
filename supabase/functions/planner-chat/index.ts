@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildPhaseSystemPrompt, normalizeTravelPhase, type TravelPhase } from "./prompts/phasePrompts.ts";
 import { detectLanguage, getLocalizedContent, type SupportedLanguage } from "./prompts/systemPrompts.ts";
 import { createRequestLogger, extractRequestId, type RequestLogger } from "../_shared/logger.ts";
+import { checkRateLimit as checkRateLimitDB, cleanupRateLimits } from "../_shared/rateLimit.ts";
 import {
   FlightDataSchema,
   AccommodationDataSchema,
@@ -45,41 +46,20 @@ const corsHeaders = {
 };
 
 // ============================================================================
-// RATE LIMITING (Simple in-memory - resets on function cold start)
-// In production, use Redis via Upstash for persistent rate limiting
+// RATE LIMITING - Per-user, per-minute, persistent via Supabase
 // ============================================================================
-const rateLimits = new Map<string, { count: number; resetAt: number }>();
 const MAX_REQUESTS_PER_MINUTE = 20;
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
 
-function checkRateLimit(userId: string, log: RequestLogger): boolean {
-  const now = Date.now();
-  const limit = rateLimits.get(userId);
-  
+async function checkRateLimit(userId: string, log: RequestLogger): Promise<boolean> {
+  const allowed = await checkRateLimitDB(userId, MAX_REQUESTS_PER_MINUTE, "planner-chat", RATE_LIMIT_WINDOW_MS);
+  if (!allowed) {
+    log.warn("rate_limit", "Rate limit exceeded", { user_id: userId });
+  }
   if (Math.random() < 0.01) {
-    for (const [key, value] of rateLimits.entries()) {
-      if (now > value.resetAt) {
-        rateLimits.delete(key);
-      }
-    }
+    cleanupRateLimits();
   }
-  
-  if (!limit || now > limit.resetAt) {
-    rateLimits.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return true;
-  }
-  
-  if (limit.count >= MAX_REQUESTS_PER_MINUTE) {
-    log.warn("rate_limit", "Rate limit exceeded", { 
-      user_id: userId, 
-      count: limit.count,
-      resets_in_ms: limit.resetAt - now,
-    });
-    return false;
-  }
-  
-  limit.count++;
-  return true;
+  return allowed;
 }
 
 const MAX_MESSAGES = 50;
@@ -609,7 +589,7 @@ serve(async (req) => {
     const log = createRequestLogger(requestId, userId);
     
     // Rate limiting
-    if (!checkRateLimit(userId, log)) {
+    if (!(await checkRateLimit(userId, log))) {
       log.error("rate_limit", "Request blocked by rate limit");
       await log.flush();
       return new Response(JSON.stringify({ 
