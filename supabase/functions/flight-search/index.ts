@@ -1,30 +1,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { checkRateLimit, getClientIp, cleanupRateLimits, rateLimitResponse } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// In-memory rate limiting (resets on cold start, but provides basic protection)
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const MAX_SEARCHES_PER_HOUR = 30;
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const record = rateLimitMap.get(ip);
-  
-  if (!record || now > record.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + 3600000 });
-    return true;
-  }
-  
-  if (record.count >= MAX_SEARCHES_PER_HOUR) {
-    return false;
-  }
-  
-  record.count++;
-  return true;
-}
 
 // Types from the external API response
 interface ExternalFlightSegment {
@@ -243,23 +225,20 @@ function transformItinerary(itinerary: ExternalItinerary, index: number, currenc
 }
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Rate limiting by IP
-    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || 
-                     req.headers.get("x-real-ip") || 
-                     "unknown";
+    const clientIp = getClientIp(req);
     
-    if (!checkRateLimit(clientIp)) {
+    if (!(await checkRateLimit(clientIp, MAX_SEARCHES_PER_HOUR, "flight-search"))) {
       console.log(`[flight-search] Rate limit exceeded for IP: ${clientIp}`);
-      return new Response(
-        JSON.stringify({ error: "Too many requests. Please try again later.", flights: [] }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return rateLimitResponse(corsHeaders);
+    }
+    
+    if (Math.random() < 0.01) {
+      cleanupRateLimits();
     }
 
     const body = await req.json();

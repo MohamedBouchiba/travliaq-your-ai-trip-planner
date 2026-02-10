@@ -1,52 +1,30 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { checkRateLimit, getClientIp, cleanupRateLimits, rateLimitResponse } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Simple in-memory rate limiter (resets on function restart)
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const MAX_REQUESTS_PER_MINUTE = 3;
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
 
-function checkRateLimit(identifier: string): boolean {
-  const now = Date.now();
-  const record = rateLimitMap.get(identifier);
-  
-  if (!record || now > record.resetAt) {
-    rateLimitMap.set(identifier, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return true;
-  }
-  
-  if (record.count >= MAX_REQUESTS_PER_MINUTE) {
-    return false;
-  }
-  
-  record.count++;
-  return true;
-}
-
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Get client IP for rate limiting
-    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0] || 
-                     req.headers.get('x-real-ip') || 
-                     'unknown';
+    const clientIp = getClientIp(req);
     
-    // Check rate limit
-    if (!checkRateLimit(clientIp)) {
+    if (!(await checkRateLimit(clientIp, MAX_REQUESTS_PER_MINUTE, "submit-questionnaire", RATE_LIMIT_WINDOW_MS))) {
       console.log('Rate limit exceeded for IP:', clientIp);
-      return new Response(
-        JSON.stringify({ error: 'Too many requests. Please try again later.' }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return rateLimitResponse(corsHeaders);
+    }
+    
+    if (Math.random() < 0.01) {
+      cleanupRateLimits();
     }
     
     const questionnaireData = await req.json();

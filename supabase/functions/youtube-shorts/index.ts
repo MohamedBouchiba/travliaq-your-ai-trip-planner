@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { checkRateLimit, getClientIp, cleanupRateLimits, rateLimitResponse } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,26 +59,7 @@ const TRAVEL_POSITIVE_KEYWORDS = [
 // Cache TTL: 3 weeks in seconds
 const CACHE_TTL = 60 * 60 * 24 * 21;
 
-// In-memory rate limiting (resets on cold start, but provides basic protection)
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const MAX_REQUESTS_PER_HOUR = 15;
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const record = rateLimitMap.get(ip);
-  
-  if (!record || now > record.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + 3600000 });
-    return true;
-  }
-  
-  if (record.count >= MAX_REQUESTS_PER_HOUR) {
-    return false;
-  }
-  
-  record.count++;
-  return true;
-}
 
 // Redis cache helpers using Upstash REST API
 async function getFromCache(key: string): Promise<YouTubeVideo[] | null> {
@@ -223,17 +205,15 @@ serve(async (req) => {
   }
 
   try {
-    // Rate limiting by IP
-    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || 
-                     req.headers.get("x-real-ip") || 
-                     "unknown";
+    const clientIp = getClientIp(req);
     
-    if (!checkRateLimit(clientIp)) {
+    if (!(await checkRateLimit(clientIp, MAX_REQUESTS_PER_HOUR, "youtube-shorts"))) {
       console.log(`[youtube-shorts] Rate limit exceeded for IP: ${clientIp}`);
-      return new Response(
-        JSON.stringify({ error: "Too many requests. Please try again later.", videos: [], count: 0 }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return rateLimitResponse(corsHeaders);
+    }
+    
+    if (Math.random() < 0.01) {
+      cleanupRateLimits();
     }
 
     const { city, country } = await req.json();

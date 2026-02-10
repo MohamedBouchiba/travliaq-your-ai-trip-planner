@@ -86,7 +86,7 @@ export function useWidgetActionExecutor(options: WidgetActionExecutorOptions) {
   const executeChooseWidgetAction = useCallback((action: ChooseWidgetAction): boolean => {
     const { widgetType, option, optionData, reason } = action;
     
-    console.log("[WidgetActionExecutor] Executing chooseWidget:", { widgetType, option, reason });
+    if (import.meta.env.DEV) console.log("[WidgetActionExecutor] Executing chooseWidget:", { widgetType, option, reason });
 
     // Find the message with this widget
     const widgetMessage = findWidgetMessage(widgetType);
