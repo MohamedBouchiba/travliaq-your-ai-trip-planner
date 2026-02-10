@@ -427,11 +427,8 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
         eventBus.emit("flight:updateFormData", fd);
       } else if (action) {
         if (action.type === "chooseWidget") {
-          // GUARD: Only execute if user explicitly asked for delegation
-          const lastUserMsg = opts.messages.filter((m) => m.role === "user").pop();
-          const delegationPatterns =
-            /choisis|decide|décide|a toi|à toi|fais confiance|prends le|meilleur pour moi|je te laisse|tu choisis/i;
-          const userAskedForChoice = lastUserMsg && delegationPatterns.test(lastUserMsg.text);
+          // GUARD: Use backend intent classification instead of fragile regex
+          const userAskedForChoice = intentClassification?.primaryIntent === "delegate_choice";
 
           if (userAskedForChoice) {
             if (import.meta.env.DEV) console.log("[useChatSubmit] chooseWidget (delegated):", action);
@@ -444,7 +441,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
               type: action.type,
               widgetType: (action as Record<string, unknown>).widgetType as string || "unknown",
               option: (action as Record<string, unknown>).option as string || "unknown",
-              reason: "User did not explicitly ask for delegation",
+              reason: "Intent not classified as delegate_choice",
               timestamp: Date.now(),
             });
           }
