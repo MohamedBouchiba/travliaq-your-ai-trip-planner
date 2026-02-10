@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { checkRateLimit, getClientIp, cleanupRateLimitMap, rateLimitResponse } from "../_shared/rateLimit.ts";
+import { checkRateLimit, getClientIp, cleanupRateLimits, rateLimitResponse } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,14 +18,14 @@ serve(async (req) => {
   try {
     // Rate limiting
     const clientIp = getClientIp(req);
-    if (!checkRateLimit(clientIp, MAX_REQUESTS_PER_HOUR)) {
+    if (!(await checkRateLimit(clientIp, MAX_REQUESTS_PER_HOUR, "activities-search"))) {
       console.warn(`[activities-search] Rate limit exceeded for IP: ${clientIp}`);
       return rateLimitResponse(corsHeaders);
     }
     
     // Periodic cleanup (1% of requests)
     if (Math.random() < 0.01) {
-      cleanupRateLimitMap();
+      cleanupRateLimits();
     }
 
     const body = await req.json();
