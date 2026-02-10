@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { checkRateLimit, getClientIp, cleanupRateLimitMap, rateLimitResponse } from "../_shared/rateLimit.ts";
+import { checkRateLimit, getClientIp, cleanupRateLimits, rateLimitResponse } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -70,14 +70,14 @@ Deno.serve(async (req) => {
   try {
     // Rate limiting
     const clientIp = getClientIp(req);
-    if (!checkRateLimit(clientIp, MAX_REQUESTS_PER_HOUR)) {
+    if (!(await checkRateLimit(clientIp, MAX_REQUESTS_PER_HOUR, "airports-in-bounds"))) {
       console.warn(`[airports-in-bounds] Rate limit exceeded for IP: ${clientIp}`);
       return rateLimitResponse(corsHeaders);
     }
     
     // Periodic cleanup (1% of requests)
     if (Math.random() < 0.01) {
-      cleanupRateLimitMap();
+      cleanupRateLimits();
     }
     const { north, south, east, west, types = ["large_airport"], limit = 100, zoom = 5, excludeCity } = await req.json() as BoundsRequest;
 

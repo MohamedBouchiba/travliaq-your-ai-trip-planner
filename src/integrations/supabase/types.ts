@@ -395,6 +395,27 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limits: {
+        Row: {
+          function_name: string
+          ip: string
+          request_count: number
+          window_start: string
+        }
+        Insert: {
+          function_name?: string
+          ip: string
+          request_count?: number
+          window_start?: string
+        }
+        Update: {
+          function_name?: string
+          ip?: string
+          request_count?: number
+          window_start?: string
+        }
+        Relationships: []
+      }
       steps: {
         Row: {
           created_at: string
@@ -819,6 +840,7 @@ export type Database = {
         Args: { response_id: string }
         Returns: undefined
       }
+      cleanup_rate_limits: { Args: never; Returns: undefined }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
