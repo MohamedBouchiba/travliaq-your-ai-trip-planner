@@ -53,6 +53,12 @@ export {
 // Preference widget callbacks (Phase 2.1 optimization)
 export { usePreferenceWidgetCallbacks } from "./usePreferenceWidgetCallbacks";
 
+// Chat submit logic (extracted from PlannerChat.tsx)
+export { useChatSubmit, type UseChatSubmitOptions } from "./useChatSubmit";
+
+// Unified Entity Pipeline
+export { persistExtractedEntities } from "./persistExtractedEntities";
+
 // Intent Router Core - Pure testable functions
 export {
   computeFlowState,
