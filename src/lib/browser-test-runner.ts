@@ -1,6 +1,7 @@
 /**
  * Mini test framework for running tests in the browser.
  * Provides describe/it/expect API similar to vitest.
+ * Supports categories for selective test execution.
  */
 
 export interface TestResult {
@@ -12,10 +13,18 @@ export interface TestResult {
 
 export interface SuiteResult {
   name: string;
+  category: string;
   tests: TestResult[];
   passed: number;
   failed: number;
   duration: number;
+}
+
+export interface CategoryInfo {
+  id: string;
+  label: string;
+  emoji: string;
+  description: string;
 }
 
 type TestFn = () => void | Promise<void>;
@@ -31,6 +40,10 @@ function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
   if (typeof a !== typeof b) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((v, i) => deepEqual(v, b[i]));
+  }
   if (typeof a !== "object") return false;
   const keysA = Object.keys(a as Record<string, unknown>);
   const keysB = Object.keys(b as Record<string, unknown>);
@@ -53,6 +66,12 @@ function createExpect(actual: unknown) {
       if (!deepEqual(actual, expected))
         throw new AssertionError(`Expected deep equal ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
     },
+    toBeTruthy() {
+      if (!actual) throw new AssertionError(`Expected truthy, got ${JSON.stringify(actual)}`);
+    },
+    toBeFalsy() {
+      if (actual) throw new AssertionError(`Expected falsy, got ${JSON.stringify(actual)}`);
+    },
     toBeNull() {
       if (actual !== null)
         throw new AssertionError(`Expected null, got ${JSON.stringify(actual)}`);
@@ -61,13 +80,41 @@ function createExpect(actual: unknown) {
       if (actual !== undefined)
         throw new AssertionError(`Expected undefined, got ${JSON.stringify(actual)}`);
     },
+    toBeDefined() {
+      if (actual === undefined)
+        throw new AssertionError(`Expected defined, got undefined`);
+    },
     toBeInstanceOf(cls: Function) {
       if (!(actual instanceof (cls as any)))
         throw new AssertionError(`Expected instance of ${cls.name}`);
     },
-    toContain(sub: string) {
-      if (typeof actual !== "string" || !actual.includes(sub))
-        throw new AssertionError(`Expected "${actual}" to contain "${sub}"`);
+    toContain(sub: unknown) {
+      if (Array.isArray(actual)) {
+        if (!actual.includes(sub))
+          throw new AssertionError(`Expected array to contain ${JSON.stringify(sub)}`);
+      } else if (typeof actual === "string") {
+        if (!actual.includes(sub as string))
+          throw new AssertionError(`Expected "${actual}" to contain "${sub}"`);
+      } else {
+        throw new AssertionError(`Expected string or array, got ${typeof actual}`);
+      }
+    },
+    toHaveLength(expected: number) {
+      const len = (actual as any)?.length;
+      if (len !== expected)
+        throw new AssertionError(`Expected length ${expected}, got ${len}`);
+    },
+    toBeGreaterThan(expected: number) {
+      if ((actual as number) <= expected)
+        throw new AssertionError(`Expected ${actual} > ${expected}`);
+    },
+    toBeGreaterThanOrEqual(expected: number) {
+      if ((actual as number) < expected)
+        throw new AssertionError(`Expected ${actual} >= ${expected}`);
+    },
+    toBeLessThan(expected: number) {
+      if ((actual as number) >= expected)
+        throw new AssertionError(`Expected ${actual} < ${expected}`);
     },
     toBeCloseTo(expected: number, precision = 2) {
       const pow = Math.pow(10, -precision) / 2;
@@ -80,10 +127,30 @@ function createExpect(actual: unknown) {
       if (value !== undefined && (actual as any)[key] !== value)
         throw new AssertionError(`Expected property "${key}" to be ${JSON.stringify(value)}, got ${JSON.stringify((actual as any)[key])}`);
     },
+    toMatch(pattern: RegExp | string) {
+      if (typeof actual !== "string") throw new AssertionError(`Expected string, got ${typeof actual}`);
+      const re = typeof pattern === "string" ? new RegExp(pattern) : pattern;
+      if (!re.test(actual))
+        throw new AssertionError(`Expected "${actual}" to match ${re}`);
+    },
     not: {
+      toBe(expected: unknown) {
+        if (actual === expected)
+          throw new AssertionError(`Expected not ${JSON.stringify(expected)}`);
+      },
       toBeNull() {
         if (actual === null)
           throw new AssertionError(`Expected not null`);
+      },
+      toEqual(expected: unknown) {
+        if (deepEqual(actual, expected))
+          throw new AssertionError(`Expected not deep equal ${JSON.stringify(expected)}`);
+      },
+      toContain(sub: unknown) {
+        if (Array.isArray(actual) && actual.includes(sub))
+          throw new AssertionError(`Expected array NOT to contain ${JSON.stringify(sub)}`);
+        if (typeof actual === "string" && actual.includes(sub as string))
+          throw new AssertionError(`Expected "${actual}" NOT to contain "${sub}"`);
       },
       toThrow() {
         if (typeof actual !== "function") throw new AssertionError("Expected a function");
@@ -93,9 +160,15 @@ function createExpect(actual: unknown) {
           throw new AssertionError("Expected not to throw");
         }
       },
-      toContain(sub: string) {
-        if (typeof actual === "string" && actual.includes(sub))
-          throw new AssertionError(`Expected "${actual}" NOT to contain "${sub}"`);
+      toBeTruthy() {
+        if (actual) throw new AssertionError(`Expected falsy, got ${JSON.stringify(actual)}`);
+      },
+      toBeFalsy() {
+        if (!actual) throw new AssertionError(`Expected truthy`);
+      },
+      toBeDefined() {
+        if (actual !== undefined)
+          throw new AssertionError(`Expected undefined, got ${JSON.stringify(actual)}`);
       },
     },
     toThrow(message?: string) {
@@ -116,11 +189,20 @@ function createExpect(actual: unknown) {
 interface TestEntry {
   suiteName: string;
   testName: string;
+  category: string;
   fn: TestFn;
 }
 
 let _entries: TestEntry[] = [];
 let _currentSuite = "";
+let _currentCategory = "uncategorized";
+
+/**
+ * Set the current category for all subsequent describe/it calls
+ */
+export function setCategory(category: string) {
+  _currentCategory = category;
+}
 
 export function describe(name: string, fn: () => void) {
   const prev = _currentSuite;
@@ -130,28 +212,51 @@ export function describe(name: string, fn: () => void) {
 }
 
 export function it(name: string, fn: TestFn) {
-  _entries.push({ suiteName: _currentSuite, testName: name, fn });
+  _entries.push({ suiteName: _currentSuite, testName: name, category: _currentCategory, fn });
 }
 
 export const expect = createExpect as unknown as (actual: unknown) => ReturnType<typeof createExpect>;
-
-// Override expect to create fresh instance each call
 export { createExpect };
 
-export async function runAllTests(
-  onProgress?: (result: TestResult, index: number, total: number) => void
-): Promise<SuiteResult[]> {
-  const suiteMap = new Map<string, TestResult[]>();
-  const total = _entries.length;
+/**
+ * Get all registered categories
+ */
+export function getRegisteredCategories(): string[] {
+  return [...new Set(_entries.map((e) => e.category))];
+}
 
-  for (let i = 0; i < _entries.length; i++) {
-    const entry = _entries[i];
+/**
+ * Get test count per category
+ */
+export function getTestCountByCategory(): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const entry of _entries) {
+    counts[entry.category] = (counts[entry.category] || 0) + 1;
+  }
+  return counts;
+}
+
+/**
+ * Run tests, optionally filtered by categories
+ */
+export async function runAllTests(
+  onProgress?: (result: TestResult, index: number, total: number) => void,
+  categories?: string[] // If provided, only run tests from these categories
+): Promise<SuiteResult[]> {
+  const entries = categories
+    ? _entries.filter((e) => categories.includes(e.category))
+    : _entries;
+
+  const suiteMap = new Map<string, { tests: TestResult[]; category: string }>();
+  const total = entries.length;
+
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
     const start = performance.now();
     let passed = true;
     let error: string | undefined;
 
     try {
-      // Re-bind expect for this test
       const origExpect = (globalThis as any).__browserExpect;
       (globalThis as any).__browserExpect = createExpect;
       await entry.fn();
@@ -168,16 +273,19 @@ export async function runAllTests(
       duration: performance.now() - start,
     };
 
-    if (!suiteMap.has(entry.suiteName)) suiteMap.set(entry.suiteName, []);
-    suiteMap.get(entry.suiteName)!.push(result);
+    if (!suiteMap.has(entry.suiteName)) {
+      suiteMap.set(entry.suiteName, { tests: [], category: entry.category });
+    }
+    suiteMap.get(entry.suiteName)!.tests.push(result);
 
     onProgress?.(result, i, total);
   }
 
   const suites: SuiteResult[] = [];
-  for (const [name, tests] of suiteMap) {
+  for (const [name, { tests, category }] of suiteMap) {
     suites.push({
       name,
+      category,
       tests,
       passed: tests.filter((t) => t.passed).length,
       failed: tests.filter((t) => !t.passed).length,
@@ -191,7 +299,7 @@ export async function runAllTests(
 export function clearTests() {
   _entries = [];
   _currentSuite = "";
+  _currentCategory = "uncategorized";
 }
 
-// Re-export for test suites
 export const test = it;
