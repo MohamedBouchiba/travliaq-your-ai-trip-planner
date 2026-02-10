@@ -473,6 +473,16 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
       const retryConfig = { ...DEFAULT_RETRY_CONFIG, ...options.retryConfig };
 
+      // ─── P0 FIX: Global stream timeout (60s) ───
+      // If the server streams slowly without closing, abort after 60s.
+      const STREAM_TIMEOUT_MS = 60_000;
+      const streamTimeoutId = setTimeout(() => {
+        if (!abortController.signal.aborted) {
+          plannerLogger.logError("timeout", new Error("Stream timeout after 60s"), { requestId: "pending" });
+          abortController.abort();
+        }
+      }, STREAM_TIMEOUT_MS);
+
       // Generate unique request ID for tracing
       const requestId = crypto.randomUUID();
       const requestStartTime = Date.now();
@@ -607,12 +617,9 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
                 try {
                   const parsed = JSON.parse(jsonStr);
 
-                  if (parsed.type === "reasoning" && parsed.reasoning) {
+                   if (parsed.type === "reasoning" && parsed.reasoning) {
                     reasoning = parsed.reasoning;
-                    console.log("[Stream] 🧠 Chain of Thought reasoning received:", {
-                      confidence: reasoning.confidence,
-                      keyInsights: reasoning.keyInsights,
-                    });
+                    if (import.meta.env.DEV) console.log("[Stream] 🧠 CoT reasoning:", reasoning.confidence);
                     // Update debug store
                     debugStore.setReasoning(reasoning);
                     
@@ -629,27 +636,27 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
                       };
                       intentClassification = derivedIntent;
                       debugStore.setLastIntent(derivedIntent);
-                      console.log("[Stream] Intent derived from reasoning:", derivedIntent.primaryIntent);
+                      if (import.meta.env.DEV) console.log("[Stream] Intent from reasoning:", derivedIntent.primaryIntent);
                     }
                   } else if (parsed.type === "intentClassification" && parsed.intentClassification) {
                     intentClassification = parsed.intentClassification;
-                    console.log("[Stream] Intent classified:", intentClassification.primaryIntent, "confidence:", intentClassification.confidence);
+                    if (import.meta.env.DEV) console.log("[Stream] Intent:", intentClassification.primaryIntent, intentClassification.confidence);
                     // Update debug store
                     debugStore.setLastIntent(intentClassification);
                   } else if (parsed.type === "flightData" && parsed.flightData) {
                     flightData = parsed.flightData;
                   } else if (parsed.type === "accommodationData" && parsed.accommodationData) {
                     accommodationData = parsed.accommodationData;
-                  } else if (parsed.type === "preferencesData" && parsed.preferencesData) {
+                   } else if (parsed.type === "preferencesData" && parsed.preferencesData) {
                     preferencesData = parsed.preferencesData;
-                    console.log("[Stream] Preferences detected:", preferencesData);
+                    if (import.meta.env.DEV) console.log("[Stream] Preferences detected");
                   } else if (parsed.type === "quickReplies" && parsed.quickReplies) {
                     quickReplies = parsed.quickReplies;
                   } else if (parsed.type === "destinationSuggestionRequest" && parsed.destinationSuggestionRequest) {
                     destinationSuggestionRequest = parsed.destinationSuggestionRequest;
-                  } else if (parsed.type === "flightSearchTrigger" && parsed.trigger) {
+                   } else if (parsed.type === "flightSearchTrigger" && parsed.trigger) {
                     flightSearchTrigger = true;
-                    console.log("[Stream] Flight search trigger received");
+                    if (import.meta.env.DEV) console.log("[Stream] Flight search trigger");
                   } else if (parsed.type === "tool_started" && parsed.tool) {
                     // Handle tool started event
                     plannerLogger.logToolEvent(requestId, parsed.tool, "started", {
@@ -753,6 +760,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
             ].filter(Boolean),
           });
 
+          clearTimeout(streamTimeoutId);
           return { content: fullContent, flightData, accommodationData, preferencesData, quickReplies, destinationSuggestionRequest, intentClassification, reasoning, flightSearchTrigger, requestId };
 
         } catch (err) {
@@ -784,6 +792,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       }
 
       // All retries failed
+      clearTimeout(streamTimeoutId);
       if (isMountedRef.current) {
         setError(lastError);
         if (options.onError && lastError) {

@@ -177,7 +177,7 @@ export function useWidgetCooldown(): UseWidgetCooldownReturn {
       return { ...prev, history: newHistory };
     });
     
-    console.log('[WidgetCooldown] Recorded show:', widgetType);
+    if (import.meta.env.DEV) console.log('[WidgetCooldown] Recorded show:', widgetType);
   }, []);
 
   /**
@@ -198,7 +198,7 @@ export function useWidgetCooldown(): UseWidgetCooldownReturn {
       return { ...prev, history: newHistory };
     });
     
-    console.log('[WidgetCooldown] Widget confirmed:', widgetType);
+    if (import.meta.env.DEV) console.log('[WidgetCooldown] Widget confirmed:', widgetType);
   }, []);
 
   /**
@@ -219,7 +219,7 @@ export function useWidgetCooldown(): UseWidgetCooldownReturn {
       return { ...prev, history: newHistory };
     });
     
-    console.log('[WidgetCooldown] Widget dismissed:', widgetType);
+    if (import.meta.env.DEV) console.log('[WidgetCooldown] Widget dismissed:', widgetType);
   }, []);
 
   /**
@@ -246,7 +246,7 @@ export function useWidgetCooldown(): UseWidgetCooldownReturn {
           return { ...prev, history: newHistory };
         });
         
-        console.log('[WidgetCooldown] User typed instead of using:', widgetType);
+        if (import.meta.env.DEV) console.log('[WidgetCooldown] User typed instead of using:', widgetType);
       }
     }
   }, []);
@@ -303,7 +303,7 @@ export function useWidgetCooldown(): UseWidgetCooldownReturn {
       sessionStart: Date.now(),
     });
     lastShownWidgetRef.current = null;
-    console.log('[WidgetCooldown] Reset cooldowns');
+    if (import.meta.env.DEV) console.log('[WidgetCooldown] Reset cooldowns');
   }, []);
 
   /**
