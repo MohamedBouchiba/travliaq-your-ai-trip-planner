@@ -57,20 +57,17 @@ import {
   PriceAlertBanner,
 } from "./chat/widgets";
 import { QuickReplies, useDynamicQuickReplies } from "./chat/QuickReplies";
-import { useChatStream, useChatWidgetFlow, useChatImperativeHandlers, useWidgetTracking, useWidgetActionExecutor, usePreferenceWidgetCallbacks, useUnifiedIntentRouter, useSessionContext, useThinkingState, useWidgetCooldown } from "./chat/hooks";
+import { useChatStream, useChatWidgetFlow, useChatImperativeHandlers, useWidgetTracking, useWidgetActionExecutor, usePreferenceWidgetCallbacks, useUnifiedIntentRouter, useSessionContext, useThinkingState, useWidgetCooldown, useChatSubmit } from "./chat/hooks";
 import { useChatDestinationFlow } from "./chat/hooks/useChatDestinationFlow";
 import { ThinkingIndicator } from "./chat/ThinkingIndicator";
 import { IntentDebugPanel } from "./chat/IntentDebugPanel";
-import { parseAction, flightDataToMemory, getMissingFieldLabel } from "./chat/utils";
+import { getMissingFieldLabel } from "./chat/utils";
 import type { ChatMessage } from "./chat/types";
-import { getCityCoords } from "./chat/types";
 import { MemoizedSmartSuggestions, type InspireFlowStep } from "./chat/MemoizedSmartSuggestions";
 import { MessageBubble } from "./chat/MessageBubble";
 import { MessageActions } from "./chat/MessageActions";
 import type { DestinationSuggestion } from "@/types/destinations";
 import { ScrollToBottomButton } from "./chat/ScrollToBottomButton";
-import { FLIGHTS_ZOOM } from "@/constants/mapSettings";
-import { geocodeCity } from "@/utils/geocodeCity";
 
 // Context imports
 import type { CountrySelectionEvent } from "@/types/flight";
@@ -78,54 +75,7 @@ import { findNearestAirports } from "@/hooks/useNearestAirports";
 import { useFlightMemoryStore, useTravelMemoryStore, useAccommodationMemoryStore, useActivityMemoryStore, usePreferenceMemoryStore, useTripBasketStore, type AccommodationEntry } from "@/stores/hooks";
 import { useDebugStore } from "@/stores/debugStore";
 import { useLocale } from "@/hooks/useLocale";
-import { eventBus, emitTabChange, emitTabAndZoom } from "@/lib/eventBus";
-
-
-/**
- * ─── PRINCIPLE 2: Unified Entity Pipeline ───
- * 
- * Single point of entry for persisting extracted entities from ANY source.
- * Merges entities from intent classification and flight data with priority:
- * flightData > intent entities (flightData is more precise when available).
- * 
- * This ensures no entity is ever lost regardless of which tool produced it.
- */
-function persistExtractedEntities(
-  intentEntities: Record<string, unknown> | undefined,
-  flightData: Record<string, unknown> | null,
-  widgetFlow: {
-    setPendingTripDuration: (d: string) => void;
-    setPendingPreferredMonth: (m: string) => void;
-  },
-  updateMemory?: (partial: Record<string, unknown>) => void,
-) {
-  // Merge: flightData values override intent entities when both exist
-  const tripDuration = 
-    (flightData?.tripDuration as string | undefined) || 
-    (intentEntities?.tripDuration as string | undefined);
-  const preferredMonth = 
-    (flightData?.preferredMonth as string | undefined) || 
-    (intentEntities?.preferredMonth as string | undefined);
-
-  if (tripDuration && typeof tripDuration === 'string') {
-    widgetFlow.setPendingTripDuration(tripDuration);
-  }
-  if (preferredMonth && typeof preferredMonth === 'string') {
-    widgetFlow.setPendingPreferredMonth(preferredMonth);
-  }
-
-  // Persist multi-destination legs if present in flightData
-  if (flightData?.legs && Array.isArray(flightData.legs) && (flightData.legs as unknown[]).length > 0 && updateMemory) {
-    const legs = (flightData.legs as Array<{ from: string; to: string; date?: string }>);
-    const legMemories = legs.map((leg, i) => ({
-      departure: leg.from ? { city: leg.from } : null,
-      arrival: leg.to ? { city: leg.to } : null,
-      date: leg.date ? new Date(leg.date) : null,
-      id: `leg-${i}-${Date.now()}`,
-    }));
-    updateMemory({ legs: legMemories, tripType: "multi" as const });
-  }
-}
+import { eventBus } from "@/lib/eventBus";
 
 // Re-export types for external consumers
 export type {
@@ -787,396 +737,39 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     },
   }));
 
-  // Send message
-  const sendText = async (text: string) => {
-    if (!text.trim() || isLoading) return;
-
-    const userText = text.trim();
-
-    // CRITICAL: Clear input immediately after capturing text
-    setInput("");
-    if (inputRef.current) {
-      inputRef.current.style.height = "auto";
-    }
-
-    // Cleanup ignored widgets: when user types a message, any non-confirmed widget
-    // should be dismissed (tracked for analytics) but kept visible in history
-    setMessages((prev) => prev.map((m) => {
-      if (m.widget && !m.widgetConfirmed) {
-        // Dismiss widget in tracking for analytics
-        widgetTracking.dismissWidget(m.id);
-        // Mark as dismissed but keep in history (don't remove)
-        return { ...m, widgetDismissed: true };
-      }
-      return m;
-    }));
-
-    // NOTE: Inspire intent detection removed (CR3) — now handled by LLM classifier pipeline
-    // This prevents cooldown bypass and infinite preferenceStyle loops
-    
-    const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
-      role: "user",
-      text: userText,
-      timestamp: Date.now(),
-    };
-
-    userMessageCountRef.current += 1;
-    eventBus.emit("chat:userMessage", { text: userText, messageCount: userMessageCountRef.current });
-
-    // CRITICAL: Do NOT clear widgets - they must remain visible in chat history
-    setMessages((prev) => [...prev, userMessage]);
-    setIsLoading(true);
-
-    widgetFlow.citySelectionShownRef.current = null;
-
-    const messageId = `bot-${Date.now()}`;
-    setMessages((prev) => [
-      ...prev,
-      { id: messageId, role: "assistant", text: "", isTyping: true, timestamp: Date.now() },
-    ]);
-
-    try {
-      const apiMessages = messages
-        .filter((m) => !m.isTyping && m.id !== "welcome")
-        .map((m) => ({ role: m.role === "system" ? "user" : m.role, content: m.text }));
-      apiMessages.push({ role: "user", content: userText });
-
-      // Build memory context
-      const activityMemoryState = getActivityMemory();
-      const preferenceMemoryState = getPreferenceMemory();
-      const visualContext = mapContext.buildContextString();
-
-      const activityContext =
-        typeof activityMemoryState?.totalActivities === 'number' && activityMemoryState.totalActivities > 0
-          ? `\n[ACTIVITÉS] ${activityMemoryState.totalActivities} activité(s) planifiée(s)`
-          : "";
-
-      const preferenceContext = preferenceMemoryState
-        ? `\n[PRÉFÉRENCES] Rythme: ${preferenceMemoryState.pace}, Style: ${preferenceMemoryState.travelStyle}, Confort: ${preferenceMemoryState.comfortLabel}, Intérêts: ${(preferenceMemoryState.interests as string[])?.join(", ") || ""}`
-        : "";
-
-      // Build active widgets context for "choose for me" functionality
-      const activeWidgetsContext = widgetTracking.getActiveWidgetsContext();
-      // Also get pending widgets from messages for more accurate options
-      const pendingWidgets = widgetActionExecutor.getPendingWidgets();
-      
-      // Build detailed destination context for "choose for me"
-      let destinationDetailsContext = "";
-      const destinationWidgetMessage = messages.find(
-        (m) => m.widget === "destinationSuggestions" && !m.widgetConfirmed && m.widgetData?.suggestions
-      );
-      if (destinationWidgetMessage?.widgetData?.suggestions) {
-        const suggestions = destinationWidgetMessage.widgetData.suggestions as Array<{
-          countryName: string;
-          countryCode: string;
-          headline?: string;
-          description?: string;
-          matchScore?: number;
-          highlights?: string[];
-          budgetRange?: string;
-        }>;
-        destinationDetailsContext = `[DESTINATIONS PROPOSÉES - CHOISIS PARMI CELLES-CI]\n${suggestions.map((d, i) => 
-          `${i + 1}. **${d.countryName}** (${d.countryCode})${d.matchScore ? ` - ${d.matchScore}% match` : ""}\n` +
-          `   Titre: ${d.headline || "Non spécifié"}\n` +
-          `   Description: ${d.description || "Non spécifié"}\n` +
-          `   Points forts: ${d.highlights?.join(", ") || "Non spécifié"}\n` +
-          `   Budget: ${d.budgetRange || "Non spécifié"}`
-        ).join("\n\n")}`;
-      }
-      
-      const pendingWidgetsContext = pendingWidgets.length > 0
-        ? pendingWidgets.map((w) => 
-            w.options 
-              ? `- Widget "${w.type}" avec options: ${w.options.join(", ")}`
-              : `- Widget "${w.type}" en attente`
-          ).join("\n")
-        : "";
-      
-      // Prioritize destination details, then add user preferences context
-      const userPrefsForChoice = preferenceMemoryState
-        ? `\n[PRÉFÉRENCES UTILISATEUR POUR LE CHOIX]\n` +
-          `- Style: ${preferenceMemoryState.travelStyle || "non défini"}\n` +
-          `- Rythme: ${preferenceMemoryState.pace || "non défini"}\n` +
-          `- Intérêts: ${(preferenceMemoryState.interests as string[])?.join(", ") || "non définis"}\n` +
-          `- Niveau confort: ${preferenceMemoryState.comfortLabel || "non défini"}`
-        : "";
-      
-      const combinedWidgetContext = [
-        destinationDetailsContext,
-        userPrefsForChoice,
-        activeWidgetsContext,
-        pendingWidgetsContext ? `[OPTIONS WIDGETS ACTIFS]\n${pendingWidgetsContext}` : ""
-      ].filter(Boolean).join("\n\n").trim();
-
-      const { content, flightData, preferencesData, quickReplies, destinationSuggestionRequest, intentClassification, flightSearchTrigger } = await streamResponse(
-        apiMessages,
-        messageId,
-        {
-          flightSummary: getMemorySummary(),
-          activityContext: activityContext + (visualContext ? `\n${visualContext}` : ""),
-          preferenceContext,
-          missingFields,
-          widgetHistory: widgetTracking.getContextForLLM(),
-          activeWidgetsContext: combinedWidgetContext, // Include active widgets for "choose for me"
-          // Phase 3: Enriched session context
-          conversationSummary: sessionContext.buildConversationSummary(5),
-          sessionEntities: sessionContext.sessionEntities,
-          widgetDecisions: sessionContext.widgetDecisions,
-          // Trip Basket: user selections summary
-          basketSummary: getBasketSummary(),
-          // Anti-loop: blocked widgets that should not be re-proposed
-          blockedWidgets: widgetCooldown.getBlockedWidgets(),
-          // Deterministic preference-first logic: send current preferences state
-          preferencesState: {
-            interests: (Array.isArray(preferenceMemoryState?.interests) ? preferenceMemoryState.interests as string[] : []),
-            style: (typeof preferenceMemoryState?.travelStyle === "string" ? preferenceMemoryState.travelStyle : null),
-            pace: (typeof preferenceMemoryState?.pace === "string" ? preferenceMemoryState.pace : null),
-            styleAxesConfigured: (() => {
-              const axes = preferenceMemoryState?.styleAxes as import("@/stores/hooks").StyleAxes | undefined;
-              if (!axes) return false;
-              // Style is configured if ANY axis has been moved from the default (50)
-              return axes.chillVsIntense !== 50 || axes.cityVsNature !== 50 || axes.ecoVsLuxury !== 50 || axes.touristVsLocal !== 50;
-            })(),
-          },
-        },
-        (id, text, isComplete) => {
-          // CRITICAL: Prevent late updates from resetting isStreaming after message is complete
-          if (completedMessageIdsRef.current.has(id) && !isComplete) {
-            return; // Ignore stale updates for already-completed messages
-          }
-          if (isComplete) {
-            completedMessageIdsRef.current.add(id);
-          }
-          
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === id
-                ? { ...m, text, isStreaming: !isComplete, isTyping: false }
-                : m
-            )
-          );
-        }
-      );
-
-      // Process intent classification for debug and potential widget triggering
-      if (intentClassification) {
-        if (import.meta.env.DEV) console.log("[PlannerChat] Intent:", intentClassification.primaryIntent);
-        setLastIntentClassification(intentClassification);
-        
-        // Process through unified intent router for validation and potential widget triggering
-        const intentResult = intentRouter.processIntent(intentClassification);
-        if (intentResult.widgetType) {
-          setLastWidgetTriggered(intentResult.widgetType);
-          
-          // CRITICAL: When intent router validates a widget, attach it to the message
-          // This covers gather_preferences, express_constraint, and any other intent with a valid widget
-          if (intentResult.shouldShowWidget && intentResult.widgetType) {
-            const widgetType = intentResult.widgetType as import("@/types/flight").WidgetType;
-            intentWidgetRef.current = widgetType; // Safeguard: store in ref for fallback
-            if (import.meta.env.DEV) console.log("[PlannerChat] Intent widget:", widgetType);
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === messageId
-                  ? { ...m, widget: widgetType, widgetData: intentResult.widgetData, widgetConfirmed: false }
-                  : m
-              )
-            );
-          }
-        }
-        
-        // FIX #2 & #3: When provide_destination is detected with a destinationCity,
-        // mark any pending citySelector widget as confirmed AND update flight memory
-        if (intentClassification.primaryIntent === "provide_destination" && intentClassification.entities?.destinationCity) {
-          const destinationCity = intentClassification.entities.destinationCity as string;
-          if (import.meta.env.DEV) console.log("[PlannerChat] provide_destination:", destinationCity);
-          
-          // Mark any pending citySelector as confirmed
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.widget === "citySelector" && !m.widgetConfirmed
-                ? { ...m, widgetConfirmed: true, widgetDisplayLabel: destinationCity }
-                : m
-            )
-          );
-          
-          // Update flight memory with destination city + geocoded coordinates
-          updateMemory({ arrival: { city: destinationCity } });
-          eventBus.emit("flight:updateFormData", { to: destinationCity });
-          
-          // Geocode city to get coordinates for map route
-          geocodeCity(destinationCity).then((coords) => {
-            if (coords) {
-              if (import.meta.env.DEV) console.log("[PlannerChat] Geocoded:", destinationCity, coords);
-              updateMemory({
-                arrival: {
-                  city: destinationCity,
-                  lat: coords.lat,
-                  lng: coords.lng,
-                  country: coords.country,
-                  countryCode: coords.countryCode,
-                },
-              });
-            }
-          });
-        }
-      }
-
-      // Handle detected preferences from chat (dietary restrictions, travel style, etc.)
-      if (preferencesData && Object.keys(preferencesData).length > 0) {
-        if (import.meta.env.DEV) console.log("[PlannerChat] Preferences detected:", preferencesData);
-        imperativeHandlers.handlePreferencesDetection(preferencesData);
-      }
-
-      // Handle flight search trigger from AI
-      if (flightSearchTrigger) {
-        if (import.meta.env.DEV) console.log("[PlannerChat] AI triggered flight search");
-        eventBus.emit("flight:triggerSearch");
-      }
-
-      if (destinationSuggestionRequest) {
-        if (import.meta.env.DEV) console.log("[PlannerChat] LLM destination suggestions requested");
-        await handleLLMDestinationRequest(messageId, destinationSuggestionRequest.requestedCount);
-        setIsLoading(false);
-        return; // Early return - we handled the message
-      }
-
-      // Update dynamic suggestions: combine AI response with contextual replies
-      const aiReplies = quickReplies?.replies?.map((r, i) => ({
-        id: `dyn-${Date.now()}-${i}`,
-        label: r.label,
-        emoji: r.emoji || "✈️",
-        message: r.message,
-      })) || [];
-
-      // Generate contextual replies based on widget interactions and flow state
-      const contextualReplies = generateContextualReplies();
-      const contextualSuggestions = contextualReplies
-        .filter((r) => r.action.type === "fillInput") // Only include fillInput actions as suggestions
-        .map((r) => ({
-          id: r.id,
-          label: r.label,
-          emoji: r.icon || "✨",
-          message: (r.action as { type: "fillInput"; message: string }).message,
-        }));
-
-      // Combine: AI replies first, then contextual (limit to 4 total)
-      const combinedSuggestions = [...aiReplies, ...contextualSuggestions].slice(0, 4);
-      setDynamicSuggestions(combinedSuggestions.length > 0 ? combinedSuggestions : []);
-
-      const { cleanContent, action } = parseAction(content || t("planner.messages.defaultError"));
-
-      // Process flight data
-      let nextMem = { ...memory, passengers: { ...memory.passengers } };
-      let widget: import("@/types/flight").WidgetType | undefined;
-      let showDateWidget = false;
-      let showTravelersWidget = false;
-
-      // ─── PRINCIPLE 2: Unified Entity Pipeline ───
-      // Single point of entry for persisting entities from ANY source.
-      // Sources are merged with priority: flightData > intent entities (more precise).
-      persistExtractedEntities(
-        intentClassification?.entities as Record<string, unknown> | undefined,
-        flightData as unknown as Record<string, unknown> | null,
-        widgetFlow,
-        updateMemory as (partial: Record<string, unknown>) => void,
-      );
-
-      if (flightData && Object.keys(flightData).length > 0) {
-        const needsDestinationCity = flightData.needsCitySelection && flightData.toCountryCode;
-        const needsDepartureCity = flightData.fromCountryCode && !flightData.from;
-        const skipDateWidget = needsDestinationCity || needsDepartureCity;
-
-        showDateWidget = flightData.needsDateWidget === true && !skipDateWidget;
-        showTravelersWidget = flightData.needsTravelersWidget === true;
-
-        if (showDateWidget && showTravelersWidget) {
-          widgetFlow.setPendingTravelersWidget(true);
-        }
-
-        const memoryUpdates = flightDataToMemory(flightData, memory);
-        updateMemory(memoryUpdates);
-        nextMem = { ...nextMem, ...memoryUpdates };
-
-        // Issue 3 fix: Track synthetic destination_selected when LLM picks a destination (delegate_choice)
-        if (flightData.toCountryCode && flightData.toCountryName) {
-          widgetTracking.trackDestinationSelect(flightData.toCountryName, flightData.toCountryCode);
-        }
-
-        if (flightData.to) {
-          const coords = getCityCoords(flightData.to.toLowerCase().split(",")[0].trim());
-          if (coords) {
-            emitTabAndZoom("flights", coords, FLIGHTS_ZOOM);
-          } else {
-            emitTabChange("flights");
-          }
-        }
-
-        eventBus.emit("flight:updateFormData", flightData);
-      } else if (action) {
-        if (action.type === "chooseWidget") {
-          // GUARD: Only execute if user explicitly asked for delegation
-          const lastUserMsg = messages.filter(m => m.role === "user").pop();
-          const delegationPatterns = /choisis|decide|décide|a toi|à toi|fais confiance|prends le|meilleur pour moi|je te laisse|tu choisis/i;
-          const userAskedForChoice = lastUserMsg && delegationPatterns.test(lastUserMsg.text);
-          
-          if (userAskedForChoice) {
-            if (import.meta.env.DEV) console.log("[PlannerChat] chooseWidget (delegated):", action);
-            const executed = widgetActionExecutor.executeChooseWidgetAction(action);
-            if (import.meta.env.DEV && executed) console.log("[PlannerChat] Widget action executed");
-          } else {
-            if (import.meta.env.DEV) console.warn("[PlannerChat] Blocked auto-chooseWidget:", action);
-            // Track blocked action in debug store
-            const { addBlockedAction } = useDebugStore.getState();
-            addBlockedAction({
-              type: action.type,
-              widgetType: action.widgetType || "unknown",
-              option: action.option || "unknown",
-              reason: "User did not explicitly ask for delegation",
-              timestamp: Date.now(),
-            });
-          }
-        } else if (action.type === "tab") {
-          emitTabChange(action.tab);
-        } else if (action.type === "zoom") {
-          eventBus.emit("map:zoom", { center: action.center, zoom: action.zoom });
-        } else if (action.type === "tabAndZoom") {
-          emitTabAndZoom(action.tab, action.center, action.zoom);
-        }
-      }
-
-      // Determine widget from flight flow
-      widget = widgetFlow.determineNextWidget(showDateWidget, showTravelersWidget, nextMem);
-      const widgetData = widget ? widgetFlow.getWidgetData() : undefined;
-
-      setMessages((prev) =>
-        prev.map((m) => {
-          if (m.id !== messageId) return m;
-          // CRITICAL: Preserve widget if already set by intent router (e.g. gather_preferences → preferenceInterests)
-          // Only override with flight-flow widget if one was determined
-          // Only override widget if flight-flow determined one; otherwise keep whatever was set by intent router
-          const finalWidget = widget ? widget : (m.widget || intentWidgetRef.current);
-          const finalWidgetData = widget ? widgetData : (m.widgetData || undefined);
-          // Clear the ref after use
-          if (intentWidgetRef.current) intentWidgetRef.current = null;
-          return { ...m, text: cleanContent, isTyping: false, isStreaming: false, widget: finalWidget, widgetData: finalWidgetData };
-        })
-      );
-    } catch (err) {
-      console.error("Failed to get chat response:", err);
-      widgetFlow.resetFlowState();
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId
-            ? { ...m, text: t("planner.chat.errorOccurred"), isTyping: false, isStreaming: false }
-            : m
-        )
-      );
-    } finally {
-      setIsLoading(false);
-      setTimeout(() => inputRef.current?.focus(), 0);
-    }
-  };
+  // Send message — extracted into useChatSubmit hook
+  const { sendText } = useChatSubmit({
+    messages,
+    setMessages,
+    setIsLoading,
+    setInput,
+    setDynamicSuggestions,
+    setLastIntentClassification,
+    setLastWidgetTriggered,
+    inputRef,
+    isLoading,
+    memory: memory as unknown as Record<string, unknown>,
+    updateMemory: updateMemory as unknown as (partial: Record<string, unknown>) => void,
+    getMemorySummary,
+    missingFields,
+    getActivityMemory: getActivityMemory as unknown as () => Record<string, unknown> | null,
+    getPreferenceMemory: getPreferenceMemory as unknown as () => Record<string, unknown> | null,
+    getBasketSummary,
+    streamResponse: streamResponse as unknown as Parameters<typeof useChatSubmit>[0]["streamResponse"],
+    widgetFlow: widgetFlow as unknown as Parameters<typeof useChatSubmit>[0]["widgetFlow"],
+    widgetTracking: widgetTracking as unknown as Parameters<typeof useChatSubmit>[0]["widgetTracking"],
+    widgetActionExecutor: widgetActionExecutor as unknown as Parameters<typeof useChatSubmit>[0]["widgetActionExecutor"],
+    widgetCooldown,
+    intentRouter: intentRouter as unknown as Parameters<typeof useChatSubmit>[0]["intentRouter"],
+    sessionContext: sessionContext as unknown as Parameters<typeof useChatSubmit>[0]["sessionContext"],
+    mapContext,
+    imperativeHandlers: imperativeHandlers as unknown as Parameters<typeof useChatSubmit>[0]["imperativeHandlers"],
+    handleLLMDestinationRequest: handleLLMDestinationRequest as unknown as Parameters<typeof useChatSubmit>[0]["handleLLMDestinationRequest"],
+    generateContextualReplies: generateContextualReplies as unknown as Parameters<typeof useChatSubmit>[0]["generateContextualReplies"],
+    completedMessageIdsRef,
+    intentWidgetRef,
+    userMessageCountRef,
+  });
 
   return (
     <aside
