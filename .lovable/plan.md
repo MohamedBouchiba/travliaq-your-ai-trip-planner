@@ -1,199 +1,142 @@
 
-# Audit complet du systeme de chat Travliaq
+# Remplacer les listes hardcodees par la base de donnees
 
-## 1. Architecture globale
+## Objectif
 
-Le chat est construit sur une architecture sophistiquee en 3 couches :
+Eliminer les tableaux statiques `knownDestinations` et `CITY_COORDINATES` en les remplacant par un cache alimente depuis les tables Supabase `cities`, `countries` et `search_autocomplete`. Le systeme s'adaptera automatiquement a toute nouvelle ville ou pays ajoute en base.
 
-- **Backend (Edge Function `planner-chat`)** : Architecture "Classify First" a deux passes LLM (Azure OpenAI). Pass 1 = classification d'intention forcee. Pass 2 = boucle ReAct multi-tool avec streaming SSE.
-- **Hooks React (couche logique)** : ~17 hooks specialises gerant streaming, widgets, cooldowns, intent routing, session, etc.
-- **Composant principal (`PlannerChat.tsx`)** : 2126 lignes -- composant monolithique qui orchestre toutes les couches.
+## Architecture
 
----
+```text
+                    App Boot
+                       |
+             DestinationIndex.init()
+                       |
+          +------------+------------+
+          |                         |
+   cities (top 5000)         countries (250)
+   par population            tous
+          |                         |
+          +------> Index en         |
+          |        memoire <--------+
+          |        (Map)
+          |
+    Lookup O(1) par nom normalise
+```
 
-## 2. Points forts
+### Ce qui change
 
-| Domaine | Detail |
+| Avant (statique) | Apres (DB) |
 |---|---|
-| Classification intent | Deux passes LLM avec `tool_choice` force -- garantit une classification coherente |
-| Anti-boucle widget | Systeme de cooldown (`useWidgetCooldown`) avec max attempts, penalite "user typed instead", et liste de blocage injectee dans le prompt |
-| Preference-first | Logique deterministe backend qui force style > interests > destinations |
-| Contexte enrichi | Session entities, conversation summary, widget history, basket summary -- tout est injecte dans le prompt |
-| Validation robuste | Schemas Zod avec `.passthrough()` pour tolerer les hallucinations LLM |
-| Streaming SSE | Retry avec backoff exponentiel, classification d'erreurs, annulation via AbortController |
-| I18n | Support FR/EN/ES avec detection automatique de langue |
+| `knownDestinations` : 60 noms hardcodes | `DestinationIndex.match(text)` : lookup dans un index de ~5250 entrees |
+| `CITY_COORDINATES` : 25 villes hardcodees | `DestinationIndex.getCoords(name)` : coords depuis la DB |
+| Ajouter une destination = modifier le code | Ajouter une destination = ajouter en base |
 
----
+## Plan d'implementation
 
-## 3. Problemes identifies et ameliorations proposees
+### Etape 1 : Creer le service `DestinationIndex`
 
-### 3.1 `PlannerChat.tsx` -- Composant monolithique (CRITIQUE)
+**Nouveau fichier** : `src/services/destinationIndex.ts`
 
-**Probleme** : 2126 lignes dans un seul composant. Le `handleSubmit` seul fait ~400 lignes avec de la logique business melee au rendu.
+Ce service singleton charge les donnees une seule fois au demarrage, puis fournit des lookups instantanes.
 
-**Amelioration** : Extraire en sous-hooks :
-- `useChatSubmit` -- logique de soumission + traitement de la reponse
-- `useChatDestinationFlow` -- logique de suggestions de destinations (dupliquee 2x dans le fichier)
-- `useChatSessionSync` -- synchronisation messages <> stockage
+**Donnees chargees** :
+- `cities` : top 5000 par population (colonnes : `name`, `latitude`, `longitude`, `country`, `country_code`)
+- `countries` : tous les 250 (colonnes : `name`, `iso2`)
 
-### 3.2 Duplication du payload de destination
+**Structure interne** :
+- `nameToCoords: Map<string, [lng, lat]>` -- noms normalises (lowercase, sans accents) vers coordonnees
+- `allNames: Set<string>` -- ensemble de tous les noms pour le matching rapide
+- `nameVariants: Map<string, string>` -- noms FR/EN : "espagne" -> "Spain", "thaïlande" -> "Thailand"
 
-**Probleme** : Le payload `DestinationSuggestRequest` est construit de maniere identique a 2 endroits (lignes ~450 et ~1140).
+**API publique** :
+- `init()` : charge les donnees (appele une fois, idempotent)
+- `isReady(): boolean` : verifie si l'index est charge
+- `getCoords(name: string): [number, number] | null` : remplace `getCityCoords`
+- `match(text: string): string[]` : remplace `extractDestinationNames` -- extrait les noms de destinations trouves dans un texte
+- `isKnownDestination(name: string): boolean` : verifie si un nom est une destination connue
 
-**Amelioration** : Extraire une fonction `buildDestinationPayload(prefs, departure)` reutilisable.
+**Normalisation** : `toLowerCase()` + suppression accents via `normalize('NFD').replace(/[\u0300-\u036f]/g, '')` pour matcher "Thaïlande" avec "thailande".
 
-### 3.3 Widget selection guard -- Regex fragile
+**Matching dans le texte** : au lieu de boucler sur 5000 noms a chaque message, on :
+1. Tokenize le texte en mots
+2. Teste chaque mot et chaque paire de mots consecutifs (pour "New York", "Bora Bora", etc.) contre le `Set`
+3. Complexite : O(n) avec n = nombre de mots dans le message (typiquement < 50)
 
-**Probleme** : La garde de selection de widget repose sur des regex (`choisis`, `decide`, `a toi`) pour detecter la delegation. C'est fragile face aux variations de langue et aux fautes.
+### Etape 2 : Initialiser au boot de l'application
 
-**Amelioration** : Deleguer cette detection au classificateur d'intention backend plutot qu'un regex frontend.
+**Fichier modifie** : `src/App.tsx` ou le composant racine du planner
 
-### 3.4 Absence de timeout sur le streaming SSE
+Appeler `DestinationIndex.init()` au montage. C'est un appel asynchrone non-bloquant -- l'UI s'affiche immediatement, les lookups retournent des resultats vides jusqu'a ce que le chargement soit termine (graceful degradation).
 
-**Probleme** : Si le serveur envoie des chunks tres lentement sans jamais fermer la connexion, aucun timeout global n'interrompt le stream. Le retry ne couvre que les echecs de connexion.
+### Etape 3 : Migrer `extractDestinationNames`
 
-**Amelioration** : Ajouter un `setTimeout` global (ex: 60s) qui appelle `abortController.abort()` si le stream n'est pas termine.
+**Fichier modifie** : `src/components/planner/chat/services/messageAnalyzer.ts`
 
-### 3.5 Rate limiting en memoire seulement
+Remplacer :
+```typescript
+// AVANT : liste statique de 60 noms
+const knownDestinations = ['Thaïlande', 'Thailand', ...];
+for (const dest of knownDestinations) {
+  if (text.toLowerCase().includes(dest.toLowerCase())) {
+    destinations.push(dest);
+  }
+}
+```
 
-**Probleme** : Le rate limiter dans l'edge function utilise un `Map` en memoire qui se reinitialise a chaque cold start. Un utilisateur peut contourner la limite en attendant un redemarrage.
+Par :
+```typescript
+// APRES : lookup dans l'index DB
+import { destinationIndex } from '@/services/destinationIndex';
+const destinations = destinationIndex.match(text);
+```
 
-**Amelioration** : Migrer vers un rate limiter base sur Supabase (table `rate_limits` avec TTL) ou Redis/Upstash.
+### Etape 4 : Migrer `getCityCoords` et `CITY_COORDINATES`
 
-### 3.6 Cache d'outils sans persistance
+**Fichier modifie** : `src/components/planner/chat/types.ts`
 
-**Probleme** : `toolResultCache` dans `toolExecutor.ts` est un `Map` en memoire avec les memes limites que le rate limiter.
+Garder `getCityCoords` comme fonction publique mais changer son implementation interne :
 
-**Impact** : Faible en pratique car l'idempotence est surtout utile au sein d'une meme requete.
+```typescript
+// AVANT : objet statique de 25 villes
+export const CITY_COORDINATES = { "paris": [2.35, 48.85], ... };
+export function getCityCoords(name: string) {
+  return CITY_COORDINATES[name.toLowerCase().trim()] || null;
+}
+```
 
-### 3.7 Gestion d'erreur dans les callbacks de preference
+```typescript
+// APRES : delegation a l'index DB
+import { destinationIndex } from '@/services/destinationIndex';
+export function getCityCoords(name: string) {
+  return destinationIndex.getCoords(name);
+}
+// CITY_COORDINATES garde pour fallback si l'index n'est pas encore charge
+```
 
-**Probleme** : Les callbacks `onStyleConfirm`, `onInterestsConfirm` dans `usePreferenceWidgetCallbacks` n'ont pas de try/catch -- une erreur dans `handleFetchDestinations` crash silencieusement.
+On garde `CITY_COORDINATES` comme fallback minimal (les 25 villes les plus courantes) pour le cas ou l'index n'est pas encore pret au moment d'un appel. Cela garantit zero regression.
 
-**Amelioration** : Wrapper en try/catch avec toast d'erreur.
+### Etape 5 : Mettre a jour les tests
 
-### 3.8 Console.log excessifs en production
+**Fichiers modifies** :
+- `src/lib/suites/chatTypes.suite.ts` : les tests `getCityCoords` continuent de passer car l'API ne change pas
+- `src/lib/suites/chatConversationSim.suite.ts` et `chatJourneysSim.suite.ts` : les tests de `extractDestinationNames` deviennent plus fiables car l'index couvre bien plus de destinations
 
-**Probleme** : Nombreux `console.log` non gardes par `process.env.NODE_ENV` dans les hooks (cooldown, intent router, widget flow).
+Pour les tests unitaires qui s'executent sans Supabase, le fallback `CITY_COORDINATES` assure que les tests de base passent toujours. Pour les tests d'integration (browser), `init()` aura ete appele.
 
-**Amelioration** : Utiliser le `plannerLogger` existant ou un guard `if (DEV)` systematique.
+## Performance
 
-### 3.9 Absence de test unitaire sur le intent router
+- **Requetes DB** : 2 requetes au boot (cities top 5000 + countries 250). Taille estimee : ~200 KB de donnees, charge en < 500ms
+- **Memoire** : ~5250 entrees dans des `Map/Set`. Negligeable (~1 MB)
+- **Lookup** : O(1) pour `getCoords` et `isKnownDestination` ; O(n_mots) pour `match`
+- **Cache** : les donnees sont chargees une seule fois par session, pas de re-fetch
 
-**Probleme** : `useUnifiedIntentRouter` (708 lignes) est la piece maitresse de la logique de declenchement de widgets mais n'a aucun test unitaire. Les tests E2E couvrent le comportement mais pas les cas limites.
+## Fichiers concernes
 
-**Amelioration** : Extraire la logique pure (`evaluatePhaseTransition`, `processIntent` core logic) en fonctions testables.
-
-### 3.10 Pas de test sur l'annulation de stream
-
-**Probleme** : `cancelStream` existe mais n'est teste ni en unitaire ni en E2E.
-
----
-
-## 4. Tests E2E existants (20 fichiers)
-
-| Fichier | Couverture |
+| Fichier | Action |
 |---|---|
-| `chat-conversation-flow.spec.ts` | 5 phases, cross-phase, messages courts, multilangue |
-| `preference-first-workflow.spec.ts` | Style > Interests > Destinations |
-| `widget-cooldown-system.spec.ts` | Max attempts, penalty, confirmed widgets |
-| `widget-selection-guard.spec.ts` | Guard "choisis pour moi" |
-| `full-user-journey.spec.ts` | Parcours complet |
-| `cr1-cr5` | Regressions specifiques (i18n, overrides, regex bypass, context, search realism) |
-| `memory-persistence.spec.ts` | Persistence de la memoire |
-| Divers | Hotels, budget, accommodation, multi-destination |
-
-### Lacunes identifiees dans la couverture E2E :
-
-1. **Aucun test de streaming/annulation** -- le bouton d'annulation pendant le streaming n'est pas teste
-2. **Aucun test de reprise apres erreur** -- que se passe-t-il si le backend renvoie une 500 ou un timeout ?
-3. **Aucun test de session** -- creation, switch, suppression de sessions n'est pas couvert
-4. **Aucun test de "choose for me"** -- le flux "choisis pour moi" avec execution d'action n'est pas teste
-5. **Aucun test mobile** -- la vue responsive du chat n'est pas testee
-6. **Aucun test de geocodage** -- le flux destination > geocode > map route n'est pas verifie
-7. **Aucun test d'historique de conversation** -- re-ouvrir un ancien chat et verifier la restauration
-8. **Aucun test de rate limiting** -- envoyer de nombreux messages rapidement
-
----
-
-## 5. Tests E2E proposes
-
-### 5.1 Session management
-```text
-- Creer une conversation, envoyer des messages
-- Creer une nouvelle session
-- Verifier que l'ancienne session est listee dans l'historique
-- Revenir a l'ancienne session, verifier la restauration des messages
-- Supprimer une session
-```
-
-### 5.2 Error resilience (backend down)
-```text
-- Envoyer un message quand le backend est indisponible
-- Verifier le message d'erreur affiche
-- Verifier que le retry automatique fonctionne
-- Verifier que l'input reste editable apres l'erreur
-```
-
-### 5.3 Stream cancellation
-```text
-- Envoyer un message
-- Pendant le streaming, cliquer sur le bouton d'annulation
-- Verifier que le message partiel est affiche
-- Verifier que l'input redevient actif
-```
-
-### 5.4 "Choose for me" flow
-```text
-- Configurer les preferences (style + interests)
-- Obtenir des suggestions de destination
-- Envoyer "choisis pour moi"
-- Verifier qu'une destination est selectionnee automatiquement
-- Verifier que le widget est marque comme confirme
-```
-
-### 5.5 Mobile responsive
-```text
-- Ouvrir le planner en viewport 390x844
-- Verifier le chat input, le scroll, l'envoi de messages
-- Verifier la barre du bas et le collapse du chat
-```
-
-### 5.6 Rate limiting
-```text
-- Envoyer 20+ messages rapidement
-- Verifier le message "trop de requetes"
-- Attendre 60s et reverifier que ca fonctionne
-```
-
-### 5.7 Conversation history persistence
-```text
-- Envoyer 5 messages, rafraichir la page
-- Verifier que les messages sont restaures
-- Verifier que les widgets confirmes restent confirmes
-- Verifier que le welcome message est dans la bonne langue
-```
-
-### 5.8 Destination geocoding flow
-```text
-- Dire "je veux aller a Tokyo"
-- Verifier que la memoire flight a les coordonnees
-- Verifier que la carte est centree sur la destination
-```
-
----
-
-## 6. Recapitulatif des priorites
-
-| Priorite | Action | Impact | Statut |
-|---|---|---|---|
-| P0 | Refactorer `PlannerChat.tsx` en sous-hooks | Maintenabilite | ✅ FAIT |
-| P0 | Ajouter un timeout global au streaming SSE | Fiabilite | ✅ FAIT |
-| P1 | Tests unitaires pour `useUnifiedIntentRouter` | Qualite | ✅ FAIT (45 tests) |
-| P1 | Tests E2E session management + error resilience | Couverture | ✅ FAIT |
-| P1 | Supprimer la duplication du payload destination | DRY | ✅ FAIT |
-| P2 | Migrer le rate limiter vers Supabase/Redis | Securite | ✅ FAIT (6 edge functions) |
-| P2 | Nettoyer les console.log en production | Performance | ✅ FAIT |
-| P2 | Tests E2E "choose for me" + mobile | Couverture | ✅ FAIT |
-| P3 | Remplacer le regex de delegation par intent backend | Robustesse | ✅ FAIT |
-| P3 | Tests E2E rate limiting + stream cancellation | Couverture | ✅ FAIT |
+| `src/services/destinationIndex.ts` | Creer (nouveau service) |
+| `src/components/planner/chat/services/messageAnalyzer.ts` | Remplacer `knownDestinations` par `destinationIndex.match()` |
+| `src/components/planner/chat/types.ts` | Migrer `getCityCoords` vers l'index, garder `CITY_COORDINATES` en fallback |
+| `src/App.tsx` (ou composant planner) | Appeler `destinationIndex.init()` au boot |
+| `src/lib/suites/chatTypes.suite.ts` | Aucun changement necessaire (API stable) |
