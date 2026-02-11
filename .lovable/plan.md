@@ -1,96 +1,109 @@
 
-# Plan : Rendre le chat intelligent -- Stop au forçage des suggestions de destinations
 
-## Probleme central
+# Plan : Fix des 7 tests en echec — scalable
 
-Apres la collecte des preferences (style + interets), le systeme **force systematiquement** 3 suggestions de destinations via deux mecanismes independants :
+## Diagnostic
 
-1. **Backend (ReAct loop)** : Le LLM appelle `request_destination_suggestions(3)` de lui-meme apres les preferences, meme quand l'utilisateur dit simplement "non"
-2. **Frontend (`evaluatePhaseTransition`)** : La transition de phase "preferences complete -> destinationSuggestions" se declenche automatiquement des que `style_configured` ou `interests_selected` existe dans l'historique
+### Echec 1 : chatAdvancedSim (Guard 1 obsolete)
+Le test attend encore `destinationSuggestions` apres preferences, mais Guard 1 a ete supprime. Simple mise a jour du test pour attendre `null`.
 
-Le resultat : l'utilisateur se retrouve TOUJOURS avec 3 destinations apres ses preferences, meme s'il n'a rien demande.
+### Echecs 2-7 : analyzeUserIntent manque de capacites
+Les tests Journey 42 et 43 utilisent des capacites qui n'existent pas encore dans `analyzeUserIntent` :
+
+| Capacite manquante | Exemples non detectes |
+|---|---|
+| `wantsMoreOptions` ne matche pas "inspire" ni "propose-moi des destinations" | "inspire-moi", "propose-moi des destinations", "oui, propose-moi des destinations" |
+| `mentionedDestination` jamais rempli | "je veux aller a Amsterdam", "non merci, je veux aller a Amsterdam" |
+| `mentionedBudget` (qualitatif) pas detecte | "escapade pas chere" (pas de montant numerique) |
 
 ## Corrections
 
-### 1. Supprimer la transition automatique preferences -> destinations (Frontend)
+### Fichier 1 : `src/components/planner/chat/services/messageAnalyzer.ts`
 
-**Fichier** : `src/components/planner/chat/hooks/intentRouterCore.ts`
+**A. Enrichir `MORE_OPTIONS_INTENT_PATTERNS`** (ligne ~446)
 
-La garde "Guard 1" (lignes 306-317) dans `evaluatePhaseTransition` force `destinationSuggestions` des que les preferences existent et qu'il n'y a pas de destination. Cette logique doit etre **supprimee** car :
-- C'est le backend (LLM) qui doit decider QUAND proposer des destinations
-- L'utilisateur peut avoir deja mentionne un pays/ville avant les preferences
-- L'utilisateur peut vouloir poser une question ou preciser un budget avant les destinations
+Ajouter les patterns manquants pour matcher "inspire", "propose", "suggere", "recommande", "idees" :
 
 ```text
-Avant : Guard 1 retourne destinationSuggestions si hasStyleOrInterests && !hasDestination
-Apres : Guard 1 supprime -- la decision revient au backend uniquement
+Avant :
+  /autre|plus\s+d'options?|alternatives?|sinon|différent/i,
+
+Apres :
+  /autre|plus\s+d'options?|alternatives?|sinon|différent|inspire|propose[r-]?\s*(moi|nous|des)|sugg[eè]re|recommande|id[ée]es?\s*(de\s+voyage|de\s+destination)?|où\s+partir/i,
 ```
 
-### 2. Empecher le LLM de forcer les suggestions (Backend)
+**B. Ajouter la detection de `mentionedDestination`** (apres le bloc `isUndecided`, ~ligne 561)
 
-**Fichier** : `supabase/functions/planner-chat/index.ts`
+Ajouter un bloc qui detecte les noms de villes/pays mentionnes dans des patterns comme :
+- "aller a/en X"
+- "partir a/en/au/aux X"
+- "destination : X"
+- "je veux X" (quand X est un nom propre capitalise)
 
-Ajouter une instruction dans le system prompt qui interdit au LLM d'appeler `request_destination_suggestions` de maniere proactive. Il ne doit l'appeler QUE si :
-- L'utilisateur demande explicitement des suggestions ("propose-moi des destinations", "inspire-moi", "ou partir ?")
-- L'utilisateur repond positivement a une question du type "voulez-vous que je vous propose des destinations ?"
+```typescript
+// Detect destination mentions
+const destinationPatterns = [
+  /(?:aller|partir|voyager)\s+(?:[àa]|en|au|aux)\s+([A-ZÀ-Ü][\w\s-]+)/i,
+  /destination\s*[:=]?\s*([A-ZÀ-Ü][\w\s-]+)/i,
+  /(?:je\s+veux|on\s+va|direction)\s+([A-ZÀ-Ü][\w\s-]+)/i,
+];
+for (const pattern of destinationPatterns) {
+  const match = text.match(pattern);
+  if (match) {
+    intent.mentionedDestination = match[1].trim();
+    break;
+  }
+}
+```
+
+**C. Enrichir la detection de budget qualitatif** (~ligne 492)
+
+Actuellement, `mentionedBudget` n'est rempli que si un montant numerique est trouve. Ajouter la detection des mentions qualitatives :
+
+```typescript
+// Qualitative budget mentions
+if (intent.wantsBudgetInfo && !intent.mentionedBudget) {
+  const qualPatterns = [
+    { pattern: /pas\s+ch[eè]re?|[ée]conomique|budget/i, label: "budget" },
+    { pattern: /luxe|premium|haut\s+de\s+gamme/i, label: "luxury" },
+    { pattern: /moyen|raisonnable|correct/i, label: "moderate" },
+  ];
+  for (const { pattern, label } of qualPatterns) {
+    if (pattern.test(text)) {
+      intent.mentionedBudget = label;
+      break;
+    }
+  }
+}
+```
+
+Egalement ajouter "pas cher" / "pas chere" / "economique" dans `BUDGET_INTENT_PATTERNS` s'ils n'y sont pas deja.
+
+### Fichier 2 : `src/lib/suites/chatAdvancedSim.suite.ts`
+
+**Ligne 620-627** : Mettre a jour le test pour reflecter la suppression de Guard 1 :
 
 ```text
-## REGLE : SUGGESTIONS DE DESTINATIONS
-N'appelle JAMAIS request_destination_suggestions de ta propre initiative.
-Tu ne dois l'appeler QUE si l'utilisateur demande EXPLICITEMENT des suggestions.
-Apres avoir collecte les preferences, pose la question :
-"Souhaitez-vous que je vous propose des destinations adaptees a vos gouts ?"
-Attends la reponse AVANT d'appeler l'outil.
+Avant : expect(result?.widgetType).toBe("destinationSuggestions");
+Apres : expect(result).toBe(null);
 ```
 
-### 3. Mettre a jour le tool description pour renforcer la garde (Backend)
+### Fichier 3 : `src/lib/suites/chatJourneysSim.suite.ts`
 
-**Fichier** : `supabase/functions/planner-chat/tools/destinationSuggestions.ts`
-
-Ajouter dans la description du tool une regle anti-proactivite :
-
-```text
-REGLE ANTI-PROACTIVITE :
-N'appelle PAS cet outil automatiquement apres les preferences.
-Attends que l'utilisateur DEMANDE des suggestions ou ACCEPTE une proposition.
-Si l'utilisateur dit "non", "pas pour l'instant", ne propose PAS de destinations.
-```
-
-### 4. Supprimer la suppression post-loop devenue inutile (Backend)
-
-**Fichier** : `supabase/functions/planner-chat/index.ts` (lignes 874-880)
-
-Le bloc qui supprime `destinationSuggestionRequest` quand `primaryIntent === "gather_preferences"` devient inutile puisque le LLM ne forcera plus les suggestions. On le conserve neanmoins comme filet de securite.
-
-### 5. Rendre le nombre de suggestions dynamique (Backend + Frontend)
-
-**Fichier** : `supabase/functions/planner-chat/tools/destinationSuggestions.ts`
-
-Le `requestedCount` par defaut passe de 3 a un choix contextuel. Quand l'utilisateur ne precise pas de nombre, le LLM devrait demander "combien de suggestions souhaitez-vous ?" ou utiliser un defaut adapte au contexte (escapade courte = 2-3, voyage long = 3-5).
-
-Modifier la description du tool :
-```text
-Si l'utilisateur ne precise pas de nombre, utilise un defaut adapte :
-- Escapade courte (1-3 jours) : 2 suggestions
-- Voyage moyen (4-7 jours) : 3 suggestions  
-- Voyage long (8+ jours) : 4-5 suggestions
-```
+Aucune modification necessaire — les tests sont corrects, c'est le code source (`analyzeUserIntent`) qui doit etre enrichi pour les faire passer.
 
 ## Resume des fichiers modifies
 
 | Fichier | Changement |
 |---|---|
-| `intentRouterCore.ts` | Suppression de Guard 1 (auto-trigger destinationSuggestions apres preferences) |
-| `planner-chat/index.ts` | Instruction anti-proactivite dans le system prompt |
-| `destinationSuggestions.ts` | Description enrichie : anti-proactivite + nombre dynamique |
+| `messageAnalyzer.ts` | Ajout patterns "inspire/propose/suggere" dans MORE_OPTIONS, detection `mentionedDestination`, detection budget qualitatif |
+| `chatAdvancedSim.suite.ts` | Test Guard 1 mis a jour pour attendre `null` |
 
-## Impact attendu
+## Scalabilite
 
-Apres ce fix, le flux sera :
-1. Utilisateur : "escapade pas cher depuis Bruxelles"
-2. Bot : collecte style (widget)
-3. Bot : collecte interets (widget)
-4. Utilisateur : "non" (pas d'autres criteres)
-5. Bot : **"Souhaitez-vous que je vous propose des destinations adaptees ?"** (au lieu de forcer 3 destinations)
-6. Utilisateur : "oui" -> Bot appelle `request_destination_suggestions`
-7. OU Utilisateur : "non, je veux aller a Amsterdam" -> Bot continue sans widget
+Cette approche est scalable car :
+- Les patterns sont dans des tableaux constants, faciles a enrichir
+- La detection de destination utilise des regex generiques (pas de noms hardcodes)
+- Le budget qualitatif utilise un mapping label extensible
+- Tous les nouveaux comportements sont couverts par les tests existants (Journey 42, 43) qui passeront une fois le code mis a jour
+
