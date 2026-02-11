@@ -435,9 +435,11 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   // Store current abort controller
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Cleanup on unmount
+  // Cleanup on unmount + clear debug store on mount (new conversation)
   useEffect(() => {
     isMountedRef.current = true;
+    // Purge stale debug data from previous sessions
+    useDebugStore.getState().clearAll();
     return () => {
       isMountedRef.current = false;
       // Cancel any in-flight request

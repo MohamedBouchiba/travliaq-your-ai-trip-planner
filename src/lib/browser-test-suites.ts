@@ -120,6 +120,12 @@ export const TEST_CATEGORIES: CategoryInfo[] = [
     emoji: "🗺️",
     description: "Parcours utilisateur longs et réalistes : mémoire, phases, widgets, suggestions, qualité UX",
   },
+  {
+    id: "sessionEntities",
+    label: "Session Entities",
+    emoji: "🏷️",
+    description: "Extraction d'entités (destinations, durées, budgets) et nettoyage du debug store",
+  },
 ];
 
 // ─── Registration ───
@@ -201,5 +207,9 @@ export async function registerAllBrowserTests(categories?: string[]) {
   if (all || categories?.includes("chatJourneysSim")) {
     const { registerChatJourneysSimTests } = await import("./suites/chatJourneysSim.suite");
     registerChatJourneysSimTests();
+  }
+  if (all || categories?.includes("sessionEntities")) {
+    const { registerSessionEntitiesTests } = await import("./suites/sessionEntities.suite");
+    registerSessionEntitiesTests();
   }
 }

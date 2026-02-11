@@ -36,18 +36,35 @@ const ENTITY_PATTERNS = {
   destinations: [
     /(?:aller|partir|voyager|visiter)\s+(?:à|en|au|aux)?\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
     /([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)\s+(?:comme destination|m'intéresse)/gi,
+    // Departure city patterns (FR)
+    /à\s+partir\s+de\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
+    /depuis\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
+    // EN patterns
+    /(?:to|from|in)\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
   ],
-  // Dates: months, specific dates
+  // Dates: months, specific dates, durations
   dates: [
     /(?:en|au mois de|pour)\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)/gi,
     /(?:du|le)?\s*(\d{1,2})\s*(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)/gi,
     /(printemps|été|automne|hiver)/gi,
+    // Duration patterns (FR + EN)
+    /(\d+)\s*jours?/gi,
+    /(\d+)\s*semaines?/gi,
+    /(\d+)\s*nuits?/gi,
+    /(\d+)\s*days?/gi,
+    /(\d+)\s*weeks?/gi,
   ],
-  // Budgets: amounts, ranges
+  // Budgets: amounts, ranges, qualitative
   budgets: [
     /(\d+(?:\s*[–-]\s*\d+)?)\s*(?:€|euros?|EUR)/gi,
     /budget\s+(?:de\s+)?(\d+(?:\s*[–-]\s*\d+)?)/gi,
     /(petit budget|budget moyen|budget élevé|luxe|économique)/gi,
+    // Cost constraint expressions (FR + EN)
+    /(?:le |la )?(moins cher(?:s|e)?|pas cher|budget serré|bon marché)/gi,
+    /(?:the )?(cheapest|budget-friendly|low[- ]?cost|affordable)/gi,
+    // Dollar/pound amounts
+    /[$£]\s*(\d[\d\s]*\d)/gi,
+    /(\d[\d\s]*\d?)\s*(?:\$|dollars?|£|pounds?)/gi,
   ],
   // Constraints: requirements
   constraints: [
