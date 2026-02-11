@@ -76,16 +76,16 @@ const ENTITY_PATTERNS = {
 /**
  * Extract unique matches from text using patterns
  */
-function extractEntities(text: string, patterns: RegExp[]): string[] {
+function extractEntities(text: string, patterns: RegExp[], minLength = 3): string[] {
   const matches = new Set<string>();
   for (const pattern of patterns) {
     // Reset regex state
     pattern.lastIndex = 0;
     let match;
     while ((match = pattern.exec(text)) !== null) {
-      // Get the first capture group or full match
+      // Use full match (match[0]) to preserve context like "2 jours"
       const value = match[1] || match[0];
-      if (value && value.trim().length > 2) {
+      if (value && value.trim().length >= minLength) {
         matches.add(value.trim());
       }
     }
@@ -142,7 +142,7 @@ export function useSessionContext({
 
     for (const msg of userMessages) {
       for (const d of extractEntities(msg.text, ENTITY_PATTERNS.destinations)) destinationsSet.add(d);
-      for (const d of extractEntities(msg.text, ENTITY_PATTERNS.dates)) datesSet.add(d);
+      for (const d of extractEntities(msg.text, ENTITY_PATTERNS.dates, 1)) datesSet.add(d);
       for (const b of extractEntities(msg.text, ENTITY_PATTERNS.budgets)) budgetsSet.add(b);
       for (const c of extractEntities(msg.text, ENTITY_PATTERNS.constraints)) constraintsSet.add(c);
     }
