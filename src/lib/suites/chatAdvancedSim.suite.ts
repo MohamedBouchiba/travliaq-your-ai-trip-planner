@@ -617,13 +617,13 @@ export function registerChatAdvancedSimTests() {
     const canShowAll = () => ({ valid: true });
     const noInteractions: any[] = [];
 
-    it("preferences filled + no destination → destinationSuggestions", () => {
+    it("preferences filled + no destination → no auto-suggestion (user controls)", () => {
       const result = evaluatePhaseTransition(
         emptyFlow(),
         [wi("preferenceStyle", "style_configured")],
         canShowAll
       );
-      expect(result?.widgetType).toBe("destinationSuggestions");
+      expect(result).toBe(null);
     });
 
     it("destination + date interaction → date picker", () => {
