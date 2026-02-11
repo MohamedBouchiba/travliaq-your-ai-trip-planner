@@ -41,6 +41,7 @@ export interface TripPreferences {
 
   // === STYLE AXES (Égaliseur) ===
   styleAxes: StyleAxes;
+  styleAxesOrder: (keyof StyleAxes)[];
 
   // === INTERESTS ===
   interests: string[]; // Max 5: ["culture", "food", "nature", "beach", "wellness", "sport", "adventure", "nightlife", "shopping", "workation"]
@@ -112,6 +113,13 @@ export const DEFAULT_STYLE_AXES: StyleAxes = {
   touristVsLocal: 50,
 };
 
+export const DEFAULT_STYLE_AXES_ORDER: (keyof StyleAxes)[] = [
+  "chillVsIntense",
+  "cityVsNature",
+  "ecoVsLuxury",
+  "touristVsLocal",
+];
+
 export const DEFAULT_MUST_HAVES: MustHaves = {
   accessibilityRequired: false,
   petFriendly: false,
@@ -133,6 +141,7 @@ export const DEFAULT_PREFERENCES: TripPreferences = {
   id: crypto.randomUUID(),
   travelStyle: "couple",
   styleAxes: DEFAULT_STYLE_AXES,
+  styleAxesOrder: DEFAULT_STYLE_AXES_ORDER,
   interests: [],
   mustHaves: DEFAULT_MUST_HAVES,
   workPreferences: DEFAULT_WORK_PREFERENCES,
