@@ -492,10 +492,13 @@ export function analyzeUserIntent(text: string | undefined): UserIntent {
   for (const pattern of BUDGET_INTENT_PATTERNS) {
     if (pattern.test(text)) {
       intent.wantsBudgetInfo = true;
-      // Try to extract amount (works for €, $, £)
-      const budgetMatch = text.match(/(\d+)\s*(euros?|€|\$|dollars?|£|pounds?)/i);
+      // Try to extract amount (works for €, $, £ — both prefix and suffix)
+      const budgetMatch = text.match(/(\d[\d\s]*\d?)\s*(euros?|€|\$|dollars?|£|pounds?)/i)
+        || text.match(/[$€£]\s*(\d[\d\s]*\d)/);
       if (budgetMatch) {
-        intent.mentionedBudget = budgetMatch[1];
+        // For prefix match ($2000), the amount is in group 1; for suffix match, also group 1
+        const raw = budgetMatch[1].replace(/\s/g, "");
+        intent.mentionedBudget = raw;
       }
       break;
     }
