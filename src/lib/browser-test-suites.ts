@@ -114,6 +114,12 @@ export const TEST_CATEGORIES: CategoryInfo[] = [
     emoji: "🚀",
     description: "Tests avancés : widgets, mémoire, filtres, boosting, conflits, UX fluide",
   },
+  {
+    id: "chatJourneysSim",
+    label: "Chat Journeys Sim",
+    emoji: "🗺️",
+    description: "Parcours utilisateur longs et réalistes : mémoire, phases, widgets, suggestions, qualité UX",
+  },
 ];
 
 // ─── Registration ───
@@ -191,5 +197,9 @@ export async function registerAllBrowserTests(categories?: string[]) {
   if (all || categories?.includes("chatAdvancedSim")) {
     const { registerChatAdvancedSimTests } = await import("./suites/chatAdvancedSim.suite");
     registerChatAdvancedSimTests();
+  }
+  if (all || categories?.includes("chatJourneysSim")) {
+    const { registerChatJourneysSimTests } = await import("./suites/chatJourneysSim.suite");
+    registerChatJourneysSimTests();
   }
 }
