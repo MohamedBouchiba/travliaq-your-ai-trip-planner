@@ -1,57 +1,100 @@
 
 
-# Plan : Drag & Drop pour hiérarchiser les sliders de style
+# Plan : Fix des incohérences persistantes (snapshot 15:22)
 
-## Ce que l'utilisateur pourra faire
+## Incohérences identifiees
 
-Chaque slider (Chill/Intense, Urbain/Nature, Budget/Luxe, Touristique/Authentique) deviendra réordonnançable par glisser-déposer. La position du haut = la priorité la plus haute. Un petit indicateur visuel (poignée de drag avec un numéro de rang) apparaitra à gauche de chaque slider.
+### 1. `sessionEntities` toujours vide -- accent manquant dans la regex
+Le pattern `/à\s+partir\s+de\s+(...)/gi` exige le caractere `à` (avec accent grave), mais l'utilisateur tape `a partir de bruxelles` sans accent. Le match echoue silencieusement. Meme probleme pour d'autres variantes informelles.
 
-## Approche technique
+### 2. `flightSummary` affiche toujours "AUVERGNE (CFE)"
+Le fix precedent (`useChatSubmit.ts` ligne 293-298) devrait fonctionner : quand `flightData` est null et `intentClassification.entities.departureCity` existe, on appelle `updateMemory({ departure: { city: depCity } })`. Mais le probleme est que le **plannerStoreV2 est persiste en localStorage** et n'est jamais purge entre sessions. L'ancien depart "AUVERGNE" survit dans le store. Le fix fonctionne en theorie, mais si l'intent n'a pas `departureCity` (ce qui arrive pour les messages suivants), l'ancien depart reste.
 
-On utilise `framer-motion` (déjà installé) qui fournit un composant `Reorder` natif avec support tactile et clavier.
+La solution : en plus du fix existant, il faut **aussi** purger le depart du planner store au debut d'une nouvelle conversation si le store contient des donnees potentiellement obsoletes.
 
-### Fichiers modifiés
+### 3. LLM repond en anglais
+L'utilisateur ecrit en francais mais le bot repond "Let's start by selecting your travel dates" et "Great! Now, let's pick your destination city in France". Le system prompt contient deja l'instruction de repondre dans la langue de l'utilisateur, mais le LLM ne la respecte pas systematiquement. Il faut renforcer cette instruction en la placant plus haut et en la repetant dans le user message context.
+
+### 4. LLM assume "France" comme destination
+Sans que l'utilisateur le dise, le LLM repond "pick your destination city in France" et met `toCountryCode: "FR"` dans flightData. C'est une hallucination du LLM. On peut ajouter une guard cote client : ignorer `toCountryCode` quand l'utilisateur n'a pas explicitement mentionne de pays.
+
+---
+
+## Corrections
+
+### Fichier 1 : `src/components/planner/chat/hooks/useSessionContext.ts`
+
+Rendre les patterns tolerants aux accents manquants :
+
+```text
+Avant :  /à\s+partir\s+de\s+(...)/gi
+Apres :  /[àa]\s+partir\s+de\s+(...)/gi
+
+Ajouter aussi :
+  /(?:au départ de|au depart de)\s+(...)/gi
+```
+
+Meme approche pour tous les patterns FR qui contiennent des caracteres accentues.
+
+### Fichier 2 : `src/components/planner/chat/hooks/useChatStream.ts`
+
+Au montage (deja present le `debugStore.clearAll()`), ajouter aussi un reset du depart dans le planner store si le chat demarre une nouvelle session :
+
+```typescript
+useEffect(() => {
+  useDebugStore.getState().clearAll();
+  // Reset stale departure from previous session
+  const currentDeparture = usePlannerStoreV2.getState().departure;
+  if (currentDeparture?.iata || currentDeparture?.city) {
+    usePlannerStoreV2.getState().setDeparture(null);
+  }
+}, []);
+```
+
+Note : on ne purge que le depart (pas tout le store) car d'autres donnees comme les preferences peuvent etre volontairement persistees.
+
+### Fichier 3 : `supabase/functions/planner-chat/index.ts`
+
+Renforcer l'instruction de langue en l'ajoutant au debut du system prompt (avant tout autre contenu) et en ajoutant un rappel dans le contexte utilisateur :
+
+```text
+## REGLE ABSOLUE NUMERO 1 : LANGUE
+Tu DOIS repondre dans la MEME LANGUE que le dernier message de l'utilisateur.
+Si l'utilisateur ecrit en francais, tu reponds en francais. AUCUNE EXCEPTION.
+Ne reponds JAMAIS en anglais sauf si l'utilisateur ecrit en anglais.
+```
+
+### Fichier 4 : `src/components/planner/chat/hooks/useChatSubmit.ts`
+
+Ajouter une guard pour ignorer `toCountryCode` quand aucun pays n'a ete explicitement mentionne par l'utilisateur :
+
+```typescript
+// Dans le traitement de flightData, avant d'appliquer toCountryCode
+if (flightData?.toCountryCode && !flightData?.to) {
+  // LLM a devine un pays sans que l'utilisateur le mentionne -> ignorer
+  delete flightData.toCountryCode;
+}
+```
+
+### Fichier 5 : `src/lib/suites/sessionEntities.suite.ts`
+
+Ajouter des tests pour les variantes sans accent :
+
+```text
+Test : "a partir de bruxelles" (sans accent) -> destinations contient "bruxelles"
+Test : "au depart de lyon" -> destinations contient "lyon"  
+Test : "je pars de marseille" -> destinations contient "marseille"
+```
+
+---
+
+## Resume des fichiers modifies
 
 | Fichier | Changement |
 |---|---|
-| `src/stores/slices/preferenceTypes.ts` | Ajouter `styleAxesOrder: (keyof StyleAxes)[]` dans `TripPreferences` + valeur par défaut |
-| `src/stores/slices/preferenceSlice.ts` | Ajouter action `setStyleAxesOrder(order)` pour persister l'ordre |
-| `src/stores/hooks/usePreferenceMemoryStore.ts` | Exposer `setStyleAxesOrder` dans le hook |
-| `src/stores/hooks/index.ts` | Re-exporter le nouveau type/action |
-| `src/components/planner/preferences/StyleEqualizer.tsx` | Remplacer la liste statique par `Reorder.Group` + `Reorder.Item` de framer-motion |
-| `src/components/planner/chat/widgets/PreferenceStyleWidget.tsx` | Idem, version chat du widget |
-
-### Details de l'implementation
-
-**1. Nouveau champ dans les preferences**
-
-```typescript
-// Dans TripPreferences
-styleAxesOrder: (keyof StyleAxes)[];
-// Default: ["chillVsIntense", "cityVsNature", "ecoVsLuxury", "touristVsLocal"]
-```
-
-**2. Action Zustand `setStyleAxesOrder`**
-
-Persiste le tableau d'ordre dans le store. Declenche la mise a jour UI.
-
-**3. StyleEqualizer avec drag & drop**
-
-- Importer `Reorder` de `framer-motion`
-- Remplacer le `div` conteneur par `Reorder.Group axis="y" values={orderedKeys} onReorder={onReorder}`
-- Chaque slider est wrappé dans `Reorder.Item value={key}`
-- Ajouter une poignée de drag (icone GripVertical de lucide) + badge de rang (1, 2, 3, 4)
-- Animation de transition fluide via les props `layout` de framer-motion
-
-**4. UX / Accessibilite**
-
-- Poignee visible au survol, toujours visible sur mobile
-- Badge numerote indiquant la priorite (1 = plus important)
-- Curseur `grab` / `grabbing` sur la poignee
-- Le slider reste fonctionnel (pas de conflit entre drag vertical et slide horizontal grace au ciblage de la poignee seulement)
-- Un petit texte explicatif sous le titre : "Glissez pour réorganiser par priorité"
-
-**5. Impact sur le backend**
-
-Le champ `styleAxesOrder` sera envoyé avec les preferences existantes vers l'edge function. Le LLM pourra utiliser l'ordre pour ponderer les suggestions (ex: si "cityVsNature" est en position 1, privilegier les destinations qui matchent cet axe).
+| `useSessionContext.ts` | Regex tolerantes aux accents manquants |
+| `useChatStream.ts` | Reset du depart du planner store au montage |
+| `planner-chat/index.ts` | Instruction de langue renforcee en position 1 |
+| `useChatSubmit.ts` | Guard contre `toCountryCode` hallucine |
+| `sessionEntities.suite.ts` | Tests pour variantes sans accent |
 
