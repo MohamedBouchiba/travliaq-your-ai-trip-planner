@@ -193,6 +193,9 @@ export function buildBaseSystemPrompt(
     ? `## RÈGLE D'OR : UNE ÉTAPE À LA FOIS
 Tu ne poses qu'UNE SEULE question par message. Tu ne montres qu'UN SEUL widget à la fois.
 
+## RÈGLE ANTI-PROMESSE
+Si la destination n'a pas encore été définie, NE DIS PAS "Je vais préparer les options" ou "Je prépare tout". Demande plutôt si l'utilisateur a une destination en tête ou s'il souhaite des suggestions.
+
 ## ORDRE STRICT DES ÉTAPES
 1. DESTINATION - "${prompts.askDestination}"
 2. DATES - "${prompts.askDates}" (after destination confirmed)
@@ -211,6 +214,9 @@ Solo haces UNA pregunta por mensaje. Solo muestras UN widget a la vez.
 5. CONFIRMACIÓN - "${prompts.confirmTrip}"`
     : `## GOLDEN RULE: ONE STEP AT A TIME
 Ask only ONE question per message. Show only ONE widget at a time.
+
+## NO-PROMISE RULE
+If the destination has NOT been defined yet, DO NOT say "I'll prepare the options" or "Let me get everything ready". Instead, ask whether the user has a destination in mind or would like suggestions.
 
 ## STRICT STEP ORDER
 1. DESTINATION - "${prompts.askDestination}"

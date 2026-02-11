@@ -31,17 +31,23 @@ interface UseSessionContextReturn {
 /**
  * Regex patterns for entity extraction
  */
+/**
+ * Reject filter: candidates matching these words are NOT destinations
+ */
+const DESTINATION_REJECT = /\b(cher|chere|chère|chères|chers|cheap|budget|moins|plus|pas|possible|affordable|luxe|luxury|prix|price|economique|économique)\b/i;
+
 const ENTITY_PATTERNS = {
   // Destinations: cities, countries
+  // NOTE: flag `g` only (not `gi`) — case-sensitive [A-ZÀ-Ü] ensures we only match capitalized words (proper nouns)
   destinations: [
-    /(?:aller|partir|voyager|visiter)\s+(?:[àa]|en|au|aux)?\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
-    /([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)\s+(?:comme destination|m'int[ée]resse)/gi,
+    /(?:aller|partir|voyager|visiter)\s+(?:[àa]|en|au|aux)?\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/g,
+    /([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)\s+(?:comme destination|m'int[ée]resse)/g,
     // Departure city patterns (FR) - tolerant to missing accents
-    /[àa]\s+partir\s+de\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
-    /(?:au d[ée]part de|je pars de)\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
-    /depuis\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
+    /[àa]\s+partir\s+de\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/g,
+    /(?:au d[ée]part de|je pars de)\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/g,
+    /depuis\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/g,
     // EN patterns
-    /(?:to|from|in)\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
+    /(?:to|from|in)\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/g,
   ],
   // Dates: months, specific dates, durations
   dates: [
@@ -60,10 +66,8 @@ const ENTITY_PATTERNS = {
     /(\d+(?:\s*[–-]\s*\d+)?)\s*(?:€|euros?|EUR)/gi,
     /budget\s+(?:de\s+)?(\d+(?:\s*[–-]\s*\d+)?)/gi,
     /(petit budget|budget moyen|budget élevé|luxe|économique)/gi,
-    // Cost constraint expressions (FR + EN)
     /(?:le |la )?(moins cher(?:s|e)?|pas cher|budget serré|bon marché)/gi,
     /(?:the )?(cheapest|budget-friendly|low[- ]?cost|affordable)/gi,
-    // Dollar/pound amounts
     /[$£]\s*(\d[\d\s]*\d)/gi,
     /(\d[\d\s]*\d?)\s*(?:\$|dollars?|£|pounds?)/gi,
   ],
@@ -77,7 +81,11 @@ const ENTITY_PATTERNS = {
 /**
  * Extract unique matches from text using patterns
  */
-function extractEntities(text: string, patterns: RegExp[], minLength = 3): string[] {
+/**
+ * Extract unique matches from text using patterns
+ * @param rejectFilter - optional regex to reject false-positive matches
+ */
+function extractEntities(text: string, patterns: RegExp[], minLength = 3, rejectFilter?: RegExp): string[] {
   const matches = new Set<string>();
   for (const pattern of patterns) {
     // Reset regex state
@@ -87,6 +95,10 @@ function extractEntities(text: string, patterns: RegExp[], minLength = 3): strin
       // Use full match (match[0]) to preserve context like "2 jours"
       const value = match[1] || match[0];
       if (value && value.trim().length >= minLength) {
+        // Apply reject filter if provided (e.g. budget words for destinations)
+        if (rejectFilter && rejectFilter.test(value)) {
+          continue;
+        }
         matches.add(value.trim());
       }
     }
@@ -142,7 +154,7 @@ export function useSessionContext({
     const constraintsSet = new Set<string>();
 
     for (const msg of userMessages) {
-      for (const d of extractEntities(msg.text, ENTITY_PATTERNS.destinations)) destinationsSet.add(d);
+      for (const d of extractEntities(msg.text, ENTITY_PATTERNS.destinations, 3, DESTINATION_REJECT)) destinationsSet.add(d);
       for (const d of extractEntities(msg.text, ENTITY_PATTERNS.dates, 1)) datesSet.add(d);
       for (const b of extractEntities(msg.text, ENTITY_PATTERNS.budgets)) budgetsSet.add(b);
       for (const c of extractEntities(msg.text, ENTITY_PATTERNS.constraints)) constraintsSet.add(c);

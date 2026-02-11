@@ -1424,4 +1424,54 @@ export function registerChatCoherenceTests() {
       expect(getSuggestions(baseSuggestionContext({ inspireFlowStep: "loading" })).length).toBe(0);
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════
+  // WIDGET COHERENCE GUARD
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Widget coherence guard", () => {
+    // Lazy import to avoid circular deps
+    let validateWidgetTextCoherence: (text: string, widgetType: string | null | undefined) => string | null;
+
+    it("loads validateWidgetTextCoherence", async () => {
+      const mod = await import("@/components/planner/chat/services/messageAnalyzer");
+      validateWidgetTextCoherence = mod.validateWidgetTextCoherence;
+      expect(typeof validateWidgetTextCoherence).toBe("function");
+    });
+
+    it("text 'Combien serez-vous ?' + widget budgetRangeSlider → rejected (null)", () => {
+      const result = validateWidgetTextCoherence!("Combien serez-vous pour ce week-end ? 🧳", "budgetRangeSlider");
+      expect(result).toBe(null);
+    });
+
+    it("text 'Quel budget ?' + widget budgetRangeSlider → accepted", () => {
+      const result = validateWidgetTextCoherence!("Quel est votre budget pour ce voyage ?", "budgetRangeSlider");
+      expect(result).toBe("budgetRangeSlider");
+    });
+
+    it("text 'Combien serez-vous ?' + widget travelersSelector → accepted", () => {
+      const result = validateWidgetTextCoherence!("Combien serez-vous pour ce week-end ?", "travelersSelector");
+      expect(result).toBe("travelersSelector");
+    });
+
+    it("text asking departure city + widget datePicker → rejected", () => {
+      const result = validateWidgetTextCoherence!("Indiquez votre ville de départ", "datePicker");
+      expect(result).toBe(null);
+    });
+
+    it("text asking departure city + widget citySelector → accepted", () => {
+      const result = validateWidgetTextCoherence!("D'où souhaitez-vous partir ?", "citySelector");
+      expect(result).toBe("citySelector");
+    });
+
+    it("no rule match → widget passes through", () => {
+      const result = validateWidgetTextCoherence!("Voici quelques suggestions intéressantes !", "destinationSuggestions");
+      expect(result).toBe("destinationSuggestions");
+    });
+
+    it("null widget → null", () => {
+      const result = validateWidgetTextCoherence!("Bonjour !", null);
+      expect(result).toBe(null);
+    });
+  });
 }

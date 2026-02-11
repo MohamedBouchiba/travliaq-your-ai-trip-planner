@@ -7,14 +7,16 @@ import { useDebugStore } from "@/stores/debugStore";
 
 // ─── Helpers ───
 
+const DESTINATION_REJECT = /\b(cher|chere|chère|chères|chers|cheap|budget|moins|plus|pas|possible|affordable|luxe|luxury|prix|price|economique|économique)\b/i;
+
 const ENTITY_PATTERNS = {
   destinations: [
-    /(?:aller|partir|voyager|visiter)\s+(?:[àa]|en|au|aux)?\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
-    /([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)\s+(?:comme destination|m'int[ée]resse)/gi,
-    /[àa]\s+partir\s+de\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
-    /(?:au d[ée]part de|je pars de)\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
-    /depuis\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
-    /(?:to|from|in)\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
+    /(?:aller|partir|voyager|visiter)\s+(?:[àa]|en|au|aux)?\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/g,
+    /([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)\s+(?:comme destination|m'int[ée]resse)/g,
+    /[àa]\s+partir\s+de\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/g,
+    /(?:au d[ée]part de|je pars de)\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/g,
+    /depuis\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/g,
+    /(?:to|from|in)\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/g,
   ],
   dates: [
     /(?:en|au mois de|pour)\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)/gi,
@@ -41,7 +43,7 @@ const ENTITY_PATTERNS = {
   ],
 };
 
-function extractEntities(text: string, patterns: RegExp[], minLength = 3): string[] {
+function extractEntities(text: string, patterns: RegExp[], minLength = 3, rejectFilter?: RegExp): string[] {
   const matches = new Set<string>();
   for (const pattern of patterns) {
     pattern.lastIndex = 0;
@@ -49,6 +51,9 @@ function extractEntities(text: string, patterns: RegExp[], minLength = 3): strin
     while ((match = pattern.exec(text)) !== null) {
       const value = match[1] || match[0];
       if (value && value.trim().length >= minLength) {
+        if (rejectFilter && rejectFilter.test(value)) {
+          continue;
+        }
         matches.add(value.trim());
       }
     }
@@ -182,13 +187,33 @@ export function registerSessionEntitiesTests() {
   describe("Combined real-world message", () => {
     it("'escapade la moins chers possible pour 2 jours à partir de bruxelles' extracts all", () => {
       const text = "je voudrais fait une escapde la moins chers possible pour 2 jours à partir de Bruxelles";
-      const destinations = extractEntities(text, ENTITY_PATTERNS.destinations);
+      const destinations = extractEntities(text, ENTITY_PATTERNS.destinations, 3, DESTINATION_REJECT);
       const dates = extractEntities(text, ENTITY_PATTERNS.dates, 1);
       const budgets = extractEntities(text, ENTITY_PATTERNS.budgets);
 
       expect(destinations.some((d) => d.toLowerCase() === "bruxelles")).toBe(true);
       expect(dates.length).toBeGreaterThan(0);
       expect(budgets.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Destination pollution rejection (anomalie 2)", () => {
+    it("'le moins chers possible' does NOT appear in destinations", () => {
+      const text = "je voudrais fait une escapde la moins chers possible pour 2 jours";
+      const destinations = extractEntities(text, ENTITY_PATTERNS.destinations, 3, DESTINATION_REJECT);
+      const hasBudgetWord = destinations.some((d) => /moins|cher|possible/i.test(d));
+      expect(hasBudgetWord).toBe(false);
+    });
+
+    it("'je veux aller à Amsterdam' → Amsterdam IS in destinations", () => {
+      const destinations = extractEntities("je veux aller à Amsterdam", ENTITY_PATTERNS.destinations, 3, DESTINATION_REJECT);
+      expect(destinations.some((d) => d.toLowerCase() === "amsterdam")).toBe(true);
+    });
+
+    it("'cheap trip to London' does not pollute destinations with 'cheap'", () => {
+      const destinations = extractEntities("cheap trip to London", ENTITY_PATTERNS.destinations, 3, DESTINATION_REJECT);
+      expect(destinations.some((d) => d.toLowerCase() === "london")).toBe(true);
+      expect(destinations.some((d) => /cheap/i.test(d))).toBe(false);
     });
   });
 }
