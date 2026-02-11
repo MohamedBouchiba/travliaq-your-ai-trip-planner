@@ -36,6 +36,7 @@ export interface PreferenceActions {
   
   // Style axes
   setStyleAxis: (axis: keyof StyleAxes, value: number) => void;
+  setStyleAxesOrder: (order: (keyof StyleAxes)[]) => void;
   
   // Travel style
   setTravelStyle: (style: TravelStyle) => void;
@@ -146,6 +147,20 @@ export const createPreferenceSlice: StateCreator<
       },
       false,
       'preferences/setStyleAxis'
+    );
+  },
+
+  setStyleAxesOrder: (order: (keyof StyleAxes)[]) => {
+    set(
+      (state) => ({
+        preferences: {
+          ...state.preferences,
+          styleAxesOrder: order,
+          lastUpdated: new Date(),
+        },
+      }),
+      false,
+      'preferences/setStyleAxesOrder'
     );
   },
 

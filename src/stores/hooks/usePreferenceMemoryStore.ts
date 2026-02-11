@@ -50,6 +50,7 @@ export type {
 // Re-export defaults
 export {
   DEFAULT_STYLE_AXES,
+  DEFAULT_STYLE_AXES_ORDER,
   DEFAULT_MUST_HAVES,
   DEFAULT_WORK_PREFERENCES,
   DEFAULT_TRIP_CONTEXT,
@@ -71,6 +72,7 @@ export interface PreferenceMemoryStoreValue {
   // Actions
   updatePreferences: (updates: Partial<TripPreferences>, fromChat?: boolean) => void;
   setStyleAxis: (axis: keyof StyleAxes, value: number) => void;
+  setStyleAxesOrder: (order: (keyof StyleAxes)[]) => void;
   setTravelStyle: (style: TravelStyle) => void;
   toggleInterest: (interest: string) => void;
   toggleMustHave: (key: keyof MustHaves) => void;
@@ -157,6 +159,7 @@ export function usePreferenceMemoryStore(): PreferenceMemoryStoreValue {
     // Actions (directly from store)
     updatePreferences: store.updatePreferences,
     setStyleAxis: store.setStyleAxis,
+    setStyleAxesOrder: store.setStyleAxesOrder,
     setTravelStyle: store.setTravelStyle,
     toggleInterest: store.toggleInterest,
     toggleMustHave: store.toggleMustHave,
@@ -183,6 +186,7 @@ export function usePreferenceMemoryStore(): PreferenceMemoryStoreValue {
     store.isHydrated,
     store.updatePreferences,
     store.setStyleAxis,
+    store.setStyleAxesOrder,
     store.setTravelStyle,
     store.toggleInterest,
     store.toggleMustHave,

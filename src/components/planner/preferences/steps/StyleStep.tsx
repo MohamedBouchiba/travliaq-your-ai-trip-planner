@@ -19,6 +19,7 @@ export const StyleStep = memo(function StyleStep({ onNextStep }: StyleStepProps)
   const {
     memory: { preferences },
     setStyleAxis,
+    setStyleAxesOrder,
     toggleInterest,
   } = usePreferenceMemoryStore();
 
@@ -29,7 +30,9 @@ export const StyleStep = memo(function StyleStep({ onNextStep }: StyleStepProps)
         <SectionHeader icon={Sliders} title={t("planner.preferences.style.yourStyle")} />
         <StyleEqualizer
           axes={preferences.styleAxes}
+          axesOrder={preferences.styleAxesOrder}
           onAxisChange={setStyleAxis}
+          onOrderChange={setStyleAxesOrder}
         />
       </div>
 
