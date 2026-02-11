@@ -17,6 +17,7 @@ import type { WidgetType } from "@/types/flight";
 import type { IntentClassification } from "./useChatStream";
 import type { WidgetInteraction } from "@/contexts/WidgetHistoryContext";
 import { boostIntentConfidence } from "../services/intentConfidenceBooster";
+import { validateWidgetTextCoherence } from "../services/messageAnalyzer";
 import {
   computeFlowState,
   computeUserBehavior,
@@ -197,51 +198,58 @@ export function useUnifiedIntentRouter({
       return { shouldShowWidget: false, widgetType: null, action: "delegate" };
     }
     
-    // TRUST THE BACKEND: If backend specified a widget, validate and use it
+    // TRUST THE BACKEND: If backend specified a widget, validate coherence first
     if (intent.widgetToShow?.type) {
-      const widgetType = intent.widgetToShow.type as WidgetType;
-      const validation = canShowWidget(widgetType);
+      const coherentWidget = validateWidgetTextCoherence(lastAssistantMessage || "", intent.widgetToShow.type);
       
-      if (validation.valid) {
-        if (onWidgetTriggered) {
-          onWidgetTriggered(widgetType, intent.widgetToShow.data);
+      if (coherentWidget) {
+        const widgetType = coherentWidget as WidgetType;
+        const validation = canShowWidget(widgetType);
+        
+        if (validation.valid) {
+          if (onWidgetTriggered) {
+            onWidgetTriggered(widgetType, intent.widgetToShow.data);
+          }
+          return {
+            shouldShowWidget: true,
+            widgetType,
+            widgetData: intent.widgetToShow.data,
+            action: "none",
+            reason: intent.widgetToShow.reason,
+          };
         }
-        return {
-          shouldShowWidget: true,
-          widgetType,
-          widgetData: intent.widgetToShow.data,
-          action: "none",
-          reason: intent.widgetToShow.reason,
-        };
-      }
-      
-      // Widget can't be shown, use suggested fallback or next required
-      let fallbackWidget = validation.suggestedWidget || getNextRequiredWidget();
+        
+        // Widget can't be shown, use suggested fallback or next required
+        let fallbackWidget = validation.suggestedWidget || getNextRequiredWidget();
 
-      // Guard: don't fallback to citySelector if no country is selected
-      if (fallbackWidget === "citySelector" && !flowState.hasDestination) {
-        if (import.meta.env.DEV) console.log("[UnifiedIntentRouter] Fallback citySelector blocked — no country selected");
-        const hasPreferences = widgetInteractions.some(i => 
-          i.interactionType === "style_configured" || i.interactionType === "interests_selected"
-        );
-        if (hasPreferences) {
-          const destValidation = canShowWidget("destinationSuggestions");
-          fallbackWidget = destValidation.valid ? "destinationSuggestions" : null;
-        } else {
-          fallbackWidget = null;
+        // Guard: don't fallback to citySelector if no country is selected
+        if (fallbackWidget === "citySelector" && !flowState.hasDestination) {
+          if (import.meta.env.DEV) console.log("[UnifiedIntentRouter] Fallback citySelector blocked — no country selected");
+          const hasPreferences = widgetInteractions.some(i => 
+            i.interactionType === "style_configured" || i.interactionType === "interests_selected"
+          );
+          if (hasPreferences) {
+            const destValidation = canShowWidget("destinationSuggestions");
+            fallbackWidget = destValidation.valid ? "destinationSuggestions" : null;
+          } else {
+            fallbackWidget = null;
+          }
         }
-      }
 
-      if (fallbackWidget) {
-        if (onWidgetTriggered) {
-          onWidgetTriggered(fallbackWidget);
+        if (fallbackWidget) {
+          if (onWidgetTriggered) {
+            onWidgetTriggered(fallbackWidget);
+          }
+          return {
+            shouldShowWidget: true,
+            widgetType: fallbackWidget,
+            action: "none",
+            reason: validation.reason || "Fallback to required widget",
+          };
         }
-        return {
-          shouldShowWidget: true,
-          widgetType: fallbackWidget,
-          action: "none",
-          reason: validation.reason || "Fallback to required widget",
-        };
+      } else {
+        if (import.meta.env.DEV) console.log("[UnifiedIntentRouter] Widget suppressed by coherence guard");
+        // Fall through to conversational/fallback logic
       }
     }
     

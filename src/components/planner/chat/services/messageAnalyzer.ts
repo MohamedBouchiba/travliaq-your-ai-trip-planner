@@ -967,3 +967,87 @@ export function getAnticipatedSuggestions(
       return [];
   }
 }
+
+// ============================================================================
+// WIDGET COHERENCE GUARD
+// ============================================================================
+
+/**
+ * Widget-text coherence rules.
+ * Each rule maps text patterns to the ONLY valid widget types.
+ * If text matches a rule but the proposed widget is NOT in the valid list, the widget is rejected.
+ * If NO rule matches, the widget is left as-is (no over-correction).
+ */
+const WIDGET_COHERENCE_RULES: Array<{
+  textPatterns: RegExp[];
+  validWidgets: string[];
+  label: string;
+}> = [
+  {
+    label: "travelers",
+    textPatterns: [
+      /combien\b.*(?:voyageur|personne|êtes|serez|partez)/i,
+      /how\s+many\b.*(?:traveler|people|person)/i,
+      /(?:voyageur|personne|traveler|people)\b.*combien/i,
+    ],
+    validWidgets: ["travelersSelector"],
+  },
+  {
+    label: "dates",
+    textPatterns: [
+      /quand\b.*(?:partir|voyager|aller)/i,
+      /quelles?\s+dates?/i,
+      /(?:when|what\s+dates?)\b.*(?:travel|go|leave|depart)/i,
+      /pour\s+quel\s+week-?end/i,
+    ],
+    validWidgets: ["datePicker", "dateRangePicker"],
+  },
+  {
+    label: "departure",
+    textPatterns: [
+      /(?:ville\s+de\s+départ|d'où\s+part|d'où\s+souhait)/i,
+      /(?:departure\s+city|where\s+(?:are\s+you|do\s+you)\s+(?:depart|leav))/i,
+      /indiquez?\s+(?:votre\s+)?ville/i,
+    ],
+    validWidgets: ["citySelector"],
+  },
+  {
+    label: "budget",
+    textPatterns: [
+      /quel\s+(?:est\s+(?:votre|ton)\s+)?budget/i,
+      /(?:what(?:'s| is)\s+your\s+budget)/i,
+      /budget\s+(?:prévu|souhaité|envisagé)/i,
+    ],
+    validWidgets: ["budgetRangeSlider"],
+  },
+];
+
+/**
+ * Validate that a proposed widget is coherent with the assistant's text.
+ * Returns null if the widget should be suppressed, or the original widgetType if OK.
+ */
+export function validateWidgetTextCoherence(
+  text: string,
+  widgetType: string | null | undefined
+): string | null {
+  if (!widgetType || !text) return widgetType ?? null;
+
+  for (const rule of WIDGET_COHERENCE_RULES) {
+    const textMatches = rule.textPatterns.some((p) => p.test(text));
+    if (textMatches) {
+      if (rule.validWidgets.includes(widgetType)) {
+        return widgetType; // coherent
+      }
+      // Text says one thing, widget says another → suppress widget
+      if (import.meta.env.DEV) {
+        console.warn(
+          `[CoherenceGuard] Text matches "${rule.label}" but widget is "${widgetType}" → suppressed`
+        );
+      }
+      return null;
+    }
+  }
+
+  // No rule matched → no over-correction
+  return widgetType;
+}
