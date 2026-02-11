@@ -8,9 +8,9 @@ export const destinationSuggestionTool = {
   type: "function",
   function: {
     name: "request_destination_suggestions",
-    description: `À utiliser OBLIGATOIREMENT quand l'utilisateur demande des recommandations de destinations ou exprime de l'incertitude sur sa destination.
+    description: `À utiliser UNIQUEMENT quand l'utilisateur demande EXPLICITEMENT des recommandations de destinations ou ACCEPTE une proposition de suggestions.
 
-DÉCLENCHEURS - Appeler cet outil si l'utilisateur dit :
+DÉCLENCHEURS - Appeler cet outil SEULEMENT si l'utilisateur dit :
 DEMANDES DIRECTES :
 - "Fais-moi X recommandations de destinations"
 - "Suggère-moi des destinations"
@@ -19,29 +19,23 @@ DEMANDES DIRECTES :
 - "Quelle destination me conseilles-tu ?"
 - "Donne-moi des idées de voyage"
 - "Recommande-moi X pays/destinations"
-- "Quelles sont les meilleures destinations pour moi ?"
-
-EXPRESSIONS D'INCERTITUDE (TRÈS IMPORTANT) :
-- "je ne sais pas où aller"
-- "je ne sais pas trop où aller"
-- "je ne sais pas trop"
-- "je sais pas où partir"
-- "aucune idée de destination"
-- "pas d'idée de destination"
-- "j'hésite sur la destination"
-- "aide-moi à choisir une destination"
-- "aide-moi à choisir"
 - "inspire-moi"
-- "besoin d'inspiration"
-- "où me conseilles-tu"
-- "des idées ?"
+- "oui" (en réponse à "Souhaitez-vous que je vous propose des destinations ?")
 
-RÈGLES IMPORTANTES :
-1. Le nombre maximum de recommandations est 5 (si l'utilisateur demande plus, expliquer poliment)
-2. Le nombre par défaut est 3
+RÈGLE ANTI-PROACTIVITÉ (TRÈS IMPORTANT) :
+- N'appelle PAS cet outil automatiquement après la collecte des préférences.
+- Attends que l'utilisateur DEMANDE des suggestions ou ACCEPTE ta proposition.
+- Si l'utilisateur dit "non", "pas pour l'instant", ou mentionne une destination, ne propose PAS de suggestions.
+- Après les préférences, pose d'abord la question : "Souhaitez-vous que je vous propose des destinations ?"
+
+RÈGLES :
+1. Le nombre maximum de recommandations est 5
+2. Le nombre par défaut dépend du contexte :
+   - Escapade courte (1-3 jours) : 2 suggestions
+   - Voyage moyen (4-7 jours) : 3 suggestions
+   - Voyage long (8+ jours) : 4-5 suggestions
 3. Cet outil déclenche l'appel à l'API de suggestions côté client
-4. Tu dois AUSSI générer un message d'accompagnement chaleureux
-5. En cas d'incertitude de l'utilisateur, TOUJOURS appeler cet outil`,
+4. Tu dois AUSSI générer un message d'accompagnement chaleureux`,
     parameters: {
       type: "object",
       properties: {
