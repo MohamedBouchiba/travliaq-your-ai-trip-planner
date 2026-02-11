@@ -39,11 +39,11 @@ export const flightExtractionTool = {
         },
         departureDate: {
           type: "string",
-          description: "ONLY extract if user gives EXACT date like 'le 15 janvier', 'le 20 mars'. NEVER extract from vague terms like 'en février', 'au printemps', 'cet été', 'dans 2 semaines'. For vague dates, use needsDateWidget instead."
+          description: "Format YYYY-MM-DD. ONLY extract if user gives EXACT date like 'le 15 janvier', 'le 20 mars'. NEVER extract from vague terms like 'en février', 'au printemps', 'cet été'. Si l'utilisateur ne précise pas l'année, utilise l'année de la DATE ACTUELLE fournie dans le prompt système. Si la date résultante est dans le passé, utilise l'année suivante. Ne JAMAIS inventer 2024 ou 2025 si la date actuelle est en 2026."
         },
         returnDate: {
           type: "string",
-          description: "ONLY extract if user gives EXACT return date like 'retour le 22'. For duration like '3 semaines', set tripDuration instead."
+          description: "Format YYYY-MM-DD. ONLY extract if user gives EXACT return date like 'retour le 22'. Même règle d'année: utilise l'année courante, ou suivante si passée. For duration like '3 semaines', set tripDuration instead."
         },
         tripDuration: {
           type: "string",

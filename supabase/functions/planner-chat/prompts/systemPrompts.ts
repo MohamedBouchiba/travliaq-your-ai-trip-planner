@@ -28,21 +28,21 @@ const LOCALIZED_CONTENT: Record<SupportedLanguage, LocalizedContent> = {
     persona: "Tu es un assistant de voyage bienveillant pour Travliaq.",
     languageInstruction: "Réponds en français",
     dateFormatHint: "Format de date: jj/mm/aaaa ou 'le 15 mars'",
-    defaultYear: "Année par défaut : 2025",
+    defaultYear: "", // Dynamically set via buildBaseSystemPrompt
     emojiLimit: "Maximum 2 emojis par message",
   },
   en: {
     persona: "You are a friendly travel assistant for Travliaq.",
     languageInstruction: "Respond in English",
     dateFormatHint: "Date format: mm/dd/yyyy or 'March 15th'",
-    defaultYear: "Default year: 2025",
+    defaultYear: "", // Dynamically set via buildBaseSystemPrompt
     emojiLimit: "Maximum 2 emojis per message",
   },
   es: {
     persona: "Eres un asistente de viajes amable para Travliaq.",
     languageInstruction: "Responde en español",
     dateFormatHint: "Formato de fecha: dd/mm/aaaa o '15 de marzo'",
-    defaultYear: "Año por defecto: 2025",
+    defaultYear: "", // Dynamically set via buildBaseSystemPrompt
     emojiLimit: "Máximo 2 emojis por mensaje",
   },
 };
@@ -219,13 +219,27 @@ Ask only ONE question per message. Show only ONE widget at a time.
 4. DEPARTURE - "${prompts.askDeparture}" (after travelers confirmed)
 5. CONFIRMATION - "${prompts.confirmTrip}"`;
 
+  const currentYear = currentDate.split("-")[0] || new Date().getFullYear().toString();
+  const defaultYearLine = language === "fr"
+    ? `Année par défaut : ${currentYear}`
+    : language === "es"
+    ? `Año por defecto: ${currentYear}`
+    : `Default year: ${currentYear}`;
+
+  const dateRuleLine = language === "fr"
+    ? `RÈGLE DATES: Toute date sans année explicite utilise ${currentYear}. Si la date résultante est dans le passé, utilise ${parseInt(currentYear) + 1}.`
+    : language === "es"
+    ? `REGLA FECHAS: Toda fecha sin año explícito usa ${currentYear}. Si la fecha resultante está en el pasado, usa ${parseInt(currentYear) + 1}.`
+    : `DATE RULE: Any date without an explicit year uses ${currentYear}. If the resulting date is in the past, use ${parseInt(currentYear) + 1}.`;
+
   return `${content.persona}
 
 ${stepByStepRules}
 
 ## TECHNICAL INFO
 - Current date: ${currentDate}
-- ${content.defaultYear}
+- ${defaultYearLine}
+- ${dateRuleLine}
 - ${content.languageInstruction}
 - ${content.emojiLimit}`;
 }

@@ -46,6 +46,54 @@ const corsHeaders = {
 };
 
 // ============================================================================
+// DATE YEAR NORMALIZATION - Safety net against LLM hallucinating past years
+// ============================================================================
+/**
+ * Normalize dates extracted by LLM tools to ensure they use the correct year.
+ * If a date is in the past relative to currentDate, bump it to the current or next year.
+ */
+export function normalizeExtractedYears(collectedData: CollectedToolData, currentDate: string): void {
+  const today = new Date(currentDate + "T00:00:00Z");
+  const currentYear = today.getFullYear();
+
+  function fixDate(dateStr: string | undefined): string | undefined {
+    if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+    const parsed = new Date(dateStr + "T00:00:00Z");
+    if (isNaN(parsed.getTime())) return dateStr;
+    
+    // If the year is in the past (before current year), fix it
+    if (parsed.getFullYear() < currentYear) {
+      const candidateThisYear = new Date(Date.UTC(currentYear, parsed.getMonth(), parsed.getDate()));
+      if (candidateThisYear >= today) {
+        return `${currentYear}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+      }
+      // Date this year is also past, use next year
+      return `${currentYear + 1}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+    }
+    return dateStr;
+  }
+
+  // Fix flight data dates
+  if (collectedData.flightData) {
+    collectedData.flightData.departureDate = fixDate(collectedData.flightData.departureDate as string | undefined) as string;
+    collectedData.flightData.returnDate = fixDate(collectedData.flightData.returnDate as string | undefined) as string;
+    // Fix legs dates
+    if (collectedData.flightData.legs && Array.isArray(collectedData.flightData.legs)) {
+      for (const leg of collectedData.flightData.legs as Array<{ date?: string }>) {
+        if (leg.date) leg.date = fixDate(leg.date);
+      }
+    }
+  }
+
+  // Fix intent classification dates
+  if (collectedData.intentClassification?.entities) {
+    const e = collectedData.intentClassification.entities;
+    if (e.exactDepartureDate) e.exactDepartureDate = fixDate(e.exactDepartureDate);
+    if (e.exactReturnDate) e.exactReturnDate = fixDate(e.exactReturnDate);
+  }
+}
+
+// ============================================================================
 // RATE LIMITING - Per-user, per-minute, persistent via Supabase
 // ============================================================================
 const MAX_REQUESTS_PER_MINUTE = 20;
@@ -395,6 +443,7 @@ function applyPreferenceFirstLogic(
 function buildClassificationSystemPrompt(
   preferencesState: { interests: string[]; style: string | null; pace: string | null },
   blockedWidgets: string[] = [],
+  currentDate?: string,
 ): string {
   const interestsStr = preferencesState.interests.length > 0
     ? preferencesState.interests.join(", ")
@@ -404,7 +453,13 @@ function buildClassificationSystemPrompt(
     ? blockedWidgets.join(", ")
     : "aucun";
 
+  const dateStr = currentDate || new Date().toISOString().split("T")[0];
+  const currentYear = dateStr.split("-")[0];
+
   return `Tu es un classificateur d'intention pour un assistant de voyage.
+DATE ACTUELLE: ${dateStr}
+RÈGLE DATES: Toute date sans année explicite utilise l'année ${currentYear}. Si la date résultante est dans le passé, utilise ${parseInt(currentYear) + 1}. Ne JAMAIS inventer une année comme 2024 ou 2025 si nous sommes en ${currentYear}.
+
 Analyse le DERNIER message utilisateur en tenant compte du contexte conversationnel fourni.
 Les messages précédents te donnent le contexte de la conversation.
 Utilise-les pour désambiguïser les intentions (ex: "2" = sélection si liste proposée, "Valentine's trip" = style de voyage si pas de contexte de dates explicite).
@@ -668,7 +723,7 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             messages: [
-              { role: "system", content: buildClassificationSystemPrompt(preferencesState, blockedWidgets) },
+              { role: "system", content: buildClassificationSystemPrompt(preferencesState, blockedWidgets, currentDate) },
               ...recentMessages,
             ],
             temperature: 0.3,
@@ -855,6 +910,9 @@ serve(async (req) => {
       finalContent = "Désolé, je n'ai pas pu générer de réponse.";
     }
     
+    // Normalize extracted years (safety net against LLM hallucinating past years)
+    normalizeExtractedYears(collectedData, currentDate);
+
     // Strip <action> tags from content (LLM sometimes generates these instead of using tools)
     finalContent = finalContent.replace(/<action>[\s\S]*?<\/action>/g, "").trim();
 
