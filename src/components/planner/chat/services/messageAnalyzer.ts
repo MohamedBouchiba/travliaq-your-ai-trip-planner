@@ -90,7 +90,7 @@ const DATES_QUESTION_PATTERNS = [
 
 const TRAVELERS_QUESTION_PATTERNS = [
   // French
-  /combien\s+(serez-vous|êtes-vous|de personnes)/i,
+  /combien\s+(serez-vous|êtes-vous|de personnes|de voyageurs?)/i,
   /(voyagez-vous|pars-tu)\s+(seul|en couple|en famille|entre amis)/i,
   /nombre\s+de\s+voyageurs?/i,
   /qui\s+(vous accompagne|t'accompagne)/i,
@@ -306,17 +306,23 @@ export function analyzeLastAssistantMessage(text: string | undefined): LastPropo
   };
 
   const PATTERN_SCORE = 10;
-  const NAME_SCORE = 5;
+  const NAME_SCORE = 12;
+  const STRUCTURAL_SCORE = 15;
   const QUESTION_BONUS = 5;
   const endsWithQuestion = text.trim().endsWith('?');
 
-  const categoryPatterns: Array<[ProposedContentType, RegExp[]]> = [
+  // Structural content (hotels, flights) gets highest pattern score
+  const structuralPatterns: Array<[ProposedContentType, RegExp[]]> = [
+    ['flights', FLIGHTS_PATTERNS],
+    ['hotels', HOTELS_PATTERNS],
+  ];
+
+  // Standard patterns get normal score
+  const standardPatterns: Array<[ProposedContentType, RegExp[]]> = [
     ['destinations', DESTINATION_PATTERNS],
     ['dates_question', DATES_QUESTION_PATTERNS],
     ['travelers_question', TRAVELERS_QUESTION_PATTERNS],
     ['budget_question', BUDGET_QUESTION_PATTERNS],
-    ['flights', FLIGHTS_PATTERNS],
-    ['hotels', HOTELS_PATTERNS],
     ['activities', ACTIVITIES_PATTERNS],
     ['destination_info', DESTINATION_INFO_PATTERNS],
     ['departure_question', DEPARTURE_QUESTION_PATTERNS],
@@ -324,19 +330,34 @@ export function analyzeLastAssistantMessage(text: string | undefined): LastPropo
     ['confirmation', CONFIRMATION_PATTERNS],
   ];
 
-  for (const [category, patterns] of categoryPatterns) {
+  // Score structural patterns (15 pts each match)
+  for (const [category, patterns] of structuralPatterns) {
+    for (const pattern of patterns) {
+      if (pattern.test(text)) {
+        scores[category] += STRUCTURAL_SCORE;
+      }
+    }
+  }
+
+  // Score standard patterns (10 pts each match)
+  for (const [category, patterns] of standardPatterns) {
     for (const pattern of patterns) {
       if (pattern.test(text)) {
         scores[category] += PATTERN_SCORE;
       }
     }
-    // Question bonus
-    if (endsWithQuestion && category.endsWith('_question')) {
-      scores[category] += QUESTION_BONUS;
+  }
+
+  // Question bonus: ONLY if a base pattern already scored > 0
+  if (endsWithQuestion) {
+    for (const [category] of [...structuralPatterns, ...standardPatterns]) {
+      if (category.endsWith('_question') && scores[category] > 0) {
+        scores[category] += QUESTION_BONUS;
+      }
     }
   }
 
-  // Destination name detection adds lower score
+  // Destination name detection: high score (12) to outrank standard patterns
   const extractedItems = extractDestinationNames(text);
   if (extractedItems.length > 0) {
     scores.destinations += NAME_SCORE;
@@ -439,7 +460,7 @@ const POSITIVE_INTENT_PATTERNS = [
 
 const NEGATIVE_INTENT_PATTERNS = [
   // French
-  /non|pas\s+vraiment|je\s+préfère\s+pas|autre\s+chose|bof|finalement\s+(pas|non)/i,
+  /non|pas\s+vraiment|je\s+préfère\s+pas|autre\s+chose|bof|finalement[,\s]+(pas|non)/i,
   // English
   /\bno\b|not\s+really|i('d)?\s+prefer\s+not|something\s+else|meh|nah|don't\s+like/i,
 ];

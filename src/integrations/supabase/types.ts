@@ -215,6 +215,24 @@ export type Database = {
         }
         Relationships: []
       }
+      destination_aliases: {
+        Row: {
+          alias: string
+          canonical_name: string
+          lang: string
+        }
+        Insert: {
+          alias: string
+          canonical_name: string
+          lang?: string
+        }
+        Update: {
+          alias?: string
+          canonical_name?: string
+          lang?: string
+        }
+        Relationships: []
+      }
       planner_sessions: {
         Row: {
           accommodation_memory: Json | null
