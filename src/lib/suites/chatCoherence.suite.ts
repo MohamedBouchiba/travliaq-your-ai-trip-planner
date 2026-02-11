@@ -632,12 +632,11 @@ export function registerChatCoherenceTests() {
       expect(intent.wantsDateInfo).toBe(true);
     });
 
-    it("turn 4: EN budget → budget intent ($ before number not extracted)", () => {
+    it("turn 4: EN budget → budget intent ($ before number extracted)", () => {
       const userMsg = "My budget is $3000 per person";
       const intent = analyzeUserIntent(userMsg);
       expect(intent.wantsBudgetInfo).toBe(true);
-      // Regex expects digit before currency symbol, $3000 has $ first
-      expect(intent.mentionedBudget).toBe(undefined);
+      expect(intent.mentionedBudget).toBe("3000");
     });
 
     it("turn 5: EN comparison request → comparison intent", () => {
