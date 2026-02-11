@@ -440,6 +440,16 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     isMountedRef.current = true;
     // Purge stale debug data from previous sessions
     useDebugStore.getState().clearAll();
+    // Reset stale departure from previous session (localStorage persistence)
+    try {
+      // Dynamic import to avoid circular dependency issues
+      import("@/stores/plannerStoreV2").then(({ usePlannerStoreV2 }) => {
+        const currentDeparture = usePlannerStoreV2.getState().departure;
+        if (currentDeparture?.iata || currentDeparture?.city) {
+          usePlannerStoreV2.getState().setDeparture(null);
+        }
+      });
+    } catch (_e) { /* store not available */ }
     return () => {
       isMountedRef.current = false;
       // Cancel any in-flight request

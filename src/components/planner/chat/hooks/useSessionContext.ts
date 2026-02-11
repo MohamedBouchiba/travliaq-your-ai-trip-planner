@@ -34,10 +34,11 @@ interface UseSessionContextReturn {
 const ENTITY_PATTERNS = {
   // Destinations: cities, countries
   destinations: [
-    /(?:aller|partir|voyager|visiter)\s+(?:à|en|au|aux)?\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
-    /([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)\s+(?:comme destination|m'intéresse)/gi,
-    // Departure city patterns (FR)
-    /à\s+partir\s+de\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
+    /(?:aller|partir|voyager|visiter)\s+(?:[àa]|en|au|aux)?\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
+    /([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)\s+(?:comme destination|m'int[ée]resse)/gi,
+    // Departure city patterns (FR) - tolerant to missing accents
+    /[àa]\s+partir\s+de\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
+    /(?:au d[ée]part de|je pars de)\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
     /depuis\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
     // EN patterns
     /(?:to|from|in)\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,

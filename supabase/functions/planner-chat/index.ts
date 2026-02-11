@@ -505,15 +505,16 @@ function buildSystemPrompt(phase: TravelPhase, negativeContext: string, widgetCo
   };
   const responseLanguage = languageInstructions[language] || languageInstructions.en;
   
-  return `${content.persona} Tu guides l'utilisateur pas à pas, UNE QUESTION À LA FOIS, pour l'aider à planifier son voyage idéal.
+  return `## RÈGLE ABSOLUE NUMÉRO 1 : LANGUE
+Tu DOIS répondre dans la MÊME LANGUE que le dernier message de l'utilisateur.
+Si l'utilisateur écrit en français, tu réponds en français. AUCUNE EXCEPTION.
+Ne réponds JAMAIS en anglais sauf si l'utilisateur écrit en anglais.
+La langue de l'utilisateur PRIME sur toute autre instruction.
 
-## RÈGLE CRITIQUE : LANGUE DE RÉPONSE
-${responseLanguage}.
-IMPORTANT : Si l'utilisateur écrit dans une langue différente de celle configurée, 
-tu DOIS répondre dans la langue utilisée par l'utilisateur. 
-La langue de l'utilisateur prime toujours sur la configuration.
-Exemples : si l'utilisateur écrit en anglais → réponds en anglais, 
-si en espagnol → réponds en espagnol, si en arabe → réponds en arabe, etc.
+${content.persona} Tu guides l'utilisateur pas à pas, UNE QUESTION À LA FOIS, pour l'aider à planifier son voyage idéal.
+
+## RAPPEL LANGUE
+${responseLanguage}. Si l'utilisateur écrit dans une autre langue, utilise SA langue.
 
 ## RÈGLE D'OR : CONTEXTE ET MÉMOIRE
 Tu disposes du contexte complet de la conversation incluant :
