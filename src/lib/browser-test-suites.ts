@@ -108,6 +108,12 @@ export const TEST_CATEGORIES: CategoryInfo[] = [
     emoji: "🎭",
     description: "Simulations de conversations réelles multi-tours avec validation pipeline complète",
   },
+  {
+    id: "chatAdvancedSim",
+    label: "Chat Advanced Sim",
+    emoji: "🚀",
+    description: "Tests avancés : widgets, mémoire, filtres, boosting, conflits, UX fluide",
+  },
 ];
 
 // ─── Registration ───
@@ -181,5 +187,9 @@ export async function registerAllBrowserTests(categories?: string[]) {
   if (all || categories?.includes("chatConversationSim")) {
     const { registerChatConversationSimTests } = await import("./suites/chatConversationSim.suite");
     registerChatConversationSimTests();
+  }
+  if (all || categories?.includes("chatAdvancedSim")) {
+    const { registerChatAdvancedSimTests } = await import("./suites/chatAdvancedSim.suite");
+    registerChatAdvancedSimTests();
   }
 }
