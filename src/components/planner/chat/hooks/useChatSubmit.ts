@@ -289,6 +289,14 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
         if (import.meta.env.DEV) console.log("[useChatSubmit] Intent:", intentClassification.primaryIntent);
         opts.setLastIntentClassification(intentClassification);
 
+        // Extract departureCity from intent when flightData is null
+        if (!flightData && intentClassification.entities?.departureCity) {
+          const depCity = intentClassification.entities.departureCity as string;
+          if (import.meta.env.DEV) console.log("[useChatSubmit] departureCity from intent:", depCity);
+          opts.updateMemory({ departure: { city: depCity } });
+          eventBus.emit("flight:updateFormData", { from: depCity });
+        }
+
         const intentResult = opts.intentRouter.processIntent(intentClassification);
         if (intentResult.widgetType) {
           opts.setLastWidgetTriggered(intentResult.widgetType);
