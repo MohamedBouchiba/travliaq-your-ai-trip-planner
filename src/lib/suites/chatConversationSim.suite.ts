@@ -752,8 +752,8 @@ export function registerChatConversationSimTests() {
       expect(analyzeAssistant("Here are some hotels in Barcelona").type).toBe("hotels");
     });
 
-    it("EN activities → activities", () => {
-      expect(analyzeAssistant("Here are the activities to do in Tokyo").type).toBe("activities");
+    it("EN activities + destination name → destinations (pattern priority)", () => {
+      expect(analyzeAssistant("Here are the activities to do in Tokyo").type).toBe("destinations");
     });
 
     it("FR departure question → departure_question", () => {
