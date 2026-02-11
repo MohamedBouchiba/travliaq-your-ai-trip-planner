@@ -352,25 +352,29 @@ describe("evaluatePhaseTransition", () => {
     expect(result).toBe(null);
   });
 
-  it("suggests destinations after style configured + no destination", () => {
+  it("does NOT auto-trigger destinations after style configured (Guard 1 removed)", () => {
     const interactions = [makeInteraction("style_configured")];
     const result = evaluatePhaseTransition(baseFlow, interactions, alwaysValid);
-    expect(result).not.toBe(null);
-    expect(result!.widgetType).toBe("destinationSuggestions");
-    expect(result!.reason).toContain("preferences complete");
+    // Guard 1 was removed: preferences no longer auto-trigger destinationSuggestions
+    expect(result).toBe(null);
   });
 
-  it("suggests destinations after interests selected", () => {
+  it("does NOT auto-trigger destinations after interests selected (Guard 1 removed)", () => {
     const interactions = [makeInteraction("interests_selected")];
     const result = evaluatePhaseTransition(baseFlow, interactions, alwaysValid);
-    expect(result!.widgetType).toBe("destinationSuggestions");
+    expect(result).toBe(null);
+  });
+
+  it("does NOT auto-trigger destinations even with both style + interests (Guard 1 removed)", () => {
+    const interactions = [makeInteraction("style_configured"), makeInteraction("interests_selected")];
+    const result = evaluatePhaseTransition(baseFlow, interactions, alwaysValid);
+    expect(result).toBe(null);
   });
 
   it("does NOT suggest destinations if destination already set", () => {
     const flow = { ...baseFlow, hasDestination: true };
     const interactions = [makeInteraction("style_configured")];
     const result = evaluatePhaseTransition(flow, interactions, alwaysValid);
-    // Should not trigger destination suggestions when destination exists
     expect(result?.widgetType).not.toBe("destinationSuggestions");
   });
 

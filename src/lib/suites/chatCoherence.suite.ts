@@ -1099,19 +1099,23 @@ export function registerChatCoherenceTests() {
     const alwaysValid = () => ({ valid: true } as WidgetValidation);
     const alwaysBlocked = () => ({ valid: false, reason: "blocked" } as WidgetValidation);
 
-    it("no destination + style configured → destinationSuggestions", () => {
+    it("no destination + style configured → null (Guard 1 removed, no auto-trigger)", () => {
       const flow = emptyFlowState();
       const result = evaluatePhaseTransition(flow, [wi("preferenceStyle", "style_configured")], alwaysValid);
-      expect(result).not.toBe(null);
-      expect(result!.widgetType).toBe("destinationSuggestions");
-      expect(result!.shouldShowWidget).toBe(true);
+      expect(result).toBe(null);
     });
 
-    it("no destination + interests selected → destinationSuggestions", () => {
+    it("no destination + interests selected → null (Guard 1 removed)", () => {
       const flow = emptyFlowState();
       const result = evaluatePhaseTransition(flow, [wi("preferenceInterests", "interests_selected")], alwaysValid);
-      expect(result).not.toBe(null);
-      expect(result!.widgetType).toBe("destinationSuggestions");
+      expect(result).toBe(null);
+    });
+
+    it("no destination + both style + interests → null (Guard 1 removed)", () => {
+      const flow = emptyFlowState();
+      const interactions = [wi("preferenceStyle", "style_configured"), wi("preferenceInterests", "interests_selected")];
+      const result = evaluatePhaseTransition(flow, interactions, alwaysValid);
+      expect(result).toBe(null);
     });
 
     it("destination city set + destination interaction → date widget", () => {
@@ -1134,9 +1138,9 @@ export function registerChatCoherenceTests() {
       expect(result).toBe(null);
     });
 
-    it("widget blocked by cooldown → no transition", () => {
-      const flow = emptyFlowState();
-      const result = evaluatePhaseTransition(flow, [wi("preferenceStyle", "style_configured")], alwaysBlocked);
+    it("widget blocked by cooldown → no transition (unchanged)", () => {
+      const flow = emptyFlowState({ hasDestination: true, hasDestinationCity: true });
+      const result = evaluatePhaseTransition(flow, [wi("citySelector", "city_selected")], alwaysBlocked);
       expect(result).toBe(null);
     });
 

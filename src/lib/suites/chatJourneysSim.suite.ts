@@ -1896,4 +1896,224 @@ export function registerChatJourneysSimTests() {
       expect(s.length).toBeGreaterThan(0);
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 41: Anti-proactivity — preferences do NOT auto-trigger destinations
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 41: Anti-proactivity — no forced destination suggestions after preferences", () => {
+    const mockCanShow = (_: WidgetType): WidgetValidation => ({ valid: true });
+    const wi = (type: string): WidgetInteraction => ({
+      id: `test-${type}`,
+      interactionType: type as WidgetInteraction["interactionType"],
+      widgetType: type,
+      timestamp: Date.now(),
+      data: {},
+      summary: `Test ${type}`,
+    });
+
+    it("style_configured alone → no auto destinationSuggestions", () => {
+      const result = evaluatePhaseTransition(
+        emptyFlow(),
+        [wi("style_configured")],
+        mockCanShow
+      );
+      expect(result).toBe(null);
+    });
+
+    it("interests_selected alone → no auto destinationSuggestions", () => {
+      const result = evaluatePhaseTransition(
+        emptyFlow(),
+        [wi("interests_selected")],
+        mockCanShow
+      );
+      expect(result).toBe(null);
+    });
+
+    it("style + interests completed → no auto destinationSuggestions", () => {
+      const result = evaluatePhaseTransition(
+        emptyFlow(),
+        [wi("style_configured"), wi("interests_selected")],
+        mockCanShow
+      );
+      expect(result).toBe(null);
+    });
+
+    it("style + interests + must_haves → still no auto destinations", () => {
+      const result = evaluatePhaseTransition(
+        emptyFlow(),
+        [wi("style_configured"), wi("interests_selected"), wi("must_haves_configured")],
+        mockCanShow
+      );
+      expect(result).toBe(null);
+    });
+
+    it("user says 'non' after preferences → negative sentiment, no widget forced", () => {
+      const intent = analyzeUserIntent("non");
+      expect(intent.isNegative).toBe(true);
+      const result = evaluatePhaseTransition(
+        emptyFlow(),
+        [wi("style_configured"), wi("interests_selected")],
+        mockCanShow
+      );
+      expect(result).toBe(null);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 42: Explicit destination request triggers correctly
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 42: Explicit destination requests vs simple responses", () => {
+    it("'inspire-moi' → detected as wanting more options (inspiration)", () => {
+      const intent = analyzeUserIntent("inspire-moi");
+      expect(intent.wantsMoreOptions).toBe(true);
+    });
+
+    it("'propose-moi des destinations' → detected as wanting more options", () => {
+      const intent = analyzeUserIntent("propose-moi des destinations");
+      expect(intent.wantsMoreOptions).toBe(true);
+    });
+
+    it("'oui' after preferences → positive sentiment (not inspiration)", () => {
+      const intent = analyzeUserIntent("oui");
+      expect(intent.isPositive).toBe(true);
+      expect(intent.wantsMoreOptions).not.toBe(true);
+    });
+
+    it("'non' → negative sentiment (no destination trigger)", () => {
+      const intent = analyzeUserIntent("non");
+      expect(intent.isNegative).toBe(true);
+    });
+
+    it("'je veux aller à Amsterdam' → destination mentioned", () => {
+      const intent = analyzeUserIntent("je veux aller à Amsterdam");
+      expect(intent.mentionedDestination).toBeTruthy();
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 43: Full escapade flow — preferences then user decides
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 43: Budget escapade — user controls destination step", () => {
+    it("step 1: initial message has budget info", () => {
+      const intent = analyzeUserIntent("je voudrais faire une escapade pas chère pour 2 jours depuis Bruxelles");
+      expect(intent.wantsBudgetInfo || intent.mentionedBudget || intent.wantsDateInfo).toBeTruthy();
+    });
+
+    it("step 2: after preferences, flow has no destination → no auto-trigger", () => {
+      const flow = emptyFlow({ hasDepartureCity: true });
+      const interactions = [wi("style_configured"), wi("interests_selected")];
+      const result = evaluatePhaseTransition(flow, interactions, (_: WidgetType) => ({ valid: true }));
+      expect(result).toBe(null);
+    });
+
+    it("step 3: user explicitly asks for suggestions → wantsMoreOptions", () => {
+      const intent = analyzeUserIntent("oui, propose-moi des destinations");
+      expect(intent.wantsMoreOptions).toBe(true);
+    });
+
+    it("step 4: user provides direct destination instead → destination detected", () => {
+      const intent = analyzeUserIntent("non merci, je veux aller à Amsterdam");
+      expect(intent.mentionedDestination).toBeTruthy();
+    });
+
+    const wi = (type: string): WidgetInteraction => ({
+      id: `j43-${type}`,
+      interactionType: type as WidgetInteraction["interactionType"],
+      widgetType: type,
+      timestamp: Date.now(),
+      data: {},
+      summary: `J43 ${type}`,
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 44: Guard 2 & 3 still work after Guard 1 removal
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 44: Remaining guards still transition correctly", () => {
+    const mockCanShow = (_: WidgetType): WidgetValidation => ({ valid: true });
+    const wi = (type: string): WidgetInteraction => ({
+      id: `j44-${type}`,
+      interactionType: type as WidgetInteraction["interactionType"],
+      widgetType: type,
+      timestamp: Date.now(),
+      data: {},
+      summary: `J44 ${type}`,
+    });
+
+    it("Guard 2: destination city + destination_selected → dateRangePicker", () => {
+      const result = evaluatePhaseTransition(
+        emptyFlow({ hasDestination: true, hasDestinationCity: true }),
+        [wi("destination_selected")],
+        mockCanShow
+      );
+      expect(result?.widgetType).toBe("dateRangePicker");
+    });
+
+    it("Guard 2: destination city + city_selected + oneway → datePicker", () => {
+      const result = evaluatePhaseTransition(
+        emptyFlow({ hasDestination: true, hasDestinationCity: true, tripType: "oneway" }),
+        [wi("city_selected")],
+        mockCanShow
+      );
+      expect(result?.widgetType).toBe("datePicker");
+    });
+
+    it("Guard 3: dates + date_range_selected → travelersSelector", () => {
+      const result = evaluatePhaseTransition(
+        emptyFlow({ hasDestination: true, hasDestinationCity: true, hasDepartureDate: true }),
+        [wi("destination_selected"), wi("date_range_selected")],
+        mockCanShow
+      );
+      expect(result?.widgetType).toBe("travelersSelector");
+    });
+
+    it("Guard 3: travelers already selected → no transition", () => {
+      const result = evaluatePhaseTransition(
+        emptyFlow({ hasDestination: true, hasDestinationCity: true, hasDepartureDate: true }),
+        [wi("destination_selected"), wi("date_range_selected"), wi("travelers_selected")],
+        mockCanShow
+      );
+      expect(result).toBe(null);
+    });
+
+    it("all guards: flight search triggered → always null", () => {
+      const result = evaluatePhaseTransition(
+        emptyFlow(),
+        [wi("style_configured"), wi("interests_selected")],
+        mockCanShow,
+        true
+      );
+      expect(result).toBe(null);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 45: Language mirroring — FR user gets FR responses
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 45: Language detection for chat coherence", () => {
+    it("detects French from user message", () => {
+      expect(detectLanguage("je voudrais partir en vacances")).toBe("fr");
+    });
+
+    it("detects French from informal message without accents", () => {
+      expect(detectLanguage("je sais pas ou aller")).toBe("fr");
+    });
+
+    it("detects English", () => {
+      expect(detectLanguage("I want to travel to Japan")).toBe("en");
+    });
+
+    it("detects French for short messages", () => {
+      expect(detectLanguage("non")).toBe("fr");
+    });
+
+    it("detects French for budget request", () => {
+      expect(detectLanguage("escapade pas cher depuis Bruxelles")).toBe("fr");
+    });
+  });
 }
