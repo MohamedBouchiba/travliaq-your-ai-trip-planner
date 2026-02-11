@@ -9,9 +9,10 @@ import { useDebugStore } from "@/stores/debugStore";
 
 const ENTITY_PATTERNS = {
   destinations: [
-    /(?:aller|partir|voyager|visiter)\s+(?:à|en|au|aux)?\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
-    /([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)\s+(?:comme destination|m'intéresse)/gi,
-    /à\s+partir\s+de\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
+    /(?:aller|partir|voyager|visiter)\s+(?:[àa]|en|au|aux)?\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
+    /([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)\s+(?:comme destination|m'int[ée]resse)/gi,
+    /[àa]\s+partir\s+de\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
+    /(?:au d[ée]part de|je pars de)\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
     /depuis\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
     /(?:to|from|in)\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/gi,
   ],
@@ -84,6 +85,21 @@ export function registerSessionEntitiesTests() {
     it("EN 'to Barcelona' captures Barcelona", () => {
       const r = extractEntities("to Barcelona", ENTITY_PATTERNS.destinations);
       expect(r.some((v) => v.toLowerCase() === "barcelona")).toBe(true);
+    });
+
+    it("FR 'a partir de Bruxelles' (no accent) captures Bruxelles", () => {
+      const r = extractEntities("a partir de Bruxelles", ENTITY_PATTERNS.destinations);
+      expect(r.some((v) => v.toLowerCase() === "bruxelles")).toBe(true);
+    });
+
+    it("FR 'au depart de Lyon' (no accent) captures Lyon", () => {
+      const r = extractEntities("au depart de Lyon", ENTITY_PATTERNS.destinations);
+      expect(r.some((v) => v.toLowerCase() === "lyon")).toBe(true);
+    });
+
+    it("FR 'je pars de Marseille' captures Marseille", () => {
+      const r = extractEntities("je pars de Marseille", ENTITY_PATTERNS.destinations);
+      expect(r.some((v) => v.toLowerCase() === "marseille")).toBe(true);
     });
   });
 

@@ -402,6 +402,11 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
 
       if (flightData && Object.keys(flightData).length > 0) {
         const fd = flightData as Record<string, unknown>;
+        // Guard: ignore hallucinated toCountryCode when no destination city was provided
+        if (fd.toCountryCode && !fd.to) {
+          if (import.meta.env.DEV) console.warn("[useChatSubmit] Ignoring hallucinated toCountryCode:", fd.toCountryCode);
+          delete fd.toCountryCode;
+        }
         const needsDestinationCity = fd.needsCitySelection && fd.toCountryCode;
         const needsDepartureCity = fd.fromCountryCode && !fd.from;
         const skipDateWidget = needsDestinationCity || needsDepartureCity;
