@@ -53,22 +53,21 @@ export interface UserIntent {
 // Patterns for detecting what the assistant proposed
 const DESTINATION_PATTERNS = [
   // French
-  /voici\s+(\d+)\s+destinations?/i,
-  /je te propose\s+(\d+)\s+destinations?/i,
+  /voici\s+(\d+)\s+[\w\s]*destinations?/i,
+  /je te propose\s+(\d+)\s+[\w\s]*destinations?/i,
   /destinations?\s+(parfaites?|idéales?|recommandées?)/i,
   /pour toi\s*:\s*([\w\s,]+)/i,
   /que penses-tu de\s+([\w\s]+)\s*\?/i,
   /découvrir\s+([\w\s]+)\s*\?/i,
   // English
-  /here\s+are\s+(\d+)\s+destinations?/i,
-  /i\s+suggest\s+(\d+)\s+destinations?/i,
+  /here\s+are\s+(\d+)\s+[\w\s]*destinations?/i,
+  /i\s+suggest\s+(\d+)\s+[\w\s]*destinations?/i,
   /destinations?\s+(perfect|ideal|recommended)/i,
   /for\s+you\s*:\s*([\w\s,]+)/i,
   /what\s+do\s+you\s+think\s+(of|about)\s+([\w\s]+)\s*\?/i,
+  /what\s+about\s+([\w\s,]+)\s*\?/i,
   /discover\s+([\w\s]+)\s*\?/i,
   /how\s+about\s+([\w\s]+)\s*\?/i,
-  // Common destinations (work for both)
-  /(thaïlande|thailand|bali|vietnam|japon|japan|grèce|greece|espagne|spain|italie|italy|portugal|maroc|morocco|mexique|mexico)/i,
 ];
 
 const DATES_QUESTION_PATTERNS = [
@@ -97,6 +96,7 @@ const TRAVELERS_QUESTION_PATTERNS = [
   /qui\s+(vous accompagne|t'accompagne)/i,
   // English
   /how\s+many\s+(people|travelers|travellers|guests|passengers)/i,
+  /how\s+many\s+of\s+you/i,
   /(are you|will you be)\s+travel(l)?ing\s+(alone|solo|as a couple|with family|with friends)/i,
   /number\s+of\s+(travelers|travellers|guests|passengers)/i,
   /who\s+(is|will be)\s+(joining|coming|accompanying)/i,
@@ -135,14 +135,14 @@ const FLIGHTS_PATTERNS = [
 
 const HOTELS_PATTERNS = [
   // French
-  /voici\s+(les|des)\s+hôtels?/i,
-  /j'ai trouvé\s+(\d+)\s+hôtels?/i,
+  /voici\s+(les|des)\s+[\w\s]*hôtels?/i,
+  /j'ai trouvé\s+(\d+)\s+[\w\s]*hôtels?/i,
   /hébergements?\s+(disponibles?|recommandés?)/i,
   /options?\s+d'hébergement/i,
   /où\s+dormir/i,
   // English
-  /here\s+are\s+(the|some)\s+hotels?/i,
-  /i('ve)?\s+found\s+(\d+)\s+hotels?/i,
+  /here\s+are\s+(the|some)\s+[\w\s]*hotels?/i,
+  /i('ve)?\s+found\s+(these|some|\d+)\s+[\w\s]*hotels?/i,
   /accommodations?\s+(available|recommended)/i,
   /accommodation\s+options?/i,
   /where\s+to\s+stay/i,
@@ -210,6 +210,8 @@ const DEPARTURE_QUESTION_PATTERNS = [
   /from\s+which\s+city/i,
   /departure\s+city/i,
   /where\s+(would you like|do you want)\s+to\s+(depart|leave)\s+from/i,
+  /where\s+will\s+you\s+be\s+depart/i,
+  /where\s+are\s+you\s+depart/i,
 ];
 
 const NEXT_STEPS_PATTERNS = [
@@ -293,95 +295,100 @@ export function analyzeLastAssistantMessage(text: string | undefined): LastPropo
     }
   }
   
-  // Check for destination proposals
-  for (const pattern of DESTINATION_PATTERNS) {
-    if (pattern.test(text)) {
-      const items = extractDestinationNames(text);
-      return { 
-        type: 'destinations', 
-        items,
-        isAskingForChoice: items.length > 1 || /que penses-tu|choisi|what do you think|choose/i.test(text)
+  // ── Score-based classification ──
+  // Each pattern match = 10 pts, destination NAME detection = 5 pts,
+  // trailing "?" = +5 bonus to question categories. Highest score wins.
+  const scores: Record<ProposedContentType, number> = {
+    destinations: 0, dates_question: 0, travelers_question: 0,
+    budget_question: 0, flights: 0, hotels: 0, activities: 0,
+    destination_info: 0, departure_question: 0, next_steps: 0,
+    confirmation: 0, open_question: 0, greeting: 0, unknown: 0,
+  };
+
+  const PATTERN_SCORE = 10;
+  const NAME_SCORE = 5;
+  const QUESTION_BONUS = 5;
+  const endsWithQuestion = text.trim().endsWith('?');
+
+  const categoryPatterns: Array<[ProposedContentType, RegExp[]]> = [
+    ['destinations', DESTINATION_PATTERNS],
+    ['dates_question', DATES_QUESTION_PATTERNS],
+    ['travelers_question', TRAVELERS_QUESTION_PATTERNS],
+    ['budget_question', BUDGET_QUESTION_PATTERNS],
+    ['flights', FLIGHTS_PATTERNS],
+    ['hotels', HOTELS_PATTERNS],
+    ['activities', ACTIVITIES_PATTERNS],
+    ['destination_info', DESTINATION_INFO_PATTERNS],
+    ['departure_question', DEPARTURE_QUESTION_PATTERNS],
+    ['next_steps', NEXT_STEPS_PATTERNS],
+    ['confirmation', CONFIRMATION_PATTERNS],
+  ];
+
+  for (const [category, patterns] of categoryPatterns) {
+    for (const pattern of patterns) {
+      if (pattern.test(text)) {
+        scores[category] += PATTERN_SCORE;
+      }
+    }
+    // Question bonus
+    if (endsWithQuestion && category.endsWith('_question')) {
+      scores[category] += QUESTION_BONUS;
+    }
+  }
+
+  // Destination name detection adds lower score
+  const extractedItems = extractDestinationNames(text);
+  if (extractedItems.length > 0) {
+    scores.destinations += NAME_SCORE;
+  }
+
+  // Find winner
+  let bestType: ProposedContentType = 'unknown';
+  let bestScore = 0;
+  for (const [type, score] of Object.entries(scores) as Array<[ProposedContentType, number]>) {
+    if (score > bestScore) {
+      bestScore = score;
+      bestType = type;
+    }
+  }
+
+  if (bestScore === 0) {
+    // Fallback: open question or unknown
+    if (endsWithQuestion) return { type: 'open_question' };
+    return { type: 'unknown' };
+  }
+
+  // Build result based on winning type
+  switch (bestType) {
+    case 'destinations':
+      return {
+        type: 'destinations',
+        items: extractedItems,
+        isAskingForChoice: extractedItems.length > 1 || /que penses-tu|choisi|what do you think|choose/i.test(text),
       };
-    }
-  }
-  
-  // Check for date questions
-  for (const pattern of DATES_QUESTION_PATTERNS) {
-    if (pattern.test(text)) {
+    case 'dates_question':
       return { type: 'dates_question', questionTopic: 'dates' };
-    }
-  }
-  
-  // Check for travelers questions
-  for (const pattern of TRAVELERS_QUESTION_PATTERNS) {
-    if (pattern.test(text)) {
+    case 'travelers_question':
       return { type: 'travelers_question', questionTopic: 'travelers' };
-    }
-  }
-  
-  // Check for budget questions
-  for (const pattern of BUDGET_QUESTION_PATTERNS) {
-    if (pattern.test(text)) {
+    case 'budget_question':
       return { type: 'budget_question', questionTopic: 'budget' };
-    }
-  }
-  
-  // Check for flights proposals
-  for (const pattern of FLIGHTS_PATTERNS) {
-    if (pattern.test(text)) {
+    case 'flights':
       return { type: 'flights', isAskingForChoice: true };
-    }
-  }
-  
-  // Check for hotels proposals
-  for (const pattern of HOTELS_PATTERNS) {
-    if (pattern.test(text)) {
+    case 'hotels':
       return { type: 'hotels', isAskingForChoice: true };
-    }
-  }
-  
-  // Check for activities proposals
-  for (const pattern of ACTIVITIES_PATTERNS) {
-    if (pattern.test(text)) {
+    case 'activities':
       return { type: 'activities', isAskingForChoice: true };
-    }
-  }
-  
-  // Check for destination info
-  for (const pattern of DESTINATION_INFO_PATTERNS) {
-    if (pattern.test(text)) {
-      const items = extractDestinationNames(text);
-      return { type: 'destination_info', items };
-    }
-  }
-  
-  // Check for departure question (before confirmation, since messages can contain both)
-  for (const pattern of DEPARTURE_QUESTION_PATTERNS) {
-    if (pattern.test(text)) {
+    case 'destination_info':
+      return { type: 'destination_info', items: extractedItems };
+    case 'departure_question':
       return { type: 'departure_question', questionTopic: 'departure_city' };
-    }
-  }
-
-  // Check for next steps / remaining fields
-  for (const pattern of NEXT_STEPS_PATTERNS) {
-    if (pattern.test(text)) {
+    case 'next_steps':
       return { type: 'next_steps', questionTopic: 'missing_fields' };
-    }
-  }
-
-  // Check for confirmations
-  for (const pattern of CONFIRMATION_PATTERNS) {
-    if (pattern.test(text)) {
+    case 'confirmation':
       return { type: 'confirmation' };
-    }
+    default:
+      return { type: bestType };
   }
-  
-  // Check for open questions (ends with ?)
-  if (text.trim().endsWith('?')) {
-    return { type: 'open_question' };
-  }
-  
-  return { type: 'unknown' };
 }
 
 // ============================================================================
@@ -390,37 +397,37 @@ export function analyzeLastAssistantMessage(text: string | undefined): LastPropo
 
 const BUDGET_INTENT_PATTERNS = [
   // French
-  /budget|€|\d+\s*(euros?|€)|pas\s+cher|économique|luxe/i,
+  /budget|€|\d+\s*(euros?|€)|pas\s+cher|économique|luxe|combien/i,
   // English
-  /budget|\$|\£|\d+\s*(dollars?|pounds?|\$|\£)|cheap|affordable|luxury|expensive/i,
+  /budget|\$|\£|\d+\s*(dollars?|pounds?|\$|\£)|cheap|affordable|luxury|expensive|how\s+much/i,
 ];
 
 const DATE_INTENT_PATTERNS = [
   // French
-  /quand|date|période|mois|semaine|weekend/i,
+  /quand|date|période|mois|semaine|weekend|\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\b/i,
   // English
-  /when|date|period|month|week|weekend/i,
+  /when|date|period|month|week|weekend|\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i,
 ];
 
 const COMPARISON_INTENT_PATTERNS = [
   // French
   /compare|versus|vs|ou\s+plutôt|différence|lequel/i,
   // English
-  /compare|versus|vs|or\s+rather|difference|which\s+one/i,
+  /compare|versus|vs|or\s+rather|difference|which\s+one|which\s+is\s+better|torn\s+between/i,
 ];
 
 const MORE_OPTIONS_INTENT_PATTERNS = [
   // French
   /autre|plus\s+d'options?|alternatives?|sinon|différent/i,
   // English
-  /other|more\s+options?|alternatives?|else|different/i,
+  /other|more\s+options?|alternatives?|else|different|something\s+(more|else|different)/i,
 ];
 
 const BOOKING_INTENT_PATTERNS = [
   // French
-  /réserve|book|je\s+prends|c'est\s+bon|valide|confirme/i,
+  /réserve|book|je\s+prends|on\s+prend|c'est\s+bon|valide|confirme/i,
   // English
-  /book|reserve|i('ll)?\s+take|sounds\s+good|confirm|validate/i,
+  /book|reserve|i('ll)?\s+take\b|sounds\s+good|confirm|validate|let's\s+go\s+with/i,
 ];
 
 const POSITIVE_INTENT_PATTERNS = [
@@ -432,16 +439,16 @@ const POSITIVE_INTENT_PATTERNS = [
 
 const NEGATIVE_INTENT_PATTERNS = [
   // French
-  /non|pas\s+vraiment|je\s+préfère\s+pas|autre\s+chose|bof/i,
+  /non|pas\s+vraiment|je\s+préfère\s+pas|autre\s+chose|bof|finalement\s+(pas|non)/i,
   // English
-  /no|not\s+really|i('d)?\s+prefer\s+not|something\s+else|meh|nah/i,
+  /\bno\b|not\s+really|i('d)?\s+prefer\s+not|something\s+else|meh|nah|don't\s+like/i,
 ];
 
 const UNDECIDED_INTENT_PATTERNS = [
   // French
-  /je\s+sais\s+pas|hésit|peut-être|je\s+ne\s+suis\s+pas\s+sûr/i,
+  /(?:je|on)\s+(?:ne\s+)?sai[st]?\s+pas|hésit|peut-être|je\s+ne\s+suis\s+pas\s+sûr/i,
   // English
-  /i\s+don't\s+know|not\s+sure|maybe|perhaps|hesitat|undecided/i,
+  /i\s+don't\s+know|not\s+sure|maybe|perhaps|hesitat|undecided|torn\s+between|can't\s+decide/i,
 ];
 
 /**
@@ -540,14 +547,14 @@ export function detectLanguage(text: string | undefined): 'fr' | 'en' {
     return currentLang === 'fr' ? 'fr' : 'en';
   }
   
-  // French markers
-  const frMarkers = /\b(je|tu|nous|vous|est|sont|le|la|les|un|une|des|pour|avec|dans|sur|qui|que|quoi|comment|pourquoi|où|quand|bonjour|merci|oui|non)\b/i;
+  // French markers — use /gi to count ALL occurrences
+  const frMarkers = /\b(je|tu|nous|vous|est|sont|le|la|les|un|une|des|pour|avec|dans|sur|qui|que|quoi|comment|pourquoi|où|quand|bonjour|merci|oui|non|on|en|au|du|ne|pas|mon|ton|son|mais|tout|ou|ni|se)\b/gi;
   
   // English markers
-  const enMarkers = /\b(i|you|we|they|is|are|the|a|an|some|for|with|in|on|who|what|why|where|when|how|hello|thanks|yes|no|please)\b/i;
+  const enMarkers = /\b(i|you|we|they|is|are|the|a|an|some|for|with|in|on|who|what|why|where|when|how|hello|thanks|yes|no|please|to|my|your|this|that|it|do|can|will|not|just|from)\b/gi;
   
-  const frCount = (text.match(frMarkers) || []).length;
-  const enCount = (text.match(enMarkers) || []).length;
+  const frCount = [...text.matchAll(frMarkers)].length;
+  const enCount = [...text.matchAll(enMarkers)].length;
   
   // If counts are equal or both zero, use current i18n language
   if (frCount === enCount) {

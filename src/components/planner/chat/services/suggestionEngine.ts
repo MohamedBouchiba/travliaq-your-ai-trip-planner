@@ -484,6 +484,6 @@ export function getWorkflowStep(context: Omit<SuggestionContext, 'workflowStep'>
   if (!context.hasDestination) return 'inspiration';
   if (!context.hasDates) return 'destination';
   if (!context.hasTravelers) return 'dates';
-  if (!context.hasFlights && context.currentTab === 'flights') return 'search';
+  if (!context.hasFlights && !context.hasHotels) return 'search';
   return 'compare';
 }

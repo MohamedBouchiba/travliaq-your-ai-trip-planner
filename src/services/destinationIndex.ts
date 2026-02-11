@@ -106,6 +106,7 @@ class DestinationIndex {
 
     for (let i = 0; i < words.length; i++) {
       // Check n-grams: 3, 2, 1 (longest first to prefer "New York City" over "New")
+      let matched = false;
       for (const len of [3, 2, 1]) {
         if (i + len > words.length) continue;
         const candidate = words.slice(i, i + len).join(" ");
@@ -114,15 +115,23 @@ class DestinationIndex {
         // Skip very short single tokens that are common words
         if (len === 1 && (norm.length < 3 || SKIP_TOKENS.has(norm))) continue;
 
-        if (this.nameSet.has(norm) && !found.has(norm)) {
-          const entry = this.byName.get(norm);
-          if (entry) {
-            found.set(norm, entry.displayName);
-            // Skip consumed words
-            i += len - 1;
-            break;
+        // Try normalized form first, then original lowercase (for accented inputs like "Thaïlande")
+        const candidateLower = candidate.toLowerCase();
+        const tryKeys = [norm];
+        if (candidateLower !== norm) tryKeys.push(candidateLower);
+
+        for (const key of tryKeys) {
+          if (this.nameSet.has(key) && !found.has(key)) {
+            const entry = this.byName.get(key);
+            if (entry) {
+              found.set(key, entry.displayName);
+              i += len - 1;
+              matched = true;
+              break;
+            }
           }
         }
+        if (matched) break;
       }
     }
 

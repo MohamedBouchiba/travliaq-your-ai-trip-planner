@@ -173,7 +173,7 @@ export function extractPhaseSignals(
   ];
   const readyToBook = bookingPatterns.some(p => p.test(lowerMessage));
   
-  // Detect negative preferences
+  // Detect negative preferences (bilingual)
   const negativePatterns = [
     /je n'aime pas/i,
     /pas de/i,
@@ -183,6 +183,13 @@ export function extractPhaseSignals(
     /d[ée]teste/i,
     /pas int[ée]ress/i,
     /non merci/i,
+    // English
+    /don't\s+want/i,
+    /avoid/i,
+    /dislike/i,
+    /\bhate\b/i,
+    /not\s+interested/i,
+    /stay\s+away/i,
   ];
   const hasNegativePreferences = negativePatterns.some(p => p.test(lowerMessage));
   
