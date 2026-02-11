@@ -295,9 +295,18 @@ export function analyzeLastAssistantMessage(text: string | undefined): LastPropo
     }
   }
   
-  // ── Score-based classification ──
-  // Each pattern match = 10 pts, destination NAME detection = 5 pts,
-  // trailing "?" = +5 bonus to question categories. Highest score wins.
+  // ── Contextual score-based classification ──
+  // 
+  // Priority tiers (higher = wins):
+  //   Tier 1 — Structural content (hotels/flights): 25 pts per match
+  //   Tier 2 — Destination name detection: 20 base + 3 per extra name
+  //   Tier 3 — Standard patterns: 10 pts per match
+  //   Question bonus: +5 ONLY when a base pattern already scored > 0
+  //
+  // This ensures destination names almost always win over standard patterns
+  // (dates_question, confirmation, activities…) but structural content
+  // (hotels, flights) still takes priority since it's more specific.
+  
   const scores: Record<ProposedContentType, number> = {
     destinations: 0, dates_question: 0, travelers_question: 0,
     budget_question: 0, flights: 0, hotels: 0, activities: 0,
@@ -305,19 +314,33 @@ export function analyzeLastAssistantMessage(text: string | undefined): LastPropo
     confirmation: 0, open_question: 0, greeting: 0, unknown: 0,
   };
 
+  const STRUCTURAL_SCORE = 25;
+  const NAME_BASE_SCORE = 20;
+  const NAME_PER_EXTRA = 3;
   const PATTERN_SCORE = 10;
-  const NAME_SCORE = 12;
-  const STRUCTURAL_SCORE = 15;
   const QUESTION_BONUS = 5;
   const endsWithQuestion = text.trim().endsWith('?');
 
-  // Structural content (hotels, flights) gets highest pattern score
+  // ── Tier 1: Structural content (hotels, flights) ──
   const structuralPatterns: Array<[ProposedContentType, RegExp[]]> = [
     ['flights', FLIGHTS_PATTERNS],
     ['hotels', HOTELS_PATTERNS],
   ];
+  for (const [category, patterns] of structuralPatterns) {
+    for (const pattern of patterns) {
+      if (pattern.test(text)) {
+        scores[category] += STRUCTURAL_SCORE;
+      }
+    }
+  }
 
-  // Standard patterns get normal score
+  // ── Tier 2: Destination name detection ──
+  const extractedItems = extractDestinationNames(text);
+  if (extractedItems.length > 0) {
+    scores.destinations += NAME_BASE_SCORE + Math.max(0, extractedItems.length - 1) * NAME_PER_EXTRA;
+  }
+
+  // ── Tier 3: Standard patterns ──
   const standardPatterns: Array<[ProposedContentType, RegExp[]]> = [
     ['destinations', DESTINATION_PATTERNS],
     ['dates_question', DATES_QUESTION_PATTERNS],
@@ -329,17 +352,6 @@ export function analyzeLastAssistantMessage(text: string | undefined): LastPropo
     ['next_steps', NEXT_STEPS_PATTERNS],
     ['confirmation', CONFIRMATION_PATTERNS],
   ];
-
-  // Score structural patterns (15 pts each match)
-  for (const [category, patterns] of structuralPatterns) {
-    for (const pattern of patterns) {
-      if (pattern.test(text)) {
-        scores[category] += STRUCTURAL_SCORE;
-      }
-    }
-  }
-
-  // Score standard patterns (10 pts each match)
   for (const [category, patterns] of standardPatterns) {
     for (const pattern of patterns) {
       if (pattern.test(text)) {
@@ -348,7 +360,7 @@ export function analyzeLastAssistantMessage(text: string | undefined): LastPropo
     }
   }
 
-  // Question bonus: ONLY if a base pattern already scored > 0
+  // ── Question bonus: ONLY if a base pattern already scored > 0 ──
   if (endsWithQuestion) {
     for (const [category] of [...structuralPatterns, ...standardPatterns]) {
       if (category.endsWith('_question') && scores[category] > 0) {
@@ -357,13 +369,7 @@ export function analyzeLastAssistantMessage(text: string | undefined): LastPropo
     }
   }
 
-  // Destination name detection: high score (12) to outrank standard patterns
-  const extractedItems = extractDestinationNames(text);
-  if (extractedItems.length > 0) {
-    scores.destinations += NAME_SCORE;
-  }
-
-  // Find winner
+  // ── Find winner ──
   let bestType: ProposedContentType = 'unknown';
   let bestScore = 0;
   for (const [type, score] of Object.entries(scores) as Array<[ProposedContentType, number]>) {
