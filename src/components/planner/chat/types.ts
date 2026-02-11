@@ -3,6 +3,7 @@
  */
 
 import type { Airport } from "@/hooks/useNearestAirports";
+import { destinationIndex } from "@/services/destinationIndex";
 import type {
   AirportChoice,
   DualAirportChoice,
@@ -266,6 +267,11 @@ export const CITY_COORDINATES: Record<string, [number, number]> = {
  * Get city coordinates from name
  */
 export function getCityCoords(cityName: string): [number, number] | null {
+  // Primary: DB-backed index
+  const fromIndex = destinationIndex.getCoords(cityName);
+  if (fromIndex) return fromIndex;
+
+  // Fallback: static coordinates for when index hasn't loaded yet
   const normalized = cityName.toLowerCase().trim();
   return CITY_COORDINATES[normalized] || null;
 }
