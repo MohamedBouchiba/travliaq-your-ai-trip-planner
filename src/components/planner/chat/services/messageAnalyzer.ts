@@ -424,7 +424,7 @@ export function analyzeLastAssistantMessage(text: string | undefined): LastPropo
 
 const BUDGET_INTENT_PATTERNS = [
   // French
-  /budget|€|\d+\s*(euros?|€)|pas\s+cher|économique|luxe|combien/i,
+  /budget|€|\d+\s*(euros?|€)|pas\s+ch[eè]re?s?|économique|luxe|combien/i,
   // English
   /budget|\$|\£|\d+\s*(dollars?|pounds?|\$|\£)|cheap|affordable|luxury|expensive|how\s+much/i,
 ];
@@ -574,20 +574,6 @@ export function analyzeUserIntent(text: string | undefined): UserIntent {
     }
   }
   
-  // Qualitative budget detection (when no numeric amount found)
-  if (intent.wantsBudgetInfo && !intent.mentionedBudget) {
-    const qualPatterns = [
-      { pattern: /pas\s+ch[eè]re?|[ée]conomique|cheap|affordable/i, label: "budget" },
-      { pattern: /luxe|premium|haut\s+de\s+gamme|luxury/i, label: "luxury" },
-      { pattern: /moyen|raisonnable|correct|moderate/i, label: "moderate" },
-    ];
-    for (const { pattern, label } of qualPatterns) {
-      if (pattern.test(text)) {
-        intent.mentionedBudget = label;
-        break;
-      }
-    }
-  }
   
   return intent;
 }
