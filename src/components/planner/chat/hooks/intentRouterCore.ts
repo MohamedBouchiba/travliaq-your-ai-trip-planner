@@ -302,19 +302,8 @@ export function evaluatePhaseTransition(
   const hasInteraction = (type: string) =>
     widgetInteractions.some((i) => i.interactionType === type);
 
-  // Guard 1: Preferences filled + no destination → suggest destinations
-  if (!flowState.hasDestination) {
-    const hasStyleOrInterests =
-      hasInteraction("style_configured") || hasInteraction("interests_selected");
-    if (hasStyleOrInterests && canShowWidget("destinationSuggestions").valid) {
-      return {
-        shouldShowWidget: true,
-        widgetType: "destinationSuggestions" as WidgetType,
-        action: "none",
-        reason: "Phase transition: preferences complete → destination suggestions",
-      };
-    }
-  }
+  // Guard 1: REMOVED — destination suggestions are now driven by backend (LLM) only.
+  // The LLM will ask the user if they want suggestions after preferences are collected.
 
   // Guard 2: Destination set + no dates → date picker
   if (flowState.hasDestinationCity && !flowState.hasDepartureDate) {
