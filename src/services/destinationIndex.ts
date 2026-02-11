@@ -21,6 +21,8 @@ function normalize(s: string): string {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -189,7 +191,7 @@ class DestinationIndex {
   private async _load(): Promise<void> {
     try {
       // Parallel fetch: top 5000 cities + all countries
-      const [citiesRes, countriesRes] = await Promise.all([
+      const [citiesRes, countriesRes, aliasesRes] = await Promise.all([
         supabase
           .from("cities")
           .select("name, latitude, longitude, country, country_code")
@@ -200,6 +202,9 @@ class DestinationIndex {
         supabase
           .from("countries")
           .select("name, iso2"),
+        supabase
+          .from("destination_aliases")
+          .select("alias, canonical_name"),
       ]);
 
       // Index cities
@@ -222,6 +227,19 @@ class DestinationIndex {
         }
       } else if (countriesRes.error) {
         console.warn("[DestinationIndex] Failed to load countries:", countriesRes.error.message);
+      }
+
+      // Index aliases (multilingual destination names)
+      if (aliasesRes.data) {
+        for (const row of aliasesRes.data) {
+          const canonicalNorm = normalize(row.canonical_name);
+          const existingEntry = this.byName.get(canonicalNorm);
+          const coords = existingEntry?.coords ?? null;
+          const type = existingEntry?.type ?? "country";
+          this._addEntry(row.alias, coords, type);
+        }
+      } else if (aliasesRes.error) {
+        console.warn("[DestinationIndex] Failed to load aliases:", aliasesRes.error.message);
       }
 
       this._ready = true;
