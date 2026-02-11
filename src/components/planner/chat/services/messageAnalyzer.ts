@@ -8,6 +8,7 @@
  */
 
 import i18n from "@/i18n/config";
+import { destinationIndex } from "@/services/destinationIndex";
 
 export type ProposedContentType = 
   | 'destinations'
@@ -242,10 +243,13 @@ const GREETING_PATTERNS = [
  * Extract destination names from text (bilingual)
  */
 function extractDestinationNames(text: string): string[] {
-  const destinations: string[] = [];
-  
-  // Common destination names (work for both FR and EN)
-  const knownDestinations = [
+  // Primary: use DB-backed index (covers ~5000 cities + 250 countries)
+  if (destinationIndex.isReady()) {
+    return destinationIndex.match(text);
+  }
+
+  // Fallback: minimal static list for when index hasn't loaded yet
+  const fallbackDestinations = [
     'Thaïlande', 'Thailand', 'Bali', 'Vietnam', 'Japon', 'Japan',
     'Grèce', 'Greece', 'Espagne', 'Spain', 'Italie', 'Italy',
     'Portugal', 'Maroc', 'Morocco', 'Mexique', 'Mexico',
@@ -259,15 +263,19 @@ function extractDestinationNames(text: string): string[] {
     'Tokyo', 'Kyoto', 'Bangkok', 'Phuket', 'Bora Bora',
     'New York', 'Los Angeles', 'Miami', 'San Francisco',
     'Londres', 'London', 'Amsterdam', 'Berlin', 'Prague', 'Vienne', 'Vienna',
+    'Zanzibar', 'Cambodge', 'Cambodia', 'Ibiza', 'Mykonos',
+    'Montenegro', 'Cyprus', 'Chypre', 'Santorini', 'Tunisie', 'Tunisia',
+    'Madère', 'Madeira',
   ];
   
-  for (const dest of knownDestinations) {
-    if (text.toLowerCase().includes(dest.toLowerCase())) {
+  const destinations: string[] = [];
+  const textLower = text.toLowerCase();
+  for (const dest of fallbackDestinations) {
+    if (textLower.includes(dest.toLowerCase())) {
       destinations.push(dest);
     }
   }
-  
-  return destinations.slice(0, 4); // Max 4 destinations
+  return destinations.slice(0, 6);
 }
 
 /**

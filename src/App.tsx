@@ -6,8 +6,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { UserPreferencesProvider } from "@/contexts/UserPreferencesContext";
 import { HelmetProvider } from "react-helmet-async";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { usePageTracking } from "@/hooks/usePageTracking";
+import { destinationIndex } from "@/services/destinationIndex";
 const SentryTest = lazy(() => import("./pages/SentryTest"));
 const Index = lazy(() => import("./pages/Index"));
 const IndexV2 = lazy(() => import("./pages/IndexV2"));
@@ -35,6 +36,10 @@ const queryClient = new QueryClient();
 const AppContent = () => {
   usePageTracking();
   
+  useEffect(() => {
+    destinationIndex.init();
+  }, []);
+
   return (
     <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>}>
       <Routes>
