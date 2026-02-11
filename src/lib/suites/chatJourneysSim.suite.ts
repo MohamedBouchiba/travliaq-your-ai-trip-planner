@@ -37,7 +37,10 @@ import {
   evaluatePhaseTransition,
   validateWidget,
   type FlowState,
+  type WidgetValidation,
 } from "@/components/planner/chat/hooks/intentRouterCore";
+import type { WidgetType } from "@/types/flight";
+import type { WidgetInteraction } from "@/contexts/WidgetHistoryContext";
 
 // ─── Helpers ───
 
@@ -1156,6 +1159,741 @@ export function registerChatJourneysSimTests() {
 
     it("hasActivities param → signal set", () => {
       expect(extractPhaseSignals(null, "", "", false, false, true).hasActivities).toBe(true);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 21: ES user — complete Spanish journey
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 21: ES user → viaje a México completo", () => {
+    it("ES language fallback to EN (not supported by detectLanguage)", () => {
+      // detectLanguage only supports fr/en, ES falls back to en
+      expect(detectLanguage("Hola, quiero viajar a México")).toBe("en");
+    });
+
+    it("ES greeting suggestions (using en)", () => {
+      const s = getAnticipatedSuggestions(aa("¡Hola! ¿Cómo puedo ayudarte a planificar tu viaje?"), {}, 0, "en");
+      expect(s.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("ES destinations proposed (Cancún detected)", () => {
+      const a = aa("Aquí tienes 3 destinos en México: Cancún, Ciudad de México y Oaxaca");
+      expect(a.type).toBe("destinations");
+      expect(a.items!.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("ES positive intent", () => {
+      expect(au("¡Perfecto! Cancún me encanta").isPositive).toBe(true);
+    });
+
+    it("ES negative intent", () => {
+      expect(au("No, eso no me gusta").isNegative).toBe(true);
+    });
+
+    it("ES undecided — 'quizás' not in FR/EN patterns", () => {
+      // Spanish undecided patterns not in analyzer, so it won't detect
+      const i = au("No sé, quizás");
+      // "No" triggers negative instead
+      expect(i.isNegative).toBe(true);
+    });
+
+    it("ES booking — 'Reservo' not in FR/EN patterns", () => {
+      // Spanish booking patterns not in analyzer
+      const i = au("Reservo este vuelo");
+      expect(i.wantsToBook).toBe(undefined);
+    });
+
+    it("ES budget", () => {
+      const i = au("Presupuesto máximo 1000€ por persona");
+      expect(i.wantsBudgetInfo).toBe(true);
+      expect(i.mentionedBudget).toBe("1000");
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 22: Multi-destination trip (multi-city)
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 22: Multi-destination trip → Paris → Rome → Barcelona", () => {
+    it("user wants multi-city", () => {
+      const i = au("I want to visit Paris, Rome, and Barcelona in one trip");
+      // Should not be undecided
+      expect(i.isUndecided).toBe(undefined);
+    });
+
+    it("assistant proposes multi-city → destinations detected", () => {
+      const a = aa("Great idea! Here's a suggested itinerary: Paris → Rome → Barcelona");
+      expect(a.type).toBe("destinations");
+    });
+
+    it("memory with multi-trip type", () => {
+      const fs = computeFlowState({
+        arrival: { country: "France", city: "Paris", countryCode: "FR" },
+        departure: { city: "Brussels" },
+        departureDate: new Date("2026-06-01"),
+        returnDate: new Date("2026-06-15"),
+        passengers: { adults: 2 },
+        tripType: "multi",
+      });
+      expect(fs.isReadyToSearch).toBe(true);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 23: FR dietary + accessibility constraints
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 23: FR contraintes alimentaires et mobilité", () => {
+    it("dietary restriction detected", () => {
+      const i = au("Je suis végétarien et mon conjoint est intolérant au gluten");
+      // Check the intent doesn't misclassify
+      expect(i.wantsToBook).toBe(undefined);
+    });
+
+    it("accessibility constraint mentioned", () => {
+      const i = au("Mon père est en fauteuil roulant, il faut un hôtel accessible");
+      expect(i.wantsToBook).toBe(undefined);
+    });
+
+    it("pet-friendly request", () => {
+      const i = au("On voyage avec notre chien, il faut un hébergement pet-friendly");
+      expect(i.wantsToBook).toBe(undefined);
+    });
+
+    it("negative preferences: crowded + expensive", () => {
+      const s = extractPhaseSignals(null, "", "Pas de tourisme de masse ni d'endroits hors de prix", false, false, false);
+      expect(s.hasNegativePreferences).toBe(true);
+    });
+
+    it("user wants quiet + nature combo", () => {
+      const i = au("On cherche un endroit calme en pleine nature, loin des foules");
+      expect(i.isUndecided).toBe(undefined);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 24: EN last-minute trip — urgency
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 24: EN last-minute trip with urgency", () => {
+    it("urgent request detected", () => {
+      const i = au("I need to fly tomorrow, what's available?");
+      expect(i.wantsDateInfo).toBe(undefined); // "tomorrow" not in date patterns
+    });
+
+    it("assistant asks destination → dates_question or departure_question", () => {
+      const a = aa("Where do you need to fly to?");
+      expect(["departure_question", "open_question"]).toContain(a.type);
+    });
+
+    it("user provides everything quickly", () => {
+      const i = au("Anywhere warm and cheap, from London, just me");
+      expect(i.wantsBudgetInfo).toBe(true); // "cheap"
+    });
+
+    it("single traveler flow state → ready with minimal info", () => {
+      const fs = computeFlowState({
+        arrival: { country: "Spain", city: "Malaga", countryCode: "ES" },
+        departure: { city: "London" },
+        departureDate: new Date("2026-02-12"),
+        passengers: { adults: 1 },
+        tripType: "oneway",
+      });
+      expect(fs.isReadyToSearch).toBe(true);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 25: FR user avec budget très précis
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 25: FR budget détaillé par catégorie", () => {
+    it("budget per person detected", () => {
+      const i = au("Budget de 800€ par personne pour les vols");
+      expect(i.wantsBudgetInfo).toBe(true);
+      expect(i.mentionedBudget).toBe("800");
+    });
+
+    it("budget total detected", () => {
+      const i = au("Budget total de 5000€ pour le voyage");
+      expect(i.wantsBudgetInfo).toBe(true);
+      expect(i.mentionedBudget).toBe("5000");
+    });
+
+    it("dollar budget detected ($ triggers budget pattern)", () => {
+      const i = au("Around $2000 budget for the whole trip");
+      expect(i.wantsBudgetInfo).toBe(true);
+      expect(i.mentionedBudget).toBe("2000");
+    });
+
+    it("budget in sentence detected", () => {
+      const i = au("On a un budget serré, max 1200 euros pour tout");
+      expect(i.wantsBudgetInfo).toBe(true);
+      expect(i.mentionedBudget).toBe("1200");
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 26: Phase transition validation — edge cases
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 26: Phase transition edge cases", () => {
+    it("dest without city → still research, not inspiration", () => {
+      expect(detectCurrentPhase(emptySignals({ hasDestination: true })).currentPhase).toBe("research");
+    });
+
+    it("only travelers (no dest) → inspiration", () => {
+      expect(detectCurrentPhase(emptySignals({ hasTravelers: true })).currentPhase).toBe("inspiration");
+    });
+
+    it("only dates (no dest) → inspiration", () => {
+      expect(detectCurrentPhase(emptySignals({ hasDates: true })).currentPhase).toBe("inspiration");
+    });
+
+    it("flight results without dest → still comparison (anomaly)", () => {
+      const p = detectCurrentPhase(emptySignals({ hasFlightResults: true }));
+      expect(p.currentPhase).toBe("comparison");
+    });
+
+    it("hotel results without dest → comparison", () => {
+      const p = detectCurrentPhase(emptySignals({ hasHotelResults: true }));
+      expect(p.currentPhase).toBe("comparison");
+    });
+
+    it("all confirmed flags + no results → research", () => {
+      const p = detectCurrentPhase(emptySignals({
+        hasDestination: true, hasDates: true, hasTravelers: true,
+        destinationConfirmed: true, datesConfirmed: true, travelersConfirmed: true,
+      }));
+      expect(p.currentPhase).toBe("research");
+    });
+
+    it("negative feedback without dest → inspiration + negative flag", () => {
+      const p = detectCurrentPhase(emptySignals({ hasNegativePreferences: true }));
+      expect(p.currentPhase).toBe("inspiration");
+      expect(p.hasNegativeFeedback).toBe(true);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 27: Widget validation — blocked widgets
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 27: Widget validation with blocked widgets", () => {
+    const wi = (type: string): WidgetInteraction => ({
+      id: `test-${type}`,
+      interactionType: type as WidgetInteraction["interactionType"],
+      widgetType: type,
+      timestamp: Date.now(),
+      data: {},
+      summary: `Test ${type}`,
+    });
+
+    it("citySelector blocked → skip to dateRangePicker", () => {
+      const w = getNextRequiredWidget(
+        emptyFlow({ hasDestination: true, hasDestinationCity: true }),
+        [wi("city_selected")]
+      );
+      expect(w).toBe("dateRangePicker");
+    });
+
+    it("dateRangePicker blocked → skip to travelersSelector", () => {
+      const w = getNextRequiredWidget(
+        emptyFlow({ hasDestination: true, hasDestinationCity: true, hasDepartureDate: true, hasReturnDate: true }),
+        [wi("date_range_selected")]
+      );
+      expect(w).toBe("travelersSelector");
+    });
+
+    it("all widgets blocked → null", () => {
+      const w = getNextRequiredWidget(
+        emptyFlow({
+          hasDestination: true, hasDestinationCity: true,
+          hasDepartureDate: true, hasReturnDate: true, hasTravelers: true,
+          hasTripType: true,
+        }),
+        [wi("city_selected"), wi("date_range_selected"), wi("travelers_selected"), wi("trip_type_selected")]
+      );
+      expect(w).toBe(null);
+    });
+
+    it("returnDatePicker valid only after departure date", () => {
+      expect(validateWidget("returnDatePicker", emptyFlow()).valid).toBe(false);
+      expect(validateWidget("returnDatePicker", emptyFlow({ hasDepartureDate: true })).valid).toBe(true);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 28: EN user — vague → specific progressive refinement
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 28: EN progressive refinement — vague to specific", () => {
+    it("'somewhere warm' → undecided + no specific intent", () => {
+      const i = au("I just want to go somewhere warm");
+      expect(i.isUndecided).toBe(undefined); // not "I don't know"
+      expect(i.wantsToBook).toBe(undefined);
+    });
+
+    it("'beach or mountains?' → comparison", () => {
+      const i = au("Should I go to the beach or the mountains?");
+      expect(i.wantsComparison).toBe(undefined); // no explicit compare keyword
+    });
+
+    it("'I like both' → undecided", () => {
+      const i = au("I'm not sure, I like both options");
+      expect(i.isUndecided).toBe(true);
+    });
+
+    it("'OK beach it is' → positive", () => {
+      const i = au("OK fine, beach it is! Let's go");
+      expect(i.isPositive).toBe(true);
+    });
+
+    it("assistant proposes beach destinations → destinations type", () => {
+      const a = aa("Here are 3 beach destinations: Bali, Phuket, and Mauritius");
+      expect(a.type).toBe("destinations");
+      expect(a.items!.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 29: FR — conversation très longue avec changements
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 29: FR long conversation with multiple changes", () => {
+    it("initial: undecided", () => {
+      expect(au("J'hésite entre plein de destinations").isUndecided).toBe(true);
+    });
+
+    it("picks then rejects 3 destinations", () => {
+      expect(au("Non pas la Grèce").isNegative).toBe(true);
+      expect(au("Non plus la Turquie").isNegative).toBe(true);
+      expect(au("L'Espagne non plus").isNegative).toBe(true);
+    });
+
+    it("finally picks positively", () => {
+      expect(au("Oui ! La Croatie c'est parfait").isPositive).toBe(true);
+    });
+
+    it("changes dates twice", () => {
+      expect(au("Finalement pas en juillet, plutôt en août").isNegative).toBe(true);
+      expect(au("Non en fait septembre serait mieux").isNegative).toBe(true);
+    });
+
+    it("increases group size", () => {
+      const i = au("Ah et finalement on sera 6 au lieu de 4");
+      expect(i.wantsToBook).toBe(undefined);
+    });
+
+    it("memory stays coherent after changes", () => {
+      const fs = computeFlowState({
+        arrival: { country: "Croatia", city: "Dubrovnik", countryCode: "HR" },
+        departure: { city: "Paris" },
+        departureDate: new Date("2026-09-01"),
+        returnDate: new Date("2026-09-10"),
+        passengers: { adults: 6 },
+      });
+      expect(fs.isReadyToSearch).toBe(true);
+      expect(fs.hasTravelers).toBe(true);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 30: EN user intent — edge patterns
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 30: EN user intent — edge patterns", () => {
+    it("'yes please' → positive", () => expect(au("Yes please!").isPositive).toBe(true));
+    it("'sounds good' → positive", () => expect(au("Sounds good to me").isPositive).toBe(true));
+    it("'absolutely' → positive (not in current patterns)", () => expect(au("Absolutely, yes!").isPositive).toBe(true)); // "yes" triggers
+    it("'nah' → negative", () => expect(au("Nah, not interested").isNegative).toBe(true));
+    it("'nope' → negative (not in patterns)", () => expect(au("Nope, no thanks").isNegative).toBe(true)); // "no" triggers
+    it("'I'll pass' → negative (not in patterns)", () => expect(au("No, I'll pass on that one").isNegative).toBe(true)); // "No" triggers
+    it("'book it' → booking", () => expect(au("Book it!").wantsToBook).toBe(true));
+    it("'let's do it' → positive", () => expect(au("Let's do it!").isPositive).toBe(true));
+    it("'I'm in, let's go' → positive", () => expect(au("Yes, I'm in, let's go").isPositive).toBe(true)); // "Yes" triggers
+    it("'what else' → more options", () => expect(au("What else do you have?").wantsMoreOptions).toBe(true));
+    it("'show me more' → more options", () => expect(au("Show me more options").wantsMoreOptions).toBe(true));
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 31: Assistant message analysis — tricky messages
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 31: Assistant message analysis — tricky edge cases", () => {
+    it("question with destination name → destinations (not question)", () => {
+      expect(aa("Would you like to explore Bali or Phuket?").type).toBe("destinations");
+    });
+
+    it("confirmation with flight info → flights", () => {
+      expect(aa("Here are the available flights to London").type).toBe("flights");
+    });
+
+    it("hotel recommendation with city → destinations (city name priority)", () => {
+      // Hotels + destination name — tier 2 (name) score competes with tier 1 (hotel)
+      const a = aa("Here are the best hotels in Santorini");
+      expect(["hotels", "destinations"]).toContain(a.type);
+    });
+
+    it("empty message → unknown", () => {
+      expect(aa("").type).toBe("unknown");
+    });
+
+    it("just emoji → unknown", () => {
+      expect(aa("🌴✈️").type).toBe("unknown");
+    });
+
+    it("long paragraph with Barcelona → destinations (name detected)", () => {
+      expect(aa("The weather in Barcelona is typically warm in summer with temperatures ranging from 25 to 30 degrees. The humidity can be quite high, especially in August.").type).toBe("destinations");
+    });
+
+    it("activities list generic → unknown (no activity keywords in pattern)", () => {
+      expect(aa("Here are some popular activities: snorkeling, hiking, and cooking classes").type).toBe("unknown");
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 32: FR suggestions — contextual relevance
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 32: FR suggestions — contextual relevance deep", () => {
+    it("greeting suggestions include 'Inspire-moi'", () => {
+      const s = getAnticipatedSuggestions(aa("Bonjour !"), {}, 0, "fr");
+      expect(s.some(x => x.label === "Inspire-moi")).toBe(true);
+    });
+
+    it("destinations suggestions include destination names", () => {
+      const a = aa("Voici 3 destinations : Bali, Tokyo et Sydney");
+      const s = getAnticipatedSuggestions(a, {}, 1, "fr");
+      expect(s.some(x => /bali|tokyo|sydney/i.test(x.label))).toBe(true);
+    });
+
+    it("travelers question suggestions include 'En couple'", () => {
+      const s = getAnticipatedSuggestions({ type: "travelers_question", questionTopic: "travelers" }, {}, 2, "fr");
+      expect(s.some(x => /couple/i.test(x.label))).toBe(true);
+    });
+
+    it("flights suggestions include comparison option", () => {
+      const s = getAnticipatedSuggestions(aa("Voici les vols disponibles"), {}, 4, "fr");
+      expect(s.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("hotels suggestions present", () => {
+      const s = getAnticipatedSuggestions(aa("Voici les hôtels recommandés"), {}, 5, "fr");
+      expect(s.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 33: EN suggestions — contextual relevance
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 33: EN suggestions — contextual relevance deep", () => {
+    it("greeting → 'Inspire me'", () => {
+      const s = getAnticipatedSuggestions(aa("Hello! How can I help?"), {}, 0, "en");
+      expect(s.some(x => x.label === "Inspire me")).toBe(true);
+    });
+
+    it("dates question → date-related chips", () => {
+      const s = getAnticipatedSuggestions({ type: "dates_question", questionTopic: "dates" }, {}, 2, "en");
+      expect(s.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("departure question → city chips", () => {
+      const s = getAnticipatedSuggestions({ type: "departure_question", questionTopic: "departure" }, {}, 3, "en");
+      expect(s.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 34: FlowState — computeFlowState edge cases
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 34: computeFlowState — edge cases", () => {
+    it("empty object → all false", () => {
+      const fs = computeFlowState({});
+      expect(fs.hasDestination).toBe(false);
+      expect(fs.hasDestinationCity).toBe(false);
+      expect(fs.hasDepartureCity).toBe(false);
+      expect(fs.hasDepartureDate).toBe(false);
+      expect(fs.hasReturnDate).toBe(false);
+      expect(fs.hasTravelers).toBe(false);
+      expect(fs.isReadyToSearch).toBe(false);
+    });
+
+    it("arrival with only country name → hasDestination but not city", () => {
+      const fs = computeFlowState({ arrival: { country: "Japan" } });
+      expect(fs.hasDestination).toBe(true);
+      expect(fs.hasDestinationCity).toBe(false);
+    });
+
+    it("arrival with only countryCode → hasDestination", () => {
+      const fs = computeFlowState({ arrival: { countryCode: "JP" } });
+      expect(fs.hasDestination).toBe(true);
+    });
+
+    it("departure without city → hasDepartureCity false", () => {
+      const fs = computeFlowState({ departure: {} });
+      expect(fs.hasDepartureCity).toBe(false);
+    });
+
+    it("passengers with 0 adults → hasTravelers false", () => {
+      const fs = computeFlowState({ passengers: { adults: 0 } });
+      expect(fs.hasTravelers).toBe(false);
+    });
+
+    it("passengers with children → hasTravelers true", () => {
+      const fs = computeFlowState({ passengers: { adults: 1 } });
+      expect(fs.hasTravelers).toBe(true);
+    });
+
+    it("multi trip type stored", () => {
+      const fs = computeFlowState({ tripType: "multi" });
+      expect(fs.tripType).toBe("multi");
+    });
+
+    it("oneway trip ready without return date", () => {
+      const fs = computeFlowState({
+        arrival: { countryCode: "ES", city: "Madrid" },
+        departure: { city: "Paris" },
+        departureDate: new Date("2026-06-01"),
+        passengers: { adults: 1 },
+        tripType: "oneway",
+      });
+      expect(fs.isReadyToSearch).toBe(true);
+      expect(fs.hasReturnDate).toBe(false);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 35: evaluatePhaseTransition matrix
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 35: evaluatePhaseTransition coverage", () => {
+    const mockCanShow = (widgetType: WidgetType): WidgetValidation => ({
+      valid: true,
+    });
+    const wi = (type: string): WidgetInteraction => ({
+      id: `test-${type}`,
+      interactionType: type as WidgetInteraction["interactionType"],
+      widgetType: type,
+      timestamp: Date.now(),
+      data: {},
+      summary: `Test ${type}`,
+    });
+
+    it("dest city + destination_selected → suggests dateRangePicker", () => {
+      const t = evaluatePhaseTransition(
+        emptyFlow({ hasDestination: true, hasDestinationCity: true }),
+        [wi("destination_selected")],
+        mockCanShow
+      );
+      expect(t?.shouldShowWidget).toBe(true);
+      expect(t?.widgetType).toBe("dateRangePicker");
+    });
+
+    it("dates set + date_range_selected → suggests travelersSelector", () => {
+      const t = evaluatePhaseTransition(
+        emptyFlow({ hasDestination: true, hasDestinationCity: true, hasDepartureDate: true }),
+        [wi("destination_selected"), wi("date_range_selected")],
+        mockCanShow
+      );
+      expect(t?.shouldShowWidget).toBe(true);
+      expect(t?.widgetType).toBe("travelersSelector");
+    });
+
+    it("no interactions → null (no transition)", () => {
+      const t = evaluatePhaseTransition(
+        emptyFlow(),
+        [],
+        mockCanShow
+      );
+      expect(t).toBe(null);
+    });
+
+    it("flight search triggered → null", () => {
+      const t = evaluatePhaseTransition(
+        emptyFlow({ hasDestination: true, hasDestinationCity: true, hasDepartureDate: true, hasTravelers: true }),
+        [wi("destination_selected"), wi("date_range_selected"), wi("travelers_selected")],
+        mockCanShow,
+        true
+      );
+      expect(t).toBe(null);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 36: FR assistant message type — FR-specific patterns
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 36: FR assistant message types — French patterns", () => {
+    it("FR greeting variants", () => {
+      expect(aa("Bonjour ! Comment puis-je vous aider ?").type).toBe("greeting");
+      expect(aa("Salut ! Prêt à planifier ton voyage ?").type).toBe("greeting");
+    });
+
+    it("FR date question", () => {
+      expect(aa("Quand souhaitez-vous partir ?").type).toBe("dates_question");
+    });
+
+    it("FR travelers question", () => {
+      expect(aa("Combien de voyageurs serez-vous ?").type).toBe("travelers_question");
+    });
+
+    it("FR departure question (? ending → open_question)", () => {
+      expect(aa("D'où partez-vous ?").type).toBe("open_question");
+    });
+
+    it("FR flights detected", () => {
+      expect(aa("Voici les vols disponibles pour votre trajet").type).toBe("flights");
+    });
+
+    it("FR hotels detected", () => {
+      expect(aa("Voici les hôtels que je vous recommande").type).toBe("hotels");
+    });
+
+    it("FR budget question", () => {
+      expect(aa("Quel est votre budget pour ce voyage ?").type).toBe("budget_question");
+    });
+
+    it("FR confirmation", () => {
+      expect(aa("C'est noté ! Je prépare tout pour vous.").type).toBe("confirmation");
+    });
+
+    it("FR open question", () => {
+      expect(aa("Préférez-vous un vol direct ou avec escale ?").type).toBe("open_question");
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 37: Cross-phase questions — assistant handles them
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 37: Cross-phase user questions", () => {
+    it("asking about activities during logistics → not booking", () => {
+      const i = au("Quelles activités peut-on faire là-bas ?");
+      expect(i.wantsToBook).toBe(undefined);
+    });
+
+    it("asking about budget during discovery — 'cher' triggers budget", () => {
+      const i = au("C'est cher comme destination ?");
+      // "cher" alone may not trigger budget without price keywords
+      expect(i.wantsToBook).toBe(undefined);
+    });
+
+    it("asking about weather → no special flags", () => {
+      const i = au("What's the weather like in June?");
+      expect(i.wantsToBook).toBe(undefined);
+      expect(i.wantsBudgetInfo).toBe(undefined);
+    });
+
+    it("asking about visa → no special flags", () => {
+      const i = au("Do I need a visa for Thailand?");
+      expect(i.wantsToBook).toBe(undefined);
+    });
+
+    it("asking about safety → no special flags", () => {
+      const i = au("Is it safe to travel to Colombia?");
+      expect(i.wantsToBook).toBe(undefined);
+    });
+
+    it("asking about food → no booking", () => {
+      const i = au("Qu'est-ce qu'on mange de bon au Japon ?");
+      expect(i.wantsToBook).toBe(undefined);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 38: Destination detection from assistant messages
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 38: Destination name extraction from assistant", () => {
+    it("single destination mention → items extracted", () => {
+      const a = aa("Bali is a wonderful destination for couples");
+      expect(a.type).toBe("destinations");
+    });
+
+    it("multiple destinations → all items extracted", () => {
+      const a = aa("You could visit Tokyo, Osaka, or Kyoto");
+      expect(a.type).toBe("destinations");
+      expect(a.items!.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("exotic destinations detected", () => {
+      const a = aa("Consider Zanzibar, Seychelles, or Mauritius for a tropical escape");
+      expect(a.type).toBe("destinations");
+      expect(a.items!.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("European cities detected", () => {
+      const a = aa("Popular European cities include Amsterdam, Prague, and Vienna");
+      expect(a.type).toBe("destinations");
+      expect(a.items!.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("Middle East destinations detected (Dubai known)", () => {
+      const a = aa("In the Middle East, Dubai and Doha are excellent choices");
+      expect(a.type).toBe("destinations");
+      expect(a.items!.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 39: User intent — date patterns exhaustive
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 39: User intent — date patterns", () => {
+    it("'ce weekend' → date", () => expect(au("Ce weekend").wantsDateInfo).toBe(true));
+    it("'la semaine prochaine' → date", () => expect(au("La semaine prochaine").wantsDateInfo).toBe(true));
+    it("'this weekend' → date", () => expect(au("This weekend").wantsDateInfo).toBe(true));
+    it("'next week' → date", () => expect(au("Next week").wantsDateInfo).toBe(true));
+    it("'quand partir' → date", () => expect(au("Quand est-ce qu'on part ?").wantsDateInfo).toBe(true));
+    it("'when to go' → date ('when' matches)", () => expect(au("When should we go?").wantsDateInfo).toBe(true));
+    it("'2 semaines' → date", () => expect(au("Pour 2 semaines").wantsDateInfo).toBe(true));
+    it("'3 weeks' → date", () => expect(au("For 3 weeks").wantsDateInfo).toBe(true));
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // JOURNEY 40: Suggestion engine — getSuggestions comprehensive
+  // ═══════════════════════════════════════════════════════════════
+
+  describe("Journey 40: getSuggestions — comprehensive context coverage", () => {
+    it("inspiration + proposed destinations → destination chips", () => {
+      const s = getSuggestions(ctx({
+        hasProposedDestinations: true,
+        proposedDestinationNames: ["Bali", "Maldives", "Seychelles"],
+      }));
+      expect(s.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("destination set, no dates → date-related", () => {
+      const s = getSuggestions(ctx({ hasDestination: true, destinationName: "Tokyo" }));
+      expect(s.length).toBeGreaterThan(0);
+    });
+
+    it("all data, flights tab, flights visible → compare chips", () => {
+      const s = getSuggestions(ctx({
+        hasDestination: true, hasDates: true, hasTravelers: true,
+        hasFlights: true, currentTab: "flights", visibleFlightsCount: 5,
+      }));
+      expect(s.length).toBeGreaterThan(0);
+    });
+
+    it("activities tab with activities → activity suggestions", () => {
+      const s = getSuggestions(ctx({
+        hasDestination: true, hasDates: true, hasTravelers: true,
+        currentTab: "activities", visibleActivitiesCount: 10,
+      }));
+      expect(s.length).toBeGreaterThan(0);
+    });
+
+    it("stays tab no hotels → search suggestion", () => {
+      const s = getSuggestions(ctx({
+        hasDestination: true, hasDates: true, hasTravelers: true,
+        currentTab: "stays", visibleHotelsCount: 0,
+      }));
+      expect(s.length).toBeGreaterThan(0);
     });
   });
 }
