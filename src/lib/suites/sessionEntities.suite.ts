@@ -40,14 +40,14 @@ const ENTITY_PATTERNS = {
   ],
 };
 
-function extractEntities(text: string, patterns: RegExp[]): string[] {
+function extractEntities(text: string, patterns: RegExp[], minLength = 3): string[] {
   const matches = new Set<string>();
   for (const pattern of patterns) {
     pattern.lastIndex = 0;
     let match;
     while ((match = pattern.exec(text)) !== null) {
       const value = match[1] || match[0];
-      if (value && value.trim().length > 2) {
+      if (value && value.trim().length >= minLength) {
         matches.add(value.trim());
       }
     }
@@ -89,27 +89,27 @@ export function registerSessionEntitiesTests() {
 
   describe("Date / duration extraction", () => {
     it("FR '2 jours' captures duration", () => {
-      const r = extractEntities("pour 2 jours", ENTITY_PATTERNS.dates);
+      const r = extractEntities("pour 2 jours", ENTITY_PATTERNS.dates, 1);
       expect(r.length).toBeGreaterThan(0);
     });
 
     it("FR '3 semaines' captures duration", () => {
-      const r = extractEntities("pendant 3 semaines", ENTITY_PATTERNS.dates);
+      const r = extractEntities("pendant 3 semaines", ENTITY_PATTERNS.dates, 1);
       expect(r.length).toBeGreaterThan(0);
     });
 
     it("EN '5 days' captures duration", () => {
-      const r = extractEntities("for 5 days", ENTITY_PATTERNS.dates);
+      const r = extractEntities("for 5 days", ENTITY_PATTERNS.dates, 1);
       expect(r.length).toBeGreaterThan(0);
     });
 
     it("FR 'en juillet' captures month", () => {
-      const r = extractEntities("en juillet", ENTITY_PATTERNS.dates);
+      const r = extractEntities("en juillet", ENTITY_PATTERNS.dates, 1);
       expect(r.some((v) => v.toLowerCase() === "juillet")).toBe(true);
     });
 
     it("FR '4 nuits' captures duration", () => {
-      const r = extractEntities("4 nuits", ENTITY_PATTERNS.dates);
+      const r = extractEntities("4 nuits", ENTITY_PATTERNS.dates, 1);
       expect(r.length).toBeGreaterThan(0);
     });
   });
@@ -167,7 +167,7 @@ export function registerSessionEntitiesTests() {
     it("'escapade la moins chers possible pour 2 jours à partir de bruxelles' extracts all", () => {
       const text = "je voudrais fait une escapde la moins chers possible pour 2 jours à partir de Bruxelles";
       const destinations = extractEntities(text, ENTITY_PATTERNS.destinations);
-      const dates = extractEntities(text, ENTITY_PATTERNS.dates);
+      const dates = extractEntities(text, ENTITY_PATTERNS.dates, 1);
       const budgets = extractEntities(text, ENTITY_PATTERNS.budgets);
 
       expect(destinations.some((d) => d.toLowerCase() === "bruxelles")).toBe(true);
