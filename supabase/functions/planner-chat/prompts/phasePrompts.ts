@@ -225,7 +225,8 @@ ${widgetHistory ? `\n## HISTORIQUE WIDGETS\n${widgetHistory}\n` : ""}
 ${chooseForMeInstructions}
 ## INFOS TECHNIQUES
 - Date actuelle : ${currentDate}
-- Année par défaut : 2025
+- Année par défaut : ${currentDate.split("-")[0] || new Date().getFullYear()}
+- RÈGLE DATES: Toute date sans année explicite utilise l'année de la date actuelle. Si la date résultante est dans le passé, utilise l'année suivante.
 - Réponds en français
 - Maximum 2 emojis par message
 

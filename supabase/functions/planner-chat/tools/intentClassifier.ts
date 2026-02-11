@@ -163,11 +163,11 @@ que tout a été dit. Ne PAS classifier comme "other" dans ces cas.
             // Dates
             exactDepartureDate: { 
               type: "string", 
-              description: "Date exacte format YYYY-MM-DD (seulement si EXPLICITE: 'le 15 mars')" 
+              description: "Date exacte format YYYY-MM-DD (seulement si EXPLICITE: 'le 15 mars'). Si l'utilisateur ne précise pas l'année, utilise l'année de la DATE ACTUELLE fournie dans le prompt système. Si la date résultante est dans le passé, utilise l'année suivante. Ne JAMAIS inventer une année arbitraire." 
             },
             exactReturnDate: { 
               type: "string", 
-              description: "Date retour exacte format YYYY-MM-DD" 
+              description: "Date retour exacte format YYYY-MM-DD. Même règle d'année que exactDepartureDate: utilise l'année courante du prompt système, ou l'année suivante si la date est passée." 
             },
             preferredMonth: { 
               type: "string", 
