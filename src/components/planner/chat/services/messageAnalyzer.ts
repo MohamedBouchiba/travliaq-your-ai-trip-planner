@@ -445,7 +445,7 @@ const COMPARISON_INTENT_PATTERNS = [
 
 const MORE_OPTIONS_INTENT_PATTERNS = [
   // French
-  /autre|plus\s+d'options?|alternatives?|sinon|différent/i,
+  /autre|plus\s+d'options?|alternatives?|sinon|différent|inspire|propose[r-]?\s*(moi|nous|des)|sugg[eè]re|recommande|id[ée]es?\s*(de\s+voyage|de\s+destination)?|où\s+partir/i,
   // English
   /other|more\s+options?|alternatives?|else|different|something\s+(more|else|different)/i,
 ];
@@ -557,6 +557,35 @@ export function analyzeUserIntent(text: string | undefined): UserIntent {
     if (pattern.test(text)) {
       intent.isUndecided = true;
       break;
+    }
+  }
+  
+  // Detect destination mentions
+  const destinationPatterns = [
+    /(?:aller|partir|voyager)\s+(?:[àa]|en|au|aux)\s+([A-ZÀ-Ü][\w\s-]+)/i,
+    /destination\s*[:=]?\s*([A-ZÀ-Ü][\w\s-]+)/i,
+    /(?:je\s+veux|on\s+va|direction)\s+([A-ZÀ-Ü][\w\s-]+)/i,
+  ];
+  for (const pattern of destinationPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      intent.mentionedDestination = match[1].trim();
+      break;
+    }
+  }
+  
+  // Qualitative budget detection (when no numeric amount found)
+  if (intent.wantsBudgetInfo && !intent.mentionedBudget) {
+    const qualPatterns = [
+      { pattern: /pas\s+ch[eè]re?|[ée]conomique|cheap|affordable/i, label: "budget" },
+      { pattern: /luxe|premium|haut\s+de\s+gamme|luxury/i, label: "luxury" },
+      { pattern: /moyen|raisonnable|correct|moderate/i, label: "moderate" },
+    ];
+    for (const { pattern, label } of qualPatterns) {
+      if (pattern.test(text)) {
+        intent.mentionedBudget = label;
+        break;
+      }
     }
   }
   
