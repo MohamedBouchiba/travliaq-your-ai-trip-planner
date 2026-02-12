@@ -126,6 +126,12 @@ export const TEST_CATEGORIES: CategoryInfo[] = [
     emoji: "🏷️",
     description: "Extraction d'entités (destinations, durées, budgets) et nettoyage du debug store",
   },
+  {
+    id: "chatPersonasSim",
+    label: "Chat Personas Sim",
+    emoji: "👤",
+    description: "Dialogues longs avec 8 personas réalistes : maman solo, digital nomad, EVJF, anniversaire, étudiant, aventurier, famille recomposée, last-minute",
+  },
 ];
 
 // ─── Registration ───
@@ -211,5 +217,9 @@ export async function registerAllBrowserTests(categories?: string[]) {
   if (all || categories?.includes("sessionEntities")) {
     const { registerSessionEntitiesTests } = await import("./suites/sessionEntities.suite");
     registerSessionEntitiesTests();
+  }
+  if (all || categories?.includes("chatPersonasSim")) {
+    const { registerChatPersonasSimTests } = await import("./suites/chatPersonasSim.suite");
+    registerChatPersonasSimTests();
   }
 }
