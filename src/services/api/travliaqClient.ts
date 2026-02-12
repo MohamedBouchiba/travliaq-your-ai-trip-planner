@@ -101,8 +101,8 @@ export const isApiError = (error: unknown): error is AxiosError => {
 export const getErrorMessage = (error: unknown): string => {
   if (isApiError(error)) {
     if (error.response?.data && typeof error.response.data === 'object') {
-      const data = error.response.data as any;
-      return data.detail || data.message || error.message;
+      const data = error.response.data as Record<string, unknown>;
+      return String(data.detail || data.message || error.message);
     }
     return error.message;
   }

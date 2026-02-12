@@ -37,9 +37,6 @@ export function usePreferencesToHotels() {
     console.log("[usePreferencesToHotels] Applied preference filters:", filters);
   }, [getHotelFilters, getActiveAccommodation, setBudgetPreset]);
 
-  // Listen for explicit apply event
-  usePlannerEvent("preferences:applyToHotels", applyPreferencesToHotels);
-  
   // Listen for preference updates and auto-apply when appropriate
   usePlannerEvent("preferences:updated", (data) => {
     // Only auto-apply if it's from chat (AI detected) and includes relevant fields

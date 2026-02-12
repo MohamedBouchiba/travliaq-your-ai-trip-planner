@@ -16,6 +16,7 @@ import type { MissingField } from "@/stores/hooks";
 import { useDebugStore } from "@/stores/debugStore";
 import { getMissingFieldLabel } from "../utils/flightDataToMemory";
 import { plannerLogger } from "@/utils/logger";
+import { createAccumulator, parseSSEChunk, type SSEEventHandlers } from "./sseEventParser";
 
 /**
  * Maximum messages to send to API to prevent context overflow
@@ -233,7 +234,7 @@ export interface StreamError extends Error {
 /**
  * Retry configuration
  */
-interface RetryConfig {
+export interface RetryConfig {
   maxRetries: number;
   baseDelayMs: number;
   maxDelayMs: number;
@@ -248,7 +249,7 @@ const DEFAULT_RETRY_CONFIG: RetryConfig = {
 /**
  * Create a StreamError with classification
  */
-function createStreamError(
+export function createStreamError(
   message: string,
   type: StreamErrorType,
   statusCode?: number
@@ -263,7 +264,7 @@ function createStreamError(
 /**
  * Classify error based on response or exception
  */
-function classifyError(error: unknown, statusCode?: number): StreamError {
+export function classifyError(error: unknown, statusCode?: number): StreamError {
   if (error instanceof Error) {
     // Check for abort
     if (error.name === "AbortError") {
@@ -298,7 +299,7 @@ function classifyError(error: unknown, statusCode?: number): StreamError {
 /**
  * Calculate delay for exponential backoff
  */
-function calculateBackoffDelay(attempt: number, config: RetryConfig): number {
+export function calculateBackoffDelay(attempt: number, config: RetryConfig): number {
   const delay = config.baseDelayMs * Math.pow(2, attempt);
   const jitter = Math.random() * 0.3 * delay; // Add 0-30% jitter
   return Math.min(delay + jitter, config.maxDelayMs);
@@ -314,7 +315,7 @@ function sleep(ms: number): Promise<void> {
 /**
  * Build the context message for the API
  */
-function buildContextMessage(memoryContext: MemoryContext): string {
+export function buildContextMessage(memoryContext: MemoryContext): string {
   const {
     flightSummary,
     activityContext,
@@ -399,7 +400,7 @@ function buildContextMessage(memoryContext: MemoryContext): string {
 /**
  * Build negative preferences context for LLM
  */
-function buildNegativePreferencesContext(prefs: NegativePreference[]): string {
+export function buildNegativePreferencesContext(prefs: NegativePreference[]): string {
   if (!prefs || prefs.length === 0) return "";
   
   const lines = prefs.map(p => {
@@ -574,26 +575,21 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           const reader = response.body!.getReader();
           const decoder = new TextDecoder();
 
-      // Reset content for this attempt
+      // Reset accumulator for this attempt
+      const acc = createAccumulator();
       fullContent = "";
-      let quickReplies: QuickReplyData | null = null;
-      let destinationSuggestionRequest: DestinationSuggestionRequest | null = null;
-      let intentClassification: IntentClassification | null = null;
-      let reasoning: ReasoningData | null = null;
-      let preferencesData: any | null = null;
-      let flightSearchTrigger = false;
-      
+
       // Throttle UI updates to reduce re-renders (max every 50ms)
           let lastUpdateTime = 0;
           const THROTTLE_MS = 50;
           let pendingUpdate = false;
-          
+
           const throttledUpdate = () => {
             const now = Date.now();
             if (now - lastUpdateTime >= THROTTLE_MS) {
               lastUpdateTime = now;
               if (isMountedRef.current) {
-                onContentUpdate(messageId, fullContent, false);
+                onContentUpdate(messageId, acc.content, false);
               }
               pendingUpdate = false;
             } else if (!pendingUpdate) {
@@ -601,11 +597,75 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
               setTimeout(() => {
                 if (isMountedRef.current && pendingUpdate) {
                   lastUpdateTime = Date.now();
-                  onContentUpdate(messageId, fullContent, false);
+                  onContentUpdate(messageId, acc.content, false);
                   pendingUpdate = false;
                 }
               }, THROTTLE_MS - (now - lastUpdateTime));
             }
+          };
+
+          // Wire up SSE event handlers
+          const sseHandlers: SSEEventHandlers = {
+            onReasoning: (reasoning, derivedIntent) => {
+              if (import.meta.env.DEV) console.log("[Stream] 🧠 CoT reasoning:", reasoning.confidence);
+              debugStore.setReasoning(reasoning);
+              if (derivedIntent) {
+                debugStore.setLastIntent(derivedIntent);
+                if (import.meta.env.DEV) console.log("[Stream] Intent from reasoning:", derivedIntent.primaryIntent);
+              }
+            },
+            onIntentClassification: (intent) => {
+              if (import.meta.env.DEV) console.log("[Stream] Intent:", intent.primaryIntent, intent.confidence);
+              debugStore.setLastIntent(intent);
+            },
+            onPreferencesData: () => {
+              if (import.meta.env.DEV) console.log("[Stream] Preferences detected");
+            },
+            onFlightSearchTrigger: () => {
+              if (import.meta.env.DEV) console.log("[Stream] Flight search trigger");
+            },
+            onToolStarted: (parsed) => {
+              plannerLogger.logToolEvent(requestId, parsed.tool, "started", {
+                reason: parsed.reason,
+              });
+              options.onToolStatus?.({
+                tool: parsed.tool,
+                status: "started",
+                reason: parsed.reason,
+                timestamp: parsed.timestamp || Date.now(),
+              });
+              debugStore.addToolExecution({
+                tool: parsed.tool,
+                status: "started",
+                reason: parsed.reason,
+                timestamp: parsed.timestamp || Date.now(),
+              });
+            },
+            onToolFinished: (parsed) => {
+              const status = parsed.success ? "finished" as const : "failed" as const;
+              plannerLogger.logToolEvent(requestId, parsed.tool, status, {
+                latency_ms: parsed.latency_ms,
+                summary: parsed.summary,
+              });
+              options.onToolStatus?.({
+                tool: parsed.tool,
+                status,
+                latency_ms: parsed.latency_ms,
+                summary: parsed.summary,
+                timestamp: parsed.timestamp || Date.now(),
+              });
+              debugStore.addToolExecution({
+                tool: parsed.tool,
+                status,
+                latency_ms: parsed.latency_ms,
+                summary: parsed.summary,
+                timestamp: parsed.timestamp || Date.now(),
+              });
+            },
+            onContent: () => {
+              fullContent = acc.content;
+              throttledUpdate();
+            },
           };
 
           while (true) {
@@ -619,107 +679,13 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
             if (done) break;
 
             const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split("\n").filter((line) => line.trim() !== "");
-
-            for (const line of lines) {
-              if (line.startsWith("data: ")) {
-                const jsonStr = line.slice(6);
-                if (jsonStr === "[DONE]") continue;
-
-                try {
-                  const parsed = JSON.parse(jsonStr);
-
-                   if (parsed.type === "reasoning" && parsed.reasoning) {
-                    reasoning = parsed.reasoning;
-                    if (import.meta.env.DEV) console.log("[Stream] 🧠 CoT reasoning:", reasoning.confidence);
-                    // Update debug store
-                    debugStore.setReasoning(reasoning);
-                    
-                    // If no explicit intentClassification, derive it from reasoning
-                    if (!intentClassification && reasoning.widgetDecision) {
-                      const derivedIntent: IntentClassification = {
-                        primaryIntent: reasoning.widgetDecision.widgetType || "unknown",
-                        confidence: reasoning.confidence,
-                        entities: {},
-                        widgetToShow: {
-                          type: reasoning.widgetDecision.widgetType || "",
-                          reason: reasoning.widgetDecision.reason || "",
-                        },
-                      };
-                      intentClassification = derivedIntent;
-                      debugStore.setLastIntent(derivedIntent);
-                      if (import.meta.env.DEV) console.log("[Stream] Intent from reasoning:", derivedIntent.primaryIntent);
-                    }
-                  } else if (parsed.type === "intentClassification" && parsed.intentClassification) {
-                    intentClassification = parsed.intentClassification;
-                    if (import.meta.env.DEV) console.log("[Stream] Intent:", intentClassification.primaryIntent, intentClassification.confidence);
-                    // Update debug store
-                    debugStore.setLastIntent(intentClassification);
-                  } else if (parsed.type === "flightData" && parsed.flightData) {
-                    flightData = parsed.flightData;
-                  } else if (parsed.type === "accommodationData" && parsed.accommodationData) {
-                    accommodationData = parsed.accommodationData;
-                   } else if (parsed.type === "preferencesData" && parsed.preferencesData) {
-                    preferencesData = parsed.preferencesData;
-                    if (import.meta.env.DEV) console.log("[Stream] Preferences detected");
-                  } else if (parsed.type === "quickReplies" && parsed.quickReplies) {
-                    quickReplies = parsed.quickReplies;
-                  } else if (parsed.type === "destinationSuggestionRequest" && parsed.destinationSuggestionRequest) {
-                    destinationSuggestionRequest = parsed.destinationSuggestionRequest;
-                   } else if (parsed.type === "flightSearchTrigger" && parsed.trigger) {
-                    flightSearchTrigger = true;
-                    if (import.meta.env.DEV) console.log("[Stream] Flight search trigger");
-                  } else if (parsed.type === "tool_started" && parsed.tool) {
-                    // Handle tool started event
-                    plannerLogger.logToolEvent(requestId, parsed.tool, "started", {
-                      reason: parsed.reason,
-                    });
-                    options.onToolStatus?.({
-                      tool: parsed.tool,
-                      status: "started",
-                      reason: parsed.reason,
-                      timestamp: parsed.timestamp || Date.now(),
-                    });
-                    // Update debug store
-                    debugStore.addToolExecution({
-                      tool: parsed.tool,
-                      status: "started",
-                      reason: parsed.reason,
-                      timestamp: parsed.timestamp || Date.now(),
-                    });
-                  } else if (parsed.type === "tool_finished" && parsed.tool) {
-                    // Handle tool finished event
-                    const status = parsed.success ? "finished" : "failed";
-                    plannerLogger.logToolEvent(requestId, parsed.tool, status, {
-                      latency_ms: parsed.latency_ms,
-                      summary: parsed.summary,
-                    });
-                    options.onToolStatus?.({
-                      tool: parsed.tool,
-                      status,
-                      latency_ms: parsed.latency_ms,
-                      summary: parsed.summary,
-                      timestamp: parsed.timestamp || Date.now(),
-                    });
-                    // Update debug store
-                    debugStore.addToolExecution({
-                      tool: parsed.tool,
-                      status,
-                      latency_ms: parsed.latency_ms,
-                      summary: parsed.summary,
-                      timestamp: parsed.timestamp || Date.now(),
-                    });
-                  } else if (parsed.type === "content" && parsed.content) {
-                    fullContent += parsed.content;
-                    // Throttled content update to reduce flickering
-                    throttledUpdate();
-                  }
-                } catch {
-                  // Ignore parse errors for malformed chunks
-                }
-              }
-            }
+            parseSSEChunk(chunk, sseHandlers, acc);
           }
+
+          // Sync final accumulator state to local variables
+          fullContent = acc.content;
+          flightData = acc.flightData;
+          accommodationData = acc.accommodationData;
 
           // Store raw response in debug store
           debugStore.addRawResponse({
@@ -729,12 +695,12 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
               content: fullContent,
               flightData,
               accommodationData,
-              preferencesData,
-              quickReplies,
-              destinationSuggestionRequest,
-              intentClassification,
-              reasoning,
-              flightSearchTrigger,
+              preferencesData: acc.preferencesData,
+              quickReplies: acc.quickReplies,
+              destinationSuggestionRequest: acc.destinationSuggestionRequest,
+              intentClassification: acc.intentClassification,
+              reasoning: acc.reasoning,
+              flightSearchTrigger: acc.flightSearchTrigger,
             },
           });
 
@@ -761,19 +727,19 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           plannerLogger.logRequestComplete(requestId, Date.now() - requestStartTime, {
             content_length: fullContent.length,
             has_flight_data: !!flightData,
-            has_intent: !!intentClassification,
+            has_intent: !!acc.intentClassification,
             tools_detected: [
               flightData && 'flight',
               accommodationData && 'accommodation',
-              preferencesData && 'preferences',
-              quickReplies && 'quickReplies',
-              destinationSuggestionRequest && 'destinationSuggestion',
-              flightSearchTrigger && 'flightSearch',
+              acc.preferencesData && 'preferences',
+              acc.quickReplies && 'quickReplies',
+              acc.destinationSuggestionRequest && 'destinationSuggestion',
+              acc.flightSearchTrigger && 'flightSearch',
             ].filter(Boolean),
           });
 
           clearTimeout(streamTimeoutId);
-          return { content: fullContent, flightData, accommodationData, preferencesData, quickReplies, destinationSuggestionRequest, intentClassification, reasoning, flightSearchTrigger, requestId };
+          return { content: fullContent, flightData, accommodationData, preferencesData: acc.preferencesData, quickReplies: acc.quickReplies, destinationSuggestionRequest: acc.destinationSuggestionRequest, intentClassification: acc.intentClassification, reasoning: acc.reasoning, flightSearchTrigger: acc.flightSearchTrigger, requestId };
 
         } catch (err) {
           lastError = err instanceof Error && "type" in err

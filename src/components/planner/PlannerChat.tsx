@@ -24,37 +24,10 @@ import { fr, enUS } from "date-fns/locale";
 
 // Chat module imports
 import {
-  DatePickerWidget,
-  DateRangePickerWidget,
-  TravelersWidget,
-  TravelersConfirmBeforeSearchWidget,
-  TripTypeConfirmWidget,
-  CitySelectionWidget,
   AirportButton,
   DualAirportSelection,
-  AirportConfirmationWidget,
   MarkdownMessage,
-  PreferenceStyleWidget,
-  PreferenceInterestsWidget,
-  MustHavesWidget,
-  DietaryWidget,
-  DestinationSuggestionsGrid,
-  ConfirmedWidget,
-  // Selection widgets (Phase 2 integration)
-  BudgetRangeSlider,
-  QuickFilterChips,
-  StarRatingSelector,
-  CabinClassSelector,
-  DirectFlightToggle,
-  DurationChips,
-  TimeOfDayChips,
-  // Comparison widgets (Phase 3 integration)
-  ComparisonWidget,
-  // Alert widgets (Phase 4 integration)
-  ConflictAlert,
-  ConflictSummaryWidget,
-  // Price alert
-  PriceAlertBanner,
+  WidgetRenderer,
 } from "./chat/widgets";
 import { QuickReplies, useDynamicQuickReplies } from "./chat/QuickReplies";
 import { useChatStream, useChatWidgetFlow, useChatImperativeHandlers, useWidgetTracking, useWidgetActionExecutor, usePreferenceWidgetCallbacks, useUnifiedIntentRouter, useSessionContext, useThinkingState, useWidgetCooldown, useChatSubmit } from "./chat/hooks";
@@ -748,24 +721,24 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     setLastWidgetTriggered,
     inputRef,
     isLoading,
-    memory: memory as unknown as Record<string, unknown>,
-    updateMemory: updateMemory as unknown as (partial: Record<string, unknown>) => void,
+    memory,
+    updateMemory,
     getMemorySummary,
     missingFields,
-    getActivityMemory: getActivityMemory as unknown as () => Record<string, unknown> | null,
-    getPreferenceMemory: getPreferenceMemory as unknown as () => Record<string, unknown> | null,
+    getActivityMemory,
+    getPreferenceMemory,
     getBasketSummary,
-    streamResponse: streamResponse as unknown as Parameters<typeof useChatSubmit>[0]["streamResponse"],
-    widgetFlow: widgetFlow as unknown as Parameters<typeof useChatSubmit>[0]["widgetFlow"],
-    widgetTracking: widgetTracking as unknown as Parameters<typeof useChatSubmit>[0]["widgetTracking"],
-    widgetActionExecutor: widgetActionExecutor as unknown as Parameters<typeof useChatSubmit>[0]["widgetActionExecutor"],
+    streamResponse,
+    widgetFlow,
+    widgetTracking,
+    widgetActionExecutor,
     widgetCooldown,
-    intentRouter: intentRouter as unknown as Parameters<typeof useChatSubmit>[0]["intentRouter"],
-    sessionContext: sessionContext as unknown as Parameters<typeof useChatSubmit>[0]["sessionContext"],
+    intentRouter,
+    sessionContext,
     mapContext,
-    imperativeHandlers: imperativeHandlers as unknown as Parameters<typeof useChatSubmit>[0]["imperativeHandlers"],
-    handleLLMDestinationRequest: handleLLMDestinationRequest as unknown as Parameters<typeof useChatSubmit>[0]["handleLLMDestinationRequest"],
-    generateContextualReplies: generateContextualReplies as unknown as Parameters<typeof useChatSubmit>[0]["generateContextualReplies"],
+    imperativeHandlers,
+    handleLLMDestinationRequest,
+    generateContextualReplies,
     completedMessageIdsRef,
     intentWidgetRef,
     userMessageCountRef,
@@ -847,6 +820,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
               onClick={() => setIsHistoryOpen(true)}
               className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
               title={t("planner.chat.history")}
+              aria-label={t("planner.chat.history")}
             >
               <History className="h-4 w-4" />
             </button>
@@ -856,6 +830,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                 onClick={onToggleCollapse}
                 className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                 title={t("planner.chat.closeChat")}
+                aria-label={t("planner.chat.closeChat")}
               >
                 <PanelLeftClose className="h-4 w-4" />
               </button>
@@ -873,10 +848,13 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
         )}
       >
           {/* Messages */}
-          <div 
+          <div
             ref={messagesContainerRef}
             onScroll={handleScroll}
             className="flex-1 overflow-y-auto"
+            role="log"
+            aria-label={t("planner.chat.conversationMessages")}
+            aria-live="polite"
           >
             <div className="max-w-3xl mx-auto py-6 px-4 space-y-6">
               {/* Optimized: filter once, render visible messages */}
@@ -889,7 +867,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                       m.role === "user" ? "bg-primary text-primary-foreground text-left" : "bg-muted text-foreground text-left"
                     )}>
                       {m.isTyping ? (
-                        <div className="flex gap-1 py-1">
+                        <div className="flex gap-1 py-1" role="status" aria-label={t("planner.chat.assistantTyping")}>
                           <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
                           <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
                           <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
@@ -930,224 +908,18 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                       />
                     )}
 
-                    {/* Widgets - Show ConfirmedWidget when widgetConfirmed is true */}
-                    {m.widget === "datePicker" && (
-                      m.widgetConfirmed ? (
-                        <ConfirmedWidget
-                          widgetType="datePicker"
-                          selectedValue={m.widgetSelectedValue}
-                          displayLabel={m.widgetDisplayLabel || t("planner.widget.dateSelected")}
-                        />
-                      ) : (
-                        <DatePickerWidget
-                          label={t("planner.widget.selectDepartureDate")}
-                          value={memory.departureDate}
-                          onChange={(date) => widgetFlow.handleDateSelect(m.id, "departure", date)}
-                          preferredMonth={m.widgetData?.preferredMonth}
-                        />
-                      )
-                    )}
-                    {m.widget === "returnDatePicker" && (
-                      m.widgetConfirmed ? (
-                        <ConfirmedWidget
-                          widgetType="returnDatePicker"
-                          selectedValue={m.widgetSelectedValue}
-                          displayLabel={m.widgetDisplayLabel || t("planner.widget.dateSelected")}
-                        />
-                      ) : (
-                        <DatePickerWidget
-                          label={t("planner.widget.selectReturnDate")}
-                          value={memory.returnDate}
-                          onChange={(date) => widgetFlow.handleDateSelect(m.id, "return", date)}
-                          minDate={memory.departureDate || undefined}
-                          preferredMonth={m.widgetData?.preferredMonth}
-                        />
-                      )
-                    )}
-                    {m.widget === "dateRangePicker" && (
-                      m.widgetConfirmed ? (
-                        <ConfirmedWidget
-                          widgetType="dateRangePicker"
-                          selectedValue={m.widgetSelectedValue}
-                          displayLabel={m.widgetDisplayLabel || t("planner.widget.datesSelected")}
-                        />
-                      ) : (
-                        <DateRangePickerWidget
-                          tripDuration={m.widgetData?.tripDuration}
-                          preferredMonth={m.widgetData?.preferredMonth}
-                          onConfirm={(dep, ret) => widgetFlow.handleDateRangeSelect(m.id, dep, ret)}
-                        />
-                      )
-                    )}
-                    {m.widget === "travelersSelector" && (
-                      m.widgetConfirmed ? (
-                        <ConfirmedWidget
-                          widgetType="travelersSelector"
-                          selectedValue={m.widgetSelectedValue}
-                          displayLabel={m.widgetDisplayLabel || t("planner.widget.travelersSelected")}
-                        />
-                      ) : (
-                        <TravelersWidget
-                          initialValues={memory.passengers}
-                          onConfirm={(travelers) => widgetFlow.handleTravelersSelect(m.id, travelers)}
-                        />
-                      )
-                    )}
-                    {m.widget === "tripTypeConfirm" && (
-                      m.widgetConfirmed ? (
-                        <ConfirmedWidget
-                          widgetType="tripTypeConfirm"
-                          selectedValue={m.widgetSelectedValue}
-                          displayLabel={m.widgetDisplayLabel || t("planner.widget.tripTypeSelected")}
-                        />
-                      ) : (
-                        <TripTypeConfirmWidget
-                          currentType={memory.tripType}
-                          onConfirm={(tripType) => widgetFlow.handleTripTypeConfirm(m.id, tripType)}
-                        />
-                      )
-                    )}
-                    {m.widget === "citySelector" && m.widgetData?.citySelection && (
-                      m.widgetConfirmed ? (
-                        <ConfirmedWidget
-                          widgetType="citySelector"
-                          selectedValue={m.widgetSelectedValue}
-                          displayLabel={m.widgetDisplayLabel || t("planner.widget.citySelected")}
-                        />
-                      ) : (
-                        <CitySelectionWidget
-                          citySelection={m.widgetData.citySelection}
-                          onSelect={(cityName) => {
-                            const { countryCode, countryName } = m.widgetData!.citySelection!;
-                            if (m.widgetData?.isDeparture) {
-                              widgetFlow.handleDepartureCitySelect(m.id, cityName, countryName, countryCode);
-                            } else {
-                              widgetFlow.handleCitySelect(m.id, cityName, countryName, countryCode);
-                            }
-                          }}
-                        />
-                      )
-                    )}
-                    {m.widget === "travelersConfirmBeforeSearch" && (
-                      m.widgetConfirmed ? (
-                        <ConfirmedWidget
-                          widgetType="travelersConfirmBeforeSearch"
-                          selectedValue={m.widgetSelectedValue}
-                          displayLabel={m.widgetDisplayLabel || t("planner.widget.travelersConfirmed")}
-                        />
-                      ) : (
-                        <TravelersConfirmBeforeSearchWidget
-                          currentTravelers={memory.passengers}
-                          onConfirm={() => widgetFlow.handleTravelersConfirmSolo(m.id)}
-                          onEditConfirm={(travelers) => widgetFlow.handleTravelersEditBeforeSearch(m.id, travelers)}
-                        />
-                      )
-                    )}
-                    {m.widget === "airportConfirmation" && m.widgetData?.airportConfirmation && (
-                      m.widgetConfirmed ? (
-                        <ConfirmedWidget
-                          widgetType="airportConfirmation"
-                          selectedValue={m.widgetSelectedValue}
-                          displayLabel={m.widgetDisplayLabel || t("planner.widget.airportsConfirmed")}
-                        />
-                      ) : (
-                        <AirportConfirmationWidget
-                          data={m.widgetData.airportConfirmation}
-                          onConfirm={(confirmed) => eventBus.emit("flight:confirmedAirports", confirmed)}
-                        />
-                      )
-                    )}
-                    
-                    {/* Preference Style Widget */}
-                    {m.widget === "preferenceStyle" && (
-                      m.widgetConfirmed ? (
-                        <ConfirmedWidget
-                          widgetType="preferenceStyle"
-                          selectedValue={m.widgetSelectedValue}
-                          displayLabel={m.widgetDisplayLabel || t("planner.widget.styleConfigured")}
-                        />
-                      ) : (
-                        <PreferenceStyleWidget onContinue={preferenceCallbacks.onStyleContinue} />
-                      )
-                    )}
-
-                    {/* Preference Interests Widget */}
-                    {m.widget === "preferenceInterests" && (
-                      m.widgetConfirmed ? (
-                        <ConfirmedWidget
-                          widgetType="preferenceInterests"
-                          selectedValue={m.widgetSelectedValue}
-                          displayLabel={m.widgetDisplayLabel || t("planner.widget.interestsSelected")}
-                        />
-                      ) : (
-                        <PreferenceInterestsWidget onContinue={preferenceCallbacks.onInterestsContinue} />
-                      )
-                    )}
-
-                    {/* Must-Haves Widget */}
-                    {m.widget === "mustHaves" && (
-                      m.widgetConfirmed ? (
-                        <ConfirmedWidget
-                          widgetType="mustHaves"
-                          selectedValue={m.widgetSelectedValue}
-                          displayLabel={m.widgetDisplayLabel || t("planner.widget.mustHavesConfigured")}
-                        />
-                      ) : (
-                        <MustHavesWidget onContinue={preferenceCallbacks.onMustHavesContinue} />
-                      )
-                    )}
-
-                    {/* Dietary Widget */}
-                    {m.widget === "dietary" && (
-                      m.widgetConfirmed ? (
-                        <ConfirmedWidget
-                          widgetType="dietary"
-                          selectedValue={m.widgetSelectedValue}
-                          displayLabel={m.widgetDisplayLabel || t("planner.widget.dietaryConfigured")}
-                        />
-                      ) : (
-                        <DietaryWidget onContinue={preferenceCallbacks.onDietaryContinue} />
-                      )
-                    )}
-
-                    {/* Destination Suggestions Grid */}
-                    {m.widget === "destinationSuggestions" && m.widgetData?.suggestions && (
-                      m.widgetConfirmed ? (
-                        <ConfirmedWidget
-                          widgetType="destinationSuggestions"
-                          selectedValue={m.widgetSelectedValue}
-                          displayLabel={m.widgetDisplayLabel || t("planner.widget.destinationSelected")}
-                        />
-                      ) : (
-                      <DestinationSuggestionsGrid
-                        suggestions={m.widgetData.suggestions as DestinationSuggestion[]}
-                        basedOnProfile={m.widgetData.basedOnProfile as { completionScore: number; keyFactors: string[] } | undefined}
-                        onSelect={(destination) => handleDestinationSelect(m.id, destination)}
-                        isLoading={isLoadingDestinations}
+                    {/* Widgets */}
+                    {m.widget && !m.widgetDismissed && (
+                      <WidgetRenderer
+                        message={m}
+                        widgetFlow={widgetFlow}
+                        preferenceCallbacks={preferenceCallbacks}
+                        handleDestinationSelect={handleDestinationSelect}
+                        isLoadingDestinations={isLoadingDestinations}
+                        memory={memory}
+                        t={t}
                       />
-                      )
                     )}
-
-                    {/* Phase 4/5 Widgets - Temporarily disabled pending type fixes
-                    
-                    These widgets were added but have type mismatches between:
-                    - WidgetData interface in types.ts
-                    - Actual component prop interfaces
-                    
-                    TODO: Fix widget component interfaces to match WidgetData or vice versa
-                    
-                    Affected widgets:
-                    - budgetRangeSlider
-                    - quickFilterChips
-                    - starRatingSelector
-                    - cabinClassSelector
-                    - directFlightToggle
-                    - durationChips
-                    - timeOfDayChips
-                    - comparisonWidget
-                    - conflictAlert
-                    - priceAlert
-                    */}
 
                     {/* Search button */}
                     {m.hasSearchButton && (
@@ -1350,6 +1122,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                     document.documentElement.classList.remove("driver-active");
                   }}
                   placeholder={isLoading ? t("planner.chat.inputLoading") : t("planner.chat.inputPlaceholder")}
+                  aria-label={t("planner.chat.inputPlaceholder")}
                   rows={1}
                   disabled={false}
                   className="pointer-events-auto flex-1 resize-none bg-transparent px-2 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"

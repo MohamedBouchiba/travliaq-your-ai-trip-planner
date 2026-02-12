@@ -54,6 +54,9 @@ const ThinkingIndicatorComponent = ({
             "max-w-[85%] ml-2",
             className
           )}
+          role="status"
+          aria-live="polite"
+          aria-label={t("planner.chat.assistantThinking")}
         >
           {/* Animated brain icon */}
           <div className="relative flex-shrink-0 mt-0.5">

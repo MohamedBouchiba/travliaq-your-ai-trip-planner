@@ -71,7 +71,8 @@ const NegativePreferencesContext = createContext<NegativePreferencesContextValue
 
 // ===== Storage Key =====
 
-const STORAGE_KEY = "travliaq_negative_preferences";
+import { STORAGE_KEYS } from "@/config/storageKeys";
+const STORAGE_KEY = STORAGE_KEYS.NEGATIVE_PREFERENCES;
 
 // ===== Provider =====
 

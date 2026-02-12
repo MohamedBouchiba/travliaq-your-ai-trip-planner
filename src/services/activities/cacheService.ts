@@ -26,7 +26,7 @@ export const activityCacheService = {
   /**
    * Cache key prefix
    */
-  CACHE_PREFIX: 'travliaq_activity',
+  CACHE_PREFIX: "travliaq_activity", // matches STORAGE_KEYS.ACTIVITY_CACHE_PREFIX
 
   /**
    * Generate cache key from type and params

@@ -152,6 +152,8 @@ export const ToolStatusIndicator = memo(function ToolStatusIndicator({
         "flex flex-wrap items-center gap-1.5",
         className
       )}
+      role="status"
+      aria-live="polite"
     >
       <AnimatePresence mode="popLayout">
         {visibleTools.map((tool) => (

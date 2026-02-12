@@ -3,7 +3,8 @@ import { usePlannerEvent, eventBus } from "@/lib/eventBus";
 import { FLIGHTS_ZOOM, STAYS_ZOOM, ACTIVITIES_ZOOM } from "@/constants/mapSettings";
 import type { TabType, MapPin } from "@/pages/TravelPlanner";
 
-const ACTIVE_TAB_KEY = "travliaq_planner_active_tab";
+import { STORAGE_KEYS } from "@/config/storageKeys";
+const ACTIVE_TAB_KEY = STORAGE_KEYS.PLANNER_ACTIVE_TAB;
 
 /**
  * Hook to manage planner state (active tab, panel visibility, selected pin)

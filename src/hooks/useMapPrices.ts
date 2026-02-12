@@ -30,8 +30,9 @@ interface UseMapPricesResult {
 
 // Constants
 // Keep backward compatibility across versions to avoid "lost cache" after refresh/deploy
-const STORAGE_KEYS = ['travliaq_price_cache_v3', 'travliaq_price_cache_v2'];
-const STORAGE_KEY = STORAGE_KEYS[0];
+import { STORAGE_KEYS as SK } from "@/config/storageKeys";
+const PRICE_CACHE_KEYS = [SK.PRICE_CACHE, SK.PRICE_CACHE_V2];
+const STORAGE_KEY = PRICE_CACHE_KEYS[0];
 const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours for ALL prices (including null - no flight available)
 const MAX_CACHE_ENTRIES = 500;
 
@@ -79,7 +80,7 @@ function loadCacheFromStorage(): void {
   try {
     // Try newest key first, then fall back to older keys
     let stored: string | null = null;
-    for (const key of STORAGE_KEYS) {
+    for (const key of PRICE_CACHE_KEYS) {
       stored = localStorage.getItem(key);
       if (stored) break;
     }
@@ -161,7 +162,7 @@ export function useMapPrices(options: UseMapPricesOptions = {}): UseMapPricesRes
       pricesCache.clear();
       pricesRef.current = {};
       setPrices({});
-      STORAGE_KEYS.forEach((k) => localStorage.removeItem(k));
+      PRICE_CACHE_KEYS.forEach((k) => localStorage.removeItem(k));
       console.log('[useMapPrices] Cleared all cache');
     } else {
       // Clear specific destinations for all origins

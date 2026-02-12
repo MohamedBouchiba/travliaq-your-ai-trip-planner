@@ -344,7 +344,7 @@ export function useActivityMemoryStore(): ActivityMemoryStoreValue {
     return {
       totalActivities: state.activities.length,
       activitiesByCity: state.activities.reduce((acc, activity) => {
-        const city = (activity as any).city || 'Unknown';
+        const city = ('city' in activity ? String(activity.city) : null) || 'Unknown';
         if (!acc[city]) {
           acc[city] = [];
         }

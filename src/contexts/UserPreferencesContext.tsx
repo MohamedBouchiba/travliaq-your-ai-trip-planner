@@ -37,7 +37,8 @@ export const useUserPreferences = () => {
   return context;
 };
 
-const STORAGE_KEY = 'travliaq_user_preferences';
+import { STORAGE_KEYS } from "@/config/storageKeys";
+const STORAGE_KEY = STORAGE_KEYS.USER_PREFERENCES;
 
 // Mapping pays -> préférences par défaut
 const countryToPreferences: Record<string, Partial<UserPreferences>> = {

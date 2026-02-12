@@ -9,15 +9,18 @@
 import { useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { ChatMessage } from "../types";
-import type { WidgetType } from "@/types/flight";
+import type { FlightFormData, ChatQuickAction, WidgetType } from "@/types/flight";
+import type { FlightMemory } from "@/stores/hooks/useFlightMemoryStore";
 import type { IntentClassification } from "./useChatStream";
-import { parseAction, flightDataToMemory, getMissingFieldLabel } from "../utils";
+import type { ChooseWidgetAction } from "./useWidgetActionExecutor";
+import { parseAction, flightDataToMemory } from "../utils";
 import { getCityCoords } from "../types";
 import { persistExtractedEntities } from "./persistExtractedEntities";
 import { geocodeCity } from "@/utils/geocodeCity";
 import { eventBus, emitTabChange, emitTabAndZoom } from "@/lib/eventBus";
 import { FLIGHTS_ZOOM } from "@/constants/mapSettings";
 import { useDebugStore } from "@/stores/debugStore";
+import { buildLLMContext } from "./buildLLMContext";
 
 // ─── Types ───
 
@@ -46,8 +49,8 @@ interface WidgetFlowShape {
   isSearchButtonShown: () => boolean;
   markSearchButtonShown: () => void;
   resetFlowState: () => void;
-  determineNextWidget: (showDate: boolean, showTravelers: boolean, mem: Record<string, unknown>) => WidgetType | undefined;
-  getWidgetData: () => Record<string, unknown> | undefined;
+  determineNextWidget: (showDate: boolean, showTravelers: boolean, mem: FlightMemory) => WidgetType | undefined;
+  getWidgetData: () => { preferredMonth?: string; tripDuration?: string } | undefined;
 }
 
 interface WidgetTrackingShape {
@@ -60,7 +63,7 @@ interface WidgetTrackingShape {
 interface IntentRouterShape {
   processIntent: (intent: IntentClassification) => {
     shouldShowWidget: boolean;
-    widgetType: string | null;
+    widgetType: WidgetType | null;
     widgetData?: Record<string, unknown>;
   };
 }
@@ -72,8 +75,8 @@ interface SessionContextShape {
 }
 
 interface WidgetActionExecutorShape {
-  getPendingWidgets: () => Array<{ type: string; options?: string[] }>;
-  executeChooseWidgetAction: (action: Record<string, unknown>) => boolean;
+  getPendingWidgets: () => Array<{ type: WidgetType; messageId: string; options?: string[] }>;
+  executeChooseWidgetAction: (action: ChooseWidgetAction) => boolean;
 }
 
 interface WidgetCooldownShape {
@@ -90,8 +93,8 @@ export interface UseChatSubmitOptions {
   setLastWidgetTriggered: (v: string | null) => void;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   isLoading: boolean;
-  memory: Record<string, unknown>;
-  updateMemory: (partial: Record<string, unknown>) => void;
+  memory: FlightMemory;
+  updateMemory: (partial: Partial<FlightMemory>) => void;
   getMemorySummary: () => string;
   missingFields: string[] | undefined;
   getActivityMemory: () => Record<string, unknown> | null;
@@ -165,115 +168,26 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
         .map((m) => ({ role: m.role === "system" ? "user" : m.role, content: m.text }));
       apiMessages.push({ role: "user", content: userText });
 
-      // Build memory context
-      const activityMemoryState = opts.getActivityMemory();
-      const preferenceMemoryState = opts.getPreferenceMemory();
-      const visualContext = opts.mapContext.buildContextString();
-
-      const activityContext =
-        typeof (activityMemoryState as Record<string, unknown>)?.totalActivities === "number" && (activityMemoryState as Record<string, unknown>).totalActivities as number > 0
-          ? `\n[ACTIVITÉS] ${(activityMemoryState as Record<string, unknown>).totalActivities} activité(s) planifiée(s)`
-          : "";
-
-      const preferenceContext = preferenceMemoryState
-        ? `\n[PRÉFÉRENCES] Rythme: ${(preferenceMemoryState as Record<string, unknown>).pace}, Style: ${(preferenceMemoryState as Record<string, unknown>).travelStyle}, Confort: ${(preferenceMemoryState as Record<string, unknown>).comfortLabel}, Intérêts: ${((preferenceMemoryState as Record<string, unknown>).interests as string[])?.join(", ") || ""}`
-        : "";
-
-      // Build active widgets context for "choose for me"
-      const activeWidgetsContext = opts.widgetTracking.getActiveWidgetsContext();
-      const pendingWidgets = opts.widgetActionExecutor.getPendingWidgets();
-
-      // Build detailed destination context
-      let destinationDetailsContext = "";
-      const destinationWidgetMessage = opts.messages.find(
-        (m) => m.widget === "destinationSuggestions" && !m.widgetConfirmed && m.widgetData?.suggestions
-      );
-      if (destinationWidgetMessage?.widgetData?.suggestions) {
-        const suggestions = destinationWidgetMessage.widgetData.suggestions as Array<{
-          countryName: string;
-          countryCode: string;
-          headline?: string;
-          description?: string;
-          matchScore?: number;
-          highlights?: string[];
-          budgetRange?: string;
-        }>;
-        destinationDetailsContext = `[DESTINATIONS PROPOSÉES - CHOISIS PARMI CELLES-CI]\n${suggestions
-          .map(
-            (d, i) =>
-              `${i + 1}. **${d.countryName}** (${d.countryCode})${d.matchScore ? ` - ${d.matchScore}% match` : ""}\n` +
-              `   Titre: ${d.headline || "Non spécifié"}\n` +
-              `   Description: ${d.description || "Non spécifié"}\n` +
-              `   Points forts: ${d.highlights?.join(", ") || "Non spécifié"}\n` +
-              `   Budget: ${d.budgetRange || "Non spécifié"}`
-          )
-          .join("\n\n")}`;
-      }
-
-      const pendingWidgetsContext =
-        pendingWidgets.length > 0
-          ? pendingWidgets
-              .map((w) =>
-                w.options ? `- Widget "${w.type}" avec options: ${w.options.join(", ")}` : `- Widget "${w.type}" en attente`
-              )
-              .join("\n")
-          : "";
-
-      const userPrefsForChoice = preferenceMemoryState
-        ? `\n[PRÉFÉRENCES UTILISATEUR POUR LE CHOIX]\n` +
-          `- Style: ${(preferenceMemoryState as Record<string, unknown>).travelStyle || "non défini"}\n` +
-          `- Rythme: ${(preferenceMemoryState as Record<string, unknown>).pace || "non défini"}\n` +
-          `- Intérêts: ${((preferenceMemoryState as Record<string, unknown>).interests as string[])?.join(", ") || "non définis"}\n` +
-          `- Niveau confort: ${(preferenceMemoryState as Record<string, unknown>).comfortLabel || "non défini"}`
-        : "";
-
-      const combinedWidgetContext = [
-        destinationDetailsContext,
-        userPrefsForChoice,
-        activeWidgetsContext,
-        pendingWidgetsContext ? `[OPTIONS WIDGETS ACTIFS]\n${pendingWidgetsContext}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n\n")
-        .trim();
+      // Build LLM context from all sources
+      const context = buildLLMContext({
+        messages: opts.messages,
+        getActivityMemory: opts.getActivityMemory,
+        getPreferenceMemory: opts.getPreferenceMemory,
+        mapContext: opts.mapContext,
+        widgetTracking: opts.widgetTracking,
+        widgetActionExecutor: opts.widgetActionExecutor,
+        getMemorySummary: opts.getMemorySummary,
+        missingFields: opts.missingFields,
+        sessionContext: opts.sessionContext,
+        getBasketSummary: opts.getBasketSummary,
+        widgetCooldown: opts.widgetCooldown,
+      });
 
       const { content, flightData, preferencesData, quickReplies, destinationSuggestionRequest, intentClassification, flightSearchTrigger } =
         await opts.streamResponse(
           apiMessages,
           messageId,
-          {
-            flightSummary: opts.getMemorySummary(),
-            activityContext: activityContext + (visualContext ? `\n${visualContext}` : ""),
-            preferenceContext,
-            missingFields: opts.missingFields,
-            widgetHistory: opts.widgetTracking.getContextForLLM(),
-            activeWidgetsContext: combinedWidgetContext,
-            conversationSummary: opts.sessionContext.buildConversationSummary(5),
-            sessionEntities: opts.sessionContext.sessionEntities,
-            widgetDecisions: opts.sessionContext.widgetDecisions,
-            basketSummary: opts.getBasketSummary(),
-            blockedWidgets: opts.widgetCooldown.getBlockedWidgets(),
-            preferencesState: {
-              interests: Array.isArray((preferenceMemoryState as Record<string, unknown>)?.interests)
-                ? (preferenceMemoryState as Record<string, unknown>).interests as string[]
-                : [],
-              style:
-                typeof (preferenceMemoryState as Record<string, unknown>)?.travelStyle === "string"
-                  ? (preferenceMemoryState as Record<string, unknown>).travelStyle
-                  : null,
-              pace:
-                typeof (preferenceMemoryState as Record<string, unknown>)?.pace === "string"
-                  ? (preferenceMemoryState as Record<string, unknown>).pace
-                  : null,
-              styleAxesConfigured: (() => {
-                const axes = (preferenceMemoryState as Record<string, unknown>)?.styleAxes as
-                  | { chillVsIntense: number; cityVsNature: number; ecoVsLuxury: number; touristVsLocal: number }
-                  | undefined;
-                if (!axes) return false;
-                return axes.chillVsIntense !== 50 || axes.cityVsNature !== 50 || axes.ecoVsLuxury !== 50 || axes.touristVsLocal !== 50;
-              })(),
-            },
-          },
+          context,
           (id, text2, isComplete) => {
             if (opts.completedMessageIdsRef.current.has(id) && !isComplete) return;
             if (isComplete) opts.completedMessageIdsRef.current.add(id);
@@ -302,7 +216,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
           opts.setLastWidgetTriggered(intentResult.widgetType);
 
           if (intentResult.shouldShowWidget && intentResult.widgetType) {
-            const widgetType = intentResult.widgetType as WidgetType;
+            const widgetType = intentResult.widgetType;
             opts.intentWidgetRef.current = widgetType;
             if (import.meta.env.DEV) console.log("[useChatSubmit] Intent widget:", widgetType);
             opts.setMessages((prev) =>
@@ -386,8 +300,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
       const { cleanContent, action } = parseAction(content || t("planner.messages.defaultError"));
 
       // Process flight data
-      const mem = opts.memory as Record<string, unknown>;
-      let nextMem = { ...mem, passengers: { ...(mem.passengers as Record<string, unknown>) } };
+      let nextMem: FlightMemory = { ...opts.memory, passengers: { ...opts.memory.passengers } };
       let widget: WidgetType | undefined;
       let showDateWidget = false;
       let showTravelersWidget = false;
@@ -395,13 +308,13 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
       // Unified Entity Pipeline
       persistExtractedEntities(
         intentClassification?.entities as Record<string, unknown> | undefined,
-        flightData as Record<string, unknown> | null,
+        flightData,
         opts.widgetFlow,
-        opts.updateMemory
+        opts.updateMemory as (partial: Record<string, unknown>) => void
       );
 
       if (flightData && Object.keys(flightData).length > 0) {
-        const fd = flightData as Record<string, unknown>;
+        const fd = flightData;
         // Guard: ignore hallucinated toCountryCode when no destination city was provided
         if (fd.toCountryCode && !fd.to) {
           if (import.meta.env.DEV) console.warn("[useChatSubmit] Ignoring hallucinated toCountryCode:", fd.toCountryCode);
@@ -418,9 +331,8 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
           opts.widgetFlow.setPendingTravelersWidget(true);
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const memoryUpdates = flightDataToMemory(fd as any, mem as any);
-        opts.updateMemory(memoryUpdates as unknown as Record<string, unknown>);
+        const memoryUpdates = flightDataToMemory(fd as FlightFormData, opts.memory);
+        opts.updateMemory(memoryUpdates);
         nextMem = { ...nextMem, ...memoryUpdates };
 
         // Track synthetic destination_selected
@@ -445,28 +357,25 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
 
           if (userAskedForChoice) {
             if (import.meta.env.DEV) console.log("[useChatSubmit] chooseWidget (delegated):", action);
-            const executed = opts.widgetActionExecutor.executeChooseWidgetAction(action as Record<string, unknown>);
+            const executed = opts.widgetActionExecutor.executeChooseWidgetAction(action);
             if (import.meta.env.DEV && executed) console.log("[useChatSubmit] Widget action executed");
           } else {
             if (import.meta.env.DEV) console.warn("[useChatSubmit] Blocked auto-chooseWidget:", action);
             const { addBlockedAction } = useDebugStore.getState();
             addBlockedAction({
               type: action.type,
-              widgetType: (action as Record<string, unknown>).widgetType as string || "unknown",
-              option: (action as Record<string, unknown>).option as string || "unknown",
+              widgetType: action.widgetType,
+              option: action.option,
               reason: "Intent not classified as delegate_choice",
               timestamp: Date.now(),
             });
           }
         } else if (action.type === "tab") {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          emitTabChange((action as any).tab);
+          emitTabChange(action.tab);
         } else if (action.type === "zoom") {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          eventBus.emit("map:zoom", { center: (action as any).center, zoom: (action as any).zoom });
+          eventBus.emit("map:zoom", { center: action.center, zoom: action.zoom });
         } else if (action.type === "tabAndZoom") {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          emitTabAndZoom((action as any).tab, (action as any).center, (action as any).zoom);
+          emitTabAndZoom(action.tab, action.center, action.zoom);
         }
       }
 

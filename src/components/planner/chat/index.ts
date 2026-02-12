@@ -73,13 +73,3 @@ export {
   type FlightMemoryUpdate,
 } from "./utils";
 
-// Machines (XState)
-// NOTE: To use the state machine, install @xstate/react: npm install @xstate/react
-export {
-  chatMachine,
-  useChatMachine,
-  type ChatMachineContext,
-  type ChatMachineEvent,
-  type TravelerCounts,
-  type UseChatMachineReturn,
-} from "./machines";

@@ -54,17 +54,18 @@ function getItemIcon(type: BasketItemType) {
 /**
  * Get label for basket item type
  */
+const BASKET_TYPE_KEYS: Record<BasketItemType, string> = {
+  flight: "planner.basket.type.flight",
+  hotel: "planner.basket.type.hotel",
+  activity: "planner.basket.type.activity",
+  transfer: "planner.basket.type.transfer",
+  train: "planner.basket.type.train",
+  'car-rental': "planner.basket.type.carRental",
+  cruise: "planner.basket.type.cruise",
+};
+
 function getItemTypeLabel(type: BasketItemType, t: (key: string) => string): string {
-  const labels: Record<BasketItemType, string> = {
-    flight: 'Vol',
-    hotel: 'Hôtel',
-    activity: 'Activité',
-    transfer: 'Transfert',
-    train: 'Train',
-    'car-rental': 'Location voiture',
-    cruise: 'Croisière',
-  };
-  return labels[type] || type;
+  return BASKET_TYPE_KEYS[type] ? t(BASKET_TYPE_KEYS[type]) : type;
 }
 
 /**
@@ -105,7 +106,7 @@ function BasketItemCard({
         <button
           onClick={() => onRemove(item.id)}
           className="h-6 w-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all"
-          aria-label="Supprimer"
+          aria-label={t("planner.basket.remove")}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
@@ -118,16 +119,17 @@ function BasketItemCard({
  * Empty basket state
  */
 function EmptyBasket() {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center justify-center py-6 text-center">
       <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-3">
         <ShoppingBag className="h-6 w-6 text-muted-foreground" />
       </div>
       <p className="text-sm text-muted-foreground">
-        Votre panier est vide
+        {t("planner.basket.emptyTitle")}
       </p>
       <p className="text-xs text-muted-foreground/70 mt-1">
-        Vos sélections de vols, hôtels et activités apparaîtront ici
+        {t("planner.basket.emptyDescription")}
       </p>
     </div>
   );
@@ -196,9 +198,9 @@ export function TripBasketPanel() {
           </div>
           <div className="text-left">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-foreground">Mon voyage</span>
+              <span className="text-sm font-medium text-foreground">{t("planner.basket.myTrip")}</span>
               <Badge variant="secondary" className="text-xs">
-                {itemCount} {itemCount === 1 ? 'élément' : 'éléments'}
+                {t("planner.basket.item", { count: itemCount })}
               </Badge>
             </div>
             <div className="flex items-center gap-2">
@@ -208,12 +210,12 @@ export function TripBasketPanel() {
               {isComplete ? (
                 <span className="flex items-center gap-1 text-xs text-green-600">
                   <Check className="h-3 w-3" />
-                  Complet
+                  {t("planner.basket.complete")}
                 </span>
               ) : missingSteps.length > 0 ? (
                 <span className="flex items-center gap-1 text-xs text-amber-600">
                   <AlertCircle className="h-3 w-3" />
-                  {missingSteps.length} étape{missingSteps.length > 1 ? 's' : ''} restante{missingSteps.length > 1 ? 's' : ''}
+                  {t("planner.basket.stepsRemaining", { count: missingSteps.length })}
                 </span>
               ) : null}
             </div>
@@ -257,7 +259,7 @@ export function TripBasketPanel() {
             {basketItems.length > 0 && (
               <div className="border-t border-border/50 p-3 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">Total estimé</p>
+                  <p className="text-xs text-muted-foreground">{t("planner.basket.estimatedTotal")}</p>
                   <p className="text-lg font-bold text-foreground">{totalPrice}€</p>
                 </div>
                 
@@ -271,7 +273,7 @@ export function TripBasketPanel() {
                       : "bg-muted text-muted-foreground"
                   )}
                 >
-                  {isComplete ? 'Réserver' : 'Compléter'}
+                  {isComplete ? t("planner.basket.book") : t("planner.basket.completeTrip")}
                 </Button>
               </div>
             )}

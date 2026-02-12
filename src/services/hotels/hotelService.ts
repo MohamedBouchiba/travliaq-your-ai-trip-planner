@@ -13,6 +13,9 @@
 
 import { travliaqClient, getErrorMessage } from '@/services/api/travliaqClient';
 import { logger, LogCategory } from '@/utils/logger';
+import { STORAGE_KEYS } from '@/config/storageKeys';
+
+const HOTELS_DEBUG_KEY = STORAGE_KEYS.HOTELS_DEBUG;
 
 // ============= Types =============
 
@@ -280,7 +283,7 @@ function hashString(str: string): string {
 function isHotelsDebugEnabled(): boolean {
   if (import.meta.env.DEV) return true;
   if (typeof window === 'undefined') return false;
-  return window.localStorage.getItem('hotels_debug') === '1';
+  return window.localStorage.getItem(HOTELS_DEBUG_KEY) === '1';
 }
 
 function hotelsDebugLog(message: string, data?: unknown) {

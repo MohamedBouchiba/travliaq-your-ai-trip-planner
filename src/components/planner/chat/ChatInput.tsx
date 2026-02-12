@@ -97,6 +97,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
                 value={value}
                 onChange={handleChange}
                 placeholder={placeholder || t("planner.chat.inputPlaceholder")}
+                aria-label={t("planner.chat.inputPlaceholder")}
                 rows={1}
                 disabled={isLoading}
                 className="flex-1 resize-none bg-transparent px-2 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"

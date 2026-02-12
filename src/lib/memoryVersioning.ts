@@ -15,13 +15,15 @@ export const MEMORY_VERSIONS = {
 
 export type MemoryKey = keyof typeof MEMORY_VERSIONS;
 
-// ===== Storage Keys =====
+// ===== Storage Keys (re-exported from central config) =====
+
+import { STORAGE_KEYS as CENTRAL_KEYS } from "@/config/storageKeys";
 
 export const STORAGE_KEYS = {
-  flight: "travliaq_flight_memory",
-  travel: "travliaq_travel_memory",
-  accommodation: "travliaq_accommodation_memory",
-  versions: "travliaq_memory_versions",
+  flight: CENTRAL_KEYS.FLIGHT_MEMORY,
+  travel: CENTRAL_KEYS.TRAVEL_MEMORY,
+  accommodation: CENTRAL_KEYS.ACCOMMODATION_MEMORY,
+  versions: CENTRAL_KEYS.MEMORY_VERSIONS,
 } as const;
 
 // ===== Migration Types =====

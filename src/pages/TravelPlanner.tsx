@@ -18,6 +18,7 @@ import OnboardingTour from "@/components/planner/OnboardingTour";
 import { PlannerErrorBoundary } from "@/components/planner/PlannerErrorBoundary";
 import { AutoDetectDeparture } from "@/components/planner/AutoDetectDeparture";
 import type { Airport } from "@/hooks/useNearestAirports";
+import { STORAGE_KEYS } from "@/config/storageKeys";
 import { WidgetHistoryProvider } from "@/contexts/WidgetHistoryContext";
 import { NegativePreferencesProvider } from "@/contexts/NegativePreferencesContext";
 import { usePlannerState } from "@/hooks/usePlannerState";
@@ -80,7 +81,7 @@ const TravelPlanner = () => {
   const initialQuery = searchParams.get("q");
 
   // Check if user has already completed onboarding in a previous session
-  const hasSeenOnboarding = localStorage.getItem("travliaq_onboarding_completed") === "true";
+  const hasSeenOnboarding = localStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETED) === "true";
   
   // Track if we should show onboarding (new user + tour not disabled)
   const shouldShowOnboarding = !disableTour && !hasSeenOnboarding;
@@ -229,7 +230,7 @@ const TravelPlanner = () => {
   // Leave confirmation if a conversation is in progress
   useEffect(() => {
     const handler = ({ dirty }: { dirty: boolean }) => setShouldConfirmLeave(dirty);
-    eventBus.on("chat:dirty", handler as any);
+    eventBus.on("chat:dirty", handler);
 
     const beforeUnload = (e: BeforeUnloadEvent) => {
       if (!shouldConfirmLeave) return;
@@ -277,11 +278,13 @@ const TravelPlanner = () => {
                     <div className="flex-1 overflow-hidden relative">
                       {mobileView === "chat" ? (
                         /* Full-screen Chat */
-                        <PlannerChat
-                          ref={chatRef}
-                          isCollapsed={false}
-                          onToggleCollapse={() => setMobileView("maps")}
-                        />
+                        <PlannerErrorBoundary componentName="PlannerChat">
+                          <PlannerChat
+                            ref={chatRef}
+                            isCollapsed={false}
+                            onToggleCollapse={() => setMobileView("maps")}
+                          />
+                        </PlannerErrorBoundary>
                       ) : (
                         /* Maps View with Widgets at top */
                         <div className="h-full relative">
@@ -419,17 +422,19 @@ const TravelPlanner = () => {
                       className="transition-all duration-300 ease-out"
                     >
                       <div data-tour="chat-panel" className="h-full relative">
-                        <PlannerChat
-                          ref={chatRef}
-                          isCollapsed={isChatCollapsed}
-                          onToggleCollapse={() => {
-                            if (chatPanelRef.current?.isCollapsed()) {
-                              chatPanelRef.current.expand();
-                            } else {
-                              chatPanelRef.current?.collapse();
-                            }
-                          }}
-                        />
+                        <PlannerErrorBoundary componentName="PlannerChat">
+                          <PlannerChat
+                            ref={chatRef}
+                            isCollapsed={isChatCollapsed}
+                            onToggleCollapse={() => {
+                              if (chatPanelRef.current?.isCollapsed()) {
+                                chatPanelRef.current.expand();
+                              } else {
+                                chatPanelRef.current?.collapse();
+                              }
+                            }}
+                          />
+                        </PlannerErrorBoundary>
                       </div>
                     </ResizablePanel>
 

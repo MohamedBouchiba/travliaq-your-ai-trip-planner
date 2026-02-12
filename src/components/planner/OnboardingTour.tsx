@@ -12,7 +12,8 @@ interface OnboardingTourProps {
   onRequestAnimation?: () => void;
 }
 
-const STORAGE_KEY = "travliaq_onboarding_completed";
+import { STORAGE_KEYS } from "@/config/storageKeys";
+const STORAGE_KEY = STORAGE_KEYS.ONBOARDING_COMPLETED;
 
 interface StepConfig {
   tab?: TabType;

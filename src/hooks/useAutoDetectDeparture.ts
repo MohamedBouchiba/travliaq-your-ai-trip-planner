@@ -3,7 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useFlightMemoryStore, type AirportInfo } from '@/stores/hooks';
 import { findNearestAirports } from '@/hooks/useNearestAirports';
 
-const STORAGE_KEY = 'travliaq_auto_departure';
+import { STORAGE_KEYS } from "@/config/storageKeys";
+const STORAGE_KEY = STORAGE_KEYS.AUTO_DEPARTURE;
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 interface CachedDeparture {

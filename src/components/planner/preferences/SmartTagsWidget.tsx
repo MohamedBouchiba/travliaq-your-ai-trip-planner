@@ -25,7 +25,8 @@ const ALL_HASHTAGS = [
   "#Plage", "#Montagne", "#Histoire", "#Gastronomie", "#Shopping", "#Wellness", "#Photo", "#Nightlife",
 ];
 
-const STORAGE_KEY = "travliaq_smart_tags_v2";
+import { STORAGE_KEYS } from "@/config/storageKeys";
+const STORAGE_KEY = STORAGE_KEYS.SMART_TAGS;
 const MESSAGES_THRESHOLD = 4; // Recalculate every N user messages
 
 interface StoredTags {

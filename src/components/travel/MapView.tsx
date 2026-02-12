@@ -42,7 +42,7 @@ const MapView = ({ days, activeDay, onScrollToDay, activeDayData }: MapViewProps
     
     if (map.current) return;
 
-    mapboxgl.accessToken = "pk.eyJ1IjoibW9oYW1lZGJvdWNoaWJhIiwiYSI6ImNtZ2t3dHZ0MzAyaDAya3NldXJ1dTkxdTAifQ.vYCeVngdG4_B0Zpms0dQNA";
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
     try {
       const firstValidCoordinate = days.find(d => 

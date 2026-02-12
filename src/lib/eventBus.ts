@@ -10,13 +10,8 @@
 import mitt, { Emitter } from "mitt";
 import type {
   FlightFormData,
-  AirportChoice,
-  DualAirportChoice,
-  AirportConfirmationData,
   ConfirmedAirports,
-  CountrySelectionEvent,
 } from "@/types/flight";
-import type { AccommodationEntry } from "@/stores/hooks";
 import type { ViatorActivity } from "@/types/activity";
 import type { HotelResult } from "@/components/planner/HotelSearchResults";
 import type { NormalizedDestination, DestinationSource } from "@/types/destination";
@@ -25,18 +20,20 @@ import type { NormalizedDestination, DestinationSource } from "@/types/destinati
 
 /**
  * All events that can be emitted through the bus.
- * Using discriminated union for type safety.
+ *
+ * NOTE: State-like events (tab:change, map:zoom, flight:updateFormData, etc.)
+ * are candidates for migration to Zustand stores. Kept here for now to avoid
+ * breaking changes; prefer store.subscribe() for new features.
  */
 export type PlannerEvents = {
   // Tab & Navigation
   "tab:change": { tab: "flights" | "activities" | "stays" | "preferences" };
   "tab:flash": { tab: "flights" | "activities" | "stays" | "preferences" };
   "panel:toggle": { visible: boolean };
-  
+
   // Map interactions
   "map:zoom": { center: [number, number]; zoom: number };
-  "map:zoomOnly": { zoom: number }; // Change zoom without moving center
-  "map:moveToLocation": { lat: number; lng: number; zoom?: number };
+  "map:zoomOnly": { zoom: number };
   "map:getBounds": void;
   "map:bounds": {
     bounds: {
@@ -48,24 +45,15 @@ export type PlannerEvents = {
   };
   "map:searchInArea": void;
   "map:searchInAreaStatus": { isSearching: boolean };
-  
+
   // Flight-related
   "flight:updateFormData": FlightFormData;
-  "flight:selectAirport": { field: "from" | "to"; airport: AirportChoice["airports"][0] };
-  "flight:askAirportChoice": AirportChoice;
-  "flight:askDualAirportChoice": DualAirportChoice;
-  "flight:askAirportConfirmation": AirportConfirmationData;
+  "flight:selectAirport": { field: "from" | "to"; airport: { iata: string; name: string; city_name: string | null; country_code: string | null; lat: number; lon: number; type: string } };
   "flight:confirmedAirports": ConfirmedAirports;
   "flight:triggerSearch": void;
-  "flight:searchComplete": { results: unknown[] };
-  
-  // Country/City selection
-  "location:countrySelected": CountrySelectionEvent;
+
+  // City selection
   "location:citySelected": { city: string; country: string; lat: number; lng: number };
-  
-  // Accommodation-related
-  "accommodation:update": { city: string; updates: Partial<AccommodationEntry> };
-  "accommodation:syncWithFlights": void;
 
   // Destination Sync (Cross-widget city propagation)
   "destination:flightFinalized": {
@@ -87,40 +75,27 @@ export type PlannerEvents = {
     reason: "user_override" | "manual_edit";
     destinationId: string;
   };
-  
-  // Hotel search results
+
+  // Hotel events
   "hotels:results": { hotels: HotelResult[] };
   "hotels:select": { hotel: HotelResult };
   "hotels:hover": { hotel: HotelResult | null; source?: "map" | "list" };
   "hotels:openDetail": { hotel: HotelResult };
   "hotels:clearSelection": void;
-  "hotels:fitToPrices": void; // Zoom map to fit all hotel price markers
-  "hotels:openPanel": void;
+  "hotels:fitToPrices": void;
   "hotels:starRating": { min: number; max: number };
-  
-  // Budget events
+
+  // Budget & filter events
   "budget:selected": { range: { min: number; max: number }; perPerson: boolean };
-  
-  // Filter events  
   "filters:changed": { filterId: string; selected: boolean };
-  "filters:cleared": void;
-  
-  // Flight preference events
   "flights:directOnly": { directOnly: boolean };
-  
-  // Activity preference events
   "activities:duration": { duration: string };
   "activities:timeOfDay": { timeSlot: string };
-  
-  // Comparison events
-  "comparison:selected": { itemId: string; itemType: string };
-  
-  // Conflict events
+
+  // Conflict & price alert events
   "conflict:resolved": { conflictId: string };
-  
-  // Price alert events
   "priceAlert:action": { alertId: string };
-  
+
   // Activities-related
   "activities:search": {
     city: string;
@@ -152,31 +127,19 @@ export type PlannerEvents = {
   "attraction:click": {
     attraction: ViatorActivity;
   };
-  
-  // Preferences-related (NEW)
-  "preferences:updated": { 
-    preferences: Record<string, unknown>; 
+
+  // Preferences
+  "preferences:updated": {
+    preferences: Record<string, unknown>;
     source: "chat" | "manual";
     fields: string[];
   };
-  "preferences:applyToHotels": void;
-  "preferences:applyToActivities": void;
-  "preferences:conflictDetected": { 
-    field: string; 
-    chatValue: unknown; 
-    manualValue: unknown;
-  };
-  
+
   // Chat interactions
-  "chat:injectMessage": { role: "assistant" | "system"; text: string };
-  "chat:offerFlightSearch": { from: string; to: string };
   "chat:userMessage": { text: string; messageCount: number };
   "chat:dirty": { dirty: boolean };
-  
-  // User actions
-  "user:locationDetected": { lat: number; lng: number; city: string };
-  
-  // Airports layer (Google Flights style)
+
+  // Airports layer
   "airports:fetch": {
     bounds: { north: number; south: number; east: number; west: number };
     zoom: number;
@@ -193,29 +156,6 @@ export type PlannerEvents = {
       type: "large" | "medium";
     };
   };
-  
-  // Onboarding
-  "onboarding:start": void;
-  "onboarding:complete": void;
-  
-  // Booking events
-  "booking:start": { context: unknown };
-  "booking:cancel": Record<string, never>;
-  "booking:stepChange": { step: string };
-  "booking:addItem": { item: unknown };
-  "booking:removeItem": { itemId: string };
-  "booking:itemConfirmed": { itemId: string };
-  
-  // Trip events
-  "trip:exported": { format: string; filename: string };
-  
-  // Workflow events
-  "workflow:goToStep": { step: string };
-  
-  // Search triggers
-  "flights:triggerSearch": void;
-  "hotels:triggerSearch": void;
-  "activities:triggerSearch": void;
 };
 
 // ===== Event Bus Instance =====

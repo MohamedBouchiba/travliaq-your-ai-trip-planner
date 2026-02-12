@@ -33,13 +33,6 @@ export {
   type UseChatImperativeHandlersOptions,
 } from "./useChatImperativeHandlers";
 
-// Workflow integration
-export {
-  useChatWorkflow,
-  type UseChatWorkflowOptions,
-  type UseChatWorkflowReturn,
-} from "./useChatWorkflow";
-
 // Widget tracking for LLM context
 export { useWidgetTracking } from "./useWidgetTracking";
 

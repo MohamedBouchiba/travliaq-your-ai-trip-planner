@@ -51,3 +51,6 @@ export * from "./interactive";
 
 // Booking widgets (Phase 6 - Premium Features)
 export * from "./booking";
+
+// Composite renderer
+export { WidgetRenderer, type WidgetRendererProps } from "./WidgetRenderer";

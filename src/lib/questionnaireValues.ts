@@ -1,6 +1,11 @@
 // Valeurs internes du questionnaire (indépendantes de la langue)
 // Ces valeurs sont stockées dans la base de données et ne changent pas avec la langue
 
+/** Type-safe check: is `value` among the string values of an enum-like object? */
+function hasValue(obj: Record<string, string>, value: string): boolean {
+  return (Object.values(obj) as string[]).includes(value);
+}
+
 export const TRAVEL_GROUPS = {
   SOLO: 'solo',
   DUO: 'duo',
@@ -317,7 +322,7 @@ export const normalizeClimate = (value: string | undefined): string | undefined 
   if (!value) return undefined;
   const lowerValue = value.toLowerCase().trim();
   
-  if (Object.values(CLIMATE).includes(lowerValue as any)) return lowerValue;
+  if (hasValue(CLIMATE, lowerValue)) return lowerValue;
   if (lowerValue.includes('importe') || lowerValue.includes("don't mind")) return CLIMATE.DONT_MIND;
   if (lowerValue.includes('chaud') || lowerValue.includes('hot') || lowerValue.includes('sunny') || lowerValue.includes('ensoleillé')) return CLIMATE.HOT_SUNNY;
   if (lowerValue.includes('doux') || lowerValue.includes('mild') || lowerValue.includes('tempéré') || lowerValue.includes('temperate')) return CLIMATE.MILD_SWEET;
@@ -338,7 +343,7 @@ export const normalizeAffinity = (value: string | undefined): string | undefined
   if (!value) return undefined;
   const lowerValue = value.toLowerCase().trim();
   
-  if (Object.values(AFFINITIES).includes(lowerValue as any)) return lowerValue;
+  if (hasValue(AFFINITIES, lowerValue)) return lowerValue;
   if (lowerValue.includes('importe') || lowerValue.includes("don't mind")) return AFFINITIES.DONT_MIND;
   if (lowerValue.includes('paradis') || lowerValue.includes('paradise') || (lowerValue.includes('plage') && lowerValue.includes('beach'))) return AFFINITIES.PARADISE_BEACHES;
   if (lowerValue.includes('historique') || lowerValue.includes('historic') || (lowerValue.includes('ville') && lowerValue.includes('city'))) return AFFINITIES.HISTORIC_CITIES;
@@ -374,7 +379,7 @@ export const normalizeAmbiance = (value: string | undefined): string | undefined
   if (!value) return undefined;
   const lowerValue = value.toLowerCase().trim();
   
-  if (Object.values(AMBIANCE).includes(lowerValue as any)) return lowerValue;
+  if (hasValue(AMBIANCE, lowerValue)) return lowerValue;
   if (lowerValue.includes('aventure') || lowerValue.includes('adventure') || lowerValue.includes('exotic') || lowerValue.includes('exotique')) return AMBIANCE.ADVENTURE_EXOTIC;
   if (lowerValue.includes('relaxation') || lowerValue.includes('détente')) return AMBIANCE.RELAXATION;
   if (lowerValue.includes('romance') || lowerValue.includes('romantique') || lowerValue.includes('intimacy') || lowerValue.includes('intimité')) return AMBIANCE.ROMANCE_INTIMACY;
@@ -392,7 +397,7 @@ export const normalizeAccommodationType = (value: string | undefined): string | 
   if (!value) return undefined;
   const lowerValue = value.toLowerCase().trim();
   
-  if (Object.values(ACCOMMODATION_TYPE).includes(lowerValue as any)) return lowerValue;
+  if (hasValue(ACCOMMODATION_TYPE, lowerValue)) return lowerValue;
   if (lowerValue.includes('importe') || lowerValue.includes("don't mind")) return ACCOMMODATION_TYPE.DONT_MIND;
   if (lowerValue.includes('hôtel') || lowerValue.includes('hotel')) return ACCOMMODATION_TYPE.HOTEL;
   if (lowerValue.includes('appartement') || lowerValue.includes('apartment')) return ACCOMMODATION_TYPE.APARTMENT;
@@ -416,7 +421,7 @@ export const normalizeHotelPreference = (value: string | undefined): string | un
   if (!value) return undefined;
   const lowerValue = value.toLowerCase().trim();
   
-  if (Object.values(HOTEL_PREFERENCES).includes(lowerValue as any)) return lowerValue;
+  if (hasValue(HOTEL_PREFERENCES, lowerValue)) return lowerValue;
   if (lowerValue.includes('importe') || lowerValue.includes("don't mind")) return HOTEL_PREFERENCES.DONT_MIND;
   if (lowerValue.includes('breakfast') || lowerValue.includes('déjeuner')) return HOTEL_PREFERENCES.BREAKFAST;
   if (lowerValue.includes('half') || lowerValue.includes('demi')) return HOTEL_PREFERENCES.HALF_BOARD;
@@ -440,7 +445,7 @@ export const normalizeComfort = (value: string | undefined): string | undefined 
   if (!value) return undefined;
   const lowerValue = value.toLowerCase().trim();
   
-  if (Object.values(COMFORT).includes(lowerValue as any)) return lowerValue;
+  if (hasValue(COMFORT, lowerValue)) return lowerValue;
   if (lowerValue.includes('basique') || lowerValue.includes('basic') || lowerValue === '1') return COMFORT.BASIC;
   if (lowerValue.includes('standard') || lowerValue === '2' || lowerValue === '3') return COMFORT.STANDARD;
   if (lowerValue.includes('confort') || lowerValue.includes('comfort') || lowerValue === '4') return COMFORT.COMFORT;
@@ -454,7 +459,7 @@ export const normalizeConstraint = (value: string | undefined): string | undefin
   if (!value) return undefined;
   const lowerValue = value.toLowerCase().trim();
   
-  if (Object.values(CONSTRAINTS).includes(lowerValue as any)) return lowerValue;
+  if (hasValue(CONSTRAINTS, lowerValue)) return lowerValue;
   if (lowerValue.includes('importe') || lowerValue.includes("don't mind")) return CONSTRAINTS.DONT_MIND;
   if (lowerValue.includes('halal')) return CONSTRAINTS.HALAL;
   if (lowerValue.includes('casher') || lowerValue.includes('kosher')) return CONSTRAINTS.KOSHER;
@@ -483,7 +488,7 @@ export const normalizeMobility = (value: string | undefined): string | undefined
   if (!value) return undefined;
   const lowerValue = value.toLowerCase().trim();
   
-  if (Object.values(MOBILITY).includes(lowerValue as any)) return lowerValue;
+  if (hasValue(MOBILITY, lowerValue)) return lowerValue;
   if (lowerValue.includes('importe') || lowerValue.includes("don't mind")) return MOBILITY.DONT_MIND;
   if (lowerValue.includes('marche') || lowerValue.includes('walking') || lowerValue.includes('pied')) return MOBILITY.WALKING;
   if (lowerValue.includes('taxi')) return MOBILITY.TAXI;
@@ -508,7 +513,7 @@ export const normalizeRhythm = (value: string | undefined): string | undefined =
   if (!value) return undefined;
   const lowerValue = value.toLowerCase().trim();
   
-  if (Object.values(RHYTHM).includes(lowerValue as any)) return lowerValue;
+  if (hasValue(RHYTHM, lowerValue)) return lowerValue;
   if (lowerValue.includes('relax') || lowerValue.includes('posé') || lowerValue.includes('tranquille')) return RHYTHM.RELAXED;
   if (lowerValue.includes('équilibré') || lowerValue.includes('balanced')) return RHYTHM.BALANCED;
   if (lowerValue.includes('intense') || lowerValue.includes('soutenu')) return RHYTHM.INTENSE;
@@ -520,7 +525,7 @@ export const normalizeSchedulePref = (value: string | undefined): string | undef
   if (!value) return undefined;
   const lowerValue = value.toLowerCase().trim();
   
-  if (Object.values(SCHEDULE).includes(lowerValue as any)) return lowerValue;
+  if (hasValue(SCHEDULE, lowerValue)) return lowerValue;
   if (lowerValue.includes('matinal') || lowerValue.includes('early bird')) return SCHEDULE.EARLY_BIRD;
   if (lowerValue.includes('couche-tard') || lowerValue.includes('night owl')) return SCHEDULE.NIGHT_OWL;
   if (lowerValue.includes('sieste') || lowerValue.includes('siesta')) return SCHEDULE.NEEDS_SIESTA;
@@ -540,7 +545,7 @@ export const normalizeFlightPref = (value: string | undefined): string | undefin
   if (!value) return undefined;
   const lowerValue = value.toLowerCase().trim();
   
-  if (Object.values(FLIGHT_PREF).includes(lowerValue as any)) return lowerValue;
+  if (hasValue(FLIGHT_PREF, lowerValue)) return lowerValue;
   if (lowerValue.includes('direct')) return FLIGHT_PREF.DIRECT;
   if (lowerValue.includes('escale') || lowerValue.includes('stop')) return FLIGHT_PREF.ONE_STOP;
   if (lowerValue.includes('moins cher') || lowerValue.includes('cheapest')) return FLIGHT_PREF.CHEAPEST;
@@ -554,7 +559,7 @@ export const normalizeStyle = (value: string | undefined): string | undefined =>
   if (!value) return undefined;
   const lowerValue = value.toLowerCase().trim();
   
-  if (Object.values(STYLES).includes(lowerValue as any)) return lowerValue;
+  if (hasValue(STYLES, lowerValue)) return lowerValue;
   if (lowerValue.includes('nature')) return STYLES.NATURE;
   if (lowerValue.includes('culture') || lowerValue.includes('musée') || lowerValue.includes('museum')) return STYLES.CULTURE_MUSEUMS;
   if (lowerValue.includes('gastronomie') || lowerValue.includes('food') || lowerValue.includes('restaurant')) return STYLES.FOOD;
@@ -578,7 +583,7 @@ export const normalizeAmenity = (value: string | undefined): string | undefined 
   if (!value) return undefined;
   const lowerValue = value.toLowerCase().trim();
   
-  if (Object.values(AMENITIES).includes(lowerValue as any)) return lowerValue;
+  if (hasValue(AMENITIES, lowerValue)) return lowerValue;
   if (lowerValue.includes('importe') || lowerValue.includes("don't mind")) return AMENITIES.DONT_MIND;
   if (lowerValue.includes('wifi')) return AMENITIES.RELIABLE_WIFI;
   if (lowerValue.includes('climatisation') || lowerValue.includes('air') || lowerValue.includes('conditioning')) return AMENITIES.AIR_CONDITIONING;
@@ -606,7 +611,7 @@ export const normalizeLuggage = (value: string | undefined): string | undefined 
   if (!value) return undefined;
   const lowerValue = value.toLowerCase().trim();
   
-  if (Object.values(LUGGAGE).includes(lowerValue as any)) return lowerValue;
+  if (hasValue(LUGGAGE, lowerValue)) return lowerValue;
   if (lowerValue.includes('personnel') || lowerValue.includes('personal')) return LUGGAGE.PERSONAL_ITEM;
   if (lowerValue.includes('cabine') && !lowerValue.includes('soute') && !lowerValue.includes('hold')) return LUGGAGE.CABIN;
   if (lowerValue.includes('soute') && !lowerValue.includes('cabine') || (lowerValue.includes('hold') && !lowerValue.includes('cabin'))) return LUGGAGE.HOLD;
@@ -620,7 +625,7 @@ export const normalizeDuration = (value: string | undefined): string | undefined
   const lowerValue = value.toLowerCase().trim();
   
   // Already internal codes
-  if (Object.values(DURATION).includes(lowerValue as any)) return lowerValue;
+  if (hasValue(DURATION, lowerValue)) return lowerValue;
   
   // Translation keys
   if (lowerValue.includes('questionnaire.duration.1to3') || lowerValue === '1-3') return DURATION.TWO_NIGHTS;
