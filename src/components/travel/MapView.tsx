@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { MAPBOX_ACCESS_TOKEN } from "@/config/mapbox";
 import "@/styles/mapbox-overrides.css";
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -42,7 +43,7 @@ const MapView = ({ days, activeDay, onScrollToDay, activeDayData }: MapViewProps
     
     if (map.current) return;
 
-    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
+    mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
 
     try {
       const firstValidCoordinate = days.find(d => 

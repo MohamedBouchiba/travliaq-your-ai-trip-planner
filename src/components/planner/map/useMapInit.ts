@@ -3,6 +3,7 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "@/styles/mapbox-overrides.css";
 import eventBus from "@/lib/eventBus";
+import { MAPBOX_ACCESS_TOKEN } from "@/config/mapbox";
 
 /**
  * Initializes the Mapbox GL map instance, handles resize observation,
@@ -33,7 +34,7 @@ export function useMapInit(
 
     window.addEventListener("destination-popup-close", handlePopupClose);
 
-    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
+    mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
