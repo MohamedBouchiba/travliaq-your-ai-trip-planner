@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next";
 import type { ChatMessage } from "../types";
 import type { FlightFormData, ChatQuickAction, WidgetType } from "@/types/flight";
 import type { FlightMemory } from "@/stores/hooks/useFlightMemoryStore";
-import type { IntentClassification } from "./useChatStream";
+import type { IntentClassification, APIMessage, MemoryContext, StreamResult, OnContentUpdate, SessionEntities } from "./chatStreamTypes";
 import type { ChooseWidgetAction } from "./useWidgetActionExecutor";
 import { parseAction, flightDataToMemory } from "../utils";
 import { getCityCoords } from "../types";
@@ -24,22 +24,12 @@ import { buildLLMContext } from "./buildLLMContext";
 
 // ─── Types ───
 
-interface StreamResponseFn {
-  (
-    messages: Array<{ role: string; content: string }>,
-    messageId: string,
-    context: any,
-    onChunk: (id: string, text: string, isComplete: boolean) => void,
-  ): Promise<{
-    content: string | null;
-    flightData: any;
-    preferencesData: Record<string, unknown> | null;
-    quickReplies: { replies?: Array<{ label: string; emoji?: string; message: string }> } | null;
-    destinationSuggestionRequest: { requestedCount?: number } | null;
-    intentClassification: IntentClassification | null;
-    flightSearchTrigger: boolean;
-  }>;
-}
+type StreamResponseFn = (
+  messages: APIMessage[],
+  messageId: string,
+  context: MemoryContext,
+  onChunk: OnContentUpdate,
+) => Promise<StreamResult>;
 
 interface WidgetFlowShape {
   setPendingTripDuration: (d: string) => void;
@@ -70,7 +60,7 @@ interface IntentRouterShape {
 
 interface SessionContextShape {
   buildConversationSummary: (n: number) => string;
-  sessionEntities: any;
+  sessionEntities: SessionEntities;
   widgetDecisions: unknown[];
 }
 

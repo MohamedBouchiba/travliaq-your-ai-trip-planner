@@ -230,7 +230,7 @@ export const createTripBasketSlice: StateCreator<
     
     if (hotels.length > 0) {
       hotels.forEach(h => {
-        const details = h.details as unknown as Record<string, unknown> | undefined;
+        const details = (h.details as unknown) as Record<string, unknown> | undefined;
         const nights = details?.nights || '?';
         lines.push(`- Hôtel: ${h.name}, ${nights} nuits, ${h.price}${state.basketCurrency}`);
       });

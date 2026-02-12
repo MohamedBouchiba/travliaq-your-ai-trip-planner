@@ -48,7 +48,7 @@ export type PlannerEvents = {
 
   // Flight-related
   "flight:updateFormData": FlightFormData;
-  "flight:selectAirport": { field: "from" | "to"; airport: { iata: string; name: string; city_name: string | null; country_code: string | null; lat: number; lon: number; type: string } };
+  "flight:selectAirport": { field: "from" | "to"; airport: { iata: string; name: string; city_name: string; country_code: string; lat: number; lon: number; distance_km?: number; type?: string } };
   "flight:confirmedAirports": ConfirmedAirports;
   "flight:triggerSearch": void;
 
@@ -94,11 +94,9 @@ export type PlannerEvents = {
   "activities:duration": { duration: string };
   "activities:timeOfDay": { timeSlot: string };
 
-  // Comparison events
-  "comparison:selected": { itemId: string; itemType: string };
-
-  // Conflict & price alert events
+  // Conflict & comparison events
   "conflict:resolved": { conflictId: string };
+  "comparison:selected": { itemId: string; itemType: string };
   "priceAlert:action": { alertId: string };
 
   // Activities-related
@@ -139,11 +137,7 @@ export type PlannerEvents = {
     source: "chat" | "manual";
     fields: string[];
   };
-  "preferences:conflictDetected": {
-    field: string;
-    chatValue: unknown;
-    manualValue: unknown;
-  };
+  "preferences:conflictDetected": { field: string; chatValue: unknown; manualValue: unknown };
 
   // Chat interactions
   "chat:userMessage": { text: string; messageCount: number };

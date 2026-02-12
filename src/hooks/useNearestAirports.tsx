@@ -7,7 +7,7 @@ export interface Airport {
   country_code: string;
   lat: number;
   lon: number;
-  distance_km: number;
+  distance_km?: number;
 }
 
 export interface NearestAirportsResponse {

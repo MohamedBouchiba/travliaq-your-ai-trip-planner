@@ -8,7 +8,7 @@
  * - Budget exceeded
  */
 
-// Types inlined (workflowMachine module removed)
+// Types inlined (workflowMachine module removed in P5)
 interface StepSelections {
   dates?: { departure?: string; return?: string };
   flights?: { outbound?: { price: number; time?: string }; return?: { price: number; time?: string } };
@@ -21,7 +21,6 @@ interface StepSelections {
 interface WorkflowContext {
   selections: StepSelections;
   budget?: { total: number; currency: string };
-  travelers?: { adults: number; children: number; infants: number };
 }
 
 /**

@@ -43,7 +43,7 @@ const LazyDestinationSuggestionsGrid = lazy(() =>
 interface WidgetFlowHandlers {
   handleDateSelect: (messageId: string, dateType: "departure" | "return", date: Date) => void;
   handleDateRangeSelect: (messageId: string, departure: Date, returnDate: Date) => void;
-  handleTravelersSelect: (messageId: string, travelers: { adults: number; children: number; infants: number; childrenAges: number[] }) => void;
+  handleTravelersSelect: (messageId: string, travelers: { adults: number; children: number; infants: number; childrenAges?: number[] }) => void;
   handleTravelersConfirmSolo: (messageId: string) => void;
   handleTravelersEditBeforeSearch: (messageId: string, travelers: { adults: number; children: number; infants: number }) => void;
   handleTripTypeConfirm: (messageId: string, tripType: "roundtrip" | "oneway" | "multi") => void;
