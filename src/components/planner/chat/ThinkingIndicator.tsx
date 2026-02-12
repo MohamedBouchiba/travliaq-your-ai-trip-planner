@@ -114,6 +114,8 @@ const ThinkingIndicatorComponent = ({
                   size="sm"
                   className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
                   onClick={() => setIsExpanded(!isExpanded)}
+                  aria-expanded={isExpanded}
+                  aria-label={isExpanded ? t("planner.thinking.hideReasoning", "Hide reasoning") : t("planner.thinking.showReasoning", "Show reasoning")}
                 >
                   {isExpanded ? (
                     <ChevronUp className="w-3 h-3" />
@@ -163,14 +165,14 @@ const ThinkingIndicatorComponent = ({
                 >
                   {reasoning.understanding && (
                     <div className="text-xs">
-                      <span className="font-medium text-primary">Compréhension:</span>
+                      <span className="font-medium text-primary">{t("planner.thinking.understandingLabel", "Understanding")}:</span>
                       <span className="ml-2 text-muted-foreground">{reasoning.understanding}</span>
                     </div>
                   )}
-                  
+
                   {reasoning.keyInsights && reasoning.keyInsights.length > 0 && (
                     <div className="text-xs">
-                      <span className="font-medium text-primary">Insights:</span>
+                      <span className="font-medium text-primary">{t("planner.thinking.insightsLabel", "Insights")}:</span>
                       <ul className="ml-4 mt-1 space-y-0.5 text-muted-foreground">
                         {reasoning.keyInsights.map((insight, i) => (
                           <li key={i} className="flex items-start gap-1">
@@ -184,7 +186,7 @@ const ThinkingIndicatorComponent = ({
 
                   {reasoning.confidence !== undefined && (
                     <div className="text-xs flex items-center gap-2">
-                      <span className="font-medium text-primary">Confiance:</span>
+                      <span className="font-medium text-primary">{t("planner.thinking.confidenceLabel", "Confidence")}:</span>
                       <div className="flex-1 h-1.5 bg-primary/10 rounded-full overflow-hidden">
                         <motion.div
                           initial={{ width: 0 }}

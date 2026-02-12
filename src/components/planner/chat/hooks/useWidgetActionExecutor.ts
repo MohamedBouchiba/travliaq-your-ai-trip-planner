@@ -92,7 +92,7 @@ export function useWidgetActionExecutor(options: WidgetActionExecutorOptions) {
     const widgetMessage = findWidgetMessage(widgetType);
     
     if (!widgetMessage) {
-      console.warn("[WidgetActionExecutor] No pending widget found for type:", widgetType);
+      if (import.meta.env.DEV) console.warn("[WidgetActionExecutor] No pending widget found for type:", widgetType);
       return false;
     }
 
@@ -117,7 +117,7 @@ export function useWidgetActionExecutor(options: WidgetActionExecutorOptions) {
             onDestinationSelect(destination);
             return true;
           } else {
-            console.warn("[WidgetActionExecutor] Destination not found in suggestions:", option);
+            if (import.meta.env.DEV) console.warn("[WidgetActionExecutor] Destination not found in suggestions:", option);
             return false;
           }
         }
@@ -267,7 +267,7 @@ export function useWidgetActionExecutor(options: WidgetActionExecutorOptions) {
       }
 
       default:
-        console.warn("[WidgetActionExecutor] Unhandled widget type:", widgetType);
+        if (import.meta.env.DEV) console.warn("[WidgetActionExecutor] Unhandled widget type:", widgetType);
         return false;
     }
   }, [

@@ -5,25 +5,40 @@
  * Handles both active and confirmed widget states.
  */
 
-import { memo } from "react";
+import { memo, lazy, Suspense } from "react";
 import type { TFunction } from "i18next";
 import type { FlightMemory } from "@/stores/hooks";
 import type { DestinationSuggestion } from "@/types/destinations";
 import type { ChatMessage } from "../types";
 import { ErrorBoundary } from "./common/ErrorBoundary";
+import { GenericWidgetSkeleton } from "./common/WidgetSkeletons";
 import { ConfirmedWidget } from "./ConfirmedWidget";
 import { DatePickerWidget } from "./DatePickerWidget";
 import { DateRangePickerWidget } from "./DateRangePickerWidget";
 import { TravelersWidget, TravelersConfirmBeforeSearchWidget } from "./TravelersWidget";
 import { TripTypeConfirmWidget } from "./TripTypeWidget";
 import { CitySelectionWidget } from "./CitySelectionWidget";
-import { AirportConfirmationWidget } from "./AirportWidgets";
-import { PreferenceStyleWidget } from "./PreferenceStyleWidget";
-import { PreferenceInterestsWidget } from "./PreferenceInterestsWidget";
-import { MustHavesWidget } from "./MustHavesWidget";
-import { DietaryWidget } from "./DietaryWidget";
-import { DestinationSuggestionsGrid } from "./DestinationSuggestionsGrid";
 import { eventBus } from "@/lib/eventBus";
+
+// Lazy-loaded widgets — not needed on initial render
+const LazyAirportConfirmationWidget = lazy(() =>
+  import("./AirportWidgets").then(m => ({ default: m.AirportConfirmationWidget }))
+);
+const LazyPreferenceStyleWidget = lazy(() =>
+  import("./PreferenceStyleWidget").then(m => ({ default: m.PreferenceStyleWidget }))
+);
+const LazyPreferenceInterestsWidget = lazy(() =>
+  import("./PreferenceInterestsWidget").then(m => ({ default: m.PreferenceInterestsWidget }))
+);
+const LazyMustHavesWidget = lazy(() =>
+  import("./MustHavesWidget").then(m => ({ default: m.MustHavesWidget }))
+);
+const LazyDietaryWidget = lazy(() =>
+  import("./DietaryWidget").then(m => ({ default: m.DietaryWidget }))
+);
+const LazyDestinationSuggestionsGrid = lazy(() =>
+  import("./DestinationSuggestionsGrid").then(m => ({ default: m.DestinationSuggestionsGrid }))
+);
 
 interface WidgetFlowHandlers {
   handleDateSelect: (messageId: string, dateType: "departure" | "return", date: Date) => void;
@@ -215,10 +230,12 @@ function WidgetSwitch({
           displayLabel={m.widgetDisplayLabel || t("planner.widget.airportsConfirmed")}
         />
       ) : (
-        <AirportConfirmationWidget
-          data={m.widgetData.airportConfirmation}
-          onConfirm={(confirmed) => eventBus.emit("flight:confirmedAirports", confirmed)}
-        />
+        <Suspense fallback={<GenericWidgetSkeleton rows={4} showHeader />}>
+          <LazyAirportConfirmationWidget
+            data={m.widgetData.airportConfirmation}
+            onConfirm={(confirmed) => eventBus.emit("flight:confirmedAirports", confirmed)}
+          />
+        </Suspense>
       );
 
     case "preferenceStyle":
@@ -229,7 +246,9 @@ function WidgetSwitch({
           displayLabel={m.widgetDisplayLabel || t("planner.widget.styleConfigured")}
         />
       ) : (
-        <PreferenceStyleWidget onContinue={preferenceCallbacks.onStyleContinue} />
+        <Suspense fallback={<GenericWidgetSkeleton rows={3} showHeader />}>
+          <LazyPreferenceStyleWidget onContinue={preferenceCallbacks.onStyleContinue} />
+        </Suspense>
       );
 
     case "preferenceInterests":
@@ -240,7 +259,9 @@ function WidgetSwitch({
           displayLabel={m.widgetDisplayLabel || t("planner.widget.interestsSelected")}
         />
       ) : (
-        <PreferenceInterestsWidget onContinue={preferenceCallbacks.onInterestsContinue} />
+        <Suspense fallback={<GenericWidgetSkeleton rows={3} showHeader />}>
+          <LazyPreferenceInterestsWidget onContinue={preferenceCallbacks.onInterestsContinue} />
+        </Suspense>
       );
 
     case "mustHaves":
@@ -251,7 +272,9 @@ function WidgetSwitch({
           displayLabel={m.widgetDisplayLabel || t("planner.widget.mustHavesConfigured")}
         />
       ) : (
-        <MustHavesWidget onContinue={preferenceCallbacks.onMustHavesContinue} />
+        <Suspense fallback={<GenericWidgetSkeleton rows={2} showHeader />}>
+          <LazyMustHavesWidget onContinue={preferenceCallbacks.onMustHavesContinue} />
+        </Suspense>
       );
 
     case "dietary":
@@ -262,7 +285,9 @@ function WidgetSwitch({
           displayLabel={m.widgetDisplayLabel || t("planner.widget.dietaryConfigured")}
         />
       ) : (
-        <DietaryWidget onContinue={preferenceCallbacks.onDietaryContinue} />
+        <Suspense fallback={<GenericWidgetSkeleton rows={2} showHeader />}>
+          <LazyDietaryWidget onContinue={preferenceCallbacks.onDietaryContinue} />
+        </Suspense>
       );
 
     case "destinationSuggestions":
@@ -274,12 +299,14 @@ function WidgetSwitch({
           displayLabel={m.widgetDisplayLabel || t("planner.widget.destinationSelected")}
         />
       ) : (
-        <DestinationSuggestionsGrid
-          suggestions={m.widgetData.suggestions as DestinationSuggestion[]}
-          basedOnProfile={m.widgetData.basedOnProfile as { completionScore: number; keyFactors: string[] } | undefined}
-          onSelect={(destination) => handleDestinationSelect(m.id, destination)}
-          isLoading={isLoadingDestinations}
-        />
+        <Suspense fallback={<GenericWidgetSkeleton rows={4} showHeader />}>
+          <LazyDestinationSuggestionsGrid
+            suggestions={m.widgetData.suggestions as DestinationSuggestion[]}
+            basedOnProfile={m.widgetData.basedOnProfile as { completionScore: number; keyFactors: string[] } | undefined}
+            onSelect={(destination) => handleDestinationSelect(m.id, destination)}
+            isLoading={isLoadingDestinations}
+          />
+        </Suspense>
       );
 
     default:

@@ -270,7 +270,7 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
     (city: string, updates: Partial<AccommodationEntry>): boolean => {
       const accommodation = findAccommodationByCity(city);
       if (!accommodation) {
-        console.warn(`[Chat] No accommodation found for city: ${city}`);
+        if (import.meta.env.DEV) console.warn(`[Chat] No accommodation found for city: ${city}`);
         toastError(
           t("planner.toast.accommodationNotFound"), 
           t("planner.toast.accommodationNotFoundDesc", { city })
@@ -327,7 +327,7 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
       const activities = getActivitiesByDestination(city);
 
       if (activities.length === 0) {
-        console.warn(`[Chat] No activities found for city: ${city}`);
+        if (import.meta.env.DEV) console.warn(`[Chat] No activities found for city: ${city}`);
         toastError(
           t("planner.toast.activityNotFound"), 
           t("planner.toast.activityNotFoundDesc", { city })
@@ -360,7 +360,7 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
       );
 
       if (!destination) {
-        console.warn(`[Chat] No destination found for city: ${city}`);
+        if (import.meta.env.DEV) console.warn(`[Chat] No destination found for city: ${city}`);
         toastError(
           t("planner.toast.destinationNotFound"), 
           t("planner.toast.destinationNotFoundDesc", { city })

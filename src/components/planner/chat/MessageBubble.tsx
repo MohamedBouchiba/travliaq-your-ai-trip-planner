@@ -12,9 +12,10 @@ import type { ChatMessage } from "./types";
 
 interface MessageBubbleProps {
   message: ChatMessage;
+  onRegenerate?: () => void;
 }
 
-export const MessageBubble = memo(function MessageBubble({ message }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message, onRegenerate }: MessageBubbleProps) {
   const isUser = message.role === "user";
   
   return (
@@ -39,7 +40,7 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
 
       {/* Copy / Like / Dislike actions for assistant messages */}
       {!isUser && !message.isTyping && !message.isStreaming && message.text && (
-        <MessageActions messageId={message.id} text={message.text} />
+        <MessageActions messageId={message.id} text={message.text} onRegenerate={onRegenerate} />
       )}
     </div>
   );

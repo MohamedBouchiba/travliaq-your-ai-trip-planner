@@ -8,6 +8,8 @@
 import React, { Component, type ReactNode, type ErrorInfo } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import i18n from "i18next";
+import { useDebugStore } from "@/stores/debugStore";
 
 /**
  * Error boundary props
@@ -69,6 +71,16 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     console.error(`[ErrorBoundary] ${this.props.widgetName || "Widget"} error:`, error);
     console.error("Component stack:", errorInfo.componentStack);
 
+    // Capture in debug store
+    if (import.meta.env.DEV) {
+      useDebugStore.getState().addWidgetError({
+        timestamp: Date.now(),
+        widgetName: this.props.widgetName || "unknown",
+        errorMessage: error.message,
+        componentStack: errorInfo.componentStack?.slice(0, 500),
+      });
+    }
+
     // Notify parent if callback provided
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
@@ -129,7 +141,9 @@ export function WidgetErrorFallback({
     <div className="flex flex-col items-center justify-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
       <AlertTriangle className="w-8 h-8 text-red-500 mb-2" />
       <p className="text-sm font-medium text-red-700 dark:text-red-300 text-center">
-        {widgetName ? `${widgetName} n'a pas pu se charger` : "Erreur de chargement"}
+        {widgetName
+          ? i18n.t("planner.widget.loadError", { widget: widgetName, defaultValue: `${widgetName} failed to load` })
+          : i18n.t("planner.widget.loadErrorGeneric", "Loading error")}
       </p>
       {error && process.env.NODE_ENV === "development" && (
         <p className="text-xs text-red-500 dark:text-red-400 mt-1 text-center max-w-xs truncate">
@@ -144,7 +158,7 @@ export function WidgetErrorFallback({
           className="mt-3 text-red-600 border-red-300 hover:bg-red-100 dark:text-red-400 dark:border-red-700 dark:hover:bg-red-900/40"
         >
           <RefreshCw className="w-3 h-3 mr-1" />
-          Réessayer
+          {i18n.t("planner.widget.retry", "Retry")}
         </Button>
       )}
     </div>

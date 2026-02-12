@@ -5,6 +5,7 @@
 
 import { useState, useCallback, useRef, useMemo } from 'react';
 import type { WidgetType } from '@/types/flight';
+import { useDebugStore } from '@/stores/debugStore';
 
 /**
  * Configuration constants
@@ -177,7 +178,16 @@ export function useWidgetCooldown(): UseWidgetCooldownReturn {
       return { ...prev, history: newHistory };
     });
     
-    if (import.meta.env.DEV) console.log('[WidgetCooldown] Recorded show:', widgetType);
+    if (import.meta.env.DEV) {
+      console.log('[WidgetCooldown] Recorded show:', widgetType);
+      useDebugStore.getState().addUserInteraction({
+        timestamp: now,
+        category: "widget",
+        action: "shown",
+        widgetType,
+        detail: `Widget shown: ${widgetType}`,
+      });
+    }
   }, []);
 
   /**
@@ -198,7 +208,16 @@ export function useWidgetCooldown(): UseWidgetCooldownReturn {
       return { ...prev, history: newHistory };
     });
     
-    if (import.meta.env.DEV) console.log('[WidgetCooldown] Widget confirmed:', widgetType);
+    if (import.meta.env.DEV) {
+      console.log('[WidgetCooldown] Widget confirmed:', widgetType);
+      useDebugStore.getState().addUserInteraction({
+        timestamp: Date.now(),
+        category: "widget",
+        action: "confirmed",
+        widgetType,
+        detail: `Widget confirmed: ${widgetType}`,
+      });
+    }
   }, []);
 
   /**
@@ -219,7 +238,16 @@ export function useWidgetCooldown(): UseWidgetCooldownReturn {
       return { ...prev, history: newHistory };
     });
     
-    if (import.meta.env.DEV) console.log('[WidgetCooldown] Widget dismissed:', widgetType);
+    if (import.meta.env.DEV) {
+      console.log('[WidgetCooldown] Widget dismissed:', widgetType);
+      useDebugStore.getState().addUserInteraction({
+        timestamp: Date.now(),
+        category: "widget",
+        action: "dismissed",
+        widgetType,
+        detail: `Widget dismissed: ${widgetType}`,
+      });
+    }
   }, []);
 
   /**
@@ -246,7 +274,16 @@ export function useWidgetCooldown(): UseWidgetCooldownReturn {
           return { ...prev, history: newHistory };
         });
         
-        if (import.meta.env.DEV) console.log('[WidgetCooldown] User typed instead of using:', widgetType);
+        if (import.meta.env.DEV) {
+          console.log('[WidgetCooldown] User typed instead of using:', widgetType);
+          useDebugStore.getState().addUserInteraction({
+            timestamp: Date.now(),
+            category: "widget",
+            action: "typed_instead",
+            widgetType,
+            detail: `User typed instead of widget: ${widgetType}`,
+          });
+        }
       }
     }
   }, []);

@@ -427,5 +427,27 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
     opts.generateContextualReplies,
   ]);
 
-  return { sendText };
+  /**
+   * Regenerate the last assistant response by re-sending the last user message.
+   */
+  const regenerateLastResponse = useCallback(async () => {
+    if (opts.isLoading) return;
+
+    // Find the last user message
+    const lastUserIdx = [...opts.messages].reverse().findIndex((m) => m.role === "user" && !m.isHidden);
+    if (lastUserIdx === -1) return;
+    const realIdx = opts.messages.length - 1 - lastUserIdx;
+    const lastUserMessage = opts.messages[realIdx];
+
+    // Remove all assistant messages after the last user message
+    opts.setMessages((prev) => prev.filter((_, i) => i <= realIdx));
+
+    // Re-send the same text through the normal flow
+    // Small delay to let state settle after removal
+    setTimeout(() => {
+      sendText(lastUserMessage.text);
+    }, 50);
+  }, [opts.isLoading, opts.messages, opts.setMessages, sendText]);
+
+  return { sendText, regenerateLastResponse };
 }

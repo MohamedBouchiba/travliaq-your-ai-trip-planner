@@ -81,6 +81,8 @@ export interface SSEEventHandlers {
   onToolFinished?: (parsed: { tool: string; success?: boolean; latency_ms?: number; summary?: string; timestamp?: number }) => void;
   /** Streaming text content chunk */
   onContent?: (contentChunk: string) => void;
+  /** SSE JSON parse error */
+  onParseError?: (rawData: string) => void;
 }
 
 // ─── Parsing ─────────────────────────────────────────────────────────────────
@@ -154,7 +156,7 @@ export function processSSELine(
       handlers.onContent?.(parsed.content);
     }
   } catch {
-    // Ignore parse errors for malformed chunks
+    handlers.onParseError?.(jsonStr);
   }
 
   return false;

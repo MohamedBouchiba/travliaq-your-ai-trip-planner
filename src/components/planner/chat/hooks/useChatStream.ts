@@ -9,406 +9,39 @@
  * - Mounted check for cleanup
  */
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { createCircuitBreaker } from "./circuitBreaker";
 import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import type { FlightFormData } from "@/types/flight";
-import type { MissingField } from "@/stores/hooks";
 import { useDebugStore } from "@/stores/debugStore";
-import { getMissingFieldLabel } from "../utils/flightDataToMemory";
 import { plannerLogger } from "@/utils/logger";
 import { createAccumulator, parseSSEChunk, type SSEEventHandlers } from "./sseEventParser";
+import { getMissingFieldLabel } from "../utils/flightDataToMemory";
 
-/**
- * Maximum messages to send to API to prevent context overflow
- * The memoryContext already contains structured summaries, so we only need recent messages
- */
-export const MAX_MESSAGES_TO_SEND = 15;
+// Re-export types and utils from extracted modules for backward compatibility
+export type {
+  APIMessage, IntentClassification, ReasoningData, ToolStatusEvent, OnToolStatusUpdate,
+  StreamResult, DestinationSuggestionRequest, QuickReplyData, TravelPhase,
+  NegativePreference, SessionEntities, WidgetDecision, MemoryContext,
+  OnContentUpdate, StreamErrorType, StreamError, RetryConfig,
+} from "./chatStreamTypes";
+export { MAX_MESSAGES_TO_SEND } from "./chatStreamTypes";
+export {
+  limitMessages, createStreamError, classifyError, calculateBackoffDelay,
+  sleep, buildContextMessage, buildNegativePreferencesContext, DEFAULT_RETRY_CONFIG,
+} from "./chatStreamUtils";
 
-/**
- * API message format for the chat endpoint
- */
-export interface APIMessage {
-  role: string;
-  content: string;
-}
+// Local imports for use within this file
+import type {
+  APIMessage, StreamError, StreamResult, MemoryContext,
+  OnContentUpdate, OnToolStatusUpdate, RetryConfig,
+} from "./chatStreamTypes";
+import {
+  createStreamError, classifyError, calculateBackoffDelay,
+  sleep, buildContextMessage, buildNegativePreferencesContext, DEFAULT_RETRY_CONFIG,
+} from "./chatStreamUtils";
 
-/**
- * Limit messages to MAX_MESSAGES_TO_SEND while preserving system context
- * Keeps the first system message (if any) and the last N-1 messages
- */
-export function limitMessages(messages: APIMessage[]): APIMessage[] {
-  if (messages.length <= MAX_MESSAGES_TO_SEND) {
-    return messages;
-  }
-  
-  // Check if first message is a system message
-  const hasSystemMessage = messages[0]?.role === "system";
-  
-  if (hasSystemMessage) {
-    // Keep system message + last (MAX - 1) messages
-    const systemMessage = messages[0];
-    const recentMessages = messages.slice(-(MAX_MESSAGES_TO_SEND - 1));
-    return [systemMessage, ...recentMessages];
-  }
-  
-  // No system message - just take the last MAX messages
-  return messages.slice(-MAX_MESSAGES_TO_SEND);
-}
-
-/**
- * Intent classification from backend
- */
-export interface IntentClassification {
-  primaryIntent: string;
-  confidence: number;
-  entities: Record<string, unknown>;
-  widgetToShow?: {
-    type: string;
-    reason: string;
-    data?: Record<string, unknown>;
-  };
-  nextExpectedIntent?: string;
-  requiresClarification?: boolean;
-  clarificationQuestion?: string;
-}
-
-/**
- * Reasoning data from Chain of Thought
- */
-export interface ReasoningData {
-  understanding: string;
-  contextAnalysis: string;
-  responseStrategy: string;
-  keyInsights?: string[];
-  anticipatedNextSteps?: string[];
-  widgetDecision?: {
-    shouldShow: boolean;
-    widgetType?: string;
-    reason?: string;
-  };
-  confidence: number;
-}
-
-/**
- * Tool execution status for real-time tracking
- */
-export interface ToolStatusEvent {
-  tool: string;
-  status: "started" | "finished" | "failed";
-  reason?: string;
-  summary?: string;
-  latency_ms?: number;
-  timestamp: number;
-}
-
-/**
- * Callback for tool status updates
- */
-export type OnToolStatusUpdate = (event: ToolStatusEvent) => void;
-
-/**
- * Stream response result
- */
-export interface StreamResult {
-  content: string;
-  flightData: FlightFormData | null;
-  accommodationData: any | null;
-  preferencesData: any | null;
-  quickReplies: QuickReplyData | null;
-  destinationSuggestionRequest: DestinationSuggestionRequest | null;
-  intentClassification: IntentClassification | null;
-  reasoning: ReasoningData | null;
-  flightSearchTrigger: boolean;
-  requestId: string;
-}
-
-/**
- * Destination suggestion request from LLM
- */
-export interface DestinationSuggestionRequest {
-  requestedCount: number;
-  reason?: string;
-  exceededLimit?: boolean;
-}
-
-/**
- * Quick replies data from AI
- */
-export interface QuickReplyData {
-  replies: Array<{
-    label: string;
-    emoji: string;
-    message: string;
-  }>;
-}
-
-/**
- * Travel phase for adaptive chat behavior
- */
-export type TravelPhase = "inspiration" | "research" | "comparison" | "planning" | "booking";
-
-/**
- * Negative preference from user
- */
-export interface NegativePreference {
-  category: string;
-  value: string;
-  reason?: string;
-}
-
-/**
- * Session entities - cumulative mentions in this session
- */
-export interface SessionEntities {
-  destinations: string[];
-  dates: string[];
-  budgets: string[];
-  constraints: string[];
-}
-
-/**
- * Widget decision record for LLM context
- */
-export interface WidgetDecision {
-  widgetType: string;
-  chosen: string;
-  timestamp: number;
-}
-
-/**
- * Memory context for building API requests
- */
-export interface MemoryContext {
-  flightSummary: string;
-  activityContext: string;
-  preferenceContext: string;
-  missingFields: MissingField[];
-  // Widget interaction history for better LLM context
-  widgetHistory?: string;
-  // Current travel phase for adaptive behavior
-  currentPhase?: TravelPhase;
-  // Negative preferences to avoid
-  negativePreferences?: NegativePreference[];
-  // Active widgets context for "choose for me" functionality
-  activeWidgetsContext?: string;
-  // NEW Phase 3: Conversation summary for context continuity
-  conversationSummary?: string;
-  // NEW Phase 3: Cumulative session entities
-  sessionEntities?: SessionEntities;
-  // NEW Phase 3: Widget decisions history
-  widgetDecisions?: WidgetDecision[];
-  // Trip Basket: summary of user selections (flights, hotels, activities)
-  basketSummary?: string;
-  // Anti-loop: widgets already shown/confirmed that should not be re-proposed
-  blockedWidgets?: string[];
-  // Deterministic preference-first logic: structured preferences state
-  preferencesState?: { interests: string[]; style: string | null; pace: string | null; styleAxesConfigured: boolean };
-}
-
-/**
- * Callback for content updates during streaming
- */
-export type OnContentUpdate = (messageId: string, content: string, isComplete: boolean) => void;
-
-/**
- * Error types for better error handling
- */
-export type StreamErrorType =
-  | "network"      // Network connectivity issues
-  | "auth"         // Authentication failures
-  | "server"       // Server errors (5xx)
-  | "rate_limit"   // Rate limiting (429)
-  | "timeout"      // Request timeout
-  | "cancelled"    // User cancelled
-  | "unknown";     // Unknown error
-
-/**
- * Stream error with classification
- */
-export interface StreamError extends Error {
-  type: StreamErrorType;
-  retryable: boolean;
-  statusCode?: number;
-}
-
-/**
- * Retry configuration
- */
-export interface RetryConfig {
-  maxRetries: number;
-  baseDelayMs: number;
-  maxDelayMs: number;
-}
-
-const DEFAULT_RETRY_CONFIG: RetryConfig = {
-  maxRetries: 3,
-  baseDelayMs: 1000,
-  maxDelayMs: 10000,
-};
-
-/**
- * Create a StreamError with classification
- */
-export function createStreamError(
-  message: string,
-  type: StreamErrorType,
-  statusCode?: number
-): StreamError {
-  const error = new Error(message) as StreamError;
-  error.type = type;
-  error.statusCode = statusCode;
-  error.retryable = type === "network" || type === "server" || type === "timeout";
-  return error;
-}
-
-/**
- * Classify error based on response or exception
- */
-export function classifyError(error: unknown, statusCode?: number): StreamError {
-  if (error instanceof Error) {
-    // Check for abort
-    if (error.name === "AbortError") {
-      return createStreamError("Requête annulée", "cancelled");
-    }
-
-    // Check for network errors
-    if (error.message.includes("fetch") || error.message.includes("network")) {
-      return createStreamError("Erreur de connexion réseau", "network");
-    }
-  }
-
-  // Classify by status code
-  if (statusCode) {
-    if (statusCode === 401 || statusCode === 403) {
-      return createStreamError("Session expirée, veuillez vous reconnecter", "auth", statusCode);
-    }
-    if (statusCode === 429) {
-      return createStreamError("Trop de requêtes, veuillez patienter", "rate_limit", statusCode);
-    }
-    if (statusCode >= 500) {
-      return createStreamError("Erreur serveur, réessai en cours...", "server", statusCode);
-    }
-  }
-
-  return createStreamError(
-    error instanceof Error ? error.message : "Erreur inconnue",
-    "unknown"
-  );
-}
-
-/**
- * Calculate delay for exponential backoff
- */
-export function calculateBackoffDelay(attempt: number, config: RetryConfig): number {
-  const delay = config.baseDelayMs * Math.pow(2, attempt);
-  const jitter = Math.random() * 0.3 * delay; // Add 0-30% jitter
-  return Math.min(delay + jitter, config.maxDelayMs);
-}
-
-/**
- * Sleep for a given duration
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Build the context message for the API
- */
-export function buildContextMessage(memoryContext: MemoryContext): string {
-  const {
-    flightSummary,
-    activityContext,
-    preferenceContext,
-    missingFields,
-    widgetHistory,
-    activeWidgetsContext,
-    conversationSummary,
-    sessionEntities,
-    widgetDecisions,
-    basketSummary,
-    blockedWidgets,
-  } = memoryContext;
-
-  if (!flightSummary && !activeWidgetsContext && !basketSummary) return widgetHistory || "";
-
-  const missingFieldsStr =
-    missingFields.length > 0
-      ? missingFields.map(getMissingFieldLabel).join(", ")
-      : "Aucun - prêt à chercher";
-
-  // Start with blocked widgets warning (anti-loop)
-  let context = "";
-  if (blockedWidgets && blockedWidgets.length > 0) {
-    context += `[WIDGETS BLOQUÉS - NE PAS RE-PROPOSER CES WIDGETS] ${blockedWidgets.join(', ')}\n`;
-  }
-
-  context += flightSummary
-    ? `[CONTEXTE MÉMOIRE] ${flightSummary}${activityContext}${preferenceContext}\n[CHAMPS MANQUANTS] ${missingFieldsStr}`
-    : "";
-
-  // Add trip basket summary (user selections)
-  if (basketSummary) {
-    context += `\n${basketSummary}`;
-  }
-
-  // Add conversation summary (Phase 3)
-  if (conversationSummary) {
-    context += `\n${conversationSummary}`;
-  }
-
-  // Add session entities (Phase 3)
-  if (sessionEntities) {
-    const { destinations, dates, budgets, constraints } = sessionEntities;
-    const entityParts: string[] = [];
-    if (destinations.length > 0) {
-      entityParts.push(`Destinations mentionnées: ${destinations.join(", ")}`);
-    }
-    if (dates.length > 0) {
-      entityParts.push(`Dates: ${dates.join(", ")}`);
-    }
-    if (budgets.length > 0) {
-      entityParts.push(`Budgets: ${budgets.join(", ")}`);
-    }
-    if (constraints.length > 0) {
-      entityParts.push(`Contraintes: ${constraints.join(", ")}`);
-    }
-    if (entityParts.length > 0) {
-      context += `\n[ENTITÉS SESSION] ${entityParts.join(" | ")}`;
-    }
-  }
-
-  // Add widget decisions (Phase 3)
-  if (widgetDecisions && widgetDecisions.length > 0) {
-    const decisionStr = widgetDecisions.map((d) => d.chosen).join(" → ");
-    context += `\n[CHOIX VIA WIDGETS] ${decisionStr}`;
-  }
-
-  // Add widget history if available
-  if (widgetHistory) {
-    context += `\n${widgetHistory}`;
-  }
-
-  // Add active widgets context for "choose for me" functionality
-  if (activeWidgetsContext) {
-    context += `\n${activeWidgetsContext}`;
-  }
-
-  return context;
-}
-
-/**
- * Build negative preferences context for LLM
- */
-export function buildNegativePreferencesContext(prefs: NegativePreference[]): string {
-  if (!prefs || prefs.length === 0) return "";
-  
-  const lines = prefs.map(p => {
-    return p.reason ? `- ${p.value} (${p.reason})` : `- ${p.value}`;
-  });
-  
-  return `[PRÉFÉRENCES NÉGATIVES - NE PAS PROPOSER]\n${lines.join("\n")}`;
-}
+// (Types, constants, and utility functions have been extracted to chatStreamTypes.ts and chatStreamUtils.ts)
 
 /**
  * Hook options
@@ -426,6 +59,9 @@ export interface UseChatStreamOptions {
 export function useChatStream(options: UseChatStreamOptions = {}) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<StreamError | null>(null);
+
+  // Circuit breaker: blocks requests after repeated failures
+  const circuitBreaker = useMemo(() => createCircuitBreaker(), []);
 
   // Debug store for developer insights
   const debugStore = useDebugStore();
@@ -484,6 +120,11 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
 
+      // Circuit breaker: reject immediately if server is known to be down
+      if (!circuitBreaker.canRequest()) {
+        throw createStreamError("Server temporarily unavailable", "server");
+      }
+
       const retryConfig = { ...DEFAULT_RETRY_CONFIG, ...options.retryConfig };
 
       // ─── P0 FIX: Global stream timeout (60s) ───
@@ -508,6 +149,20 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         has_blocked_widgets: (memoryContext.blockedWidgets?.length || 0) > 0,
       });
 
+      // Track phase transitions
+      if (memoryContext.currentPhase) {
+        const { phaseHistory } = useDebugStore.getState();
+        const lastPhase = phaseHistory.length > 0 ? phaseHistory[phaseHistory.length - 1].toPhase : undefined;
+        if (lastPhase !== memoryContext.currentPhase) {
+          debugStore.addPhaseTransition({
+            timestamp: Date.now(),
+            fromPhase: lastPhase,
+            toPhase: memoryContext.currentPhase,
+            confidence: 80,
+          });
+        }
+      }
+
       if (isMountedRef.current) {
         setIsStreaming(true);
         setError(null);
@@ -528,8 +183,14 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           }
 
           // Notify retry attempt
-          if (attempt > 0 && options.onRetry) {
-            options.onRetry(attempt, retryConfig.maxRetries);
+          if (attempt > 0) {
+            options.onRetry?.(attempt, retryConfig.maxRetries);
+            debugStore.addRetryAttempt({
+              timestamp: Date.now(),
+              attempt,
+              maxRetries: retryConfig.maxRetries,
+              delayMs: calculateBackoffDelay(attempt - 1, retryConfig),
+            });
           }
 
           const contextMessage = buildContextMessage(memoryContext);
@@ -611,12 +272,14 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
               debugStore.setReasoning(reasoning);
               if (derivedIntent) {
                 debugStore.setLastIntent(derivedIntent);
+                debugStore.addIntentHistory({ timestamp: Date.now(), intent: derivedIntent, source: "reasoning" });
                 if (import.meta.env.DEV) console.log("[Stream] Intent from reasoning:", derivedIntent.primaryIntent);
               }
             },
             onIntentClassification: (intent) => {
               if (import.meta.env.DEV) console.log("[Stream] Intent:", intent.primaryIntent, intent.confidence);
               debugStore.setLastIntent(intent);
+              debugStore.addIntentHistory({ timestamp: Date.now(), intent, source: "backend" });
             },
             onPreferencesData: () => {
               if (import.meta.env.DEV) console.log("[Stream] Preferences detected");
@@ -665,6 +328,9 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
             onContent: () => {
               fullContent = acc.content;
               throttledUpdate();
+            },
+            onParseError: (rawData) => {
+              debugStore.addSSEParseError({ timestamp: Date.now(), rawData: rawData.slice(0, 500) });
             },
           };
 
@@ -739,6 +405,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           });
 
           clearTimeout(streamTimeoutId);
+          circuitBreaker.recordSuccess();
           return { content: fullContent, flightData, accommodationData, preferencesData: acc.preferencesData, quickReplies: acc.quickReplies, destinationSuggestionRequest: acc.destinationSuggestionRequest, intentClassification: acc.intentClassification, reasoning: acc.reasoning, flightSearchTrigger: acc.flightSearchTrigger, requestId };
 
         } catch (err) {
@@ -750,6 +417,15 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           plannerLogger.logError(requestId, lastError, {
             attempt,
             type: lastError.type,
+            retryable: lastError.retryable,
+          });
+
+          // Capture error in debug store
+          debugStore.addStreamError({
+            timestamp: Date.now(),
+            type: lastError.type,
+            message: lastError.message,
+            statusCode: lastError.statusCode,
             retryable: lastError.retryable,
           });
 
@@ -771,6 +447,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
       // All retries failed
       clearTimeout(streamTimeoutId);
+      circuitBreaker.recordFailure();
       if (isMountedRef.current) {
         setError(lastError);
         if (options.onError && lastError) {
@@ -780,7 +457,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
       throw lastError || createStreamError("Erreur inconnue", "unknown");
     },
-    [cancelStream, options]
+    [cancelStream, options, circuitBreaker]
   );
 
   // Cleanup streaming state

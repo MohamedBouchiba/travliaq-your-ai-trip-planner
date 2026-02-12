@@ -3,13 +3,14 @@
  * Fully i18n-enabled
  */
 
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { eventBus, emitTabChange } from "@/lib/eventBus";
 import type { QuickReply, QuickReplyAction } from "./types";
 import type { WidgetInteraction } from "@/contexts/WidgetHistoryContext";
 import type { SessionEntities } from "./hooks/useChatStream";
+import { useDebugStore } from "@/stores/debugStore";
 
 interface QuickRepliesProps {
   replies: QuickReply[];
@@ -28,8 +29,46 @@ export function QuickReplies({
   disabled = false,
   className,
 }: QuickRepliesProps) {
+  const { t } = useTranslation();
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const buttons = containerRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)");
+    if (!buttons || buttons.length === 0) return;
+
+    const current = document.activeElement as HTMLButtonElement;
+    const idx = Array.from(buttons).indexOf(current);
+    if (idx === -1) return;
+
+    let next = -1;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      next = (idx + 1) % buttons.length;
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      next = (idx - 1 + buttons.length) % buttons.length;
+    } else if (e.key === "Home") {
+      next = 0;
+    } else if (e.key === "End") {
+      next = buttons.length - 1;
+    }
+
+    if (next >= 0) {
+      e.preventDefault();
+      buttons[next].focus();
+    }
+  };
+
   const handleQuickReply = (reply: QuickReply) => {
     if (disabled) return;
+
+    if (import.meta.env.DEV) {
+      useDebugStore.getState().addUserInteraction({
+        timestamp: Date.now(),
+        category: "quickReply",
+        action: "clicked",
+        detail: `Quick reply: "${reply.label}" -> ${reply.action.type}`,
+        data: { label: reply.label, actionType: reply.action.type },
+      });
+    }
 
     const action = reply.action;
 
@@ -68,18 +107,23 @@ export function QuickReplies({
 
   return (
     <div
+      ref={containerRef}
       onWheel={handleWheel}
+      onKeyDown={handleKeyDown}
+      role="toolbar"
+      aria-label={t("planner.chat.quickRepliesLabel", "Quick replies")}
       className={cn(
         "flex gap-2 mt-3 overflow-x-auto pb-1 themed-scroll",
         className
       )}
       style={{ scrollbarWidth: 'thin' }}
     >
-      {replies.map((reply) => (
+      {replies.map((reply, index) => (
         <button
           key={reply.id}
           onClick={() => handleQuickReply(reply)}
           disabled={disabled}
+          tabIndex={index === 0 ? 0 : -1}
           className={cn(
             "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all shrink-0",
             "hover:scale-[1.02] active:scale-[0.98]",

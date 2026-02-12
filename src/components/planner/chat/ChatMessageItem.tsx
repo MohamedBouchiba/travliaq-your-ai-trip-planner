@@ -71,6 +71,7 @@ interface ChatMessageItemProps {
   onFillInput: (text: string) => void;
   onTriggerWidget: (widget: string) => void;
   onDestinationSelect?: (destination: DestinationSuggestion) => void;
+  onRegenerate?: () => void;
 }
 
 function ChatMessageItemComponent({
@@ -83,6 +84,7 @@ function ChatMessageItemComponent({
   onFillInput,
   onTriggerWidget,
   onDestinationSelect,
+  onRegenerate,
 }: ChatMessageItemProps) {
   const { t } = useTranslation();
   return (
@@ -109,7 +111,7 @@ function ChatMessageItemComponent({
 
         {/* Copy / Like / Dislike actions */}
         {m.role === "assistant" && !m.isTyping && !m.isStreaming && m.text && (
-          <MessageActions messageId={m.id} text={m.text} />
+          <MessageActions messageId={m.id} text={m.text} onRegenerate={onRegenerate} />
         )}
 
         {/* Airport choices */}
