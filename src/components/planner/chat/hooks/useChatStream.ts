@@ -37,7 +37,7 @@ import type {
   OnContentUpdate, OnToolStatusUpdate, RetryConfig,
 } from "./chatStreamTypes";
 import {
-  createStreamError, classifyError, calculateBackoffDelay,
+  limitMessages, createStreamError, classifyError, calculateBackoffDelay,
   sleep, buildContextMessage, buildNegativePreferencesContext, DEFAULT_RETRY_CONFIG,
 } from "./chatStreamUtils";
 

@@ -8,7 +8,21 @@
  * - Budget exceeded
  */
 
-import type { WorkflowContext, StepSelections } from "../machines/workflowMachine";
+// Types inlined (workflowMachine module removed)
+interface StepSelections {
+  dates?: { departure?: string; return?: string };
+  flights?: { outbound?: { price: number; time?: string }; return?: { price: number; time?: string } };
+  hotels?: { price: number; checkIn?: string; checkOut?: string; name?: string };
+  activities: Array<{ id?: string; price: number; time?: string; duration?: number; name?: string; date?: Date }>;
+  transfers: Array<{ price: number; from?: string; to?: string }>;
+  travelers?: { adults: number; children: number; infants: number };
+}
+
+interface WorkflowContext {
+  selections: StepSelections;
+  budget?: { total: number; currency: string };
+  travelers?: { adults: number; children: number; infants: number };
+}
 
 /**
  * Conflict severity levels

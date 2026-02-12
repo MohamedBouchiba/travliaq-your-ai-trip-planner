@@ -71,7 +71,7 @@ export function handleAirportSelect(
     { id: `confirm-${Date.now()}-${field}`, role: "assistant", text: confirmText },
   ]);
 
-  eventBus.emit("flight:selectAirport", { field, airport });
+  eventBus.emit("flight:selectAirport", { field, airport: { ...airport, type: "airport" } });
 }
 
 /**

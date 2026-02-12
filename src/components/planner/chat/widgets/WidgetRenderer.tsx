@@ -166,7 +166,7 @@ function WidgetSwitch({
       ) : (
         <TravelersWidget
           initialValues={memory.passengers}
-          onConfirm={(travelers) => widgetFlow.handleTravelersSelect(m.id, travelers)}
+          onConfirm={(travelers) => widgetFlow.handleTravelersSelect(m.id, { ...travelers, childrenAges: [] })}
         />
       );
 
