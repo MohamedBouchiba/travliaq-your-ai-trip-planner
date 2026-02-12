@@ -39,12 +39,13 @@ export function AIConflictBadge({ onApply, className }: AIConflictBadgeProps) {
   
   // Listen for conflict events
   usePlannerEvent("preferences:conflictDetected", (data) => {
+    const conflict = data as ConflictData;
     setConflicts(prev => {
       // Avoid duplicates
-      if (prev.some(c => c.field === data.field)) {
-        return prev.map(c => c.field === data.field ? data : c);
+      if (prev.some(c => c.field === conflict.field)) {
+        return prev.map(c => c.field === conflict.field ? conflict : c);
       }
-      return [...prev, data];
+      return [...prev, conflict];
     });
   });
 

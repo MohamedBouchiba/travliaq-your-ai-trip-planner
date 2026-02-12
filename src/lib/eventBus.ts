@@ -81,6 +81,7 @@ export type PlannerEvents = {
   "hotels:select": { hotel: HotelResult };
   "hotels:hover": { hotel: HotelResult | null; source?: "map" | "list" };
   "hotels:openDetail": { hotel: HotelResult };
+  "hotels:openPanel": void;
   "hotels:clearSelection": void;
   "hotels:fitToPrices": void;
   "hotels:starRating": { min: number; max: number };
@@ -88,9 +89,13 @@ export type PlannerEvents = {
   // Budget & filter events
   "budget:selected": { range: { min: number; max: number }; perPerson: boolean };
   "filters:changed": { filterId: string; selected: boolean };
+  "filters:cleared": void;
   "flights:directOnly": { directOnly: boolean };
   "activities:duration": { duration: string };
   "activities:timeOfDay": { timeSlot: string };
+
+  // Comparison events
+  "comparison:selected": { itemId: string; itemType: string };
 
   // Conflict & price alert events
   "conflict:resolved": { conflictId: string };
@@ -133,6 +138,11 @@ export type PlannerEvents = {
     preferences: Record<string, unknown>;
     source: "chat" | "manual";
     fields: string[];
+  };
+  "preferences:conflictDetected": {
+    field: string;
+    chatValue: unknown;
+    manualValue: unknown;
   };
 
   // Chat interactions

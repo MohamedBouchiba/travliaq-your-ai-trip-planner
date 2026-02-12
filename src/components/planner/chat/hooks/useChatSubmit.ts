@@ -28,11 +28,11 @@ interface StreamResponseFn {
   (
     messages: Array<{ role: string; content: string }>,
     messageId: string,
-    context: Record<string, unknown>,
+    context: any,
     onChunk: (id: string, text: string, isComplete: boolean) => void,
   ): Promise<{
     content: string | null;
-    flightData: Record<string, unknown> | null;
+    flightData: any;
     preferencesData: Record<string, unknown> | null;
     quickReplies: { replies?: Array<{ label: string; emoji?: string; message: string }> } | null;
     destinationSuggestionRequest: { requestedCount?: number } | null;
@@ -70,7 +70,7 @@ interface IntentRouterShape {
 
 interface SessionContextShape {
   buildConversationSummary: (n: number) => string;
-  sessionEntities: Record<string, unknown>;
+  sessionEntities: any;
   widgetDecisions: unknown[];
 }
 

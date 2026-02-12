@@ -35,7 +35,7 @@ export function useFlightState(
 
   // Event listener: airport selection
   usePlannerEvent("flight:selectAirport", useCallback((data) => {
-    setSelectedAirport({ field: data.field, airport: data.airport });
+    setSelectedAirport({ field: data.field, airport: { ...data.airport, distance_km: 0 } });
   }, []));
 
   // Event listener: trigger flight search
