@@ -2018,6 +2018,7 @@ const resources = {
       "planner.preferences.style.yourStyle": "Votre style de voyage",
       "planner.preferences.style.interests": "Centres d'intérêt",
       "planner.preferences.style.defineCriteria": "Définir vos critères",
+      "planner.preferences.style.helpTooltip": "Ajustez chaque curseur pour indiquer vos préférences.\nGlissez les lignes pour les réorganiser par priorité : la première ligne compte le plus.",
       
       // PreferencesPanel - Criteria Step
       "planner.preferences.criteria.mustHaves": "Critères obligatoires",
@@ -4940,6 +4941,7 @@ const resources = {
       "planner.preferences.style.yourStyle": "Your travel style",
       "planner.preferences.style.interests": "Interests",
       "planner.preferences.style.defineCriteria": "Define your criteria",
+      "planner.preferences.style.helpTooltip": "Adjust each slider to indicate your preferences.\nDrag lines to reorder by priority: the first line matters most.",
       
       // PreferencesPanel - Criteria Step
       "planner.preferences.criteria.mustHaves": "Required criteria",
