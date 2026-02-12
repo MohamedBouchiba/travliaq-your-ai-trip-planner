@@ -70,20 +70,25 @@ export interface AnticipatedSuggestion {
  * Extract destination names from text (bilingual)
  */
 function extractDestinationNames(text: string): string[] {
+  const found = new Map<string, string>(); // lowercase key → displayName
+
   // Primary: use DB-backed index (covers ~5000 cities + 250 countries)
   if (destinationIndex.isReady()) {
-    return destinationIndex.match(text);
-  }
-
-  // Fallback: minimal static list for when index hasn't loaded yet
-  const destinations: string[] = [];
-  const textLower = text.toLowerCase();
-  for (const dest of FALLBACK_DESTINATIONS) {
-    if (textLower.includes(dest.toLowerCase())) {
-      destinations.push(dest);
+    for (const name of destinationIndex.match(text)) {
+      found.set(name.toLowerCase(), name);
     }
   }
-  return destinations.slice(0, 6);
+
+  // Always check fallback list for common spellings the DB may store differently
+  const textLower = text.toLowerCase();
+  for (const dest of FALLBACK_DESTINATIONS) {
+    const key = dest.toLowerCase();
+    if (textLower.includes(key) && !found.has(key)) {
+      found.set(key, dest);
+    }
+  }
+
+  return [...found.values()].slice(0, 6);
 }
 
 /**
@@ -158,12 +163,21 @@ export function analyzeLastAssistantMessage(text: string | undefined): LastPropo
     ['next_steps', NEXT_STEPS_PATTERNS],
     ['confirmation', CONFIRMATION_PATTERNS],
   ];
+  let hasDestinationPattern = false;
   for (const [category, patterns] of standardPatterns) {
     for (const pattern of patterns) {
       if (pattern.test(text)) {
         scores[category] += PATTERN_SCORE;
+        if (category === 'destinations') hasDestinationPattern = true;
       }
     }
+  }
+
+  // ── Dampening: incidental destination mention in confirmation messages ──
+  // When only 1 destination name is found with no listing pattern ("here are X destinations")
+  // and a confirmation pattern matched, reduce destination score so confirmation wins.
+  if (extractedItems.length === 1 && !hasDestinationPattern && scores.confirmation > 0) {
+    scores.destinations = Math.min(scores.destinations, PATTERN_SCORE - 1);
   }
 
   // ── Question bonus: ONLY if a base pattern already scored > 0 ──

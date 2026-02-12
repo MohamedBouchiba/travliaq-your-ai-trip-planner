@@ -160,6 +160,9 @@ export const CONFIRMATION_PATTERNS = [
   /i('ll)?\s+note/i,
   /let('s)?\s+recap/i,
   /got\s+it/i,
+  /i\s+understand/i,
+  /understood/i,
+  /let\s+me\s+help/i,
 ];
 
 export const DEPARTURE_QUESTION_PATTERNS = [

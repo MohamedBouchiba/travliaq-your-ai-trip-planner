@@ -190,6 +190,10 @@ export function extractPhaseSignals(
     /\bhate\b/i,
     /not\s+interested/i,
     /stay\s+away/i,
+    /\bno\s+\w+/i,
+    /\bnothing\b/i,
+    /\bwithout\b/i,
+    /\bonly\b/i,
   ];
   const hasNegativePreferences = negativePatterns.some(p => p.test(lowerMessage));
   
