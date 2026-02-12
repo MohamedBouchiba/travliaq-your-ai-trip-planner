@@ -6,8 +6,9 @@
 import { memo, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Reorder, useDragControls } from "framer-motion";
-import { GripVertical } from "lucide-react";
+import { GripVertical, HelpCircle } from "lucide-react";
 import { DualSlider } from "@/components/ui/dual-slider";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { StyleAxes } from "@/stores/hooks";
 
@@ -49,7 +50,7 @@ const DraggableAxis = memo(function DraggableAxis({ axisKey, rank, value, onChan
       value={axisKey}
       dragListener={false}
       dragControls={controls}
-      className="group flex items-center gap-1.5"
+      className="group flex items-center gap-1.5 py-1 px-1.5 bg-muted/5 rounded-lg"
       whileDrag={{ scale: 1.02, boxShadow: "0 4px 16px hsl(var(--primary) / 0.15)", zIndex: 10 }}
       transition={{ duration: 0.2 }}
     >
@@ -69,8 +70,8 @@ const DraggableAxis = memo(function DraggableAxis({ axisKey, rank, value, onChan
 
       {/* Left label */}
       <div className={cn(
-        "flex items-center gap-1 min-w-[80px] justify-end",
-        compact && "min-w-[65px]"
+        "flex items-center gap-1 w-[100px] justify-end",
+        compact && "w-[80px]"
       )}>
         <span className="text-sm">{leftEmoji}</span>
         <span className={cn(
@@ -93,8 +94,8 @@ const DraggableAxis = memo(function DraggableAxis({ axisKey, rank, value, onChan
 
       {/* Right label */}
       <div className={cn(
-        "flex items-center gap-1 min-w-[80px]",
-        compact && "min-w-[65px]"
+        "flex items-center gap-1 w-[100px]",
+        compact && "w-[80px]"
       )}>
         <span className={cn(
           "text-[11px] font-medium transition-colors whitespace-nowrap",
@@ -124,9 +125,23 @@ export const StyleEqualizer = memo(function StyleEqualizer({ axes, axesOrder, on
 
   return (
     <div className={cn("space-y-1", compact && "space-y-0.5")}>
-      <p className="text-[10px] text-muted-foreground mb-1.5">
-        {t("planner.preferences.style.dragHint", "Glissez pour réorganiser par priorité")}
-      </p>
+      <div className="flex items-center justify-between mb-1.5">
+        <p className="text-[10px] text-muted-foreground">
+          {t("planner.preferences.style.dragHint", "Glissez pour réorganiser par priorité")}
+        </p>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button type="button" className="text-muted-foreground hover:text-foreground transition-colors">
+                <HelpCircle className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="max-w-[240px] whitespace-pre-line text-xs">
+              {t("planner.preferences.style.helpTooltip")}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
       <Reorder.Group
         axis="y"
         values={safeOrder}

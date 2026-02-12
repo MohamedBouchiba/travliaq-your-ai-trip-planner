@@ -5,10 +5,11 @@
  */
 
 import { memo, useCallback, useMemo } from "react";
-import { Sliders, ArrowRight, GripVertical } from "lucide-react";
+import { Sliders, ArrowRight, GripVertical, HelpCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Reorder, useDragControls } from "framer-motion";
 import { DualSlider } from "@/components/ui/dual-slider";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePreferenceMemoryStore, type StyleAxes } from "@/stores/hooks";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +46,7 @@ const ChatDraggableAxis = memo(function ChatDraggableAxis({ axisKey, rank, value
       value={axisKey}
       dragListener={false}
       dragControls={controls}
-      className="group flex items-center gap-2"
+      className="group flex items-center gap-2 py-1 px-1.5 bg-muted/5 rounded-lg"
       whileDrag={{ scale: 1.02, boxShadow: "0 4px 16px hsl(var(--primary) / 0.15)", zIndex: 10 }}
       transition={{ duration: 0.2 }}
     >
@@ -64,7 +65,7 @@ const ChatDraggableAxis = memo(function ChatDraggableAxis({ axisKey, rank, value
       </div>
 
       {/* Left label */}
-      <div className="flex items-center gap-1.5 min-w-[90px] justify-end">
+      <div className="flex items-center gap-1.5 w-[100px] justify-end">
         <span className="text-base">{leftEmoji}</span>
         <span className={cn(
           "text-xs font-medium transition-colors",
@@ -85,7 +86,7 @@ const ChatDraggableAxis = memo(function ChatDraggableAxis({ axisKey, rank, value
       </div>
 
       {/* Right label */}
-      <div className="flex items-center gap-1.5 min-w-[90px]">
+      <div className="flex items-center gap-1.5 w-[100px]">
         <span className={cn(
           "text-xs font-medium transition-colors",
           value > 60 ? "text-foreground" : "text-muted-foreground"
@@ -121,7 +122,19 @@ export const PreferenceStyleWidget = memo(function PreferenceStyleWidget({
       {/* Header */}
       <div className="flex items-center gap-2 mb-2">
         <Sliders className="h-4 w-4 text-primary" />
-        <span className="text-sm font-semibold text-foreground">{t("planner.preference.styleTitle")}</span>
+        <span className="text-sm font-semibold text-foreground flex-1">{t("planner.preference.styleTitle")}</span>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button type="button" className="text-muted-foreground hover:text-foreground transition-colors">
+                <HelpCircle className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="max-w-[240px] whitespace-pre-line text-xs">
+              {t("planner.preferences.style.helpTooltip")}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       <p className="text-[10px] text-muted-foreground mb-3">
