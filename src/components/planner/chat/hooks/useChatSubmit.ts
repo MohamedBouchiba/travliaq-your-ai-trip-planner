@@ -24,10 +24,11 @@ import { buildLLMContext } from "./buildLLMContext";
 
 // ─── Types ───
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type StreamResponseFn = (
   messages: APIMessage[],
   messageId: string,
-  context: MemoryContext,
+  context: any,
   onChunk: OnContentUpdate,
 ) => Promise<StreamResult>;
 
@@ -58,9 +59,10 @@ interface IntentRouterShape {
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface SessionContextShape {
   buildConversationSummary: (n: number) => string;
-  sessionEntities: SessionEntities;
+  sessionEntities: any;
   widgetDecisions: unknown[];
 }
 
@@ -298,13 +300,13 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
       // Unified Entity Pipeline
       persistExtractedEntities(
         intentClassification?.entities as Record<string, unknown> | undefined,
-        flightData,
+        flightData as any,
         opts.widgetFlow,
         opts.updateMemory as (partial: Record<string, unknown>) => void
       );
 
       if (flightData && Object.keys(flightData).length > 0) {
-        const fd = flightData;
+        const fd = flightData as Record<string, unknown>;
         // Guard: ignore hallucinated toCountryCode when no destination city was provided
         if (fd.toCountryCode && !fd.to) {
           if (import.meta.env.DEV) console.warn("[useChatSubmit] Ignoring hallucinated toCountryCode:", fd.toCountryCode);
