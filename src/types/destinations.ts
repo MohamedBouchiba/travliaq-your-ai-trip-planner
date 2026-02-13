@@ -58,6 +58,7 @@ export interface UserLocation {
 export interface DestinationSuggestRequest {
   userLocation?: UserLocation;
   styleAxes?: Partial<StyleAxes>;
+  styleAxesOrder?: (keyof StyleAxes)[];
   interests?: Interest[];
   mustHaves?: MustHaves;
   dietaryRestrictions?: string[];

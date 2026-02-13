@@ -14,6 +14,7 @@ interface PreferencesInput {
     ecoVsLuxury: number;
     touristVsLocal: number;
   };
+  styleAxesOrder?: (keyof PreferencesInput["styleAxes"])[];
   interests: string[];
   mustHaves: {
     accessibilityRequired?: boolean;
@@ -55,6 +56,8 @@ export function buildDestinationPayload({
       ecoVsLuxury: prefs.styleAxes.ecoVsLuxury ?? 50,
       touristVsLocal: prefs.styleAxes.touristVsLocal ?? 50,
     },
+
+    styleAxesOrder: prefs.styleAxesOrder as DestinationSuggestRequest["styleAxesOrder"],
 
     interests: prefs.interests.slice(0, 5) as DestinationSuggestRequest["interests"],
 
