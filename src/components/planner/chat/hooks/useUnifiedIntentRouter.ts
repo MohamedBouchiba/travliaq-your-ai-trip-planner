@@ -282,9 +282,9 @@ export function useUnifiedIntentRouter({
           if (onWidgetTriggered) onWidgetTriggered("preferenceInterests");
           return { shouldShowWidget: true, widgetType: "preferenceInterests", action: "none", reason: "Interests detected" };
         }
-        if (entities.budgetLevel && canShowWidget("budgetRangeSlider").valid) {
-          if (onWidgetTriggered) onWidgetTriggered("budgetRangeSlider");
-          return { shouldShowWidget: true, widgetType: "budgetRangeSlider", action: "none", reason: "Budget level detected" };
+        if (entities.budgetLevel && canShowWidget("preferenceStyle").valid) {
+          if (onWidgetTriggered) onWidgetTriggered("preferenceStyle");
+          return { shouldShowWidget: true, widgetType: "preferenceStyle", action: "none", reason: "Budget detected — showing pre-filled preferences" };
         }
       }
     }

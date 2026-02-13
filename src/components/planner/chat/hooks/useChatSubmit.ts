@@ -101,6 +101,7 @@ export interface UseChatSubmitOptions {
   sessionContext: SessionContextShape;
   mapContext: { buildContextString: () => string };
   imperativeHandlers: { handlePreferencesDetection: (prefs: Record<string, unknown>) => void };
+  preFillBudgetPreferences: (ecoVsLuxuryValue: number) => void;
   handleLLMDestinationRequest: (messageId: string, count?: number) => Promise<void>;
   generateContextualReplies: () => Array<{ id: string; label: string; icon?: string; action: { type: string; message?: string } }>;
   completedMessageIdsRef: React.MutableRefObject<Set<string>>;
@@ -201,6 +202,17 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
           if (import.meta.env.DEV) console.log("[useChatSubmit] departureCity from intent:", depCity);
           opts.updateMemory({ departure: { city: depCity } });
           eventBus.emit("flight:updateFormData", { from: depCity });
+        }
+
+        // Pre-fill budget preferences before widget routing so the preferenceStyle widget renders pre-filled
+        if (intentClassification.entities?.budgetLevel) {
+          const level = intentClassification.entities.budgetLevel as string;
+          const ecoValue =
+            level === "budget" ? 10 :
+            level === "comfort" ? 40 :
+            level === "premium" ? 70 : 90;
+          opts.preFillBudgetPreferences(ecoValue);
+          if (import.meta.env.DEV) console.log("[useChatSubmit] Pre-filled budget:", level, "→ ecoVsLuxury:", ecoValue);
         }
 
         const intentResult = opts.intentRouter.processIntent(intentClassification);
