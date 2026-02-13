@@ -173,10 +173,11 @@ export function analyzeLastAssistantMessage(text: string | undefined): LastPropo
     }
   }
 
-  // ── Dampening: incidental destination mention in confirmation messages ──
+  // ── Dampening: incidental destination mention in strong confirmation messages ──
   // When only 1 destination name is found with no listing pattern ("here are X destinations")
-  // and a confirmation pattern matched, reduce destination score so confirmation wins.
-  if (extractedItems.length === 1 && !hasDestinationPattern && scores.confirmation > 0) {
+  // and MULTIPLE confirmation patterns matched (strong signal), reduce destination score.
+  // Single confirmation + destination name (e.g. "Excellent choix ! Bali...") keeps destinations.
+  if (extractedItems.length === 1 && !hasDestinationPattern && scores.confirmation >= 2 * PATTERN_SCORE) {
     scores.destinations = Math.min(scores.destinations, PATTERN_SCORE - 1);
   }
 
