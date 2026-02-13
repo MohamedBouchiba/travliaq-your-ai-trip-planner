@@ -163,22 +163,19 @@ export function analyzeLastAssistantMessage(text: string | undefined): LastPropo
     ['next_steps', NEXT_STEPS_PATTERNS],
     ['confirmation', CONFIRMATION_PATTERNS],
   ];
-  let hasDestinationPattern = false;
   for (const [category, patterns] of standardPatterns) {
     for (const pattern of patterns) {
       if (pattern.test(text)) {
         scores[category] += PATTERN_SCORE;
-        if (category === 'destinations') hasDestinationPattern = true;
       }
     }
   }
 
-  // ── Dampening: incidental destination mention in strong confirmation messages ──
-  // When only 1 destination name is found with no listing pattern ("here are X destinations")
-  // and MULTIPLE confirmation patterns matched (strong signal), reduce destination score.
-  // Single confirmation + destination name (e.g. "Excellent choix ! Bali...") keeps destinations.
-  if (extractedItems.length === 1 && !hasDestinationPattern && scores.confirmation >= 2 * PATTERN_SCORE) {
-    scores.destinations = Math.min(scores.destinations, PATTERN_SCORE - 1);
+  // ── Strong confirmation boost ──
+  // When 2+ confirmation patterns match (e.g. "I understand. Let me help..."),
+  // the signal is strong enough to beat a single incidental destination name.
+  if (scores.confirmation >= 2 * PATTERN_SCORE) {
+    scores.confirmation += PATTERN_SCORE;
   }
 
   // ── Question bonus: ONLY if a base pattern already scored > 0 ──
