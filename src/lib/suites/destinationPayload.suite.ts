@@ -89,5 +89,19 @@ export function registerDestinationPayloadTests() {
       expect(result.mustHaves.familyFriendly).toBe(true);
       expect(result.mustHaves.accessibilityRequired).toBe(false);
     });
+
+    it("includes styleAxesOrder when provided", () => {
+      const prefs = {
+        ...defaultPrefs,
+        styleAxesOrder: ["ecoVsLuxury" as const, "chillVsIntense" as const, "cityVsNature" as const, "touristVsLocal" as const],
+      };
+      const result = buildDestinationPayload({ preferences: prefs });
+      expect(result.styleAxesOrder).toEqual(["ecoVsLuxury", "chillVsIntense", "cityVsNature", "touristVsLocal"]);
+    });
+
+    it("excludes styleAxesOrder when not provided", () => {
+      const result = buildDestinationPayload({ preferences: defaultPrefs });
+      expect(result.styleAxesOrder).toBeUndefined();
+    });
   });
 }

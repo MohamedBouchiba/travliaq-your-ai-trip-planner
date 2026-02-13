@@ -174,6 +174,13 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
         sessionContext: opts.sessionContext,
         getBasketSummary: opts.getBasketSummary,
         widgetCooldown: opts.widgetCooldown,
+        phaseSignals: {
+          hasDestination: !!opts.memory.arrival,
+          hasDates: !!opts.memory.departureDate,
+          hasTravelers: opts.memory.passengers.adults > 0,
+          hasFlightResults: false, // Will be set by external state if available
+          hasHotelResults: false,
+        },
       });
 
       const { content, flightData, preferencesData, quickReplies, destinationSuggestionRequest, intentClassification, flightSearchTrigger } =
@@ -213,6 +220,17 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
             level === "premium" ? 70 : 90;
           opts.preFillBudgetPreferences(ecoValue);
           if (import.meta.env.DEV) console.log("[useChatSubmit] Pre-filled budget:", level, "→ ecoVsLuxury:", ecoValue);
+        }
+
+        // Sync extracted interests to preference store (only if store is empty)
+        const intentInterests = intentClassification.entities?.interests;
+        if (Array.isArray(intentInterests) && intentInterests.length > 0) {
+          const currentPrefs = opts.getPreferenceMemory?.();
+          const existingInterests = currentPrefs?.interests as string[] | undefined;
+          if (!existingInterests?.length) {
+            opts.imperativeHandlers.handlePreferencesDetection({ interests: intentInterests });
+            if (import.meta.env.DEV) console.log("[useChatSubmit] Synced interests from intent:", intentInterests);
+          }
         }
 
         const intentResult = opts.intentRouter.processIntent(intentClassification);

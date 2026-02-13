@@ -14,6 +14,7 @@ export interface StoredMessage {
   id: string;
   role: "assistant" | "user" | "system";
   text: string;
+  timestamp?: number;
   hasSearchButton?: boolean;
   isHidden?: boolean;
   isStreaming?: boolean;

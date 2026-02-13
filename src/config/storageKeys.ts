@@ -19,6 +19,7 @@ export const STORAGE_KEYS = {
   // Chat sessions
   CHAT_SESSIONS_INDEX: "travliaq_chat_sessions_index",
   CHAT_SESSION_PREFIX: "travliaq_chat_session_",
+  CHAT_SESSION_STATE_PREFIX: "travliaq_chat_state_",
 
   // UI state
   PLANNER_ACTIVE_TAB: "travliaq_planner_active_tab",

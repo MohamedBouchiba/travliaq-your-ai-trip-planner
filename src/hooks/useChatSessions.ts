@@ -458,6 +458,7 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
             
             // Remove deleted session from localStorage
             localStorage.removeItem(SESSION_PREFIX + sessionId);
+            localStorage.removeItem(SK.CHAT_SESSION_STATE_PREFIX + sessionId);
             localStorage.setItem(SESSIONS_INDEX_KEY, JSON.stringify(remaining));
             
             // Delete from database (async, don't wait)
@@ -486,6 +487,7 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
             
             // Remove deleted session and save new session to localStorage
             localStorage.removeItem(SESSION_PREFIX + sessionId);
+            localStorage.removeItem(SK.CHAT_SESSION_STATE_PREFIX + sessionId);
             localStorage.setItem(SESSION_PREFIX + newSession.id, JSON.stringify(defaultMessages));
             localStorage.setItem(SESSIONS_INDEX_KEY, JSON.stringify([newSession]));
             
@@ -504,6 +506,7 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
           sessionsRef.current = remaining;
           
           localStorage.removeItem(SESSION_PREFIX + sessionId);
+            localStorage.removeItem(SK.CHAT_SESSION_STATE_PREFIX + sessionId);
           localStorage.setItem(SESSIONS_INDEX_KEY, JSON.stringify(remaining));
           
           if (user) {
@@ -541,9 +544,10 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
       // Get all session IDs to delete from database
       const sessionIds = sessionsRef.current.map((s) => s.id);
 
-      // Clear localStorage for chat sessions
+      // Clear localStorage for chat sessions and state snapshots
       sessionIds.forEach((id) => {
         localStorage.removeItem(SESSION_PREFIX + id);
+        localStorage.removeItem(SK.CHAT_SESSION_STATE_PREFIX + id);
       });
       localStorage.removeItem(SESSIONS_INDEX_KEY);
 

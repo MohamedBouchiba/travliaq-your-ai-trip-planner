@@ -8,8 +8,17 @@
 
 import type { ChatMessage } from "../types";
 import type { WidgetType } from "@/types/flight";
+import { getSimplePhase, type TravelPhase } from "../services/phaseDetector";
 
 // ─── Input shapes (match the interfaces from useChatSubmit) ───
+
+interface PhaseSignalInputs {
+  hasDestination: boolean;
+  hasDates: boolean;
+  hasTravelers: boolean;
+  hasFlightResults: boolean;
+  hasHotelResults: boolean;
+}
 
 interface ContextSources {
   messages: ChatMessage[];
@@ -36,6 +45,7 @@ interface ContextSources {
   };
   getBasketSummary: () => string;
   widgetCooldown: { getBlockedWidgets: () => string[] };
+  phaseSignals?: PhaseSignalInputs;
 }
 
 /**
@@ -157,6 +167,16 @@ export function buildLLMContext(sources: ContextSources): Record<string, unknown
     })(),
   };
 
+  // ── Phase detection ──
+  let currentPhase: TravelPhase | undefined;
+  if (sources.phaseSignals) {
+    const s = sources.phaseSignals;
+    // Detect inspiration if last user message suggests it
+    const lastUserMsg = sources.messages.findLast((m) => m.role === "user")?.text ?? "";
+    const askedForInspiration = /inspire|je ne sais pas|aucune id[ée]e|o[uù] aller|propose|sugg[eè]re/i.test(lastUserMsg);
+    currentPhase = getSimplePhase(s.hasDestination, s.hasDates, s.hasTravelers, s.hasFlightResults, s.hasHotelResults, askedForInspiration);
+  }
+
   return {
     flightSummary: sources.getMemorySummary(),
     activityContext:
@@ -171,5 +191,6 @@ export function buildLLMContext(sources: ContextSources): Record<string, unknown
     basketSummary: sources.getBasketSummary(),
     blockedWidgets: sources.widgetCooldown.getBlockedWidgets(),
     preferencesState,
+    currentPhase,
   };
 }
