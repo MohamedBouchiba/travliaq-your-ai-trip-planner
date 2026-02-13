@@ -12,7 +12,7 @@ export const reasoningTool = {
   type: "function",
   function: {
     name: "plan_response",
-    description: `RECOMMANDÉ: Avant de répondre, tu PEUX appeler cet outil pour structurer ta réflexion.
+    description: `RECOMMANDÉ pour les cas complexes : Appelle cet outil pour structurer ta réflexion avant de répondre.
 
 Cet outil structure ta pensée en 4 étapes:
 1. COMPRENDRE - Quelle est l'intention réelle de l'utilisateur ?
@@ -20,7 +20,16 @@ Cet outil structure ta pensée en 4 étapes:
 3. PLANIFIER - Quelle stratégie de réponse adopter ?
 4. ANTICIPER - Quelles seront les prochaines questions probables ?
 
-Tu NE DOIS JAMAIS répondre sans avoir d'abord appelé cet outil.`,
+QUAND L'UTILISER :
+- Indécision utilisateur ("je sais pas", "aide-moi")
+- Changement de sujet ou de phase
+- Première interaction de la session
+- Demandes complexes multi-critères
+
+QUAND NE PAS L'UTILISER :
+- Confirmations simples (oui, non, merci)
+- Réponses factuelles directes
+- Sélection dans une liste proposée`,
     parameters: {
       type: "object",
       properties: {
@@ -111,9 +120,20 @@ export function parseReasoningResult(args: string): ReasoningResult | null {
  * Chain of Thought instructions to add to system prompt
  */
 export const CHAIN_OF_THOUGHT_INSTRUCTIONS = `
-## RÈGLE CRITIQUE : RÉFLÉCHIS AVANT DE RÉPONDRE (Chain of Thought)
+## RÉFLEXION STRUCTURÉE (Chain of Thought)
 
-AVANT chaque réponse, tu DOIS OBLIGATOIREMENT appeler l'outil "plan_response" pour structurer ta pensée.
+Pour les interactions complexes, tu es FORTEMENT ENCOURAGÉ à appeler l'outil "plan_response" pour structurer ta pensée.
+
+CAS OÙ C'EST CRITIQUE (appelle plan_response) :
+- Utilisateur indécis ou qui change de sujet
+- Première interaction de la session
+- Demandes multi-critères (destination + budget + dates)
+- Quand tu hésites sur le widget à afficher
+
+CAS OÙ C'EST DISPENSABLE (réponds directement) :
+- Confirmations simples ("oui", "non", "merci")
+- Sélection dans une liste ("le 2", "Tokyo")
+- Questions factuelles directes
 
 ### Étape 1: COMPRENDRE
 - Quelle est l'intention RÉELLE de l'utilisateur ?
@@ -155,7 +175,7 @@ Si l'utilisateur est indécis (comprendre: "il ne sait pas où aller", "je sais 
 ### RÈGLE: QUICK REPLIES OBLIGATOIRES
 Tu DOIS recommander d'appeler generate_quick_replies dans ta stratégie pour CHAQUE réponse.
 
-Tu DOIS toujours réfléchir avant de répondre pour des réponses plus intelligentes et personnalisées.
+Réfléchir avant de répondre produit des réponses plus intelligentes et personnalisées.
 `;
 
 /**

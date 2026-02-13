@@ -12,7 +12,7 @@ export type LegacyPhase = "inspiration" | "research" | "comparison" | "planning"
 const LEGACY_PHASE_MAP: Record<string, TravelPhase> = {
   inspiration: "discovery",
   research: "logistics",
-  comparison: "accommodation",
+  comparison: "logistics",
   planning: "activities",
   booking: "recap",
 };
@@ -252,4 +252,41 @@ export function getPhaseTransitionHint(currentPhase: TravelPhase, targetPhase: T
   };
 
   return transitions[`${currentPhase}_${targetPhase}`] || "";
+}
+
+// ============================================================================
+// WIDGET-PHASE VALIDATION (B13)
+// ============================================================================
+
+/**
+ * Map of which widgets are valid in each travel phase.
+ * Prevents the LLM from proposing discovery widgets during logistics, etc.
+ */
+const VALID_WIDGETS_BY_PHASE: Record<TravelPhase, Set<string>> = {
+  discovery: new Set([
+    "preferenceInterests", "preferenceStyle", "destinationSuggestions",
+    "citySelector", "budgetRangeSlider",
+  ]),
+  logistics: new Set([
+    "datePicker", "dateRangePicker", "travelersSelector", "citySelector",
+    "tripTypeConfirm", "budgetRangeSlider",
+  ]),
+  accommodation: new Set([
+    "preferenceStyle", "budgetRangeSlider",
+  ]),
+  activities: new Set([
+    "preferenceInterests",
+  ]),
+  recap: new Set([]),
+};
+
+/**
+ * Check whether a widget type is valid for the given phase.
+ * Returns true if valid, false if the widget shouldn't be shown in this phase.
+ */
+export function isWidgetValidInPhase(widgetType: string | undefined, phase: TravelPhase): boolean {
+  if (!widgetType) return true;
+  const allowed = VALID_WIDGETS_BY_PHASE[phase];
+  if (!allowed || allowed.size === 0) return false;
+  return allowed.has(widgetType);
 }

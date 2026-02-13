@@ -557,6 +557,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     widgetFlow.resetFlowState();
     setIsLoading(false);
     airportFetchKeyRef.current = null;
+    // B7: Clear completed message IDs to prevent stale IDs from previous session
+    completedMessageIdsRef.current.clear();
 
     const timer = setTimeout(() => {
       isSwitchingSessionRef.current = false;

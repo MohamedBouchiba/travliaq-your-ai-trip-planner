@@ -332,7 +332,7 @@ export function useUnifiedIntentRouter({
     }
     
     return { shouldShowWidget: false, widgetType: null, action: "none" };
-  }, [canShowWidget, getNextRequiredWidget, onWidgetTriggered, onSearchTriggered, onDelegateChoice, lastUserMessage]);
+  }, [canShowWidget, getNextRequiredWidget, onWidgetTriggered, onSearchTriggered, onDelegateChoice, lastUserMessage, lastAssistantMessage, flowState, widgetInteractions]);
 
   return {
     processIntent,

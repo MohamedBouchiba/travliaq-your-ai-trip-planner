@@ -2,8 +2,10 @@
  * ChatMessages - Scrollable list of chat messages
  */
 
-import { useRef, useEffect } from "react";
+import { useRef } from "react";
+import { ArrowDown } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
+import { useChatScroll } from "@/hooks/useChatScroll";
 import type { ChatMessage as ChatMessageType } from "./types";
 import type { Airport } from "@/hooks/useNearestAirports";
 
@@ -51,17 +53,18 @@ export function ChatMessages({
   onQuickReplyFillInput,
   onQuickReplyWidget,
 }: ChatMessagesProps) {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
+  const containerRef = useRef<HTMLDivElement>(null);
   const visibleMessages = messages.filter((m) => !m.isHidden);
 
+  // B9: Use intelligent scroll management instead of naive scrollIntoView
+  const { isUserScrolling, showNewMessageIndicator, newMessageCount, scrollToBottom, handleScroll } =
+    useChatScroll({
+      messagesCount: visibleMessages.length,
+      containerRef,
+    });
+
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="relative flex-1 overflow-y-auto" ref={containerRef} onScroll={handleScroll}>
       <div className="max-w-3xl mx-auto py-6 px-4 space-y-6">
         {visibleMessages.map((message) => (
           <ChatMessage
@@ -84,8 +87,20 @@ export function ChatMessages({
             onQuickReplyWidget={onQuickReplyWidget}
           />
         ))}
-        <div ref={messagesEndRef} />
       </div>
+
+      {/* Scroll-to-bottom button when user has scrolled up during streaming */}
+      {isUserScrolling && showNewMessageIndicator && (
+        <button
+          type="button"
+          onClick={() => scrollToBottom()}
+          className="absolute bottom-4 right-4 z-10 flex items-center gap-1.5 px-3 py-2 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors text-xs font-medium"
+          aria-label={`${newMessageCount} new message${newMessageCount > 1 ? "s" : ""}, scroll to bottom`}
+        >
+          <ArrowDown className="h-3.5 w-3.5" />
+          {newMessageCount > 0 && <span>{newMessageCount}</span>}
+        </button>
+      )}
     </div>
   );
 }

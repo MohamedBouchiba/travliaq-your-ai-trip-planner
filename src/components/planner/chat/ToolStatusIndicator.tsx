@@ -5,7 +5,7 @@
  * providing transparency into the AI's reasoning process.
  */
 
-import { memo } from "react";
+import { memo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, CheckCircle, AlertCircle, Brain, Plane, MessageSquare, MapPin, Calendar, Users, Search, Sparkles, Hotel } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -143,19 +143,50 @@ const ToolItem = memo(function ToolItem({
 /**
  * Main ToolStatusIndicator component
  */
+/** Duration (ms) to keep success tools visible after completion */
+const SUCCESS_PERSIST_MS = 2000;
+
 export const ToolStatusIndicator = memo(function ToolStatusIndicator({
   tools,
   className,
   compact = false,
 }: ToolStatusIndicatorProps) {
   const { t } = useTranslation();
-  // Filter to show running and recently completed tools
-  const visibleTools = tools.filter(tool =>
-    tool.status === "running" ||
-    tool.status === "pending" ||
-    (tool.status === "success" && tool.duration !== undefined)
-  );
-  
+  // B8: Track recently-completed tools so they persist on screen briefly
+  const [recentlyCompleted, setRecentlyCompleted] = useState<Set<string>>(new Set());
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  useEffect(() => {
+    for (const tool of tools) {
+      const key = `${tool.name}-${tool.startTime}`;
+      if (tool.status === "success" && !recentlyCompleted.has(key) && !timersRef.current.has(key)) {
+        // Mark as recently completed
+        setRecentlyCompleted(prev => new Set(prev).add(key));
+        // Schedule removal after persistence window
+        const timer = setTimeout(() => {
+          setRecentlyCompleted(prev => {
+            const next = new Set(prev);
+            next.delete(key);
+            return next;
+          });
+          timersRef.current.delete(key);
+        }, SUCCESS_PERSIST_MS);
+        timersRef.current.set(key, timer);
+      }
+    }
+    return () => {
+      // Cleanup timers on unmount
+      for (const timer of timersRef.current.values()) clearTimeout(timer);
+    };
+  }, [tools, recentlyCompleted]);
+
+  // Show running, pending, and recently completed (within persistence window)
+  const visibleTools = tools.filter(tool => {
+    if (tool.status === "running" || tool.status === "pending") return true;
+    const key = `${tool.name}-${tool.startTime}`;
+    return recentlyCompleted.has(key);
+  });
+
   if (visibleTools.length === 0) {
     return null;
   }

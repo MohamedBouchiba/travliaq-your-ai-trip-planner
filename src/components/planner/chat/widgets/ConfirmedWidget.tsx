@@ -61,16 +61,19 @@ export function ConfirmedWidget({
   return (
     <div
       className={cn(
-        "mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl",
-        "bg-primary/10 border border-primary/20",
-        "text-sm",
+        "mt-2 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl",
+        "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800",
+        "text-sm shadow-sm",
+        "animate-in fade-in-0 zoom-in-95 duration-300",
         className
       )}
     >
-      <span className="text-primary">{icon}</span>
-      <span className="text-muted-foreground">{typeLabel} :</span>
-      <span className="font-medium text-foreground">{displayLabel}</span>
-      <Check className="h-3.5 w-3.5 text-green-500" />
+      <span className="text-green-600 dark:text-green-400">{icon}</span>
+      <span className="text-muted-foreground font-medium">{typeLabel} :</span>
+      <span className="font-semibold text-foreground">{displayLabel}</span>
+      <span className="flex items-center justify-center h-5 w-5 rounded-full bg-green-100 dark:bg-green-900/50">
+        <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+      </span>
     </div>
   );
 }

@@ -196,6 +196,12 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
         },
       });
 
+      // B7: Prune completedMessageIds to prevent unbounded growth
+      if (opts.completedMessageIdsRef.current.size > 50) {
+        const entries = [...opts.completedMessageIdsRef.current];
+        opts.completedMessageIdsRef.current = new Set(entries.slice(-30));
+      }
+
       const { content, flightData, preferencesData, quickReplies, destinationSuggestionRequest, intentClassification, reasoning, flightSearchTrigger } =
         await opts.streamResponse(
           apiMessages,

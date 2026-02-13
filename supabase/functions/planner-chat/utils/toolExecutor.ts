@@ -99,6 +99,10 @@ export function buildToolResponseMessage(
  */
 export const MULTI_TOOL_CONFIG = {
   MAX_LOOPS: 3,
+  /** Max tokens for ReAct loop iterations (tool calls + reasoning) */
+  REACT_MAX_TOKENS: 1000,
+  /** Max tokens for final content-only generation call */
+  FINAL_CONTENT_MAX_TOKENS: 800,
   ALLOWED_CHAINING_TOOLS: [
     "classify_intent",
     "plan_response",

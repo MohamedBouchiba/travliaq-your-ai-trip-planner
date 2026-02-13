@@ -96,7 +96,7 @@ export const PreferencesDataSchema = z.object({
   accessibilityRequired: coerceBool,
   familyFriendly: coerceBool,
   dietaryRestrictions: z.array(z.string().max(50)).optional(),
-}).passthrough();
+}).strip();
 
 export type PreferencesData = z.infer<typeof PreferencesDataSchema>;
 

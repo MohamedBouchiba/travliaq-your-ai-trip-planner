@@ -1,7 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buildPhaseSystemPrompt, normalizeTravelPhase, type TravelPhase } from "./prompts/phasePrompts.ts";
+import { buildPhaseSystemPrompt, normalizeTravelPhase, isWidgetValidInPhase, type TravelPhase } from "./prompts/phasePrompts.ts";
 import { detectLanguage, getLocalizedContent, type SupportedLanguage } from "./prompts/systemPrompts.ts";
 import { createRequestLogger, extractRequestId, type RequestLogger } from "../_shared/logger.ts";
 import { checkRateLimit as checkRateLimitDB, cleanupRateLimits } from "../_shared/rateLimit.ts";
@@ -170,6 +170,8 @@ function processToolCall(
         if (intentClassification) {
           // Apply deterministic preference-first override (CR2: applyWidgetForcingLogic removed)
           intentClassification = applyPreferenceFirstLogic(intentClassification, preferencesState, log);
+          // B5: Correct budget/style confusion
+          intentClassification = applyBudgetStyleGuard(intentClassification, log);
           updatedData.intentClassification = intentClassification;
           result = { success: true, data: { message: "Intent classified", intent: intentClassification } };
         }
@@ -230,10 +232,19 @@ function processToolCall(
         if (validationResult.success && validationResult.data) {
           let preferencesData = validationResult.data;
           preferencesData = Object.fromEntries(
-            Object.entries(preferencesData).filter(([_, v]) => 
+            Object.entries(preferencesData).filter(([_, v]) =>
               v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0)
             )
           );
+          // B14: Merge dietary restrictions with existing data (don't overwrite)
+          if (preferencesData.dietaryRestrictions && collectedData.preferencesData?.dietaryRestrictions) {
+            const merged = [...new Set([
+              ...collectedData.preferencesData.dietaryRestrictions,
+              ...preferencesData.dietaryRestrictions,
+            ])];
+            preferencesData.dietaryRestrictions = merged;
+            log.info("dietary_merge", "Merged dietary restrictions from previous tool call", { merged });
+          }
           if (Object.keys(preferencesData).length > 0) {
             updatedData.preferencesData = preferencesData;
             result = { success: true, data: { message: "Preferences updated", extracted: preferencesData } };
@@ -434,6 +445,40 @@ function applyPreferenceFirstLogic(
   }
 
   return intentClassification;
+}
+
+/**
+ * B5: Guard against budget/style confusion.
+ * If the LLM assigned preferenceStyle but entities contain budget-related signals,
+ * correct the widget to budgetRangeSlider.
+ */
+function applyBudgetStyleGuard(
+  intent: IntentClassificationResult,
+  log: RequestLogger
+): IntentClassificationResult {
+  if (intent.widgetToShow?.type !== "preferenceStyle") return intent;
+
+  const entities = intent.entities || {};
+  const hasBudgetSignal =
+    entities.budgetLevel != null ||
+    entities.budgetMin != null ||
+    entities.budgetMax != null ||
+    entities.priceRange != null;
+
+  if (hasBudgetSignal) {
+    log.info("budget_style_guard", "Correcting preferenceStyle → budgetRangeSlider (budget entities detected)", {
+      entities: Object.keys(entities),
+    });
+    return {
+      ...intent,
+      widgetToShow: {
+        type: "budgetRangeSlider",
+        reason: "Budget-related entities detected, using budget widget instead of style widget",
+      },
+    };
+  }
+
+  return intent;
 }
 
 /**
@@ -720,10 +765,34 @@ serve(async (req) => {
     const recentMessages = limitedMessages.slice(-4);
     const hasUserMessage = recentMessages.some((m: { role: string }) => m.role === "user");
     
+    // B6: Detect number-only replies after numbered lists and inject disambiguation context
+    const classifyMessages = [...recentMessages];
+    const lastUserMsg = classifyMessages.filter((m: { role: string }) => m.role === "user").pop();
+    const lastAssistantMsg = classifyMessages.filter((m: { role: string }) => m.role === "assistant").pop();
+    if (lastUserMsg && lastAssistantMsg) {
+      const userText = (lastUserMsg as { content: string }).content.trim();
+      const assistantText = (lastAssistantMsg as { content: string }).content;
+      const isNumberOnly = /^\d{1,2}$/.test(userText);
+      const hasNumberedList = /\d+\.\s+.+/m.test(assistantText);
+      if (isNumberOnly && hasNumberedList) {
+        log.info("number_disambiguation", "Number-only reply after numbered list detected, injecting context", {
+          userReply: userText,
+        });
+        // Inject a system hint right before the user message to reinforce disambiguation
+        const hintIdx = classifyMessages.lastIndexOf(lastUserMsg);
+        if (hintIdx > 0) {
+          classifyMessages.splice(hintIdx, 0, {
+            role: "system",
+            content: `ATTENTION: Le dernier message assistant contenait une liste numérotée. L'utilisateur répond "${userText}" — c'est une SÉLECTION dans la liste (confirm_selection), PAS un nombre de voyageurs.`,
+          });
+        }
+      }
+    }
+
     if (hasUserMessage) {
       const classifyStartTime = Date.now();
       log.info("classify_first", "Starting dedicated intent classification call", { contextMessages: recentMessages.length });
-      
+
       try {
         const classifyResponse = await fetch(url, {
           method: "POST",
@@ -734,7 +803,7 @@ serve(async (req) => {
           body: JSON.stringify({
             messages: [
               { role: "system", content: buildClassificationSystemPrompt(preferencesState, blockedWidgets, currentDate) },
-              ...recentMessages,
+              ...classifyMessages,
             ],
             temperature: 0.3,
             max_tokens: 200,
@@ -784,7 +853,27 @@ serve(async (req) => {
     // ========================================================================
     // STEP 2: REACT LOOP (without classify_intent — already done above)
     // ========================================================================
-    const reActTools = ALL_TOOLS.filter(t => t.function.name !== "classify_intent");
+    // B13: Widget-phase validation — suppress widgets that don't belong in the current phase
+    const classifiedWidget = collectedData.intentClassification?.widgetToShow?.type;
+    if (classifiedWidget && !isWidgetValidInPhase(classifiedWidget, phase)) {
+      log.info("widget_phase_guard", `Widget "${classifiedWidget}" not valid in phase "${phase}", suppressing`, {
+        widget: classifiedWidget,
+        phase,
+      });
+      collectedData.intentClassification = {
+        ...collectedData.intentClassification!,
+        widgetToShow: undefined,
+      };
+    }
+
+    const preferenceFirstApplied = collectedData.intentClassification?.primaryIntent === "gather_preferences";
+    const reActTools = ALL_TOOLS.filter(t => {
+      if (t.function.name === "classify_intent") return false;
+      // B3: If preference-first override was applied, remove destination suggestions
+      // to prevent the LLM from calling it (which would show "Searching..." then nothing)
+      if (preferenceFirstApplied && t.function.name === "request_destination_suggestions") return false;
+      return true;
+    });
     
     let loopCount = 0;
     let conversationMessages = [
@@ -809,7 +898,7 @@ serve(async (req) => {
         body: JSON.stringify({
           messages: conversationMessages,
           temperature: 0.7,
-          max_tokens: 600,
+          max_tokens: MULTI_TOOL_CONFIG.REACT_MAX_TOKENS,
           tools: reActTools,
           tool_choice: "auto",
           stream: false,
@@ -900,7 +989,7 @@ serve(async (req) => {
         body: JSON.stringify({
           messages: conversationMessages,
           temperature: 0.7,
-          max_tokens: 300,
+          max_tokens: MULTI_TOOL_CONFIG.FINAL_CONTENT_MAX_TOKENS,
           stream: stream,
         }),
       });
