@@ -31,6 +31,8 @@ export interface SSEAccumulator {
   quickReplies: QuickReplyData | null;
   destinationSuggestionRequest: DestinationSuggestionRequest | null;
   intentClassification: IntentClassification | null;
+  /** Preserved reasoning-derived intent — survives intentClassification overwrite */
+  reasoningWidgetDecision: IntentClassification | null;
   reasoning: ReasoningData | null;
   flightSearchTrigger: boolean;
 }
@@ -47,6 +49,7 @@ export function createAccumulator(): SSEAccumulator {
     quickReplies: null,
     destinationSuggestionRequest: null,
     intentClassification: null,
+    reasoningWidgetDecision: null,
     reasoning: null,
     flightSearchTrigger: false,
   };
@@ -125,6 +128,19 @@ export function processSSELine(
         acc.intentClassification = derivedIntent;
       }
 
+      // Always preserve reasoning widget decision separately (survives intent overwrite)
+      if (parsed.reasoning.widgetDecision) {
+        acc.reasoningWidgetDecision = derivedIntent || {
+          primaryIntent: parsed.reasoning.widgetDecision.widgetType || "unknown",
+          confidence: parsed.reasoning.confidence,
+          entities: {},
+          widgetToShow: {
+            type: parsed.reasoning.widgetDecision.widgetType || "",
+            reason: parsed.reasoning.widgetDecision.reason || "",
+          },
+        };
+      }
+
       handlers.onReasoning?.(parsed.reasoning, derivedIntent);
     } else if (parsed.type === "intentClassification" && parsed.intentClassification) {
       acc.intentClassification = parsed.intentClassification;
@@ -166,27 +182,36 @@ export function processSSELine(
  * Process a raw SSE chunk (may contain multiple lines).
  *
  * Splits the chunk into lines, filters for "data: " prefixed lines,
- * and delegates each to `processSSELine`.
+ * and delegates each to `processSSELine`. Incomplete lines (from TCP
+ * chunking) are returned as `remainingBuffer` for the next call.
  *
- * @param chunk    Raw text chunk from the ReadableStream
- * @param handlers Callbacks for each event type
- * @param acc      Mutable accumulator to update
- * @returns `true` if [DONE] sentinel was encountered, `false` otherwise
+ * @param chunk       Raw text chunk from the ReadableStream
+ * @param handlers    Callbacks for each event type
+ * @param acc         Mutable accumulator to update
+ * @param lineBuffer  Leftover from previous chunk (default "")
+ * @returns `{ done, remainingBuffer }`
  */
 export function parseSSEChunk(
   chunk: string,
   handlers: SSEEventHandlers,
   acc: SSEAccumulator,
-): boolean {
-  const lines = chunk.split("\n").filter((line) => line.trim() !== "");
+  lineBuffer: string = "",
+): { done: boolean; remainingBuffer: string } {
+  const raw = lineBuffer + chunk;
 
-  for (const line of lines) {
+  // If the raw data doesn't end with a newline, the last segment is incomplete
+  const endsWithNewline = raw.endsWith("\n");
+  const segments = raw.split("\n");
+  const remaining = endsWithNewline ? "" : (segments.pop() || "");
+
+  for (const line of segments) {
+    if (line.trim() === "") continue;
     if (line.startsWith("data: ")) {
       const jsonStr = line.slice(6);
       const isDone = processSSELine(jsonStr, handlers, acc);
-      if (isDone) return true;
+      if (isDone) return { done: true, remainingBuffer: "" };
     }
   }
 
-  return false;
+  return { done: false, remainingBuffer: remaining };
 }

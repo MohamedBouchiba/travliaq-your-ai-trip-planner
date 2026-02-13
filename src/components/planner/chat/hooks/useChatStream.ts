@@ -334,6 +334,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
             },
           };
 
+          let sseLineBuffer = "";
           while (true) {
             // Check if cancelled
             if (abortController.signal.aborted) {
@@ -345,7 +346,9 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
             if (done) break;
 
             const chunk = decoder.decode(value, { stream: true });
-            parseSSEChunk(chunk, sseHandlers, acc);
+            const parseResult = parseSSEChunk(chunk, sseHandlers, acc, sseLineBuffer);
+            sseLineBuffer = parseResult.remainingBuffer;
+            if (parseResult.done) break;
           }
 
           // Sync final accumulator state to local variables

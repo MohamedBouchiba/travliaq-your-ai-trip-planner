@@ -13,6 +13,7 @@ import {
   countUserMessages,
   generateSmartTitle,
   generatePreview,
+  migrateMessageTimestamps,
 } from "./sessionHelpers";
 
 // Re-export types for consumers (PlannerChat.tsx etc.)
@@ -168,7 +169,8 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
       const messagesRaw = localStorage.getItem(SESSION_PREFIX + mostRecent.id);
       if (messagesRaw) {
         const parsed = JSON.parse(messagesRaw);
-        setMessages(Array.isArray(parsed) ? parsed : [getDefaultWelcomeMessage(currentTranslations)]);
+        const msgs = Array.isArray(parsed) ? migrateMessageTimestamps(parsed, mostRecent.createdAt) : [getDefaultWelcomeMessage(currentTranslations)];
+        setMessages(msgs);
       } else {
         setMessages([getDefaultWelcomeMessage(currentTranslations)]);
       }
@@ -366,12 +368,15 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
   // Switch to a different session
   const selectSession = useCallback((sessionId: string) => {
     const currentTranslations = getTranslations();
-    
+
     try {
       const messagesRaw = localStorage.getItem(SESSION_PREFIX + sessionId);
       if (messagesRaw) {
         const parsed = JSON.parse(messagesRaw);
-        setMessages(Array.isArray(parsed) ? parsed : [getDefaultWelcomeMessage(currentTranslations)]);
+        const session = sessionsRef.current.find(s => s.id === sessionId);
+        const baseTs = session?.createdAt || Date.now();
+        const msgs = Array.isArray(parsed) ? migrateMessageTimestamps(parsed, baseTs) : [getDefaultWelcomeMessage(currentTranslations)];
+        setMessages(msgs);
       } else {
         setMessages([getDefaultWelcomeMessage(currentTranslations)]);
       }
@@ -445,7 +450,7 @@ export const useChatSessions = (options: UseChatSessionsOptions = {}) => {
               try {
                 const parsed = JSON.parse(messagesRaw);
                 if (Array.isArray(parsed)) {
-                  nextMessages = parsed;
+                  nextMessages = migrateMessageTimestamps(parsed, mostRecent.createdAt);
                 }
               } catch {
                 // Keep default messages

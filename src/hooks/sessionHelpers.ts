@@ -58,7 +58,26 @@ export const getDefaultWelcomeMessage = (
   id: "welcome",
   role: "assistant",
   text: translations.welcomeMessage,
+  timestamp: Date.now(),
 });
+
+/**
+ * Assign synthetic timestamps to old messages that lack them.
+ * Welcome message gets `baseTimestamp - 1000` to stay first.
+ * Other messages get `baseTimestamp + index * 60_000`.
+ */
+export function migrateMessageTimestamps(
+  messages: StoredMessage[],
+  baseTimestamp: number,
+): StoredMessage[] {
+  return messages.map((m, i) => {
+    if (m.timestamp) return m;
+    if (m.id === "welcome") {
+      return { ...m, timestamp: baseTimestamp - 1000 };
+    }
+    return { ...m, timestamp: baseTimestamp + i * 60_000 };
+  });
+}
 
 // ─── Emoji mapping for trip titles ───
 

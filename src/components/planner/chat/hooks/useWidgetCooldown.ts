@@ -14,6 +14,9 @@ const WIDGET_COOLDOWN_MS = 60000; // 1 minute cooldown before re-showing same wi
 const MAX_WIDGET_ATTEMPTS = 2; // Max times to show same widget per session
 const USER_TYPED_PENALTY_MS = 120000; // 2 min penalty if user typed instead of using widget
 
+/** Widgets that can be re-shown after confirmation (standard cooldown, not permanent block) */
+const REFINABLE_WIDGETS = new Set<string>(["preferenceInterests", "preferenceStyle"]);
+
 /**
  * Widget interaction record
  */
@@ -93,9 +96,10 @@ export function useWidgetCooldown(): UseWidgetCooldownReturn {
     
     const now = Date.now();
     
-    // Rule 1: Already confirmed = don't show again for this data
+    // Rule 1: Already confirmed = don't show again (except refinable widgets)
     if (record.confirmed) {
-      return false;
+      if (!REFINABLE_WIDGETS.has(widgetType)) return false;
+      // Refinable widgets fall through to standard cooldown check
     }
     
     // Rule 2: Max attempts reached
@@ -133,7 +137,8 @@ export function useWidgetCooldown(): UseWidgetCooldownReturn {
     const now = Date.now();
     
     if (record.confirmed) {
-      return 'already_confirmed';
+      if (!REFINABLE_WIDGETS.has(widgetType)) return 'already_confirmed';
+      // Refinable widgets fall through to cooldown check
     }
     
     if (record.attempts >= MAX_WIDGET_ATTEMPTS) {

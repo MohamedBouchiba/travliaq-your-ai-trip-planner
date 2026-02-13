@@ -22,6 +22,19 @@ import { FLIGHTS_ZOOM } from "@/constants/mapSettings";
 import { useDebugStore } from "@/stores/debugStore";
 import { buildLLMContext } from "./buildLLMContext";
 
+// ─── Departure city validation (Bug D fix) ───
+
+const INVALID_DEPARTURE_PATTERNS = [
+  /^(ici|là|là où|je suis|mon emplacement|ma position|ma ville|current|here|my location|my city|where i am|my place)/i,
+  /^(près de|proche de|around|near)/i,
+];
+
+/** @internal Exported for testing */
+export function isValidDepartureCity(city: string): boolean {
+  if (!city || city.trim().length < 2 || city.trim().length > 60) return false;
+  return !INVALID_DEPARTURE_PATTERNS.some((p) => p.test(city.trim()));
+}
+
 // ─── Types ───
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -183,7 +196,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
         },
       });
 
-      const { content, flightData, preferencesData, quickReplies, destinationSuggestionRequest, intentClassification, flightSearchTrigger } =
+      const { content, flightData, preferencesData, quickReplies, destinationSuggestionRequest, intentClassification, reasoning, flightSearchTrigger } =
         await opts.streamResponse(
           apiMessages,
           messageId,
@@ -206,9 +219,13 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
         // Extract departureCity from intent when flightData is null
         if (!flightData && intentClassification.entities?.departureCity) {
           const depCity = intentClassification.entities.departureCity as string;
-          if (import.meta.env.DEV) console.log("[useChatSubmit] departureCity from intent:", depCity);
-          opts.updateMemory({ departure: { city: depCity } });
-          eventBus.emit("flight:updateFormData", { from: depCity });
+          if (isValidDepartureCity(depCity)) {
+            if (import.meta.env.DEV) console.log("[useChatSubmit] departureCity from intent:", depCity);
+            opts.updateMemory({ departure: { city: depCity } });
+            eventBus.emit("flight:updateFormData", { from: depCity });
+          } else if (import.meta.env.DEV) {
+            console.warn("[useChatSubmit] Rejected invalid departureCity:", depCity);
+          }
         }
 
         // Pre-fill budget preferences before widget routing so the preferenceStyle widget renders pre-filled
@@ -248,6 +265,31 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
                   : m
               )
             );
+          }
+        }
+
+        // Reasoning widget fallback: if intent router didn't show a widget
+        // but reasoning had a widgetDecision, try it as last resort
+        if (!opts.intentWidgetRef.current && reasoning?.widgetDecision?.shouldShow) {
+          const rwType = reasoning.widgetDecision.widgetType as WidgetType;
+          if (rwType) {
+            const fallbackResult = opts.intentRouter.processIntent({
+              primaryIntent: rwType,
+              confidence: reasoning.confidence || 0.7,
+              entities: {},
+              widgetToShow: { type: rwType, reason: reasoning.widgetDecision.reason || "" },
+            });
+            if (fallbackResult.shouldShowWidget && fallbackResult.widgetType) {
+              opts.intentWidgetRef.current = fallbackResult.widgetType;
+              if (import.meta.env.DEV) console.log("[useChatSubmit] Reasoning fallback widget:", fallbackResult.widgetType);
+              opts.setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === messageId
+                    ? { ...m, widget: fallbackResult.widgetType!, widgetData: fallbackResult.widgetData, widgetConfirmed: false }
+                    : m
+                )
+              );
+            }
           }
         }
 
