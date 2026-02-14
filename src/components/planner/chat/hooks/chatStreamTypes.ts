@@ -6,6 +6,7 @@
 
 import type { FlightFormData } from "@/types/flight";
 import type { MissingField } from "@/stores/hooks";
+import type { TripRecapData } from "../types";
 
 /**
  * Maximum messages to send to API to prevent context overflow
@@ -84,6 +85,7 @@ export interface StreamResult {
   intentClassification: IntentClassification | null;
   reasoning: ReasoningData | null;
   flightSearchTrigger: boolean;
+  tripRecapData: TripRecapData | null;
   requestId: string;
 }
 

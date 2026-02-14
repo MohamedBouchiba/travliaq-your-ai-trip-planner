@@ -16,6 +16,7 @@ import type {
   QuickReplyData,
   DestinationSuggestionRequest,
 } from "./useChatStream";
+import type { TripRecapData } from "../types";
 
 // ─── Accumulator ─────────────────────────────────────────────────────────────
 
@@ -35,6 +36,7 @@ export interface SSEAccumulator {
   reasoningWidgetDecision: IntentClassification | null;
   reasoning: ReasoningData | null;
   flightSearchTrigger: boolean;
+  tripRecapData: TripRecapData | null;
 }
 
 /**
@@ -52,6 +54,7 @@ export function createAccumulator(): SSEAccumulator {
     reasoningWidgetDecision: null,
     reasoning: null,
     flightSearchTrigger: false,
+    tripRecapData: null,
   };
 }
 
@@ -78,6 +81,8 @@ export interface SSEEventHandlers {
   onDestinationSuggestionRequest?: (data: DestinationSuggestionRequest) => void;
   /** Flight search trigger */
   onFlightSearchTrigger?: (trigger: any) => void;
+  /** Trip recap data */
+  onTripRecapData?: (data: TripRecapData) => void;
   /** MCP tool started */
   onToolStarted?: (parsed: { tool: string; reason?: string; timestamp?: number }) => void;
   /** MCP tool finished (or failed) */
@@ -163,6 +168,9 @@ export function processSSELine(
     } else if (parsed.type === "flightSearchTrigger" && parsed.trigger) {
       acc.flightSearchTrigger = true;
       handlers.onFlightSearchTrigger?.(parsed.trigger);
+    } else if (parsed.type === "tripRecapData" && parsed.tripRecapData) {
+      acc.tripRecapData = parsed.tripRecapData;
+      handlers.onTripRecapData?.(parsed.tripRecapData);
     } else if (parsed.type === "tool_started" && parsed.tool) {
       handlers.onToolStarted?.(parsed);
     } else if (parsed.type === "tool_finished" && parsed.tool) {

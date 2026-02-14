@@ -11,6 +11,7 @@ import type {
   CitySelectionData,
   AirportConfirmationData,
 } from "@/types/flight";
+import type { StreamErrorType } from "./hooks/chatStreamTypes";
 import type { DestinationSuggestion, ProfileCompleteness } from "@/types/destinations";
 
 // Re-export for convenience
@@ -95,6 +96,20 @@ export interface RichContent {
 }
 
 /**
+ * E2: Trip recap structured data from the backend
+ */
+export interface TripRecapData {
+  destination: { city: string; country: string; countryCode?: string };
+  dates?: { departure?: string; return?: string; duration?: string };
+  travelers?: { adults?: number; children?: number; infants?: number; description?: string };
+  flight?: { fromCity?: string; fromIata?: string; toCity?: string; toIata?: string; airline?: string; price?: number; currency?: string; tripType?: string };
+  accommodation?: { name?: string; type?: string; stars?: number; pricePerNight?: number; currency?: string; neighborhood?: string };
+  activities?: Array<{ day?: number; title: string; description?: string }>;
+  budget?: { estimated?: number; currency?: string; breakdown?: string };
+  notes?: string;
+}
+
+/**
  * Widget Data passed to inline widgets
  */
 export interface WidgetData {
@@ -143,6 +158,9 @@ export interface WidgetData {
   // Price alert
   alert?: unknown;
   onAction?: () => void;
+
+  // Trip recap (E2)
+  tripRecap?: TripRecapData;
 }
 
 /**
@@ -158,6 +176,9 @@ export interface ChatMessage {
   isTyping?: boolean;
   isStreaming?: boolean;
   isHidden?: boolean;
+
+  // C2: Error state for user-visible error messages with retry
+  errorType?: StreamErrorType;
 
   // Legacy widget support (existing functionality)
   airportChoices?: AirportChoice;

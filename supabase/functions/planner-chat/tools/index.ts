@@ -51,10 +51,16 @@ export {
 } from "./destinationSuggestions.ts";
 
 // Flight search trigger
-export { 
-  flightSearchTriggerTool, 
-  type FlightSearchTriggerResult 
+export {
+  flightSearchTriggerTool,
+  type FlightSearchTriggerResult
 } from "./flightSearchTrigger.ts";
+
+// Trip recap
+export {
+  tripRecapTool,
+  type TripRecapData
+} from "./tripRecap.ts";
 
 /**
  * All tools array for Azure OpenAI tool_choice
@@ -79,6 +85,7 @@ export const TOOL_NAMES = {
   QUICK_REPLIES: "generate_quick_replies",
   DESTINATION_SUGGESTIONS: "request_destination_suggestions",
   FLIGHT_SEARCH: "trigger_flight_search",
+  TRIP_RECAP: "generate_trip_recap",
 } as const;
 
 export type ToolName = typeof TOOL_NAMES[keyof typeof TOOL_NAMES];

@@ -16,6 +16,7 @@
   "planner.chat.excellentChoice": "Excellent choix ! {{country}} est une destination magnifique.",
   "planner.chat.searchingCities": "Je recherche les meilleures villes...",
   "planner.chat.errorOccurred": "Désolé, une erreur s'est produite. Réessayez.",
+  "planner.chat.retry": "Réessayer",
   "planner.chat.retrying": "Nouvelle tentative ({{attempt}}/{{max}})...",
   "planner.chat.serverUnavailable": "Serveur temporairement indisponible, réessayez dans quelques secondes",
   "planner.message.regenerate": "Régénérer",

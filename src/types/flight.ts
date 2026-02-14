@@ -206,7 +206,9 @@ export type WidgetType =
   | "comparisonWidget"
   // Alert widgets (Phase 4)
   | "conflictAlert"
-  | "priceAlert";
+  | "priceAlert"
+  // Trip recap (E2)
+  | "tripRecap";
 
 // ===== Chat Actions =====
 

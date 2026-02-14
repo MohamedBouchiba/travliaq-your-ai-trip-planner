@@ -1,10 +1,14 @@
 /**
  * ChatMessages - Scrollable list of chat messages
+ *
+ * C3: Uses ChatHandlersContext to provide handlers to children,
+ * eliminating prop drilling through ChatMessage → WidgetRenderer.
  */
 
-import { useRef } from "react";
+import { useRef, useMemo } from "react";
 import { ArrowDown } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
+import { ChatHandlersProvider, type ChatHandlers } from "./contexts/ChatHandlersContext";
 import { useChatScroll } from "@/hooks/useChatScroll";
 import type { ChatMessage as ChatMessageType } from "./types";
 import type { Airport } from "@/hooks/useNearestAirports";
@@ -19,7 +23,7 @@ interface ChatMessagesProps {
     passengers: { adults: number; children: number; infants: number };
     tripType: "roundtrip" | "oneway" | "multi";
   };
-  // Handlers
+  // Handlers (provided via context to children)
   onDateSelect: (messageId: string, type: "departure" | "return", date: Date) => void;
   onDateRangeSelect: (messageId: string, departure: Date, returnDate: Date) => void;
   onTravelersSelect: (messageId: string, travelers: { adults: number; children: number; infants: number }) => void;
@@ -33,6 +37,8 @@ interface ChatMessagesProps {
   onQuickReplyMessage: (message: string) => void;
   onQuickReplyFillInput?: (message: string) => void;
   onQuickReplyWidget?: (widget: string) => void;
+  // C2: Retry after error
+  onRetry?: () => void;
 }
 
 export function ChatMessages({
@@ -52,9 +58,34 @@ export function ChatMessages({
   onQuickReplyMessage,
   onQuickReplyFillInput,
   onQuickReplyWidget,
+  onRetry,
 }: ChatMessagesProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const visibleMessages = messages.filter((m) => !m.isHidden);
+
+  // C3: Memoize handlers object to avoid re-creating on every render
+  const handlers = useMemo<ChatHandlers>(() => ({
+    onDateSelect,
+    onDateRangeSelect,
+    onTravelersSelect,
+    onTravelersConfirmSolo,
+    onTravelersEditBeforeSearch,
+    onTripTypeConfirm,
+    onCitySelect,
+    onDepartureCitySelect,
+    onAirportSelect,
+    onSearchButtonClick,
+    onQuickReplyMessage,
+    onQuickReplyFillInput,
+    onQuickReplyWidget,
+    onRetry,
+  }), [
+    onDateSelect, onDateRangeSelect, onTravelersSelect,
+    onTravelersConfirmSolo, onTravelersEditBeforeSearch, onTripTypeConfirm,
+    onCitySelect, onDepartureCitySelect, onAirportSelect,
+    onSearchButtonClick, onQuickReplyMessage, onQuickReplyFillInput, onQuickReplyWidget,
+    onRetry,
+  ]);
 
   // B9: Use intelligent scroll management instead of naive scrollIntoView
   const { isUserScrolling, showNewMessageIndicator, newMessageCount, scrollToBottom, handleScroll } =
@@ -64,43 +95,32 @@ export function ChatMessages({
     });
 
   return (
-    <div className="relative flex-1 overflow-y-auto" ref={containerRef} onScroll={handleScroll}>
-      <div className="max-w-3xl mx-auto py-6 px-4 space-y-6">
-        {visibleMessages.map((message) => (
-          <ChatMessage
-            key={message.id}
-            message={message}
-            isLoading={isLoading}
-            memory={memory}
-            onDateSelect={onDateSelect}
-            onDateRangeSelect={onDateRangeSelect}
-            onTravelersSelect={onTravelersSelect}
-            onTravelersConfirmSolo={onTravelersConfirmSolo}
-            onTravelersEditBeforeSearch={onTravelersEditBeforeSearch}
-            onTripTypeConfirm={onTripTypeConfirm}
-            onCitySelect={onCitySelect}
-            onDepartureCitySelect={onDepartureCitySelect}
-            onAirportSelect={onAirportSelect}
-            onSearchButtonClick={onSearchButtonClick}
-            onQuickReplyMessage={onQuickReplyMessage}
-            onQuickReplyFillInput={onQuickReplyFillInput}
-            onQuickReplyWidget={onQuickReplyWidget}
-          />
-        ))}
-      </div>
+    <ChatHandlersProvider handlers={handlers}>
+      <div className="relative flex-1 overflow-y-auto" ref={containerRef} onScroll={handleScroll}>
+        <div className="max-w-3xl mx-auto py-6 px-4 space-y-6">
+          {visibleMessages.map((message) => (
+            <ChatMessage
+              key={message.id}
+              message={message}
+              isLoading={isLoading}
+              memory={memory}
+            />
+          ))}
+        </div>
 
-      {/* Scroll-to-bottom button when user has scrolled up during streaming */}
-      {isUserScrolling && showNewMessageIndicator && (
-        <button
-          type="button"
-          onClick={() => scrollToBottom()}
-          className="absolute bottom-4 right-4 z-10 flex items-center gap-1.5 px-3 py-2 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors text-xs font-medium"
-          aria-label={`${newMessageCount} new message${newMessageCount > 1 ? "s" : ""}, scroll to bottom`}
-        >
-          <ArrowDown className="h-3.5 w-3.5" />
-          {newMessageCount > 0 && <span>{newMessageCount}</span>}
-        </button>
-      )}
-    </div>
+        {/* Scroll-to-bottom button when user has scrolled up during streaming */}
+        {isUserScrolling && showNewMessageIndicator && (
+          <button
+            type="button"
+            onClick={() => scrollToBottom()}
+            className="absolute bottom-4 right-4 z-10 flex items-center gap-1.5 px-3 py-2 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors text-xs font-medium"
+            aria-label={`${newMessageCount} new message${newMessageCount > 1 ? "s" : ""}, scroll to bottom`}
+          >
+            <ArrowDown className="h-3.5 w-3.5" />
+            {newMessageCount > 0 && <span>{newMessageCount}</span>}
+          </button>
+        )}
+      </div>
+    </ChatHandlersProvider>
   );
 }

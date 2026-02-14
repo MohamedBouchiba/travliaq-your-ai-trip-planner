@@ -19,6 +19,7 @@ import { TravelersWidget, TravelersConfirmBeforeSearchWidget } from "./Travelers
 import { TripTypeConfirmWidget } from "./TripTypeWidget";
 import { CitySelectionWidget } from "./CitySelectionWidget";
 import { eventBus } from "@/lib/eventBus";
+import { TripRecapWidget } from "./TripRecapWidget";
 
 // Lazy-loaded widgets — not needed on initial render
 const LazyAirportConfirmationWidget = lazy(() =>
@@ -308,6 +309,10 @@ function WidgetSwitch({
           />
         </Suspense>
       );
+
+    case "tripRecap":
+      if (!m.widgetData?.tripRecap) return null;
+      return <TripRecapWidget data={m.widgetData.tripRecap} />;
 
     default:
       return null;

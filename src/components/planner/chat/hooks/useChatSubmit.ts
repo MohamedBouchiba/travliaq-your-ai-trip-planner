@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next";
 import type { ChatMessage } from "../types";
 import type { FlightFormData, ChatQuickAction, WidgetType } from "@/types/flight";
 import type { FlightMemory } from "@/stores/hooks/useFlightMemoryStore";
-import type { IntentClassification, APIMessage, MemoryContext, StreamResult, OnContentUpdate, SessionEntities } from "./chatStreamTypes";
+import type { IntentClassification, APIMessage, MemoryContext, StreamResult, OnContentUpdate, SessionEntities, StreamError } from "./chatStreamTypes";
 import type { ChooseWidgetAction } from "./useWidgetActionExecutor";
 import { parseAction, flightDataToMemory } from "../utils";
 import { getCityCoords } from "../types";
@@ -20,6 +20,7 @@ import { geocodeCity } from "@/utils/geocodeCity";
 import { eventBus, emitTabChange, emitTabAndZoom } from "@/lib/eventBus";
 import { FLIGHTS_ZOOM } from "@/constants/mapSettings";
 import { useDebugStore } from "@/stores/debugStore";
+import { usePlannerStoreV2 } from "@/stores/plannerStoreV2";
 import { buildLLMContext } from "./buildLLMContext";
 
 // ─── Departure city validation (Bug D fix) ───
@@ -124,6 +125,8 @@ export interface UseChatSubmitOptions {
 
 export function useChatSubmit(opts: UseChatSubmitOptions) {
   const { t } = useTranslation();
+  // B4: Read hotel search results from store to feed phase detection
+  const hasHotelResults = usePlannerStoreV2((s) => s.hotelSearchResults.length > 0);
 
   const sendText = useCallback(async (text: string) => {
     if (!text.trim() || opts.isLoading) return;
@@ -191,8 +194,8 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
           hasDestination: !!opts.memory.arrival,
           hasDates: !!opts.memory.departureDate,
           hasTravelers: opts.memory.passengers.adults > 0,
-          hasFlightResults: false, // Will be set by external state if available
-          hasHotelResults: false,
+          hasFlightResults: false, // TODO: No flight results tracking in store yet
+          hasHotelResults,         // B4: Wired from accommodation store
         },
       });
 
@@ -202,7 +205,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
         opts.completedMessageIdsRef.current = new Set(entries.slice(-30));
       }
 
-      const { content, flightData, preferencesData, quickReplies, destinationSuggestionRequest, intentClassification, reasoning, flightSearchTrigger } =
+      const { content, flightData, preferencesData, quickReplies, destinationSuggestionRequest, intentClassification, reasoning, flightSearchTrigger, tripRecapData } =
         await opts.streamResponse(
           apiMessages,
           messageId,
@@ -274,30 +277,10 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
           }
         }
 
-        // Reasoning widget fallback: if intent router didn't show a widget
-        // but reasoning had a widgetDecision, try it as last resort
-        if (!opts.intentWidgetRef.current && reasoning?.widgetDecision?.shouldShow) {
-          const rwType = reasoning.widgetDecision.widgetType as WidgetType;
-          if (rwType) {
-            const fallbackResult = opts.intentRouter.processIntent({
-              primaryIntent: rwType,
-              confidence: reasoning.confidence || 0.7,
-              entities: {},
-              widgetToShow: { type: rwType, reason: reasoning.widgetDecision.reason || "" },
-            });
-            if (fallbackResult.shouldShowWidget && fallbackResult.widgetType) {
-              opts.intentWidgetRef.current = fallbackResult.widgetType;
-              if (import.meta.env.DEV) console.log("[useChatSubmit] Reasoning fallback widget:", fallbackResult.widgetType);
-              opts.setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === messageId
-                    ? { ...m, widget: fallbackResult.widgetType!, widgetData: fallbackResult.widgetData, widgetConfirmed: false }
-                    : m
-                )
-              );
-            }
-          }
-        }
+        // C1: Reasoning widget fallback removed (A1: plan_response no longer exists).
+        // Widget decisions now come from 2 sources only:
+        // 1. Backend intent classification → intentRouter.processIntent()
+        // 2. Flight flow state → widgetFlow.determineNextWidget()
 
         // provide_destination handling
         if (intentClassification.primaryIntent === "provide_destination" && intentClassification.entities?.destinationCity) {
@@ -453,12 +436,20 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
       widget = opts.widgetFlow.determineNextWidget(showDateWidget, showTravelersWidget, nextMem);
       const widgetData = widget ? opts.widgetFlow.getWidgetData() : undefined;
 
+      // E2: If trip recap data received, override widget to show recap
+      if (tripRecapData) {
+        if (import.meta.env.DEV) console.log("[useChatSubmit] Trip recap received:", tripRecapData.destination?.city);
+        widget = "tripRecap" as WidgetType;
+      }
+
       opts.setMessages((prev) =>
         prev.map((m) => {
           if (m.id !== messageId) return m;
           // C3: Don't fall back to m.widget (ghost widget from SSE) — if no widget determined, clear it
           const finalWidget = widget || opts.intentWidgetRef.current || null;
-          const finalWidgetData = widget ? widgetData : (opts.intentWidgetRef.current ? undefined : null);
+          const finalWidgetData = tripRecapData
+            ? { tripRecap: tripRecapData }
+            : widget ? widgetData : (opts.intentWidgetRef.current ? undefined : null);
           if (opts.intentWidgetRef.current) opts.intentWidgetRef.current = null;
           return { ...m, text: cleanContent, isTyping: false, isStreaming: false, widget: finalWidget, widgetData: finalWidgetData };
         })
@@ -466,9 +457,12 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
     } catch (err) {
       console.error("Failed to get chat response:", err);
       opts.widgetFlow.resetFlowState();
+      // C2: Classify the error type for user-visible error rendering
+      const streamErr = err instanceof Error && "type" in err ? (err as StreamError) : null;
+      const errorType = streamErr?.type ?? "unknown";
       opts.setMessages((prev) =>
         prev.map((m) =>
-          m.id === messageId ? { ...m, text: t("planner.chat.errorOccurred"), isTyping: false, isStreaming: false } : m
+          m.id === messageId ? { ...m, text: t("planner.chat.errorOccurred"), isTyping: false, isStreaming: false, errorType } : m
         )
       );
     } finally {
@@ -496,6 +490,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
     opts.imperativeHandlers,
     opts.handleLLMDestinationRequest,
     opts.generateContextualReplies,
+    hasHotelResults,
   ]);
 
   /**

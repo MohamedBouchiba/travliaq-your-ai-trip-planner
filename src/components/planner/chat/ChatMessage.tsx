@@ -1,13 +1,17 @@
 /**
  * ChatMessage - Single message with avatar, content, widgets, and quick replies
+ *
+ * C3: Handler props replaced by useChatHandlers() context.
+ * Only message-specific data (message, memory, isLoading) remains as props.
  */
 
-import { Plane } from "lucide-react";
+import { Plane, RefreshCw, AlertTriangle, WifiOff } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type { ChatMessage as ChatMessageType } from "./types";
 import { QuickReplies } from "./QuickReplies";
+import { useChatHandlers } from "./contexts/ChatHandlersContext";
 import {
   DatePickerWidget,
   DateRangePickerWidget,
@@ -18,8 +22,8 @@ import {
   AirportButton,
   DualAirportSelection,
   AirportConfirmationWidget,
+  TripRecapWidget,
 } from "./widgets";
-import type { Airport } from "@/hooks/useNearestAirports";
 import { eventBus } from "@/lib/eventBus";
 
 interface ChatMessageProps {
@@ -32,20 +36,6 @@ interface ChatMessageProps {
     passengers: { adults: number; children: number; infants: number };
     tripType: "roundtrip" | "oneway" | "multi";
   };
-  // Handlers
-  onDateSelect: (messageId: string, type: "departure" | "return", date: Date) => void;
-  onDateRangeSelect: (messageId: string, departure: Date, returnDate: Date) => void;
-  onTravelersSelect: (messageId: string, travelers: { adults: number; children: number; infants: number }) => void;
-  onTravelersConfirmSolo: (messageId: string) => void;
-  onTravelersEditBeforeSearch: (messageId: string, travelers: { adults: number; children: number; infants: number }) => void;
-  onTripTypeConfirm: (messageId: string, tripType: "roundtrip" | "oneway" | "multi") => void;
-  onCitySelect: (messageId: string, cityName: string, countryName: string, countryCode: string) => void;
-  onDepartureCitySelect: (messageId: string, cityName: string, countryName: string, countryCode: string) => void;
-  onAirportSelect: (messageId: string, field: "from" | "to", airport: Airport, isDual?: boolean) => void;
-  onSearchButtonClick: (messageId: string) => void;
-  onQuickReplyMessage: (message: string) => void;
-  onQuickReplyFillInput?: (message: string) => void;
-  onQuickReplyWidget?: (widget: string) => void;
 }
 
 /**
@@ -88,20 +78,10 @@ export function ChatMessage({
   message: m,
   isLoading = false,
   memory,
-  onDateSelect,
-  onDateRangeSelect,
-  onTravelersSelect,
-  onTravelersConfirmSolo,
-  onTravelersEditBeforeSearch,
-  onTripTypeConfirm,
-  onCitySelect,
-  onDepartureCitySelect,
-  onAirportSelect,
-  onSearchButtonClick,
-  onQuickReplyMessage,
-  onQuickReplyFillInput,
-  onQuickReplyWidget,
 }: ChatMessageProps) {
+  // C3: Get handlers from context instead of props
+  const handlers = useChatHandlers();
+
   return (
     <div
       className={cn(
@@ -119,9 +99,11 @@ export function ChatMessage({
         <div
           className={cn(
             "inline-block text-sm leading-relaxed px-4 py-3 rounded-2xl max-w-[85%]",
-            m.role === "user"
-              ? "bg-primary text-primary-foreground text-left"
-              : "bg-muted text-foreground text-left"
+            m.errorType
+              ? "bg-destructive/10 text-destructive border border-destructive/20 text-left"
+              : m.role === "user"
+                ? "bg-primary text-primary-foreground text-left"
+                : "bg-muted text-foreground text-left"
           )}
         >
           {m.isTyping ? (
@@ -129,6 +111,26 @@ export function ChatMessage({
               <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
               <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
               <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+            </div>
+          ) : m.errorType ? (
+            <div className="flex items-start gap-2">
+              {m.errorType === "network" ? (
+                <WifiOff className="h-4 w-4 mt-0.5 shrink-0" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              )}
+              <div>
+                <p className="font-medium">{m.text}</p>
+                {handlers.onRetry && (
+                  <button
+                    onClick={handlers.onRetry}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive text-xs font-medium transition-colors"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    {t("planner.chat.retry")}
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <>
@@ -147,7 +149,7 @@ export function ChatMessage({
               <AirportButton
                 key={airport.iata}
                 airport={airport}
-                onClick={() => onAirportSelect(m.id, m.airportChoices!.field, airport, false)}
+                onClick={() => handlers.onAirportSelect(m.id, m.airportChoices!.field, airport, false)}
                 disabled={isLoading}
               />
             ))}
@@ -158,7 +160,7 @@ export function ChatMessage({
         {m.dualAirportChoices && (
           <DualAirportSelection
             choices={m.dualAirportChoices}
-            onSelect={(field, airport) => onAirportSelect(m.id, field, airport, true)}
+            onSelect={(field, airport) => handlers.onAirportSelect(m.id, field, airport, true)}
             disabled={isLoading}
           />
         )}
@@ -168,7 +170,7 @@ export function ChatMessage({
           <DatePickerWidget
             label={undefined}
             value={memory.departureDate}
-            onChange={(date) => onDateSelect(m.id, "departure", date)}
+            onChange={(date) => handlers.onDateSelect(m.id, "departure", date)}
             preferredMonth={m.widgetData?.preferredMonth}
           />
         )}
@@ -176,7 +178,7 @@ export function ChatMessage({
           <DatePickerWidget
             label={undefined}
             value={memory.returnDate}
-            onChange={(date) => onDateSelect(m.id, "return", date)}
+            onChange={(date) => handlers.onDateSelect(m.id, "return", date)}
             minDate={memory.departureDate || undefined}
             preferredMonth={m.widgetData?.preferredMonth}
           />
@@ -187,7 +189,7 @@ export function ChatMessage({
           <DateRangePickerWidget
             tripDuration={m.widgetData?.tripDuration}
             preferredMonth={m.widgetData?.preferredMonth}
-            onConfirm={(dep, ret) => onDateRangeSelect(m.id, dep, ret)}
+            onConfirm={(dep, ret) => handlers.onDateRangeSelect(m.id, dep, ret)}
           />
         )}
 
@@ -195,7 +197,7 @@ export function ChatMessage({
         {m.widget === "travelersSelector" && (
           <TravelersWidget
             initialValues={memory.passengers}
-            onConfirm={(travelers) => onTravelersSelect(m.id, travelers)}
+            onConfirm={(travelers) => handlers.onTravelersSelect(m.id, travelers)}
           />
         )}
 
@@ -203,7 +205,7 @@ export function ChatMessage({
         {m.widget === "tripTypeConfirm" && (
           <TripTypeConfirmWidget
             currentType={memory.tripType}
-            onConfirm={(tripType) => onTripTypeConfirm(m.id, tripType)}
+            onConfirm={(tripType) => handlers.onTripTypeConfirm(m.id, tripType)}
           />
         )}
 
@@ -214,9 +216,9 @@ export function ChatMessage({
             onSelect={(cityName) => {
               const { countryCode, countryName } = m.widgetData!.citySelection!;
               if (m.widgetData?.isDeparture) {
-                onDepartureCitySelect(m.id, cityName, countryName, countryCode);
+                handlers.onDepartureCitySelect(m.id, cityName, countryName, countryCode);
               } else {
-                onCitySelect(m.id, cityName, countryName, countryCode);
+                handlers.onCitySelect(m.id, cityName, countryName, countryCode);
               }
             }}
           />
@@ -226,8 +228,8 @@ export function ChatMessage({
         {m.widget === "travelersConfirmBeforeSearch" && (
           <TravelersConfirmBeforeSearchWidget
             currentTravelers={memory.passengers}
-            onConfirm={() => onTravelersConfirmSolo(m.id)}
-            onEditConfirm={(travelers) => onTravelersEditBeforeSearch(m.id, travelers)}
+            onConfirm={() => handlers.onTravelersConfirmSolo(m.id)}
+            onEditConfirm={(travelers) => handlers.onTravelersEditBeforeSearch(m.id, travelers)}
           />
         )}
 
@@ -241,11 +243,16 @@ export function ChatMessage({
           />
         )}
 
+        {/* Trip Recap Widget */}
+        {m.widget === "tripRecap" && m.widgetData?.tripRecap && (
+          <TripRecapWidget data={m.widgetData.tripRecap} />
+        )}
+
         {/* Flight search button - uses translated text from i18n */}
         {m.hasSearchButton && (
           <div className="mt-3">
             <button
-              onClick={() => onSearchButtonClick(m.id)}
+              onClick={() => handlers.onSearchButtonClick(m.id)}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-primary/20"
             >
               <Plane className="h-4 w-4" />
@@ -258,9 +265,9 @@ export function ChatMessage({
         {m.quickReplies && m.quickReplies.length > 0 && (
           <QuickReplies
             replies={m.quickReplies}
-            onSendMessage={onQuickReplyMessage}
-            onFillInput={onQuickReplyFillInput}
-            onTriggerWidget={onQuickReplyWidget}
+            onSendMessage={handlers.onQuickReplyMessage}
+            onFillInput={handlers.onQuickReplyFillInput}
+            onTriggerWidget={handlers.onQuickReplyWidget}
             disabled={isLoading}
           />
         )}

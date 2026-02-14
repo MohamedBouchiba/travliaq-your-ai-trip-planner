@@ -25,6 +25,9 @@ export { DietaryWidget } from "./DietaryWidget";
 export { DestinationSuggestionCard } from "./DestinationSuggestionCard";
 export { DestinationSuggestionsGrid } from "./DestinationSuggestionsGrid";
 
+// Trip recap (E2)
+export { TripRecapWidget } from "./TripRecapWidget";
+
 // Selection widgets (Sprint 1A - Quick filters)
 export * from "./selection";
 

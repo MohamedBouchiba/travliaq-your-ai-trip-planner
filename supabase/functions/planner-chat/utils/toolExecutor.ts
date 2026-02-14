@@ -160,6 +160,7 @@ export interface CollectedToolData {
   intentClassification: Record<string, unknown> | null;
   reasoningData: Record<string, unknown> | null;
   flightSearchTrigger: boolean;
+  tripRecapData: Record<string, unknown> | null;
 }
 
 export function createEmptyCollectedData(): CollectedToolData {
@@ -172,6 +173,7 @@ export function createEmptyCollectedData(): CollectedToolData {
     intentClassification: null,
     reasoningData: null,
     flightSearchTrigger: false,
+    tripRecapData: null,
   };
 }
 

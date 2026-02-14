@@ -17,13 +17,14 @@ import {
 
 // Import tools from modular files
 import { intentClassifierTool, parseIntentClassification, type IntentClassificationResult } from "./tools/intentClassifier.ts";
-import { reasoningTool, parseReasoningResult, CHAIN_OF_THOUGHT_INSTRUCTIONS, type ReasoningResult } from "./tools/reasoningEngine.ts";
+import { parseReasoningResult, type ReasoningResult } from "./tools/reasoningEngine.ts";
 import { flightExtractionTool } from "./tools/flightExtractor.ts";
 import { accommodationExtractionTool } from "./tools/accommodationExtractor.ts";
 import { preferenceExtractionTool } from "./tools/preferenceExtractor.ts";
 import { quickRepliesExtractionTool } from "./tools/quickReplies.ts";
 import { destinationSuggestionTool } from "./tools/destinationSuggestions.ts";
 import { flightSearchTriggerTool } from "./tools/flightSearchTrigger.ts";
+import { tripRecapTool } from "./tools/tripRecap.ts";
 import { TOOL_NAMES } from "./tools/index.ts";
 
 // Import utilities
@@ -39,6 +40,8 @@ import {
   type CollectedToolData,
   type ToolExecutionResult,
 } from "./utils/toolExecutor.ts";
+import { fetchWithRetry } from "./utils/fetchWithRetry.ts";
+import { truncateMessages, estimateMessagesTokens } from "./utils/tokenEstimator.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -113,8 +116,9 @@ async function checkRateLimit(userId: string, log: RequestLogger): Promise<boole
 const MAX_MESSAGES = 50;
 
 // All available tools for the LLM
+// A1: plan_response (reasoningTool) removed — classify_intent already handles intent+reasoning
+// in a dedicated call. Keeping plan_response caused redundant ReAct iterations.
 const ALL_TOOLS = [
-  reasoningTool,
   intentClassifierTool,
   flightExtractionTool,
   accommodationExtractionTool,
@@ -122,7 +126,39 @@ const ALL_TOOLS = [
   destinationSuggestionTool,
   quickRepliesExtractionTool,
   flightSearchTriggerTool,
+  tripRecapTool,
 ];
+
+// A6: Phase-specific tool filtering — only expose relevant tools per phase
+// classify_intent is always excluded from ReAct (handled in dedicated call)
+// plan_response removed (A1) — reasoning now handled inline by the LLM
+// generate_quick_replies is always included (needed in every phase)
+const TOOL_NAMES_BY_PHASE: Record<TravelPhase, Set<string>> = {
+  discovery: new Set([
+    "update_preferences",
+    "request_destination_suggestions",
+    "generate_quick_replies",
+  ]),
+  logistics: new Set([
+    "update_flight_widget",
+    "update_preferences",
+    "trigger_flight_search",
+    "generate_quick_replies",
+  ]),
+  accommodation: new Set([
+    "update_accommodation_widget",
+    "update_preferences",
+    "generate_quick_replies",
+  ]),
+  activities: new Set([
+    "update_preferences",
+    "generate_quick_replies",
+  ]),
+  recap: new Set([
+    "generate_quick_replies",
+    "generate_trip_recap",
+  ]),
+};
 
 /**
  * Process a single tool call and return the result
@@ -327,7 +363,22 @@ function processToolCall(
         }
         break;
       }
-      
+
+      case "generate_trip_recap": {
+        try {
+          const recapData = JSON.parse(toolCall.function.arguments);
+          if (recapData?.destination?.city) {
+            updatedData.tripRecapData = recapData;
+            result = { success: true, data: { message: "Trip recap generated", recap: recapData } };
+          } else {
+            result = { success: false, error: { code: "VALIDATION_FAILED", message: "Trip recap requires at least a destination" } };
+          }
+        } catch {
+          result = { success: false, error: { code: "PARSE_ERROR", message: "Invalid trip recap JSON" } };
+        }
+        break;
+      }
+
       default:
         log.warn("tool_execution", `Unknown tool: ${toolName}`);
         result = {
@@ -637,13 +688,29 @@ Exemples INTERDITS (NE FAIS JAMAIS ÇA) :
 
 ${phasePrompt}
 
+## RÈGLES CRITIQUES : ANTI-HALLUCINATION
+Tu ne DOIS JAMAIS inventer ou estimer :
+- Prix (vols, hôtels, activités) → utilise trigger_flight_search ou dis "lançons une recherche"
+- Horaires de vols ou disponibilités → utilise les outils de recherche
+- Météo, distances, durées de trajet → dis "je n'ai pas cette donnée précise"
+- Visa, réglementations → renvoie vers les sources officielles
+- Notes/avis → ne cite jamais de chiffre sans source API
+
+Si tu n'as pas l'info : dis-le clairement et propose un outil ou une action concrète.
+
 ## RECHERCHE DE VOLS - COMPORTEMENT ATTENDU
 Quand trigger_flight_search est appelé, le formulaire de recherche est PRÉ-REMPLI dans l'onglet Vols.
 L'utilisateur doit VÉRIFIER le formulaire et lancer la recherche manuellement.
 NE DIS JAMAIS "je recherche" ou "les résultats arrivent".
 DIS : "J'ai pré-rempli le formulaire de recherche dans l'onglet Vols. Vérifiez les détails et lancez la recherche quand vous êtes prêt."
 
-${CHAIN_OF_THOUGHT_INSTRUCTIONS}`;
+## RÉFLEXION AVANT RÉPONSE
+Avant de répondre, pense brièvement :
+1. Que veut l'utilisateur ? (intention explicite + implicite)
+2. Que sais-tu déjà ? (destination, dates, voyageurs, préférences)
+3. Quelle est la prochaine étape logique ?
+4. Quel outil appeler ? (update_preferences, update_flight_widget, generate_quick_replies, etc.)
+Si confiance faible, demande une clarification plutôt que de deviner.`;
 }
 
 serve(async (req) => {
@@ -794,7 +861,7 @@ serve(async (req) => {
       log.info("classify_first", "Starting dedicated intent classification call", { contextMessages: recentMessages.length });
 
       try {
-        const classifyResponse = await fetch(url, {
+        const classifyResponse = await fetchWithRetry(url, {
           method: "POST",
           headers: {
             "api-key": AZURE_OPENAI_API_KEY,
@@ -811,7 +878,7 @@ serve(async (req) => {
             tool_choice: { type: "function", function: { name: "classify_intent" } },
             stream: false,
           }),
-        });
+        }, log, "classify_first");
         
         const classifyLatency = Date.now() - classifyStartTime;
         
@@ -867,19 +934,28 @@ serve(async (req) => {
     }
 
     const preferenceFirstApplied = collectedData.intentClassification?.primaryIntent === "gather_preferences";
+    // A6: Filter tools by current phase + existing guards
+    const phaseToolNames = TOOL_NAMES_BY_PHASE[phase];
     const reActTools = ALL_TOOLS.filter(t => {
       if (t.function.name === "classify_intent") return false;
       // B3: If preference-first override was applied, remove destination suggestions
-      // to prevent the LLM from calling it (which would show "Searching..." then nothing)
       if (preferenceFirstApplied && t.function.name === "request_destination_suggestions") return false;
+      // A6: Only include tools valid for the current phase
+      if (!phaseToolNames.has(t.function.name)) return false;
       return true;
+    });
+    log.info("tool_filtering", `Phase "${phase}": ${reActTools.length} tools available`, {
+      tools: reActTools.map(t => t.function.name),
     });
     
     let loopCount = 0;
-    let conversationMessages = [
+    // A4: Truncate messages to stay within token budget (80% of context window)
+    const MAX_CONTEXT_TOKENS = 12000; // ~80% of 16384 for GPT-4o-mini
+    const rawMessages = [
       { role: "system", content: systemPrompt },
       ...limitedMessages,
     ];
+    let conversationMessages = truncateMessages(rawMessages, MAX_CONTEXT_TOKENS, log);
     let finalContent = "";
     let lastResponse: unknown = null;
     
@@ -889,7 +965,7 @@ serve(async (req) => {
       log.azureCall("start");
       const azureStartTime = Date.now();
       
-      const response = await fetch(url, {
+      const response = await fetchWithRetry(url, {
         method: "POST",
         headers: {
           "api-key": AZURE_OPENAI_API_KEY,
@@ -903,7 +979,7 @@ serve(async (req) => {
           tool_choice: "auto",
           stream: false,
         }),
-      });
+      }, log, "react_loop");
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -986,26 +1062,52 @@ serve(async (req) => {
     if (!finalContent && loopCount > 0) {
       log.info("multi_tool", "Making final content generation call");
 
+      const needsQuickReplies = quickRepliesTool && !collectedData.quickRepliesData;
+      // A3: Use real streaming when we don't need to process tool_calls from the response
+      const useRealStreaming = stream && !needsQuickReplies;
+
       const finalCallBody: Record<string, unknown> = {
         messages: conversationMessages,
         temperature: 0.7,
         max_tokens: MULTI_TOOL_CONFIG.FINAL_CONTENT_MAX_TOKENS,
-        stream: false,
+        stream: useRealStreaming,
       };
       // C1: Add quick replies tool so the LLM can generate suggestions
-      if (quickRepliesTool && !collectedData.quickRepliesData) {
+      if (needsQuickReplies) {
         finalCallBody.tools = [quickRepliesTool];
         finalCallBody.tool_choice = "auto";
       }
 
-      const finalResponse = await fetch(url, {
+      // A3: Real streaming — emit collected data then stream Azure response directly
+      if (useRealStreaming) {
+        log.info("streaming", "Using real streaming for final content");
+        // Normalize dates before streaming (won't have access to content after)
+        normalizeExtractedYears(collectedData, currentDate);
+
+        const streamingResponse = await fetchWithRetry(url, {
+          method: "POST",
+          headers: {
+            "api-key": AZURE_OPENAI_API_KEY,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(finalCallBody),
+        }, log, "final_content_stream");
+
+        if (streamingResponse.ok) {
+          return createStreamingResponse(streamingResponse, collectedData, log, requestId, toolExecutionLog);
+        }
+        // If streaming call failed, fall through to non-streaming fallback
+        log.warn("streaming", "Streaming call failed, falling back to non-streaming");
+      }
+
+      const finalResponse = await fetchWithRetry(url, {
         method: "POST",
         headers: {
           "api-key": AZURE_OPENAI_API_KEY,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(finalCallBody),
-      });
+        body: JSON.stringify({ ...finalCallBody, stream: false }),
+      }, log, "final_content");
 
       if (!finalResponse.ok) {
         finalContent = "J'ai mis à jour les informations.";
@@ -1028,7 +1130,7 @@ serve(async (req) => {
         }
       }
 
-      // Now stream if requested
+      // Now stream if requested (simulated since content is already generated)
       if (stream && finalContent) {
         return createSimulatedStreamingResponse(finalContent, collectedData, log, toolExecutionLog);
       }
@@ -1162,9 +1264,11 @@ function createSimulatedStreamingResponse(
       // Emit collected data first
       emitCollectedDataEvents(controller, encoder, collectedData, toolLog);
       
-      // Stream content character by character
-      for (const char of content) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "content", content: char })}\n\n`));
+      // A3: Stream content in word-sized chunks (not character by character)
+      // Split by spaces and punctuation boundaries for natural-looking streaming
+      const words = content.match(/\S+\s*/g) || [content];
+      for (const word of words) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "content", content: word })}\n\n`));
       }
       
       controller.enqueue(encoder.encode("data: [DONE]\n\n"));
@@ -1243,5 +1347,9 @@ function emitCollectedDataEvents(
   
   if (data.flightSearchTrigger) {
     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "flightSearchTrigger", trigger: true })}\n\n`));
+  }
+
+  if (data.tripRecapData) {
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "tripRecapData", tripRecapData: data.tripRecapData })}\n\n`));
   }
 }

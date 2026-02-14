@@ -10,7 +10,7 @@
  */
 
 import { useState, useRef, useEffect, useImperativeHandle, forwardRef, useCallback, memo, useMemo } from "react";
-import { Plane, History, Send, PanelLeftClose } from "lucide-react";
+import { Plane, History, Send, PanelLeftClose, RefreshCw, AlertTriangle, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import logo from "@/assets/logo-travliaq.png";
@@ -886,13 +886,33 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                   <div className={cn("flex-1 min-w-0", m.role === "user" ? "text-right" : "")}>
                     <div className={cn(
                       "inline-block text-sm leading-relaxed px-4 py-3 rounded-2xl max-w-[85%]",
-                      m.role === "user" ? "bg-primary text-primary-foreground text-left" : "bg-muted text-foreground text-left"
+                      m.errorType
+                        ? "bg-destructive/10 text-destructive border border-destructive/20 text-left"
+                        : m.role === "user" ? "bg-primary text-primary-foreground text-left" : "bg-muted text-foreground text-left"
                     )}>
                       {m.isTyping ? (
                         <div className="flex gap-1 py-1" role="status" aria-label={t("planner.chat.assistantTyping")}>
                           <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
                           <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
                           <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                        </div>
+                      ) : m.errorType ? (
+                        <div className="flex items-start gap-2">
+                          {m.errorType === "network" ? (
+                            <WifiOff className="h-4 w-4 mt-0.5 shrink-0" />
+                          ) : (
+                            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                          )}
+                          <div>
+                            <p className="font-medium">{m.text}</p>
+                            <button
+                              onClick={regenerateLastResponse}
+                              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive text-xs font-medium transition-colors"
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                              {t("planner.chat.retry")}
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <>

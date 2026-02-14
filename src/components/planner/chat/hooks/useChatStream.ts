@@ -409,7 +409,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
           clearTimeout(streamTimeoutId);
           circuitBreaker.recordSuccess();
-          return { content: fullContent, flightData, accommodationData, preferencesData: acc.preferencesData, quickReplies: acc.quickReplies, destinationSuggestionRequest: acc.destinationSuggestionRequest, intentClassification: acc.intentClassification, reasoning: acc.reasoning, flightSearchTrigger: acc.flightSearchTrigger, requestId };
+          return { content: fullContent, flightData, accommodationData, preferencesData: acc.preferencesData, quickReplies: acc.quickReplies, destinationSuggestionRequest: acc.destinationSuggestionRequest, intentClassification: acc.intentClassification, reasoning: acc.reasoning, flightSearchTrigger: acc.flightSearchTrigger, tripRecapData: acc.tripRecapData, requestId };
 
         } catch (err) {
           lastError = err instanceof Error && "type" in err
