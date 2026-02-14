@@ -440,10 +440,10 @@ export function registerChatConversationSimTests() {
       expect(signals.askedForInspiration).toBe(true);
     });
 
-    it("phase stays inspiration when asking for ideas", () => {
+    it("phase stays inspiration when asking for ideas (no dest)", () => {
       const phase = detectCurrentPhase(emptySignals({ askedForInspiration: true }));
       expect(phase.currentPhase).toBe("inspiration");
-      expect(phase.confidenceScore).toBeGreaterThanOrEqual(90);
+      expect(phase.confidenceScore).toBeGreaterThanOrEqual(70);
     });
 
     it("user hesitates between options → undecided intent", () => {

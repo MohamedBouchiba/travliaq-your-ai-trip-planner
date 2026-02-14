@@ -674,10 +674,10 @@ export function registerChatJourneysSimTests() {
       expect(detectCurrentPhase(emptySignals()).currentPhase).toBe("inspiration");
     });
 
-    it("asked for inspiration → inspiration (95%)", () => {
+    it("C5: asked for inspiration (no dest) → inspiration (75%)", () => {
       const p = detectCurrentPhase(emptySignals({ askedForInspiration: true }));
       expect(p.currentPhase).toBe("inspiration");
-      expect(p.confidenceScore).toBe(95);
+      expect(p.confidenceScore).toBe(75);
     });
 
     it("destination picked → research", () => {
@@ -1037,8 +1037,8 @@ export function registerChatJourneysSimTests() {
     it("dest+dates+travelers+flights → comparison", () => expect(getSimplePhase(true, true, true, true, false, false)).toBe("comparison"));
     it("dest+dates+travelers+hotels → comparison", () => expect(getSimplePhase(true, true, true, false, true, false)).toBe("comparison"));
     it("dest+dates+travelers+both → comparison", () => expect(getSimplePhase(true, true, true, true, true, false)).toBe("comparison"));
-    it("askedInspiration overrides dest → inspiration", () => expect(getSimplePhase(true, false, false, false, false, true)).toBe("inspiration"));
-    it("askedInspiration alone → inspiration", () => expect(getSimplePhase(false, false, false, false, false, true)).toBe("inspiration"));
+    it("C5: askedInspiration no longer overrides dest → research", () => expect(getSimplePhase(true, false, false, false, false, true)).toBe("research"));
+    it("askedInspiration alone (no dest) → inspiration", () => expect(getSimplePhase(false, false, false, false, false, true)).toBe("inspiration"));
   });
 
   // ═══════════════════════════════════════════════════════════════

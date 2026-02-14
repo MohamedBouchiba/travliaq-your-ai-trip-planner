@@ -105,10 +105,11 @@ export function detectCurrentPhase(signals: PhaseSignals): PhaseContext {
     currentPhase = "planning";
     confidenceScore = 85;
   }
-  // INSPIRATION: User asked for inspiration OR has no destination
-  else if (signals.askedForInspiration || !signals.hasDestination) {
+  // INSPIRATION: No destination selected yet
+  // C5: Removed askedForInspiration override — it matched common words and kept phase stuck
+  else if (!signals.hasDestination) {
     currentPhase = "inspiration";
-    confidenceScore = signals.askedForInspiration ? 95 : 75;
+    confidenceScore = 75;
   }
   // RESEARCH: Has destination, collecting other info
   else {
@@ -229,9 +230,11 @@ export function getSimplePhase(
   hasTravelers: boolean,
   hasFlightResults: boolean,
   hasHotelResults: boolean,
-  askedForInspiration: boolean
+  _askedForInspiration?: boolean
 ): TravelPhase {
-  if (askedForInspiration || !hasDestination) return "inspiration";
+  // C5: askedForInspiration was overriding even when destination was set,
+  // keeping phase stuck at "inspiration". Now only check destination state.
+  if (!hasDestination) return "inspiration";
   if (hasFlightResults || hasHotelResults) return "comparison";
   if (hasDestination && hasDates && hasTravelers) return "planning";
   return "research";

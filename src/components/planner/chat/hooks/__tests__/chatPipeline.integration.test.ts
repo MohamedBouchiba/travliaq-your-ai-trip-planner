@@ -41,9 +41,10 @@ vi.mock("../../services/phaseDetector", () => ({
     hasTravelers: boolean,
     hasFlightResults: boolean,
     hasHotelResults: boolean,
-    askedForInspiration: boolean,
+    _askedForInspiration?: boolean,
   ) => {
-    if (askedForInspiration || !hasDestination) return "inspiration";
+    // C5: askedForInspiration no longer overrides when destination is set
+    if (!hasDestination) return "inspiration";
     if (hasFlightResults || hasHotelResults) return "comparison";
     if (hasDestination && hasDates && hasTravelers) return "planning";
     return "research";

@@ -544,10 +544,10 @@ export function registerChatPersonasSimTests() {
       expect(signals.askedForInspiration).toBe(true);
     });
 
-    it("T1: phase stays inspiration when undecided", () => {
+    it("T1: phase stays inspiration when undecided (no dest)", () => {
       const phase = detectCurrentPhase(emptySignals({ askedForInspiration: true }));
       expect(phase.currentPhase).toBe("inspiration");
-      expect(phase.confidenceScore).toBeGreaterThanOrEqual(90);
+      expect(phase.confidenceScore).toBeGreaterThanOrEqual(70);
     });
 
     it("T2: user still undecided → undecided intent", () => {

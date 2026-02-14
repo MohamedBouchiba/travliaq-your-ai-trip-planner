@@ -171,10 +171,9 @@ export function buildLLMContext(sources: ContextSources): Record<string, unknown
   let currentPhase: TravelPhase | undefined;
   if (sources.phaseSignals) {
     const s = sources.phaseSignals;
-    // Detect inspiration if last user message suggests it
-    const lastUserMsg = sources.messages.findLast((m) => m.role === "user")?.text ?? "";
-    const askedForInspiration = /inspire|je ne sais pas|aucune id[ée]e|o[uù] aller|propose|sugg[eè]re/i.test(lastUserMsg);
-    currentPhase = getSimplePhase(s.hasDestination, s.hasDates, s.hasTravelers, s.hasFlightResults, s.hasHotelResults, askedForInspiration);
+    // C5: Removed askedForInspiration regex — it matched common words like "propose"/"suggère"
+    // and kept the phase stuck at "inspiration" even after destination was selected
+    currentPhase = getSimplePhase(s.hasDestination, s.hasDates, s.hasTravelers, s.hasFlightResults, s.hasHotelResults);
   }
 
   return {

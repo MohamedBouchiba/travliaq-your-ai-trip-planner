@@ -543,10 +543,10 @@ export function registerChatAdvancedSimTests() {
       expect(p.currentPhase).toBe("inspiration");
     });
 
-    it("inspiration asked → inspiration (95% confidence)", () => {
+    it("C5: inspiration asked (no dest) → inspiration (75% confidence)", () => {
       const p = detectCurrentPhase(emptySignals({ askedForInspiration: true }));
       expect(p.currentPhase).toBe("inspiration");
-      expect(p.confidenceScore).toBe(95);
+      expect(p.confidenceScore).toBe(75);
     });
 
     it("destination only → research", () => {
@@ -1047,8 +1047,8 @@ export function registerChatAdvancedSimTests() {
       expect(getSimplePhase(false, false, false, false, false, false)).toBe("inspiration");
     });
 
-    it("inspiration asked → inspiration (even with destination)", () => {
-      expect(getSimplePhase(true, false, false, false, false, true)).toBe("inspiration");
+    it("C5: inspiration asked no longer overrides destination → research", () => {
+      expect(getSimplePhase(true, false, false, false, false, true)).toBe("research");
     });
 
     it("destination only → research", () => {

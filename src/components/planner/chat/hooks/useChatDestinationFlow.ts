@@ -60,6 +60,9 @@ export function useChatDestinationFlow({
   const [isLoadingDestinations, setIsLoadingDestinations] = useState(false);
   const [inspireFlowStep, setInspireFlowStep] = useState<InspireFlowStep>("idle");
 
+  // C2: Cache suggestions by preferences hash to avoid regenerating different results
+  const suggestionsCache = useRef<{ hash: string; suggestions: DestinationSuggestion[]; basedOnProfile?: { completionScore: number } } | null>(null);
+
   // Shared fetch logic
   const fetchSuggestions = useCallback(async (limit: number) => {
     const prefs = getPreferences();
@@ -146,9 +149,41 @@ export function useChatDestinationFlow({
 
     try {
       const limit = Math.min(requestedCount, 5);
+
+      // C2: Check cache — reuse suggestions if preferences haven't changed
+      const prefs = getPreferences();
+      const cacheKey = JSON.stringify({ interests: prefs.interests, style: prefs.style, budget: prefs.budget, departure: departureCity });
+      if (suggestionsCache.current?.hash === cacheKey && suggestionsCache.current.suggestions.length >= limit) {
+        const cached = suggestionsCache.current;
+        const suggestions = cached.suggestions.slice(0, limit);
+        setDestinationSuggestions(suggestions);
+        setDestinationProfileScore(cached.basedOnProfile?.completionScore || 0);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  isTyping: false,
+                  isStreaming: false,
+                  widget: "destinationSuggestions" as WidgetType,
+                  widgetData: { suggestions, basedOnProfile: cached.basedOnProfile },
+                }
+              : m
+          )
+        );
+        setInspireFlowStep("results");
+        return;
+      }
+
       const response = await fetchSuggestions(limit);
 
       if (response.success && response.suggestions.length > 0) {
+        // C2: Cache the results for this preference set
+        suggestionsCache.current = {
+          hash: cacheKey,
+          suggestions: response.suggestions,
+          basedOnProfile: response.basedOnProfile ? { completionScore: response.basedOnProfile.completionScore || 0 } : undefined,
+        };
         setDestinationSuggestions(response.suggestions);
         const completionScore = response.basedOnProfile?.completionScore || 0;
         setDestinationProfileScore(completionScore);
@@ -207,7 +242,7 @@ export function useChatDestinationFlow({
         )
       );
     }
-  }, [fetchSuggestions, setMessages, t]);
+  }, [fetchSuggestions, getPreferences, departureCity, setMessages, t]);
 
   // Handle destination selection from DestinationSuggestionsGrid
   const handleDestinationSelect = useCallback(async (messageId: string, destination: DestinationSuggestion) => {

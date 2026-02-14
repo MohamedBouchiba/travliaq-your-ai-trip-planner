@@ -663,10 +663,10 @@ export function registerChatCoherenceTests() {
       expect(ctx.completedSteps.length).toBe(0);
     });
 
-    it("asked for inspiration → inspiration with high confidence", () => {
+    it("asked for inspiration (no dest) → inspiration", () => {
       const ctx = detectCurrentPhase(emptySignals({ askedForInspiration: true }));
       expect(ctx.currentPhase).toBe("inspiration");
-      expect(ctx.confidenceScore).toBeGreaterThanOrEqual(90);
+      expect(ctx.confidenceScore).toBeGreaterThanOrEqual(70);
     });
 
     it("destination set → research", () => {

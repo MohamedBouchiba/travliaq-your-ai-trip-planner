@@ -456,8 +456,9 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
       opts.setMessages((prev) =>
         prev.map((m) => {
           if (m.id !== messageId) return m;
-          const finalWidget = widget ? widget : m.widget || opts.intentWidgetRef.current;
-          const finalWidgetData = widget ? widgetData : m.widgetData || undefined;
+          // C3: Don't fall back to m.widget (ghost widget from SSE) — if no widget determined, clear it
+          const finalWidget = widget || opts.intentWidgetRef.current || null;
+          const finalWidgetData = widget ? widgetData : (opts.intentWidgetRef.current ? undefined : null);
           if (opts.intentWidgetRef.current) opts.intentWidgetRef.current = null;
           return { ...m, text: cleanContent, isTyping: false, isStreaming: false, widget: finalWidget, widgetData: finalWidgetData };
         })

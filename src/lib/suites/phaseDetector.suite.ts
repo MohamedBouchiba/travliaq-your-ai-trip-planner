@@ -35,10 +35,10 @@ export function registerPhaseDetectorTests() {
       expect(result.currentPhase).toBe("inspiration");
     });
 
-    it("returns inspiration when asked for inspiration", () => {
+    it("C5: askedForInspiration alone (no dest) returns inspiration", () => {
       const result = detectCurrentPhase({ ...emptySignals, askedForInspiration: true });
       expect(result.currentPhase).toBe("inspiration");
-      expect(result.confidenceScore).toBe(95);
+      expect(result.confidenceScore).toBe(75);
     });
 
     it("returns research when has destination", () => {
@@ -108,8 +108,8 @@ export function registerPhaseDetectorTests() {
       expect(getSimplePhase(false, false, false, false, false, false)).toBe("inspiration");
     });
 
-    it("returns inspiration when asked for inspiration", () => {
-      expect(getSimplePhase(true, true, true, false, false, true)).toBe("inspiration");
+    it("C5: askedForInspiration no longer overrides when destination is set", () => {
+      expect(getSimplePhase(true, true, true, false, false, true)).toBe("planning");
     });
 
     it("returns comparison when has flight results", () => {

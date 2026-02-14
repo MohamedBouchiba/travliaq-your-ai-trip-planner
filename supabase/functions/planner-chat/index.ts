@@ -917,9 +917,11 @@ serve(async (req) => {
       
       lastResponse = data;
       const choice = data.choices?.[0];
-      finalContent = choice?.message?.content || "";
-      
+
       if (!choice?.message?.tool_calls || choice.message.tool_calls.length === 0) {
+        // C4: Only use content as finalContent when there are NO tool calls
+        // (this is the LLM's actual response, not a placeholder during tool processing)
+        finalContent = choice?.message?.content || "";
         log.info("multi_tool", "No tool calls, ending loop", { loopCount });
         break;
       }
@@ -977,31 +979,58 @@ serve(async (req) => {
       }
     }
     
+    // C4: Always make final content call when tools were used (loopCount > 0)
+    // even if some content was captured, because tool-iteration content is just placeholders
+    // C1: Include generate_quick_replies so the LLM can produce quick replies
+    const quickRepliesTool = ALL_TOOLS.find(t => t.function.name === "generate_quick_replies");
     if (!finalContent && loopCount > 0) {
       log.info("multi_tool", "Making final content generation call");
-      
+
+      const finalCallBody: Record<string, unknown> = {
+        messages: conversationMessages,
+        temperature: 0.7,
+        max_tokens: MULTI_TOOL_CONFIG.FINAL_CONTENT_MAX_TOKENS,
+        stream: false,
+      };
+      // C1: Add quick replies tool so the LLM can generate suggestions
+      if (quickRepliesTool && !collectedData.quickRepliesData) {
+        finalCallBody.tools = [quickRepliesTool];
+        finalCallBody.tool_choice = "auto";
+      }
+
       const finalResponse = await fetch(url, {
         method: "POST",
         headers: {
           "api-key": AZURE_OPENAI_API_KEY,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          messages: conversationMessages,
-          temperature: 0.7,
-          max_tokens: MULTI_TOOL_CONFIG.FINAL_CONTENT_MAX_TOKENS,
-          stream: stream,
-        }),
+        body: JSON.stringify(finalCallBody),
       });
 
       if (!finalResponse.ok) {
         finalContent = "J'ai mis à jour les informations.";
-      } else if (stream) {
-        // Return streaming response
-        return createStreamingResponse(finalResponse, collectedData, log, requestId, toolExecutionLog);
       } else {
         const finalData = await finalResponse.json();
-        finalContent = finalData.choices?.[0]?.message?.content || "J'ai mis à jour les informations.";
+        const finalChoice = finalData.choices?.[0];
+        finalContent = finalChoice?.message?.content || "J'ai mis à jour les informations.";
+
+        // C1: Process quick replies if the LLM called generate_quick_replies
+        if (finalChoice?.message?.tool_calls) {
+          for (const tc of finalChoice.message.tool_calls) {
+            if (tc.function?.name === "generate_quick_replies") {
+              const { result, updatedData } = processToolCall(tc, requestId, collectedData, log, preferencesState);
+              if (result.success) {
+                collectedData = mergeToolData(collectedData, updatedData);
+                log.info("quick_replies", "Quick replies generated in final call");
+              }
+            }
+          }
+        }
+      }
+
+      // Now stream if requested
+      if (stream && finalContent) {
+        return createSimulatedStreamingResponse(finalContent, collectedData, log, toolExecutionLog);
       }
     }
     
