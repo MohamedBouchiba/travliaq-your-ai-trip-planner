@@ -152,7 +152,7 @@ export function useChatDestinationFlow({
 
       // C2: Check cache — reuse suggestions if preferences haven't changed
       const prefs = getPreferences();
-      const cacheKey = JSON.stringify({ interests: prefs.interests, style: prefs.style, budget: prefs.budget, departure: departureCity });
+      const cacheKey = JSON.stringify({ interests: prefs.interests, style: prefs.travelStyle, budget: prefs.comfortLevel, departure: departureCity });
       if (suggestionsCache.current?.hash === cacheKey && suggestionsCache.current.suggestions.length >= limit) {
         const cached = suggestionsCache.current;
         const suggestions = cached.suggestions.slice(0, limit);
@@ -166,7 +166,7 @@ export function useChatDestinationFlow({
                   isTyping: false,
                   isStreaming: false,
                   widget: "destinationSuggestions" as WidgetType,
-                  widgetData: { suggestions, basedOnProfile: cached.basedOnProfile },
+                  widgetData: { suggestions, basedOnProfile: cached.basedOnProfile as import("@/types/destinations").ProfileCompleteness | undefined },
                 }
               : m
           )

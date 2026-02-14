@@ -1,10 +1,14 @@
 /**
  * VirtualizedChatMessages - Optimized scrollable list for chat messages
  * Uses simple windowing for long conversations, standard rendering for short ones
+ *
+ * C3: Uses ChatHandlersProvider context (same as ChatMessages) so ChatMessage
+ * receives handlers via context, not props.
  */
 
-import { useRef, useEffect, memo, useState, useCallback } from "react";
+import { useRef, useEffect, memo, useState, useCallback, useMemo } from "react";
 import { ChatMessage } from "./ChatMessage";
+import { ChatHandlersProvider, type ChatHandlers } from "./contexts/ChatHandlersContext";
 import type { ChatMessage as ChatMessageType } from "./types";
 import type { Airport } from "@/hooks/useNearestAirports";
 
@@ -35,6 +39,7 @@ interface ChatMessagesProps {
   onQuickReplyMessage: (message: string) => void;
   onQuickReplyFillInput?: (message: string) => void;
   onQuickReplyWidget?: (widget: string) => void;
+  onRetry?: () => void;
 }
 
 // Memoized row component for better performance
@@ -57,6 +62,7 @@ export function VirtualizedChatMessages({
   onQuickReplyMessage,
   onQuickReplyFillInput,
   onQuickReplyWidget,
+  onRetry,
 }: ChatMessagesProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -64,6 +70,30 @@ export function VirtualizedChatMessages({
 
   const visibleMessages = messages.filter((m) => !m.isHidden);
   const shouldWindow = visibleMessages.length >= WINDOWING_THRESHOLD;
+
+  // C3: Memoize handlers for context
+  const handlers = useMemo<ChatHandlers>(() => ({
+    onDateSelect,
+    onDateRangeSelect,
+    onTravelersSelect,
+    onTravelersConfirmSolo,
+    onTravelersEditBeforeSearch,
+    onTripTypeConfirm,
+    onCitySelect,
+    onDepartureCitySelect,
+    onAirportSelect,
+    onSearchButtonClick,
+    onQuickReplyMessage,
+    onQuickReplyFillInput,
+    onQuickReplyWidget,
+    onRetry,
+  }), [
+    onDateSelect, onDateRangeSelect, onTravelersSelect,
+    onTravelersConfirmSolo, onTravelersEditBeforeSearch, onTripTypeConfirm,
+    onCitySelect, onDepartureCitySelect, onAirportSelect,
+    onSearchButtonClick, onQuickReplyMessage, onQuickReplyFillInput, onQuickReplyWidget,
+    onRetry,
+  ]);
 
   // Calculate visible range based on scroll position
   const handleScroll = useCallback(() => {
@@ -74,10 +104,7 @@ export function VirtualizedChatMessages({
     const containerHeight = container.clientHeight;
     const scrollHeight = container.scrollHeight;
 
-    // Estimate message height (average)
     const estimatedMessageHeight = scrollHeight / visibleMessages.length;
-    
-    // Calculate visible range with overscan
     const startIndex = Math.max(0, Math.floor(scrollTop / estimatedMessageHeight) - OVERSCAN);
     const visibleCount = Math.ceil(containerHeight / estimatedMessageHeight) + OVERSCAN * 2;
     const endIndex = Math.min(visibleMessages.length, startIndex + visibleCount);
@@ -85,18 +112,16 @@ export function VirtualizedChatMessages({
     setVisibleRange({ start: startIndex, end: endIndex });
   }, [shouldWindow, visibleMessages.length]);
 
-  // Set up scroll listener
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !shouldWindow) return;
 
     container.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll(); // Initial calculation
+    handleScroll();
 
     return () => container.removeEventListener("scroll", handleScroll);
   }, [handleScroll, shouldWindow]);
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
@@ -104,77 +129,52 @@ export function VirtualizedChatMessages({
   // For short conversations, use simple rendering
   if (!shouldWindow) {
     return (
-      <div ref={containerRef} className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto py-6 px-4 space-y-6">
-          {visibleMessages.map((message) => (
-            <MemoizedChatMessage
-              key={message.id}
-              message={message}
-              isLoading={isLoading}
-              memory={memory}
-              onDateSelect={onDateSelect}
-              onDateRangeSelect={onDateRangeSelect}
-              onTravelersSelect={onTravelersSelect}
-              onTravelersConfirmSolo={onTravelersConfirmSolo}
-              onTravelersEditBeforeSearch={onTravelersEditBeforeSearch}
-              onTripTypeConfirm={onTripTypeConfirm}
-              onCitySelect={onCitySelect}
-              onDepartureCitySelect={onDepartureCitySelect}
-              onAirportSelect={onAirportSelect}
-              onSearchButtonClick={onSearchButtonClick}
-              onQuickReplyMessage={onQuickReplyMessage}
-              onQuickReplyFillInput={onQuickReplyFillInput}
-              onQuickReplyWidget={onQuickReplyWidget}
-            />
-          ))}
-          <div ref={messagesEndRef} />
+      <ChatHandlersProvider handlers={handlers}>
+        <div ref={containerRef} className="flex-1 overflow-y-auto">
+          <div className="max-w-3xl mx-auto py-6 px-4 space-y-6">
+            {visibleMessages.map((message) => (
+              <MemoizedChatMessage
+                key={message.id}
+                message={message}
+                isLoading={isLoading}
+                memory={memory}
+              />
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
-      </div>
+      </ChatHandlersProvider>
     );
   }
 
   // Windowed rendering for long conversations
   const windowedMessages = visibleMessages.slice(visibleRange.start, visibleRange.end);
-  const topSpacerHeight = visibleRange.start * 120; // Estimated height
+  const topSpacerHeight = visibleRange.start * 120;
   const bottomSpacerHeight = (visibleMessages.length - visibleRange.end) * 120;
 
   return (
-    <div ref={containerRef} className="flex-1 overflow-y-auto">
-      <div className="max-w-3xl mx-auto py-6 px-4">
-        {/* Top spacer to maintain scroll position */}
-        {topSpacerHeight > 0 && <div style={{ height: topSpacerHeight }} aria-hidden />}
-        
-        {/* Visible messages */}
-        <div className="space-y-6">
-          {windowedMessages.map((message) => (
-            <MemoizedChatMessage
-              key={message.id}
-              message={message}
-              isLoading={isLoading}
-              memory={memory}
-              onDateSelect={onDateSelect}
-              onDateRangeSelect={onDateRangeSelect}
-              onTravelersSelect={onTravelersSelect}
-              onTravelersConfirmSolo={onTravelersConfirmSolo}
-              onTravelersEditBeforeSearch={onTravelersEditBeforeSearch}
-              onTripTypeConfirm={onTripTypeConfirm}
-              onCitySelect={onCitySelect}
-              onDepartureCitySelect={onDepartureCitySelect}
-              onAirportSelect={onAirportSelect}
-              onSearchButtonClick={onSearchButtonClick}
-              onQuickReplyMessage={onQuickReplyMessage}
-              onQuickReplyFillInput={onQuickReplyFillInput}
-              onQuickReplyWidget={onQuickReplyWidget}
-            />
-          ))}
-        </div>
+    <ChatHandlersProvider handlers={handlers}>
+      <div ref={containerRef} className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto py-6 px-4">
+          {topSpacerHeight > 0 && <div style={{ height: topSpacerHeight }} aria-hidden />}
+          
+          <div className="space-y-6">
+            {windowedMessages.map((message) => (
+              <MemoizedChatMessage
+                key={message.id}
+                message={message}
+                isLoading={isLoading}
+                memory={memory}
+              />
+            ))}
+          </div>
 
-        {/* Bottom spacer */}
-        {bottomSpacerHeight > 0 && <div style={{ height: bottomSpacerHeight }} aria-hidden />}
-        
-        <div ref={messagesEndRef} />
+          {bottomSpacerHeight > 0 && <div style={{ height: bottomSpacerHeight }} aria-hidden />}
+          
+          <div ref={messagesEndRef} />
+        </div>
       </div>
-    </div>
+    </ChatHandlersProvider>
   );
 }
 
