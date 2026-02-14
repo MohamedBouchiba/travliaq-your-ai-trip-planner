@@ -15,6 +15,11 @@ export default defineConfig({
     environment: 'happy-dom',
     setupFiles: ['./src/test/setup.ts'],
     css: true,
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      'e2e/**',
+    ],
     environmentMatchGlobs: [
       // Use node environment for pure utility tests
       ['**/utils/__tests__/**', 'node'],

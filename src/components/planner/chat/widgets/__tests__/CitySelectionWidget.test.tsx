@@ -69,8 +69,8 @@ describe("CitySelectionWidget", () => {
 
     fireEvent.click(screen.getByText("Lyon"));
 
-    expect(screen.getByText("📍")).toBeInTheDocument();
-    expect(screen.getByText(/Lyon/)).toBeInTheDocument();
+    // Confirmed state shows "Lyon, France" with a check icon
+    expect(screen.getByText(/Lyon, France/)).toBeInTheDocument();
   });
 
   it("shows loading state when isLoading is true", () => {
@@ -87,13 +87,14 @@ describe("CitySelectionWidget", () => {
     expect(screen.queryByText("Paris")).not.toBeInTheDocument();
   });
 
-  it("shows numbered badges for cities", () => {
+  it("shows numbered badges for non-recommended cities", () => {
     const onSelect = vi.fn();
     render(
       <CitySelectionWidget citySelection={mockCitySelection} onSelect={onSelect} />
     );
 
-    expect(screen.getByText("1")).toBeInTheDocument();
+    // Recommended city (Paris) uses MapPin icon, no number badge
+    // Other cities get numbered badges starting at 2
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
   });

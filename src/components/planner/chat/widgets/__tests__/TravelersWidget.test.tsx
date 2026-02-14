@@ -152,9 +152,10 @@ describe("TravelersConfirmBeforeSearchWidget", () => {
       />
     );
 
-    expect(screen.getByText(/alone/i)).toBeInTheDocument();
-    expect(screen.getByText(/Yes/i)).toBeInTheDocument();
-    expect(screen.getByText(/No/i)).toBeInTheDocument();
+    // Use more specific regex to avoid multiple matches (both question and button contain "alone")
+    expect(screen.getByText(/alone\?/i)).toBeInTheDocument();
+    expect(screen.getByText(/yes/i)).toBeInTheDocument();
+    expect(screen.getByText(/no,/i)).toBeInTheDocument();
   });
 
   it("calls onConfirm when solo is confirmed", () => {
