@@ -8,6 +8,8 @@
 import { Plane, RefreshCw, AlertTriangle, WifiOff } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useTranslation } from "react-i18next";
+
+// t() is used inside the component via useTranslation hook
 import { cn } from "@/lib/utils";
 import type { ChatMessage as ChatMessageType } from "./types";
 import { QuickReplies } from "./QuickReplies";
@@ -79,6 +81,7 @@ export function ChatMessage({
   isLoading = false,
   memory,
 }: ChatMessageProps) {
+  const { t } = useTranslation();
   // C3: Get handlers from context instead of props
   const handlers = useChatHandlers();
 

@@ -226,6 +226,7 @@ const WIDGET_PREREQUISITES: Record<WidgetType, (flow: FlowState) => WidgetValida
   comparisonWidget: () => ({ valid: true }),
   conflictAlert: () => ({ valid: true }),
   priceAlert: () => ({ valid: true }),
+  tripRecap: () => ({ valid: true }),
 };
 
 /**
