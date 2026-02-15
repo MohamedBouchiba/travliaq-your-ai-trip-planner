@@ -41,6 +41,9 @@ const LazyDietaryWidget = lazy(() =>
 const LazyDestinationSuggestionsGrid = lazy(() =>
   import("./DestinationSuggestionsGrid").then(m => ({ default: m.DestinationSuggestionsGrid }))
 );
+const LazyBudgetRangeSlider = lazy(() =>
+  import("./selection/BudgetRangeSlider").then(m => ({ default: m.BudgetRangeSlider }))
+);
 
 interface WidgetFlowHandlers {
   handleDateSelect: (messageId: string, dateType: "departure" | "return", date: Date) => void;
@@ -51,6 +54,7 @@ interface WidgetFlowHandlers {
   handleTripTypeConfirm: (messageId: string, tripType: "roundtrip" | "oneway" | "multi") => void;
   handleCitySelect: (messageId: string, cityName: string, countryName: string, countryCode: string) => void;
   handleDepartureCitySelect: (messageId: string, cityName: string, countryName: string, countryCode: string) => void;
+  handleBudgetSelect: (messageId: string, range: { min: number; max: number } | null) => void;
 }
 
 interface PreferenceCallbacks {
@@ -84,6 +88,7 @@ const MODIFIABLE_WIDGETS = new Set<WidgetType>([
   "preferenceInterests",
   "mustHaves",
   "dietary",
+  "budgetRangeSlider",
 ]);
 
 /**
@@ -343,6 +348,26 @@ function WidgetSwitch({
             basedOnProfile={m.widgetData.basedOnProfile as { completionScore: number; keyFactors: string[] } | undefined}
             onSelect={(destination) => handleDestinationSelect(m.id, destination)}
             isLoading={isLoadingDestinations}
+          />
+        </Suspense>
+      );
+
+    case "budgetRangeSlider":
+      return m.widgetConfirmed ? (
+        <ConfirmedWidget
+          widgetType="budgetRangeSlider"
+          selectedValue={m.widgetSelectedValue}
+          displayLabel={m.widgetDisplayLabel || t("planner.widget.budgetSelected")}
+          onModify={modifyHandler}
+        />
+      ) : (
+        <Suspense fallback={<GenericWidgetSkeleton rows={2} showHeader />}>
+          <LazyBudgetRangeSlider
+            onBudgetChange={(range) => widgetFlow.handleBudgetSelect(m.id, range)}
+            label={m.widgetData?.label as string | undefined}
+            currency={(m.widgetData?.currency as string) || "€"}
+            showSlider={m.widgetData?.showSlider as boolean | undefined}
+            perPerson={m.widgetData?.perPerson as boolean | undefined}
           />
         </Suspense>
       );

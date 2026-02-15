@@ -67,6 +67,7 @@ export interface DestinationSuggestRequest {
   flexibility?: "fixed" | "flexible" | "very_flexible";
   budgetLevel?: BudgetLevel;
   travelMonth?: number;  // 1-12
+  tripDuration?: string; // e.g. "weekend", "week", "2_weeks"
 }
 
 // ===== Response Types =====

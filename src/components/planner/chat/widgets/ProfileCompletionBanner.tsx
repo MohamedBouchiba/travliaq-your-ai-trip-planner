@@ -64,9 +64,14 @@ export const ProfileCompletionBanner = memo(function ProfileCompletionBanner({
           <div className="p-1.5 rounded-lg bg-primary/15">
             <Sparkles className="h-4 w-4 text-primary" />
           </div>
-          <span className="text-sm text-foreground/80">
-            {t("planner.suggestions.mediumProfileInfo")}
-          </span>
+          <div className="flex flex-col">
+            <span className="text-sm text-foreground/80">
+              {t("planner.suggestions.mediumProfileInfo")}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {t("planner.suggestions.basedOnConversation")}
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-3 ml-9">
           <Progress value={score} className="h-1.5 flex-1" />
@@ -97,9 +102,14 @@ export const ProfileCompletionBanner = memo(function ProfileCompletionBanner({
         <div className="p-1.5 rounded-lg bg-amber-500/15 mt-0.5">
           <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
         </div>
-        <p className="text-sm text-amber-800 dark:text-amber-200 leading-relaxed">
-          {t("planner.suggestions.lowProfileWarning", { score })}
-        </p>
+        <div className="flex flex-col">
+          <p className="text-sm text-amber-800 dark:text-amber-200 leading-relaxed">
+            {t("planner.suggestions.lowProfileWarning", { score })}
+          </p>
+          <span className="text-xs text-amber-600/70 dark:text-amber-400/70">
+            {t("planner.suggestions.basedOnConversation")}
+          </span>
+        </div>
       </div>
       <div className="flex items-center gap-3 ml-9">
         <Progress value={score} className="h-1.5 flex-1" />

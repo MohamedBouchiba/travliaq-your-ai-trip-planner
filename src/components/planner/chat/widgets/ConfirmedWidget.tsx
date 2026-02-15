@@ -32,6 +32,7 @@ const widgetIcons: Partial<Record<WidgetType, React.ReactNode>> = {
   mustHaves: <Heart className="h-3.5 w-3.5" />,
   dietary: <Utensils className="h-3.5 w-3.5" />,
   airportConfirmation: <Plane className="h-3.5 w-3.5" />,
+  budgetRangeSlider: <Sliders className="h-3.5 w-3.5" />,
 };
 
 // Map widget types to labels
@@ -49,6 +50,7 @@ const widgetLabels: Partial<Record<WidgetType, string>> = {
   mustHaves: "Critères",
   dietary: "Régime",
   airportConfirmation: "Aéroports",
+  budgetRangeSlider: "Budget",
 };
 
 export function ConfirmedWidget({

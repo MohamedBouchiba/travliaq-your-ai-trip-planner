@@ -1361,6 +1361,7 @@ const resources = {
       "planner.messages.noDestinations": "Désolé, je n'ai pas pu trouver de destinations correspondant à vos critères. Essayez d'ajuster vos préférences.",
       "planner.messages.noDestinationsHint": "Désolé, je n'ai pas pu trouver de destinations correspondant à vos critères. Essayez d'abord de me donner vos préférences de voyage avec 'Inspire-moi !' 🌍",
       "planner.messages.errorDestinations": "Une erreur est survenue lors de la recherche de destinations. Veuillez réessayer.",
+      "planner.messages.needDepartureCityFirst": "Pour vous proposer des destinations adaptées, j'ai besoin de savoir d'où vous partez. De quelle ville partez-vous ?",
       "planner.messages.searchingDestinations": "Je recherche {{count}} destinations parfaites pour vous...",
       "planner.messages.defaultError": "Désolé, je n'ai pas pu répondre.",
       "planner.messages.exceededLimit": "Je ne peux afficher que 5 destinations maximum, mais voici mes {{count}} meilleures recommandations pour vous...",
@@ -2590,7 +2591,8 @@ const resources = {
       "planner.suggestions.lowProfileWarning": "Ces suggestions sont basées sur un profil à {{score}}%. Affine tes préférences pour des recommandations sur mesure !",
       "planner.suggestions.mediumProfileInfo": "Bon début ! Complète ton profil pour des suggestions encore plus précises.",
       "planner.suggestions.highProfileSuccess": "Suggestions hautement personnalisées",
-      "planner.suggestions.completeProfile": "Compléter mon profil",
+      "planner.suggestions.basedOnConversation": "Basées sur votre conversation",
+      "planner.suggestions.completeProfile": "Affiner mes préférences",
       "planner.suggestions.keepGoing": "Ça me va comme ça",
       
       // Planner - Airport Widgets
@@ -2877,6 +2879,7 @@ const resources = {
       "planner.widget.interestsSelected": "Intérêts sélectionnés",
       "planner.widget.mustHavesConfigured": "Critères configurés",
       "planner.widget.dietaryConfigured": "Régime configuré",
+      "planner.widget.budgetSelected": "Budget sélectionné",
       "planner.widget.destinationSelected": "Destination sélectionnée",
 
       // Planner - Missing keys for style/preferences callbacks
@@ -4285,6 +4288,7 @@ const resources = {
       "planner.messages.noDestinations": "Sorry, I couldn't find destinations matching your criteria. Try adjusting your preferences.",
       "planner.messages.noDestinationsHint": "Sorry, I couldn't find destinations matching your criteria. Try telling me your travel preferences first with 'Inspire me!' 🌍",
       "planner.messages.errorDestinations": "An error occurred while searching for destinations. Please try again.",
+      "planner.messages.needDepartureCityFirst": "To suggest destinations that suit you, I need to know where you're departing from. Which city are you leaving from?",
       "planner.messages.searchingDestinations": "Searching for {{count}} perfect destinations for you...",
       "planner.messages.defaultError": "Sorry, I couldn't respond.",
       "planner.messages.exceededLimit": "I can only show 5 destinations maximum, but here are my {{count}} best recommendations for you...",
@@ -5514,7 +5518,8 @@ const resources = {
       "planner.suggestions.lowProfileWarning": "These suggestions are based on a {{score}}% profile. Refine your preferences for tailored recommendations!",
       "planner.suggestions.mediumProfileInfo": "Good start! Complete your profile for even better suggestions.",
       "planner.suggestions.highProfileSuccess": "Highly personalized suggestions",
-      "planner.suggestions.completeProfile": "Complete my profile",
+      "planner.suggestions.basedOnConversation": "Based on your conversation",
+      "planner.suggestions.completeProfile": "Refine my preferences",
       "planner.suggestions.keepGoing": "That works for me",
       
       // Planner - Airport Widgets
@@ -5801,6 +5806,7 @@ const resources = {
       "planner.widget.interestsSelected": "Interests selected",
       "planner.widget.mustHavesConfigured": "Criteria configured",
       "planner.widget.dietaryConfigured": "Dietary configured",
+      "planner.widget.budgetSelected": "Budget selected",
       "planner.widget.destinationSelected": "Destination selected",
 
       // Planner - Missing keys for style/preferences callbacks

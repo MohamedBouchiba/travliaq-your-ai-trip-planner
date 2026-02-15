@@ -110,28 +110,30 @@ export function usePreferenceWidgetCallbacks({
       else if (styleAxes.ecoVsLuxury < 40) styleLabels.push(t("planner.style.eco"));
       const styleLabel = styleLabels.length > 0 ? styleLabels.join(", ") : t("planner.style.balanced");
 
-      // Mark current style widget as confirmed
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.widget === "preferenceStyle" && !m.widgetConfirmed
-            ? { ...m, widgetConfirmed: true, widgetSelectedValue: styleAxes, widgetDisplayLabel: styleLabel }
-            : m
-        )
-      );
-
       // Check if interests widget can be shown (cooldown check)
       if (widgetCooldown && !widgetCooldown.canShowWidget("preferenceInterests")) {
-        // Skip interests, go directly to extra step
+        // Mark confirmed only, skip interests → go to extra step
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.widget === "preferenceStyle" && !m.widgetConfirmed
+              ? { ...m, widgetConfirmed: true, widgetSelectedValue: styleAxes, widgetDisplayLabel: styleLabel }
+              : m
+          )
+        );
         setInspireFlowStep("extra");
         return;
       }
 
-      // After style, show interests widget
+      // Confirm style widget + add interests widget in one pass
       widgetCooldown?.recordWidgetShown("preferenceInterests");
       setInspireFlowStep("interests");
       const interestsId = `pref-interests-${Date.now()}`;
       setMessages((prev) => [
-        ...prev,
+        ...prev.map((m) =>
+          m.widget === "preferenceStyle" && !m.widgetConfirmed
+            ? { ...m, widgetConfirmed: true, widgetSelectedValue: styleAxes, widgetDisplayLabel: styleLabel }
+            : m
+        ),
         {
           id: interestsId,
           role: "assistant",
@@ -160,18 +162,15 @@ export function usePreferenceWidgetCallbacks({
         ? interests.slice(0, 3).join(", ") + (interests.length > 3 ? ` +${interests.length - 3}` : "")
         : t("planner.preference.noInterests");
 
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.widget === "preferenceInterests" && !m.widgetConfirmed
-            ? { ...m, widgetConfirmed: true, widgetSelectedValue: interests, widgetDisplayLabel: interestsLabel }
-            : m
-        )
-      );
-
+      // Confirm interests widget + add question in one pass
       setInspireFlowStep("extra");
       const questionId = `extra-question-${Date.now()}`;
       setMessages((prev) => [
-        ...prev,
+        ...prev.map((m) =>
+          m.widget === "preferenceInterests" && !m.widgetConfirmed
+            ? { ...m, widgetConfirmed: true, widgetSelectedValue: interests, widgetDisplayLabel: interestsLabel }
+            : m
+        ),
         { id: questionId, role: "assistant", text: t("planner.preference.anythingElse") },
       ]);
 
@@ -206,16 +205,16 @@ export function usePreferenceWidgetCallbacks({
       if (mustHaves.highSpeedWifi) activeHaves.push(t("planner.mustHaves.wifi"));
       const mustHavesLabel = activeHaves.length > 0 ? activeHaves.join(", ") : t("planner.mustHaves.none");
 
-      setMessages((prev) =>
-        prev.map((m) =>
+      // Confirm mustHaves widget + add question in one pass
+      const questionId = `after-musthaves-${Date.now()}`;
+      setMessages((prev) => [
+        ...prev.map((m) =>
           m.widget === "mustHaves" && !m.widgetConfirmed
             ? { ...m, widgetConfirmed: true, widgetSelectedValue: mustHaves, widgetDisplayLabel: mustHavesLabel }
             : m
-        )
-      );
-
-      const questionId = `after-musthaves-${Date.now()}`;
-      setMessages((prev) => [...prev, { id: questionId, role: "assistant", text: t("planner.preference.afterMustHaves") }]);
+        ),
+        { id: questionId, role: "assistant", text: t("planner.preference.afterMustHaves") },
+      ]);
 
       const suggestions: Array<{ id: string; label: string; emoji: string; message: string }> = [];
       if (!widgetCooldown || widgetCooldown.canShowWidget("dietary")) {
@@ -239,18 +238,29 @@ export function usePreferenceWidgetCallbacks({
 
       const dietaryLabel = dietary.length > 0 ? dietary.join(", ") : t("planner.dietary.none");
 
-      setMessages((prev) =>
-        prev.map((m) =>
+      // Confirm dietary widget first
+      if (checkAndAskDepartureCity()) {
+        // Still need to confirm the widget even if departure city is missing
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.widget === "dietary" && !m.widgetConfirmed
+              ? { ...m, widgetConfirmed: true, widgetSelectedValue: dietary, widgetDisplayLabel: dietaryLabel }
+              : m
+          )
+        );
+        return;
+      }
+
+      // Confirm dietary widget + add loading message in one pass
+      const loadingId = `fetching-destinations-${Date.now()}`;
+      setMessages((prev) => [
+        ...prev.map((m) =>
           m.widget === "dietary" && !m.widgetConfirmed
             ? { ...m, widgetConfirmed: true, widgetSelectedValue: dietary, widgetDisplayLabel: dietaryLabel }
             : m
-        )
-      );
-
-      if (checkAndAskDepartureCity()) return;
-
-      const loadingId = `fetching-destinations-${Date.now()}`;
-      setMessages((prev) => [...prev, { id: loadingId, role: "assistant", text: t("planner.preference.searchingDestinations"), isTyping: true }]);
+        ),
+        { id: loadingId, role: "assistant", text: t("planner.preference.searchingDestinations"), isTyping: true },
+      ]);
       setDynamicSuggestions([]);
       handleFetchDestinations(loadingId);
     } catch (error) {

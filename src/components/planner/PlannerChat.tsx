@@ -378,6 +378,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     departureCity,
     departureCountry,
     departureDateMs: departureDateValue,
+    tripDuration: widgetFlow.getWidgetData().tripDuration,
     updateMemory: updateMemory as (partial: Record<string, unknown>) => void,
     setMessages,
     widgetTracking,
