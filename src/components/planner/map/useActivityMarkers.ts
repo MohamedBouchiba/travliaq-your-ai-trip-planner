@@ -5,6 +5,7 @@ import type { TabType, MapPin } from "@/pages/TravelPlanner";
 import { useActivityMemoryStore } from "@/stores/hooks";
 import { cityCoordinates } from "./constants";
 import eventBus from "@/lib/eventBus";
+import { escapeHtml, escapeHtmlAttribute } from "@/components/planner/chat/utils/security";
 
 /**
  * Manages activity-related map markers: destination markers,
@@ -197,7 +198,7 @@ export function useActivityMarkers(opts: {
             max-width: 120px;
             overflow: hidden;
             text-overflow: ellipsis;
-          ">${dest.city}</div>
+          ">${escapeHtml(dest.city)}</div>
         </div>
         <style>
           @keyframes markerBounce {
@@ -319,9 +320,9 @@ export function useActivityMarkers(opts: {
         const reviewsLabel = t("planner.common.reviews");
         tooltip.setHTML(`
           <div class="bg-card border rounded-lg shadow-xl w-64 overflow-hidden">
-            ${imageUrl ? `<img src="${imageUrl}" class="w-full h-32 object-cover" alt="${attraction.title}" />` : ''}
+            ${imageUrl ? `<img src="${escapeHtmlAttribute(imageUrl)}" class="w-full h-32 object-cover" alt="${escapeHtmlAttribute(attraction.title)}" />` : ''}
             <div class="p-3">
-              <h4 class="font-semibold text-sm line-clamp-2 mb-2">${attraction.title}</h4>
+              <h4 class="font-semibold text-sm line-clamp-2 mb-2">${escapeHtml(attraction.title)}</h4>
               <div class="flex items-center gap-1">
                 <span class="text-amber-400">\u2605</span>
                 <span class="text-xs font-medium">${typeof rating === 'number' ? rating.toFixed(1) : rating}</span>
