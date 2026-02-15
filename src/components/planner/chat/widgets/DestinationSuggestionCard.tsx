@@ -115,6 +115,7 @@ export const DestinationSuggestionCard = memo(function DestinationSuggestionCard
     estimatedBudgetPerPerson,
     topActivities,
     bestSeasons,
+    flightDurationFromOrigin,
     flightPriceEstimate,
     sourceAirportIata,
     imageUrl,
@@ -199,10 +200,17 @@ export const DestinationSuggestionCard = memo(function DestinationSuggestionCard
               <span>{estimatedBudgetPerPerson.min}-{estimatedBudgetPerPerson.max}€/j</span>
             </div>
             <span className="text-border/60">|</span>
-            <div className="flex items-center gap-1">
-              <Calendar className="h-4 w-4 text-purple-500 shrink-0" />
-              <span>{bestSeasons.slice(0, 2).join(", ")}</span>
-            </div>
+            {flightDurationFromOrigin ? (
+              <div className="flex items-center gap-1">
+                <Clock className="h-4 w-4 text-sky-500 shrink-0" />
+                <span>{flightDurationFromOrigin}</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                <Calendar className="h-4 w-4 text-purple-500 shrink-0" />
+                <span>{bestSeasons.slice(0, 2).join(", ")}</span>
+              </div>
+            )}
             <span className="text-border/60">|</span>
             <div className="flex items-center gap-1">
               <Plane className="h-4 w-4 text-blue-500 shrink-0" />

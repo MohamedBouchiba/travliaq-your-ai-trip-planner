@@ -97,6 +97,7 @@ export interface DestinationSuggestion {
   topActivities: TopActivity[];
   bestSeasons: string[];
   flightDurationFromOrigin?: string | null;
+  flightDurationMinutes?: number | null;
   flightPriceEstimate?: number | null;
   sourceAirportIata?: string | null;
   // New API fields

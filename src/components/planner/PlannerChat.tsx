@@ -800,6 +800,42 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     userMessageCountRef,
   });
 
+  // Wrapper around sendText: intercept "nothing else" responses during inspire flow
+  const NOTHING_ELSE_RE = /^(rien d'autre|rien|non|c'est tout|nothing else|no|that's all|c'est bon|non merci|nope|pas d'autre|rien de plus)$/i;
+  const handleSend = useCallback((text: string) => {
+    if (!text.trim()) return;
+
+    // During inspire flow "extra" step, intercept "nothing else" text → trigger destination fetch
+    if (inspireFlowStep === "extra" && NOTHING_ELSE_RE.test(text.trim())) {
+      // Show the user message in chat
+      const userMsgId = `user-${Date.now()}`;
+      if (!departureCity) {
+        const askId = `ask-departure-${Date.now()}`;
+        setMessages((prev) => [
+          ...prev,
+          { id: userMsgId, role: "user" as const, text: text.trim() },
+          { id: askId, role: "assistant" as const, text: t("planner.preference.askDepartureCity") },
+        ]);
+        setDynamicSuggestions([]);
+        setInput("");
+        return;
+      }
+
+      const loadingId = `fetching-${Date.now()}`;
+      setMessages((prev) => [
+        ...prev,
+        { id: userMsgId, role: "user" as const, text: text.trim() },
+        { id: loadingId, role: "assistant" as const, text: t("planner.preference.searchingDestinations"), isTyping: true },
+      ]);
+      handleFetchDestinations(loadingId);
+      setDynamicSuggestions([]);
+      setInput("");
+      return;
+    }
+
+    sendText(text);
+  }, [inspireFlowStep, departureCity, sendText, handleFetchDestinations, setMessages, setDynamicSuggestions, setInput, t]);
+
   // Memoize visible messages to avoid re-filtering on every render
   const visibleMessages = useMemo(
     () => messages.filter((m) => !m.isHidden).slice(-100),
@@ -992,7 +1028,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                     {m.quickReplies && m.quickReplies.length > 0 && (
                       <QuickReplies
                         replies={m.quickReplies}
-                        onSendMessage={(message) => sendText(message)}
+                        onSendMessage={(message) => handleSend(message)}
                         onFillInput={(message) => {
                           setInput(message);
                           setTimeout(() => inputRef.current?.focus(), 0);
@@ -1194,14 +1230,14 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
-                      sendText(input);
+                      handleSend(input);
                       setTimeout(() => inputRef.current?.focus(), 0);
                     }
                   }}
                 />
                 <button
                   type="button"
-                  onClick={() => sendText(input)}
+                  onClick={() => handleSend(input)}
                   disabled={!input.trim() || isLoading}
                   className={cn(
                     "h-9 w-9 shrink-0 rounded-lg flex items-center justify-center transition-all",

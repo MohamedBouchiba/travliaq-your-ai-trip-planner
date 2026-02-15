@@ -5,7 +5,7 @@
  * Handles: fetching destination suggestions, processing selection, triggering city fetching.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { DestinationSuggestion } from "@/types/destinations";
 import type { WidgetType } from "@/types/flight";
@@ -62,6 +62,8 @@ export function useChatDestinationFlow({
   const [destinationProfileScore, setDestinationProfileScore] = useState(0);
   const [isLoadingDestinations, setIsLoadingDestinations] = useState(false);
   const [inspireFlowStep, setInspireFlowStep] = useState<InspireFlowStep>("idle");
+  // F3: Auto-resume destination fetch when departure city becomes available
+  const [pendingDestinationFetch, setPendingDestinationFetch] = useState(false);
 
   // Shared fetch logic
   const fetchSuggestions = useCallback(async (limit: number) => {
@@ -134,6 +136,23 @@ export function useChatDestinationFlow({
     }
   }, [fetchSuggestions, setMessages, t]);
 
+  // Stable ref to handleFetchDestinations for the auto-resume effect
+  const handleFetchRef = useRef(handleFetchDestinations);
+  handleFetchRef.current = handleFetchDestinations;
+
+  // F3: Auto-resume destination fetch when departureCity becomes available after a pending request
+  useEffect(() => {
+    if (pendingDestinationFetch && departureCity) {
+      setPendingDestinationFetch(false);
+      const loadingId = `fetching-${Date.now()}`;
+      setMessages((prev) => [
+        ...prev,
+        { id: loadingId, role: "assistant" as const, text: t("planner.preference.searchingDestinations"), isTyping: true },
+      ]);
+      handleFetchRef.current(loadingId);
+    }
+  }, [departureCity, pendingDestinationFetch, setMessages, t]);
+
   // LLM-triggered destination suggestion request (during chat flow)
   const handleLLMDestinationRequest = useCallback(async (
     messageId: string,
@@ -150,13 +169,25 @@ export function useChatDestinationFlow({
 
     // A6: Guard — ensure we have a departure city before suggesting
     if (!departureCity) {
-      setMessages((prev) =>
-        prev.map((m) =>
+      // Don't overwrite the LLM message — add a NEW assistant message asking for departure city
+      const askId = `ask-departure-${Date.now()}`;
+      setMessages((prev) => {
+        const cleaned = prev.map((m) =>
           m.id === messageId
-            ? { ...m, isTyping: false, isStreaming: false, text: t("planner.messages.needDepartureCityFirst") }
+            ? { ...m, isTyping: false, isStreaming: false }
             : m
-        )
-      );
+        );
+        return [
+          ...cleaned,
+          {
+            id: askId,
+            role: "assistant" as const,
+            text: t("planner.messages.needDepartureCityFirst"),
+          },
+        ];
+      });
+      // F3: Mark pending so fetch auto-resumes when departureCity becomes available
+      setPendingDestinationFetch(true);
       return;
     }
 

@@ -5,7 +5,7 @@
  * Phase 2: Integrated with useWidgetCooldown to prevent infinite loops
  */
 
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import type { ChatMessage } from "../types";
@@ -67,6 +67,9 @@ export function usePreferenceWidgetCallbacks({
   departureCityName,
 }: UsePreferenceWidgetCallbacksOptions): PreferenceWidgetCallbacks {
   const { t } = useTranslation();
+
+  // Idempotence guard: prevent duplicate "Autre chose ?" message from double-fire
+  const extraQuestionAdded = useRef(false);
 
   /**
    * Helper: check departure city before fetching destinations.
@@ -152,6 +155,10 @@ export function usePreferenceWidgetCallbacks({
    */
   const onInterestsContinue = useCallback(() => {
     try {
+      // Idempotence guard: prevent duplicate "Autre chose ?" from double-fire
+      if (extraQuestionAdded.current) return;
+      extraQuestionAdded.current = true;
+
       // CRITICAL: Record widget confirmation to prevent re-triggering
       widgetCooldown?.recordWidgetConfirmed("preferenceInterests");
       
