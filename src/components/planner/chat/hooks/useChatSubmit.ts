@@ -139,10 +139,13 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
       opts.inputRef.current.style.height = "auto";
     }
 
-    // Dismiss non-confirmed widgets
+    // Widgets that should persist across messages (not dismissed on user input)
+    const PERSISTENT_WIDGET_TYPES = new Set(["destinationSuggestions", "tripRecap"]);
+
+    // Dismiss non-confirmed widgets (except persistent types like suggestions)
     opts.setMessages((prev) =>
       prev.map((m) => {
-        if (m.widget && !m.widgetConfirmed) {
+        if (m.widget && !m.widgetConfirmed && !PERSISTENT_WIDGET_TYPES.has(m.widget)) {
           opts.widgetTracking.dismissWidget(m.id);
           return { ...m, widgetDismissed: true };
         }
@@ -191,7 +194,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
         getBasketSummary: opts.getBasketSummary,
         widgetCooldown: opts.widgetCooldown,
         phaseSignals: {
-          hasDestination: !!opts.memory.arrival,
+          hasDestination: !!(opts.memory.arrival?.city || opts.memory.arrival?.countryCode),
           hasDates: !!opts.memory.departureDate,
           hasTravelers: opts.memory.passengers.adults > 0,
           hasFlightResults: false, // TODO: No flight results tracking in store yet
@@ -361,13 +364,14 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
       // Unified Entity Pipeline
       persistExtractedEntities(
         intentClassification?.entities as Record<string, unknown> | undefined,
-        flightData as any,
+        flightData,
         opts.widgetFlow,
-        opts.updateMemory as (partial: Record<string, unknown>) => void
+        opts.updateMemory
       );
 
       if (flightData && Object.keys(flightData).length > 0) {
-        const fd = flightData as Record<string, unknown>;
+        // Mutable copy for hallucination guard
+        const fd = { ...flightData };
         // Guard: ignore hallucinated toCountryCode when no destination city was provided
         if (fd.toCountryCode && !fd.to) {
           if (import.meta.env.DEV) console.warn("[useChatSubmit] Ignoring hallucinated toCountryCode:", fd.toCountryCode);
@@ -384,17 +388,17 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
           opts.widgetFlow.setPendingTravelersWidget(true);
         }
 
-        const memoryUpdates = flightDataToMemory(fd as FlightFormData, opts.memory);
+        const memoryUpdates = flightDataToMemory(fd, opts.memory);
         opts.updateMemory(memoryUpdates);
         nextMem = { ...nextMem, ...memoryUpdates };
 
         // Track synthetic destination_selected
         if (fd.toCountryCode && fd.toCountryName) {
-          opts.widgetTracking.trackDestinationSelect(fd.toCountryName as string, fd.toCountryCode as string);
+          opts.widgetTracking.trackDestinationSelect(fd.toCountryName, fd.toCountryCode);
         }
 
         if (fd.to) {
-          const coords = getCityCoords((fd.to as string).toLowerCase().split(",")[0].trim());
+          const coords = getCityCoords(fd.to.toLowerCase().split(",")[0].trim());
           if (coords) {
             emitTabAndZoom("flights", coords, FLIGHTS_ZOOM);
           } else {

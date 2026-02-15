@@ -9,6 +9,7 @@ import { useCallback, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { DestinationSuggestion } from "@/types/destinations";
 import type { WidgetType } from "@/types/flight";
+import type { TripPreferences } from "@/stores/slices/preferenceTypes";
 import type { ChatMessage } from "../types";
 import { getDestinationSuggestions } from "@/services/destinations";
 import { buildDestinationPayload } from "../utils/buildDestinationPayload";
@@ -16,7 +17,7 @@ import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/
 import type { InspireFlowStep } from "../MemoizedSmartSuggestions";
 
 interface UseChatDestinationFlowOptions {
-  getPreferences: () => import("@/stores/hooks").TripPreferences;
+  getPreferences: () => TripPreferences;
   departureCity: string | undefined;
   departureCountry: string | undefined;
   departureDateMs: number | undefined;

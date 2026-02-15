@@ -11,7 +11,6 @@ export * from "./typeDefs/intent";
 export { ChatInput, type ChatInputRef } from "./ChatInput";
 export { ChatMessage } from "./ChatMessage";
 export { ChatMessages } from "./ChatMessages";
-export { VirtualizedChatMessages, ChatMessagesVirtualized } from "./VirtualizedChatMessages";
 export { QuickReplies, QUICK_REPLY_PRESETS } from "./QuickReplies";
 
 // Extracted components (Phase 2.1 optimization)

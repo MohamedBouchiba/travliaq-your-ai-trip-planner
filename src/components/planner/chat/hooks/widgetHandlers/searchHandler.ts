@@ -20,8 +20,12 @@ export function handleSearchButtonClick(
     memory.passengers.children +
     memory.passengers.infants;
 
-  // If only 1 adult (default), ask for confirmation
+  // Skip solo-confirmation if travelers were explicitly confirmed via widget
+  const travelersExplicitlyConfirmed = refs.travelersConfirmed.current;
+
+  // Only ask "traveling alone?" if travelers were NOT explicitly confirmed and still at defaults
   if (
+    !travelersExplicitlyConfirmed &&
     totalTravelers === 1 &&
     memory.passengers.adults === 1 &&
     memory.passengers.children === 0 &&

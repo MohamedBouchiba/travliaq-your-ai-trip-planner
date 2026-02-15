@@ -43,6 +43,7 @@ import { MessageBubble } from "./chat/MessageBubble";
 import { MessageActions } from "./chat/MessageActions";
 import type { DestinationSuggestion } from "@/types/destinations";
 import { ScrollToBottomButton } from "./chat/ScrollToBottomButton";
+import { TripStatusBar } from "./chat/TripStatusBar";
 
 // Context imports
 import type { CountrySelectionEvent } from "@/types/flight";
@@ -405,6 +406,15 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     widgetCooldown, // Pass cooldown system
     departureCityName: departureCity, // Pass departure city for pre-destination check
   });
+
+  // Reopen a confirmed widget so the user can modify their selection
+  const handleWidgetReopen = useCallback((messageId: string) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId ? { ...m, widgetConfirmed: false } : m
+      )
+    );
+  }, [setMessages]);
 
   // Utilities to avoid infinite sync loops between local state ↔ persisted state
   const areStoredMessagesEqual = useCallback((a: StoredMessage[], b: StoredMessage[]) => {
@@ -960,6 +970,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                         isLoadingDestinations={isLoadingDestinations}
                         memory={memory}
                         t={t}
+                        onWidgetReopen={handleWidgetReopen}
                       />
                     )}
 
@@ -1136,6 +1147,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
               }}
               isLoading={isLoading}
             />
+
+            <TripStatusBar memory={memory} t={t} />
 
             <div className="relative z-20 max-w-3xl mx-auto p-4 pt-0">
               <div className="relative z-20 flex items-end gap-2 rounded-2xl border border-border bg-muted/30 p-2 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20">

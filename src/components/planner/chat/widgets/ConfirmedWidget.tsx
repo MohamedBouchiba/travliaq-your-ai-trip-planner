@@ -5,7 +5,7 @@
  * their choice. The widget remains visible in the chat history.
  */
 
-import { Check, Calendar, Users, Plane, MapPin, Heart, Utensils, Sliders } from "lucide-react";
+import { Check, Calendar, Users, Plane, MapPin, Heart, Utensils, Sliders, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WidgetType } from "@/types/flight";
 
@@ -14,6 +14,7 @@ interface ConfirmedWidgetProps {
   selectedValue: unknown;
   displayLabel: string;
   className?: string;
+  onModify?: () => void;
 }
 
 // Map widget types to icons
@@ -54,6 +55,7 @@ export function ConfirmedWidget({
   widgetType,
   displayLabel,
   className,
+  onModify,
 }: ConfirmedWidgetProps) {
   const icon = widgetIcons[widgetType] || <Check className="h-3.5 w-3.5" />;
   const typeLabel = widgetLabels[widgetType] || "Sélection";
@@ -74,6 +76,16 @@ export function ConfirmedWidget({
       <span className="flex items-center justify-center h-5 w-5 rounded-full bg-green-100 dark:bg-green-900/50">
         <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
       </span>
+      {onModify && (
+        <button
+          onClick={onModify}
+          className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+          aria-label="Modifier"
+        >
+          <Pencil className="h-3 w-3" />
+          <span>Modifier</span>
+        </button>
+      )}
     </div>
   );
 }

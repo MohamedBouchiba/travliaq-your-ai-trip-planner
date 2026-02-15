@@ -1,25 +1,28 @@
 /**
  * persistExtractedEntities - Unified Entity Pipeline
- * 
+ *
  * Single point of entry for persisting extracted entities from ANY source.
  * Merges entities from intent classification and flight data with priority:
  * flightData > intent entities (flightData is more precise when available).
  */
 
+import type { FlightFormData } from "@/types/flight";
+import type { FlightMemory } from "@/stores/hooks/useFlightMemoryStore";
+
 export function persistExtractedEntities(
   intentEntities: Record<string, unknown> | undefined,
-  flightData: Record<string, unknown> | null,
+  flightData: FlightFormData | null,
   widgetFlow: {
     setPendingTripDuration: (d: string) => void;
     setPendingPreferredMonth: (m: string) => void;
   },
-  updateMemory?: (partial: Record<string, unknown>) => void,
+  updateMemory?: (partial: Partial<FlightMemory>) => void,
 ) {
   const tripDuration =
-    (flightData?.tripDuration as string | undefined) ||
+    flightData?.tripDuration ||
     (intentEntities?.tripDuration as string | undefined);
   const preferredMonth =
-    (flightData?.preferredMonth as string | undefined) ||
+    flightData?.preferredMonth ||
     (intentEntities?.preferredMonth as string | undefined);
 
   if (tripDuration && typeof tripDuration === "string") {
@@ -30,14 +33,13 @@ export function persistExtractedEntities(
   }
 
   // Persist multi-destination legs if present in flightData
-  if (flightData?.legs && Array.isArray(flightData.legs) && (flightData.legs as unknown[]).length > 0 && updateMemory) {
-    const legs = flightData.legs as Array<{ from: string; to: string; date?: string }>;
-    const legMemories = legs.map((leg, i) => ({
+  if (flightData?.legs && flightData.legs.length > 0 && updateMemory) {
+    const legMemories = flightData.legs.map((leg, i) => ({
       departure: leg.from ? { city: leg.from } : null,
       arrival: leg.to ? { city: leg.to } : null,
       date: leg.date ? new Date(leg.date) : null,
       id: `leg-${i}-${Date.now()}`,
     }));
-    updateMemory({ legs: legMemories, tripType: "multi" as const });
+    updateMemory({ legs: legMemories, tripType: "multi" });
   }
 }

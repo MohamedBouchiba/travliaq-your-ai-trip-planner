@@ -9,6 +9,7 @@ import { memo, lazy, Suspense } from "react";
 import type { TFunction } from "i18next";
 import type { FlightMemory } from "@/stores/hooks";
 import type { DestinationSuggestion } from "@/types/destinations";
+import type { WidgetType } from "@/types/flight";
 import type { ChatMessage } from "../types";
 import { ErrorBoundary } from "./common/ErrorBoundary";
 import { GenericWidgetSkeleton } from "./common/WidgetSkeletons";
@@ -67,7 +68,23 @@ export interface WidgetRendererProps {
   isLoadingDestinations: boolean;
   memory: FlightMemory;
   t: TFunction;
+  onWidgetReopen?: (messageId: string) => void;
 }
+
+/** Widgets that can be reopened after confirmation */
+const MODIFIABLE_WIDGETS = new Set<WidgetType>([
+  "datePicker",
+  "returnDatePicker",
+  "dateRangePicker",
+  "travelersSelector",
+  "tripTypeConfirm",
+  "citySelector",
+  "travelersConfirmBeforeSearch",
+  "preferenceStyle",
+  "preferenceInterests",
+  "mustHaves",
+  "dietary",
+]);
 
 /**
  * Renders the appropriate widget based on message.widget type
@@ -80,6 +97,7 @@ export const WidgetRenderer = memo(function WidgetRenderer({
   isLoadingDestinations,
   memory,
   t,
+  onWidgetReopen,
 }: WidgetRendererProps) {
   if (!m.widget) return null;
 
@@ -93,6 +111,7 @@ export const WidgetRenderer = memo(function WidgetRenderer({
         isLoadingDestinations={isLoadingDestinations}
         memory={memory}
         t={t}
+        onWidgetReopen={onWidgetReopen}
       />
     </ErrorBoundary>
   );
@@ -107,7 +126,12 @@ function WidgetSwitch({
   isLoadingDestinations,
   memory,
   t,
+  onWidgetReopen,
 }: WidgetRendererProps) {
+  const modifyHandler = onWidgetReopen && m.widget && MODIFIABLE_WIDGETS.has(m.widget)
+    ? () => onWidgetReopen(m.id)
+    : undefined;
+
   switch (m.widget) {
     case "datePicker":
       return m.widgetConfirmed ? (
@@ -115,6 +139,7 @@ function WidgetSwitch({
           widgetType="datePicker"
           selectedValue={m.widgetSelectedValue}
           displayLabel={m.widgetDisplayLabel || t("planner.widget.dateSelected")}
+          onModify={modifyHandler}
         />
       ) : (
         <DatePickerWidget
@@ -131,6 +156,7 @@ function WidgetSwitch({
           widgetType="returnDatePicker"
           selectedValue={m.widgetSelectedValue}
           displayLabel={m.widgetDisplayLabel || t("planner.widget.dateSelected")}
+          onModify={modifyHandler}
         />
       ) : (
         <DatePickerWidget
@@ -148,6 +174,7 @@ function WidgetSwitch({
           widgetType="dateRangePicker"
           selectedValue={m.widgetSelectedValue}
           displayLabel={m.widgetDisplayLabel || t("planner.widget.datesSelected")}
+          onModify={modifyHandler}
         />
       ) : (
         <DateRangePickerWidget
@@ -163,6 +190,7 @@ function WidgetSwitch({
           widgetType="travelersSelector"
           selectedValue={m.widgetSelectedValue}
           displayLabel={m.widgetDisplayLabel || t("planner.widget.travelersSelected")}
+          onModify={modifyHandler}
         />
       ) : (
         <TravelersWidget
@@ -177,6 +205,7 @@ function WidgetSwitch({
           widgetType="tripTypeConfirm"
           selectedValue={m.widgetSelectedValue}
           displayLabel={m.widgetDisplayLabel || t("planner.widget.tripTypeSelected")}
+          onModify={modifyHandler}
         />
       ) : (
         <TripTypeConfirmWidget
@@ -192,6 +221,7 @@ function WidgetSwitch({
           widgetType="citySelector"
           selectedValue={m.widgetSelectedValue}
           displayLabel={m.widgetDisplayLabel || t("planner.widget.citySelected")}
+          onModify={modifyHandler}
         />
       ) : (
         <CitySelectionWidget
@@ -213,6 +243,7 @@ function WidgetSwitch({
           widgetType="travelersConfirmBeforeSearch"
           selectedValue={m.widgetSelectedValue}
           displayLabel={m.widgetDisplayLabel || t("planner.widget.travelersConfirmed")}
+          onModify={modifyHandler}
         />
       ) : (
         <TravelersConfirmBeforeSearchWidget
@@ -229,6 +260,7 @@ function WidgetSwitch({
           widgetType="airportConfirmation"
           selectedValue={m.widgetSelectedValue}
           displayLabel={m.widgetDisplayLabel || t("planner.widget.airportsConfirmed")}
+          onModify={modifyHandler}
         />
       ) : (
         <Suspense fallback={<GenericWidgetSkeleton rows={4} showHeader />}>
@@ -245,6 +277,7 @@ function WidgetSwitch({
           widgetType="preferenceStyle"
           selectedValue={m.widgetSelectedValue}
           displayLabel={m.widgetDisplayLabel || t("planner.widget.styleConfigured")}
+          onModify={modifyHandler}
         />
       ) : (
         <Suspense fallback={<GenericWidgetSkeleton rows={3} showHeader />}>
@@ -258,6 +291,7 @@ function WidgetSwitch({
           widgetType="preferenceInterests"
           selectedValue={m.widgetSelectedValue}
           displayLabel={m.widgetDisplayLabel || t("planner.widget.interestsSelected")}
+          onModify={modifyHandler}
         />
       ) : (
         <Suspense fallback={<GenericWidgetSkeleton rows={3} showHeader />}>
@@ -271,6 +305,7 @@ function WidgetSwitch({
           widgetType="mustHaves"
           selectedValue={m.widgetSelectedValue}
           displayLabel={m.widgetDisplayLabel || t("planner.widget.mustHavesConfigured")}
+          onModify={modifyHandler}
         />
       ) : (
         <Suspense fallback={<GenericWidgetSkeleton rows={2} showHeader />}>
@@ -284,6 +319,7 @@ function WidgetSwitch({
           widgetType="dietary"
           selectedValue={m.widgetSelectedValue}
           displayLabel={m.widgetDisplayLabel || t("planner.widget.dietaryConfigured")}
+          onModify={modifyHandler}
         />
       ) : (
         <Suspense fallback={<GenericWidgetSkeleton rows={2} showHeader />}>
@@ -298,6 +334,7 @@ function WidgetSwitch({
           widgetType="destinationSuggestions"
           selectedValue={m.widgetSelectedValue}
           displayLabel={m.widgetDisplayLabel || t("planner.widget.destinationSelected")}
+          onModify={modifyHandler}
         />
       ) : (
         <Suspense fallback={<GenericWidgetSkeleton rows={4} showHeader />}>
