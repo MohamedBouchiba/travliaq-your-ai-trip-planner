@@ -4,6 +4,7 @@ import mapboxgl from "mapbox-gl";
 import type { AirportMarker } from "@/hooks/useAirportsInBounds";
 import type { MapPricesResult } from "@/hooks/useMapPrices";
 import eventBus from "@/lib/eventBus";
+import { escapeHtml } from "@/components/planner/chat/utils/security";
 
 interface FlightPriceMarkersProps {
   map: mapboxgl.Map | null;
@@ -117,7 +118,7 @@ function createMarkerElement(
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-        ">${cityName}</span>
+        ">${escapeHtml(cityName)}</span>
         <span class="airport-price" style="
           color: ${priceColor};
           font-size: 13px;
