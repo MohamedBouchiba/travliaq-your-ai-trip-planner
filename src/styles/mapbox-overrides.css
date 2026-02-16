@@ -1,22 +1,39 @@
 /* Mapbox control theming to blend with site (dark, no white bands) */
-.mapboxgl-ctrl, .mapboxgl-ctrl-group {
+/* Only style the navigation button group - NOT the attribution container */
+.mapboxgl-ctrl-group {
   background-color: hsl(var(--background) / 0.9) !important;
   border: 1px solid hsl(var(--border)) !important;
   color: hsl(var(--foreground)) !important;
   box-shadow: 0 6px 20px hsl(var(--primary) / 0.15) !important;
 }
 
-.mapboxgl-ctrl button {
+.mapboxgl-ctrl-group button {
   filter: invert(1) hue-rotate(180deg) brightness(0.9);
 }
 
+/* Ensure logo wrapper has no background */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
 .mapboxgl-ctrl-attrib, .mapboxgl-ctrl-attrib-inner {
-  background-color: hsl(var(--background) / 0.5) !important;
+  background-color: transparent !important;
   color: hsl(var(--muted-foreground)) !important;
   border: none !important;
   border-radius: 4px !important;
   font-size: 9px !important;
   padding: 2px 4px !important;
+  box-shadow: none !important;
+}
+
+/* Remove white background from attribution container wrapper */
+.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl,
+.mapboxgl-ctrl-bottom-right .mapboxgl-ctrl-attrib {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
 }
 
 .mapboxgl-ctrl-attrib.mapboxgl-compact {

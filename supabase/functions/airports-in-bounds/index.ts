@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const MAX_REQUESTS_PER_HOUR = 60; // Airports in bounds - map panning triggers many calls
+const MAX_REQUESTS_PER_HOUR = 300; // Airports in bounds - map panning triggers many calls
 
 interface BoundsRequest {
   north: number;
