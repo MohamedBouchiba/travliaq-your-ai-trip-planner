@@ -123,7 +123,7 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
         <Button
           variant={isComplete ? 'hero' : 'secondary'}
           size="sm"
-          disabled={!isComplete}
+          disabled={false}
           onClick={onPlanTrip}
           className="gap-1.5 text-xs h-7 px-3"
         >
