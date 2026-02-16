@@ -52,7 +52,13 @@ export const ENTITY_PATTERNS = {
     /(?:to|from|in)\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/g,
   ],
   // Dates: months, specific dates, durations
+  // FIX-B3: Date ranges first (more specific patterns must come before less specific)
   dates: [
+    // Date ranges: "du 15 au 18 mars", "from March 15 to 18"
+    /du\s+\d{1,2}\s+au\s+\d{1,2}\s+(?:janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)/gi,
+    /from\s+(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}\s+to\s+\d{1,2}/gi,
+    // ISO-like ranges: "15/03 au 18/03", "15/03/2026"
+    /\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s+au\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/gi,
     /(?:en|au mois de|pour)\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)/gi,
     /(?:du|le)?\s*(\d{1,2})\s*(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)/gi,
     /(printemps|été|automne|hiver)/gi,
@@ -88,15 +94,15 @@ export const ENTITY_PATTERNS = {
  * @param rejectFilter - optional regex to reject false-positive matches
  */
 /** @internal Exported for testing */
-export function extractEntities(text: string, patterns: RegExp[], minLength = 3, rejectFilter?: RegExp): string[] {
+export function extractEntities(text: string, patterns: RegExp[], minLength = 3, rejectFilter?: RegExp, useFullMatch = false): string[] {
   const matches = new Set<string>();
   for (const pattern of patterns) {
     // Reset regex state
     pattern.lastIndex = 0;
     let match;
     while ((match = pattern.exec(text)) !== null) {
-      // Use full match (match[0]) to preserve context like "2 jours"
-      const value = match[1] || match[0];
+      // FIX-B3: useFullMatch=true for dates to capture "15 mars" instead of just "15"
+      const value = useFullMatch ? match[0] : (match[1] || match[0]);
       if (value && value.trim().length >= minLength) {
         // Apply reject filter if provided (e.g. budget words for destinations)
         if (rejectFilter && rejectFilter.test(value)) {
@@ -173,7 +179,7 @@ export function useSessionContext({
       if (!extracted) {
         extracted = {
           destinations: extractEntities(msg.text, ENTITY_PATTERNS.destinations, 3, DESTINATION_REJECT),
-          dates: extractEntities(msg.text, ENTITY_PATTERNS.dates, 1),
+          dates: extractEntities(msg.text, ENTITY_PATTERNS.dates, 2, undefined, true),
           budgets: extractEntities(msg.text, ENTITY_PATTERNS.budgets),
           constraints: extractEntities(msg.text, ENTITY_PATTERNS.constraints),
         };
