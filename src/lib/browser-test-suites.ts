@@ -132,6 +132,12 @@ export const TEST_CATEGORIES: CategoryInfo[] = [
     emoji: "👤",
     description: "Dialogues longs avec 8 personas réalistes : maman solo, digital nomad, EVJF, anniversaire, étudiant, aventurier, famille recomposée, last-minute",
   },
+  {
+    id: "widgetAntiLoop",
+    label: "Widget Anti-Loop",
+    emoji: "🔄",
+    description: "Non-régression boucle widget : blockedWidgets, styleAxesConfigured, guards conversationnels",
+  },
 ];
 
 // ─── Registration ───
@@ -221,5 +227,9 @@ export async function registerAllBrowserTests(categories?: string[]) {
   if (all || categories?.includes("chatPersonasSim")) {
     const { registerChatPersonasSimTests } = await import("./suites/chatPersonasSim.suite");
     registerChatPersonasSimTests();
+  }
+  if (all || categories?.includes("widgetAntiLoop")) {
+    const { registerWidgetAntiLoopTests } = await import("./suites/widgetAntiLoop.suite");
+    registerWidgetAntiLoopTests();
   }
 }
