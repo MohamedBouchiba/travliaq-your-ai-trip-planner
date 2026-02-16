@@ -30,8 +30,6 @@ const PlannerFooterSummary = ({
   summary,
   travelers = 2,
   activities = 0,
-  cities = 0,
-  stopovers = 0,
   destination = "votre destination",
 }: PlannerFooterSummaryProps) => {
   const { t } = useTranslation();
@@ -41,7 +39,6 @@ const PlannerFooterSummary = ({
     budget: { icon: Icons.DollarSign, label: t("travel.summary.stats.budget"), color: 'golden' },
     weather: { icon: Icons.CloudSun, label: t("travel.summary.stats.weather"), color: 'turquoise' },
     style: { icon: Icons.Sparkles, label: t("travel.summary.stats.style"), color: 'golden' },
-    cities: { icon: Icons.MapPin, label: t("travel.summary.stats.cities"), color: 'turquoise' },
     people: { icon: Icons.Users, label: t("travel.summary.stats.travelers"), color: 'turquoise' },
     activities: { icon: Icons.Activity, label: t("travel.summary.stats.activities"), color: 'golden' },
     custom: { icon: Icons.Info, label: "INFO", color: 'turquoise' },
@@ -51,7 +48,7 @@ const PlannerFooterSummary = ({
     { type: 'days' as const, value: summary.totalDays },
     { type: 'budget' as const, value: summary.totalBudget },
     { type: 'weather' as const, value: summary.averageWeather },
-    { type: 'style' as const, value: summary.travelStyle.split(' ')[0] },
+    { type: 'style' as const, value: summary.travelStyle },
     { type: 'people' as const, value: travelers },
     { type: 'activities' as const, value: activities > 0 ? activities : summary.totalDays * 2 },
   ] : [])).map(stat => {
@@ -72,33 +69,33 @@ const PlannerFooterSummary = ({
   return (
     <section
       data-day-id="summary"
-      className="relative min-h-[60vh] bg-gradient-to-b from-background to-background/95 text-foreground snap-start flex items-center py-10"
+      className="relative min-h-screen bg-gradient-to-b from-travliaq-deep-blue to-travliaq-deep-blue/95 text-white snap-start flex items-center py-10"
     >
-      <div className="w-full px-6">
-        <h2 className="font-montserrat text-xl font-bold text-center mb-1">
+      <div className="w-full px-6 lg:px-12">
+        <h2 className="font-montserrat text-2xl font-bold text-center mb-1 text-white">
           {t("travel.summary.title")}
         </h2>
-        <p className="text-xs text-muted-foreground text-center mb-5">{destination}</p>
+        <p className="text-sm text-white/60 text-center mb-6">{destination}</p>
 
         {/* Compact stat grid — 3 columns */}
-        <div className="grid grid-cols-3 gap-2 max-w-md mx-auto">
+        <div className="grid grid-cols-3 gap-2.5 max-w-lg mx-auto">
           {displayStats.map((stat, idx) => {
             const Icon = stat.icon;
             const colorClass =
               stat.color === 'turquoise'
-                ? 'text-primary'
-                : 'text-amber-400';
+                ? 'text-travliaq-turquoise'
+                : 'text-travliaq-golden-sand';
 
             return (
               <div
                 key={idx}
-                className="flex flex-col items-center gap-1 rounded-lg bg-card/60 border border-border/30 p-2.5"
+                className="flex flex-col items-center gap-1.5 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm p-3 hover:bg-white/10 transition-colors"
               >
-                <Icon className={`h-3.5 w-3.5 ${colorClass}`} />
-                <span className="font-montserrat text-sm font-bold text-foreground leading-tight text-center">
+                <Icon className={`h-4 w-4 ${colorClass}`} />
+                <span className="font-montserrat text-base font-bold text-white leading-tight text-center">
                   {stat.value}
                 </span>
-                <span className="text-[9px] uppercase tracking-wider text-muted-foreground text-center leading-tight">
+                <span className="text-[8px] uppercase tracking-widest text-white/50 text-center leading-tight">
                   {stat.label}
                 </span>
               </div>

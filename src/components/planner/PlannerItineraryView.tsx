@@ -1,9 +1,10 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import HeroHeader from '@/components/travel/HeroHeader';
 import DaySection from '@/components/travel/DaySection';
 import PlannerFooterSummary from '@/components/planner/PlannerFooterSummary';
+import TravelCalendar from '@/components/travel/TravelCalendar';
 
 interface PlannerItineraryViewProps {
   onBackToMap: () => void;
@@ -37,6 +38,19 @@ const PlannerItineraryView = ({ onBackToMap }: PlannerItineraryViewProps) => {
   const travelData = mockTravelData;
   const regularSteps = travelData.days;
 
+  const summaryId = useMemo(
+    () => Math.max(...regularSteps.map((d) => d.id), 0) + 1,
+    [regularSteps]
+  );
+
+  const allSteps = useMemo(
+    () => [
+      ...regularSteps.map((d) => ({ id: d.id, title: d.title, isSummary: false })),
+      { id: summaryId, title: 'Récap', isSummary: true },
+    ],
+    [regularSteps, summaryId]
+  );
+
   // Scroll tracking
   useEffect(() => {
     const el = scrollRef.current;
@@ -68,6 +82,17 @@ const PlannerItineraryView = ({ onBackToMap }: PlannerItineraryViewProps) => {
         return;
       }
 
+      // Check if at summary
+      const summaryElement = el.querySelector('[data-day-id="summary"]') as HTMLElement | null;
+      if (summaryElement) {
+        const summaryTop =
+          summaryElement.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+        if (scrollTop >= summaryTop - 200) {
+          setActiveDay(summaryId);
+          return;
+        }
+      }
+
       let currentId = 1;
       for (const o of offsetsRef.current) {
         if (scrollTop >= o.top - 150) currentId = o.id;
@@ -85,17 +110,24 @@ const PlannerItineraryView = ({ onBackToMap }: PlannerItineraryViewProps) => {
       el.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', recomputeOffsets);
     };
-  }, [regularSteps.length]);
+  }, [regularSteps.length, summaryId]);
 
-  const scrollToDay = useCallback((dayId: number | string) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const target = el.querySelector(`[data-day-id="${dayId}"]`) as HTMLElement | null;
-    if (!target) return;
-    const getTop = (node: HTMLElement) =>
-      node.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
-    el.scrollTo({ top: getTop(target), behavior: 'smooth' });
-  }, []);
+  const scrollToDay = useCallback(
+    (dayId: number | string) => {
+      const el = scrollRef.current;
+      if (!el) return;
+      const selector =
+        dayId === summaryId ? '[data-day-id="summary"]' : `[data-day-id="${dayId}"]`;
+      const target = el.querySelector(selector) as HTMLElement | null;
+      if (!target) return;
+      const getTop = (node: HTMLElement) =>
+        node.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+      el.scrollTo({ top: getTop(target), behavior: 'smooth' });
+    },
+    [summaryId]
+  );
+
+  const showStepTracker = activeDay >= 1;
 
   return (
     <div className="h-full flex flex-col bg-background relative">
@@ -105,14 +137,25 @@ const PlannerItineraryView = ({ onBackToMap }: PlannerItineraryViewProps) => {
           variant="ghost"
           size="sm"
           onClick={onBackToMap}
-          className="gap-2 bg-background/80 backdrop-blur-sm border border-border/50 hover:bg-background/95 shadow-sm"
+          className="gap-2 bg-black/50 backdrop-blur-sm border border-white/20 hover:bg-black/70 text-white shadow-sm"
         >
           <ArrowLeft className="h-4 w-4" />
           Carte
         </Button>
       </div>
 
-      {/* Scrollable content - reuses recommendation page components */}
+      {/* Fixed step tracker at top */}
+      {showStepTracker && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30">
+          <TravelCalendar
+            days={allSteps}
+            activeDay={activeDay}
+            onScrollToDay={scrollToDay}
+          />
+        </div>
+      )}
+
+      {/* Scrollable content */}
       <div
         ref={scrollRef}
         className="h-full overflow-y-auto scroll-smooth snap-y snap-mandatory themed-scroll"
