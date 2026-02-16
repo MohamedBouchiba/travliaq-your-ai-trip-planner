@@ -1,23 +1,23 @@
 import { useTripBasketStore } from '@/stores/tripBasketStore';
 import { useUserPreferences } from '@/contexts/UserPreferencesContext';
 import { Button } from '@/components/ui/button';
-import { Plane } from 'lucide-react';
+import { Plane, Hotel, Compass, Check } from 'lucide-react';
 import { useMemo } from 'react';
+import { cn } from '@/lib/utils';
 
 interface TripPriceBarProps {
   onPlanTrip: () => void;
 }
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
-  EUR: '€',
-  USD: '$',
-  GBP: '£',
-  CHF: 'CHF',
-  CAD: 'CA$',
-  MAD: 'MAD',
-  XOF: 'CFA',
-  TND: 'DT',
+  EUR: '€', USD: '$', GBP: '£', CHF: 'CHF', CAD: 'CA$', MAD: 'MAD', XOF: 'CFA', TND: 'DT',
 };
+
+const STEP_CONFIG = [
+  { key: 'flights', icon: Plane, label: 'Vols' },
+  { key: 'hotels', icon: Hotel, label: 'Hôtels' },
+  { key: 'activities', icon: Compass, label: 'Activités' },
+] as const;
 
 const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
   const basketItems = useTripBasketStore((s) => s.basketItems);
@@ -39,8 +39,7 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
     }).format(totalPrice);
   }, [totalPrice]);
 
-  const isComplete = useMemo(() => {
-    if (basketItems.length === 0) return false;
+  const { completedSteps, requiredSteps, isComplete } = useMemo(() => {
     const completedTypes = new Set(basketItems.map((i) => i.type));
     const completed: string[] = [];
     if (completedTypes.has('flight')) completed.push('flights');
@@ -63,35 +62,65 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
     const required = requiredMap[flexibleTripType] || ['flights', 'hotels', 'activities'];
     const bookableSteps = ['flights', 'hotels', 'activities', 'transfers', 'train', 'car-rental', 'cruise'];
     const missing = required.filter((s) => bookableSteps.includes(s) && !completed.includes(s));
-    return missing.length === 0;
+
+    return {
+      completedSteps: completed,
+      requiredSteps: required,
+      isComplete: missing.length === 0 && basketItems.length > 0,
+    };
   }, [basketItems, flexibleTripType]);
 
-  return (
-    <div className="absolute bottom-0 left-0 right-0 z-20">
-      <div className="mx-3 mb-3 rounded-xl bg-card/90 backdrop-blur-xl border border-border/40 shadow-lg">
-        <div className="flex items-center justify-between px-3 py-2 gap-2">
-          {/* Price display */}
-          <div className="flex items-baseline gap-1 min-w-0">
-            <span className="text-lg font-bold text-foreground tabular-nums">
-              {formattedPrice}
-            </span>
-            <span className="text-xs font-medium text-muted-foreground">
-              {symbol}
-            </span>
-          </div>
+  // Only show steps that are required for this trip type
+  const visibleSteps = STEP_CONFIG.filter((s) => requiredSteps.includes(s.key));
 
-          {/* Plan button */}
-          <Button
-            variant={isComplete ? 'hero' : 'secondary'}
-            size="sm"
-            disabled={!isComplete}
-            onClick={onPlanTrip}
-            className="gap-1.5 text-xs h-8 px-3"
-          >
-            <Plane className="h-3.5 w-3.5" />
-            Planifier mon voyage
-          </Button>
+  return (
+    <div className="absolute bottom-0 left-0 right-0 z-20 bg-card/90 backdrop-blur-xl border-t border-border/30">
+      <div className="flex items-center justify-between px-3 py-1.5 gap-2">
+        {/* Step indicators */}
+        <div className="flex items-center gap-2">
+          {visibleSteps.map(({ key, icon: Icon }) => {
+            const done = completedSteps.includes(key);
+            return (
+              <div
+                key={key}
+                className={cn(
+                  'relative flex items-center justify-center h-6 w-6 rounded-full border transition-colors',
+                  done
+                    ? 'bg-green-500/15 border-green-500/50 text-green-600 dark:text-green-400'
+                    : 'bg-muted/50 border-border/50 text-muted-foreground/60'
+                )}
+              >
+                {done ? (
+                  <Check className="h-3 w-3" />
+                ) : (
+                  <Icon className="h-3 w-3" />
+                )}
+              </div>
+            );
+          })}
         </div>
+
+        {/* Price */}
+        <div className="flex items-baseline gap-1 min-w-0">
+          <span className="text-sm font-bold text-foreground tabular-nums">
+            {formattedPrice}
+          </span>
+          <span className="text-[10px] font-medium text-muted-foreground">
+            {symbol}
+          </span>
+        </div>
+
+        {/* Plan button */}
+        <Button
+          variant={isComplete ? 'hero' : 'secondary'}
+          size="sm"
+          disabled={!isComplete}
+          onClick={onPlanTrip}
+          className="gap-1.5 text-xs h-7 px-3"
+        >
+          <Plane className="h-3 w-3" />
+          Planifier
+        </Button>
       </div>
     </div>
   );
