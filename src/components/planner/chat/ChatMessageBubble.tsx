@@ -22,7 +22,6 @@ import {
 } from "./widgets";
 import { QuickReplies } from "./QuickReplies";
 import { MessageActions } from "./MessageActions";
-import { ToolStatusIndicator } from "./ToolStatusIndicator";
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
