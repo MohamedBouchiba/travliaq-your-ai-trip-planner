@@ -173,13 +173,10 @@ export function buildLLMContext(sources: ContextSources): Record<string, unknown
             touristVsLocal: number;
           }
         | undefined;
+      // If axes exist at all, the user has interacted with the style widget
+      // (even if all values are 50/balanced — that's a valid choice)
       if (!axes) return false;
-      return (
-        axes.chillVsIntense !== 50 ||
-        axes.cityVsNature !== 50 ||
-        axes.ecoVsLuxury !== 50 ||
-        axes.touristVsLocal !== 50
-      );
+      return true;
     })(),
   };
 

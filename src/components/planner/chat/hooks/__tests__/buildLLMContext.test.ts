@@ -207,7 +207,7 @@ describe("buildLLMContext — preferencesState", () => {
     expect((result.preferencesState as any).styleAxesConfigured).toBe(true);
   });
 
-  it("detects default style axes as not configured", () => {
+  it("detects default style axes as configured (balanced is a valid choice)", () => {
     const sources = makeMinimalSources({
       getPreferenceMemory: () => ({
         interests: [],
@@ -220,7 +220,8 @@ describe("buildLLMContext — preferencesState", () => {
       }),
     });
     const result = buildLLMContext(sources as any);
-    expect((result.preferencesState as any).styleAxesConfigured).toBe(false);
+    // All at 50 is still a valid confirmed configuration
+    expect((result.preferencesState as any).styleAxesConfigured).toBe(true);
   });
 });
 
