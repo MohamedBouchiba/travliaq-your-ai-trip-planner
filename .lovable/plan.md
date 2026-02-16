@@ -1,112 +1,100 @@
 
-# Bouton "Signaler un probleme" avec envoi immediat + pop-up message optionnel
 
-## Flux utilisateur
+# Barre de prix + bouton "Planifier mon voyage" et vue itineraire
 
-1. Sous le champ de saisie, le texte statique est remplace par : *"Un souci ? [Cliquez ici pour nous aider](lien)"*
-2. **Au clic** : le JSON de debug est immediatement uploade vers Supabase Storage (`bug-reports` bucket). Un toast confirme : "Rapport envoye !"
-3. **Ensuite** : une pop-up (Dialog) s'affiche avec un textarea optionnel : "Souhaitez-vous ajouter un commentaire ?"
-   - Si l'utilisateur ecrit + valide : un second fichier `{report_id}_comment.json` est uploade avec le message + le report_id
-   - Si l'utilisateur ferme sans ecrire : rien de plus n'est envoye
-4. **Rate limit** : le lien est desactive tant que l'utilisateur n'a pas envoye au moins 5 messages depuis le dernier rapport
+## Objectif
 
-## Donnees collectees dans le JSON (maximum de profondeur)
+Ajouter une barre horizontale fixe en bas de la zone map (panneau droit sur desktop, bas d'ecran sur mobile) affichant :
+- Le prix total du panier (Trip Basket Store) en temps reel
+- Un bouton "Planifier mon voyage" grise tant que le panier n'est pas complet, qui se degrise quand toutes les etapes requises sont remplies
+- Au clic sur le bouton, la map est remplacee par une vue itineraire jour-par-jour (inspiree de TravelRecommendations) dans le meme panneau
 
-Tout le contenu du `debugStore` est inclus, soit :
+## Architecture
 
-- **Metadonnees** : user_id, session_id (activeSessionId), timestamp, user-agent, URL courante, langue, viewport
-- **Messages** : historique complet (messageTimeline) avec texte integral, widgets, widgetData, widgetConfirmed, suggestionsShown
-- **Intent** : lastIntent + intentHistory complet (primary, confidence, entities, widgetToShow, source)
-- **Reasoning** : understanding, contextAnalysis, responseStrategy, keyInsights, widgetDecision, confidence
-- **Flow state** : hasDestination, hasDepartureDate, hasTravelers, isReadyToSearch, etc.
-- **Memory context** : flightSummary, activityContext, preferenceContext, widgetHistory, blockedWidgets, basketSummary, conversationSummary, currentPhase, missingFields, sessionEntities
-- **Phase** : phaseHistory (from/to/confidence)
-- **Tools** : toolExecutions (tool, status, latency_ms, summary, loopIteration)
-- **Erreurs** : streamErrors, widgetErrors, sseParseErrors, retryAttempts
-- **Interactions** : userInteractions (category, action, detail, widgetType), blockedActions
-- **EventBus** : eventBusLog (event, payload)
-- **Raw responses** : rawResponses (requestId, data)
-- **Timeline chronologique** : tous les elements ci-dessus fusionnes et tries par timestamp (meme format que le bouton Copy du DebugPanel)
+Le panneau droit du planner aura deux etats :
+1. **Mode Map** (actuel) : map + widgets + la nouvelle barre de prix en bas
+2. **Mode Itineraire** : la map est remplacee par la vue itineraire, le chat reste a gauche
+
+Un state `viewMode: 'map' | 'itinerary'` dans TravelPlanner controlera l'affichage.
+
+## Etapes d'implementation
+
+### 1. Nouveau composant `TripPriceBar`
+Fichier : `src/components/planner/TripPriceBar.tsx`
+
+- S'abonne au `useTripBasketStore` pour lire `getTotalPrice()`, `basketCurrency`, `isBasketComplete()`, `getMissingSteps()`
+- Affiche le prix total formate (ex: "1 250 EUR")
+- Affiche le nombre d'elements dans le panier
+- Bouton "Planifier mon voyage" :
+  - `disabled` si `!isBasketComplete()`
+  - Style grise quand disabled, style accent/hero quand actif
+  - `onClick` declenche le passage en mode itineraire
+- Barre fine (h-14 environ), positionnee en `absolute bottom-0` dans le conteneur map
+- Responsive : s'adapte au mobile
+
+### 2. Nouveau composant `PlannerItineraryView`
+Fichier : `src/components/planner/PlannerItineraryView.tsx`
+
+- Vue qui remplace la map quand l'utilisateur clique "Planifier mon voyage"
+- Pour l'instant (phase 1) : affiche un placeholder / mockup avec les donnees du basket
+- Reutilise les composants existants de TravelRecommendations : `DaySection`, `HeroHeader`, `FooterSummary`
+- Bouton "Retour a la carte" pour revenir au mode map
+- Plus tard : l'IA generera le contenu jour-par-jour (pas implemente maintenant)
+
+### 3. Modifications dans `TravelPlanner.tsx`
+
+- Ajout d'un state `viewMode: 'map' | 'itinerary'`
+- Dans le panneau droit (desktop) :
+  - Si `viewMode === 'map'` : affichage actuel (map + widgets) + `TripPriceBar` en bas
+  - Si `viewMode === 'itinerary'` : affichage de `PlannerItineraryView` a la place de la map
+- Sur mobile : meme logique, la barre de prix apparait en bas de la vue "maps"
+- Le chat reste toujours visible et fonctionnel quel que soit le mode
+
+### 4. Aucune modification des stores existants
+
+Le `useTripBasketStore` expose deja tout ce qu'il faut :
+- `getTotalPrice()` et `basketCurrency` pour le prix
+- `isBasketComplete()` pour activer/desactiver le bouton
+- `getMissingSteps()` pour afficher ce qu'il manque (tooltip optionnel)
+- `getBasketItems()` pour le nombre d'elements
 
 ## Details techniques
 
-### 1. Migration SQL - Bucket `bug-reports`
-
-```sql
-INSERT INTO storage.buckets (id, name, public) VALUES ('bug-reports', 'bug-reports', false);
-
--- Utilisateurs authentifies peuvent uploader
-CREATE POLICY "Authenticated users can upload bug reports"
-ON storage.objects FOR INSERT
-TO authenticated
-WITH CHECK (bucket_id = 'bug-reports');
-
--- Pas de SELECT/UPDATE/DELETE pour les utilisateurs
+```text
++----------------------------------+
+|  Chat  |        Map Area         |
+|        |                         |
+|        |   [widgets overlay]     |
+|        |                         |
+|        |                         |
+|        +-------------------------+
+|        | 0 EUR  [Planifier...  ] | <-- TripPriceBar (absolute bottom)
++----------------------------------+
 ```
 
-### 2. Nouveau hook `src/hooks/useBugReport.ts`
+Quand le bouton est clique :
 
-Responsabilites :
-- `canReport` : `true` si nombre de messages user depuis le dernier rapport >= 5
-- `isUploading` : etat de chargement pendant l'upload
-- `submitReport()` :
-  1. Collecte l'integralite du `useDebugStore.getState()` (toutes les slices)
-  2. Ajoute les metadonnees (user_id via `supabase.auth.getUser()`, session_id via `useChatSessions`, timestamp, user-agent, URL, langue)
-  3. Reconstruit la timeline chronologique (meme logique que `handleCopyDebugInfo` du DebugPanel)
-  4. Upload vers `bug-reports/{user_id}/{timestamp_iso}_{random}.json`
-  5. Retourne le `reportId` (nom du fichier sans extension)
-- `submitComment(reportId, comment)` : uploade `{reportId}_comment.json` avec `{ reportId, comment, timestamp }`
-- Tracking via `localStorage` : `bugReport_lastTimestamp` + `bugReport_messagesSince`
+```text
++----------------------------------+
+|  Chat  |   Itinerary View       |
+|        |   [<- Retour carte]    |
+|        |                         |
+|        |   Jour 1 - ...         |
+|        |   Jour 2 - ...         |
+|        |   Jour 3 - ...         |
++----------------------------------+
+```
 
-### 3. Modification de `ChatInputArea.tsx`
+- La barre de prix utilise `z-20` pour etre au-dessus de la map mais sous les modales
+- Le bouton utilise le variant `hero` quand actif, `secondary` + `disabled` quand grise
+- L'itineraire est scrollable verticalement dans le panneau
+- Pas d'appel IA pour l'instant : le contenu de l'itineraire sera un placeholder qui affiche les elements du basket groupes par jour/ville
 
-- Nouvelles props : `onReportBug`, `canReport`, `isReporting`
-- Le `<p>` statique est remplace par :
-  - Si `canReport` : "Un souci ? **Cliquez ici** pour nous aider" (lien cliquable)
-  - Si pas `canReport` : texte grise "Envoyez encore X messages pour pouvoir signaler un probleme"
-  - Si `isReporting` : spinner "Envoi en cours..."
-
-### 4. Nouveau composant `src/components/planner/chat/BugReportDialog.tsx`
-
-- Dialog Radix (AlertDialog) avec :
-  - Titre : "Merci pour votre aide !"
-  - Description : "Le rapport technique a ete envoye. Souhaitez-vous ajouter un commentaire ?"
-  - Textarea optionnel
-  - Bouton "Envoyer le commentaire" + "Fermer sans commentaire"
-- Gere `isOpen`, `onClose`, `onSubmitComment(text)`
-
-### 5. Integration dans `PlannerChat.tsx`
-
-- Importer `useBugReport` + `BugReportDialog`
-- Compter `userMessageCount` = `messages.filter(m => m.role === "user").length`
-- Au clic report : appeler `submitReport()`, ouvrir le dialog
-- Passer props a `ChatInputArea`
-
-### 6. Cles i18n
-
-**FR** :
-- `planner.chat.reportBugPrefix` : "Un souci ? "
-- `planner.chat.reportBugLink` : "Cliquez ici pour nous aider"
-- `planner.chat.reportBugSent` : "Rapport envoye, merci !"
-- `planner.chat.reportBugCooldown` : "Envoyez encore {{count}} messages pour signaler un probleme"
-- `planner.chat.reportBugUploading` : "Envoi du rapport..."
-- `planner.chat.reportCommentTitle` : "Merci pour votre aide !"
-- `planner.chat.reportCommentDescription` : "Le rapport a ete envoye. Vous pouvez ajouter un commentaire pour nous aider a comprendre le probleme."
-- `planner.chat.reportCommentPlaceholder` : "Decrivez le probleme rencontre (optionnel)..."
-- `planner.chat.reportCommentSend` : "Envoyer le commentaire"
-- `planner.chat.reportCommentSkip` : "Fermer"
-
-**EN** : Equivalents anglais.
-
-### 7. Resume des fichiers
+## Fichiers concernes
 
 | Fichier | Action |
 |---------|--------|
-| Migration SQL | Creer bucket `bug-reports` + RLS INSERT only |
-| `src/hooks/useBugReport.ts` | Creer - collecte exhaustive + upload + rate limit |
-| `src/components/planner/chat/BugReportDialog.tsx` | Creer - dialog commentaire optionnel |
-| `src/components/planner/chat/ChatInputArea.tsx` | Modifier - lien cliquable + props report |
-| `src/components/planner/PlannerChat.tsx` | Modifier - brancher hook + dialog |
-| `src/i18n/locales/fr/planner.json` | Ajouter cles i18n |
-| `src/i18n/locales/en/planner.json` | Ajouter cles i18n |
-| `src/i18n/config.ts` | Ajouter cles i18n fallback |
+| `src/components/planner/TripPriceBar.tsx` | Creer |
+| `src/components/planner/PlannerItineraryView.tsx` | Creer |
+| `src/pages/TravelPlanner.tsx` | Modifier (ajouter viewMode + integrer les 2 composants) |
+
