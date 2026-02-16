@@ -5,7 +5,7 @@
  */
 
 import { memo } from "react";
-import { Send } from "lucide-react";
+import { Send, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,10 @@ interface ChatInputAreaProps {
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   isLoading: boolean;
   onSend: (text: string) => void;
+  onReportBug?: () => void;
+  canReport?: boolean;
+  isReporting?: boolean;
+  messagesUntilReport?: number;
 }
 
 export const ChatInputArea = memo(function ChatInputArea({
@@ -23,6 +27,10 @@ export const ChatInputArea = memo(function ChatInputArea({
   inputRef,
   isLoading,
   onSend,
+  onReportBug,
+  canReport = false,
+  isReporting = false,
+  messagesUntilReport = 0,
 }: ChatInputAreaProps) {
   const { t } = useTranslation();
 
@@ -90,7 +98,27 @@ export const ChatInputArea = memo(function ChatInputArea({
         </button>
       </div>
       <p className="text-[10px] text-muted-foreground/70 text-center mt-1.5">
-        {t("planner.chat.inputHelper")}
+        {isReporting ? (
+          <span className="inline-flex items-center gap-1">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            {t("planner.chat.reportBugUploading")}
+          </span>
+        ) : canReport ? (
+          <span>
+            {t("planner.chat.reportBugPrefix")}
+            <button
+              type="button"
+              onClick={onReportBug}
+              className="underline text-primary/80 hover:text-primary transition-colors cursor-pointer"
+            >
+              {t("planner.chat.reportBugLink")}
+            </button>
+          </span>
+        ) : messagesUntilReport > 0 ? (
+          <span>{t("planner.chat.reportBugCooldown", { count: messagesUntilReport })}</span>
+        ) : (
+          <span>{t("planner.chat.inputHelper")}</span>
+        )}
       </p>
     </div>
   );

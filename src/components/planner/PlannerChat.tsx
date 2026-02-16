@@ -31,6 +31,8 @@ import type { ChatMessage } from "./chat/types";
 import { MemoizedSmartSuggestions, type InspireFlowStep } from "./chat/MemoizedSmartSuggestions";
 import { ChatHeader } from "./chat/ChatHeader";
 import { ChatInputArea } from "./chat/ChatInputArea";
+import { BugReportDialog } from "./chat/BugReportDialog";
+import { useBugReport } from "@/hooks/useBugReport";
 import { ChatMessageBubble } from "./chat/ChatMessageBubble";
 import type { ToolExecution } from "./chat/ToolStatusIndicator";
 import type { DestinationSuggestion } from "@/types/destinations";
@@ -118,6 +120,22 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [dynamicSuggestions, setDynamicSuggestions] = useState<Array<{id: string; label: string; emoji: string; message: string}>>([]);
+  const [bugReportDialogOpen, setBugReportDialogOpen] = useState(false);
+  const [currentReportId, setCurrentReportId] = useState<string | null>(null);
+
+  // User message count for bug report rate limiting
+  const userMessageCount = useMemo(() => messages.filter(m => m.role === "user").length, [messages]);
+
+  // Bug report hook
+  const bugReport = useBugReport({ activeSessionId, userMessageCount });
+
+  const handleReportBug = useCallback(async () => {
+    const reportId = await bugReport.submitReport();
+    if (reportId) {
+      setCurrentReportId(reportId);
+      setBugReportDialogOpen(true);
+    }
+  }, [bugReport]);
   
   // Track completed message IDs to prevent late streaming updates from resetting isStreaming
   const completedMessageIdsRef = useRef<Set<string>>(new Set());
@@ -719,6 +737,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
   // Wrapper around sendText: intercept "nothing else" responses during inspire flow
   const handleSend = useCallback((text: string) => {
     if (!text.trim()) return;
+    bugReport.trackUserMessage();
 
     // During inspire flow "extra" step, intercept "nothing else" text → trigger destination fetch
     if (inspireFlowStep === "extra" && isDismissalMessage(text)) {
@@ -972,8 +991,21 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
               inputRef={inputRef}
               isLoading={isLoading}
               onSend={handleSend}
+              onReportBug={handleReportBug}
+              canReport={bugReport.canReport}
+              isReporting={bugReport.isUploading}
+              messagesUntilReport={bugReport.messagesUntilReport}
             />
           </div>
+
+          {/* Bug Report Comment Dialog */}
+          <BugReportDialog
+            isOpen={bugReportDialogOpen}
+            onClose={() => setBugReportDialogOpen(false)}
+            onSubmitComment={(comment) => {
+              if (currentReportId) bugReport.submitComment(currentReportId, comment);
+            }}
+          />
       </div>
       
       {/* Intent Debug Panel - only visible in development */}

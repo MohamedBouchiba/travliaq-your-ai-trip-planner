@@ -437,5 +437,16 @@
   "planner.confirmed.airportConfirmation": "Aéroports",
   "planner.confirmed.budgetRangeSlider": "Budget",
   "planner.confirmed.selection": "Sélection",
-  "planner.confirmed.modify": "Modifier"
+  "planner.confirmed.modify": "Modifier",
+
+  "planner.chat.reportBugPrefix": "Un souci ? ",
+  "planner.chat.reportBugLink": "Cliquez ici pour nous aider",
+  "planner.chat.reportBugSent": "Rapport envoyé, merci !",
+  "planner.chat.reportBugCooldown": "Envoyez encore {{count}} message(s) pour signaler un problème",
+  "planner.chat.reportBugUploading": "Envoi du rapport...",
+  "planner.chat.reportCommentTitle": "Merci pour votre aide !",
+  "planner.chat.reportCommentDescription": "Le rapport a été envoyé. Vous pouvez ajouter un commentaire pour nous aider à comprendre le problème.",
+  "planner.chat.reportCommentPlaceholder": "Décrivez le problème rencontré (optionnel)...",
+  "planner.chat.reportCommentSend": "Envoyer le commentaire",
+  "planner.chat.reportCommentSkip": "Fermer"
 }
