@@ -183,12 +183,14 @@ const PlannerItineraryView = ({ onBackToMap }: PlannerItineraryViewProps) => {
           ))}
         </div>
 
-        {/* Compact summary */}
+        {/* Summary */}
         <PlannerFooterSummary
           summary={travelData.summary}
           travelers={2}
           activities={regularSteps.length}
+          cities={new Set(regularSteps.map((d) => d.title.split(' ')[0])).size}
           destination={travelData.destination}
+          mainImage={travelData.mainImage}
         />
       </div>
     </div>
