@@ -99,7 +99,7 @@ const DaySection = ({ day, index, isActive }: DaySectionProps) => {
       </div>
 
       {/* Contenu */}
-      <div className="relative z-10 container mx-auto px-4 lg:px-80 py-12 lg:py-16">
+      <div className="relative z-10 container mx-auto px-4 lg:px-16 py-12 lg:py-16">
         <div className="max-w-3xl">
           {/* Header du jour - Layout optimisé */}
           <div className="mb-3 animate-fade-in">
