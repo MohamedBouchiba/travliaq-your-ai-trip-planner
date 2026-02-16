@@ -28,6 +28,7 @@ export async function fetchTopCities(
   try {
     const response = await supabaseFetch("top-cities-by-country", {
       method: "GET",
+      authOptional: true,
       params: { country_code: countryCode, limit: String(limit) },
       signal,
     });
