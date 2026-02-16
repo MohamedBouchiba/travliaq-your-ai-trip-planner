@@ -96,10 +96,6 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
           ) : (
             <>
               <MarkdownMessage content={m.text} />
-              {m.isStreaming && <span className="inline-block w-1.5 h-4 bg-current ml-0.5 animate-pulse" aria-hidden="true" />}
-              {m.isStreaming && activeTools.length > 0 && (
-                <ToolStatusIndicator tools={activeTools} compact className="mt-2" />
-              )}
             </>
           )}
         </div>
