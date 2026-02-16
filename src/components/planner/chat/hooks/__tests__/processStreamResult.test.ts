@@ -1,10 +1,10 @@
 /**
  * Tests for processStreamResult pure functions
- * Tests: processFlightData, processAction, buildCombinedSuggestions
+ * Tests: processFlightData, processAction, buildCombinedSuggestions, shouldForceShowDateWidget
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { processFlightData, processAction, buildCombinedSuggestions } from "../processStreamResult";
+import { processFlightData, processAction, buildCombinedSuggestions, shouldForceShowDateWidget } from "../processStreamResult";
 import type { FlightFormData } from "@/types/flight";
 
 // ─── Helpers ───
@@ -236,5 +236,81 @@ describe("buildCombinedSuggestions", () => {
       { id: "c", label: "X", action: { type: "fillInput", message: "x" } },
     ]);
     expect(result[0].emoji).toBe("✨");
+  });
+});
+
+// ─── B5: shouldForceShowDateWidget ───
+
+describe("shouldForceShowDateWidget", () => {
+  it("returns true when showDateWidget is already true", () => {
+    expect(shouldForceShowDateWidget({
+      showDateWidget: true,
+      hasDepartureDate: false,
+      intentTripDuration: undefined,
+      flightDataTripDuration: undefined,
+    })).toBe(true);
+  });
+
+  it("returns false when departure date already exists", () => {
+    expect(shouldForceShowDateWidget({
+      showDateWidget: false,
+      hasDepartureDate: true,
+      intentTripDuration: "4 jours",
+      flightDataTripDuration: undefined,
+    })).toBe(false);
+  });
+
+  it("returns true when intent has tripDuration and no departure date", () => {
+    expect(shouldForceShowDateWidget({
+      showDateWidget: false,
+      hasDepartureDate: false,
+      intentTripDuration: "4 jours",
+      flightDataTripDuration: undefined,
+    })).toBe(true);
+  });
+
+  it("returns true when flightData has tripDuration and no departure date", () => {
+    expect(shouldForceShowDateWidget({
+      showDateWidget: false,
+      hasDepartureDate: false,
+      intentTripDuration: undefined,
+      flightDataTripDuration: "5 jours",
+    })).toBe(true);
+  });
+
+  it("returns true when both sources have tripDuration", () => {
+    expect(shouldForceShowDateWidget({
+      showDateWidget: false,
+      hasDepartureDate: false,
+      intentTripDuration: "4 jours",
+      flightDataTripDuration: "5 jours",
+    })).toBe(true);
+  });
+
+  it("returns false when no tripDuration and no showDateWidget", () => {
+    expect(shouldForceShowDateWidget({
+      showDateWidget: false,
+      hasDepartureDate: false,
+      intentTripDuration: undefined,
+      flightDataTripDuration: undefined,
+    })).toBe(false);
+  });
+
+  it("returns false when tripDuration is null", () => {
+    expect(shouldForceShowDateWidget({
+      showDateWidget: false,
+      hasDepartureDate: false,
+      intentTripDuration: null,
+      flightDataTripDuration: null,
+    })).toBe(false);
+  });
+
+  it("returns false when tripDuration is empty string", () => {
+    expect(shouldForceShowDateWidget({
+      showDateWidget: false,
+      hasDepartureDate: false,
+      intentTripDuration: "",
+      flightDataTripDuration: "",
+    })).toBe(false);
   });
 });

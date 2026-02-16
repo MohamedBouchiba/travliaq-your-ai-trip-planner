@@ -322,7 +322,8 @@ export function evaluatePhaseTransition(
   }
 
   // Guard 3: Dates set + travelers not confirmed → travelers selector
-  if (flowState.hasDepartureDate && !hasInteraction("travelers_selected")) {
+  // Also check flowState.hasTravelers to avoid redundancy when travelers are set via entity extraction
+  if (flowState.hasDepartureDate && !hasInteraction("travelers_selected") && !flowState.hasTravelers) {
     const hasDateInteraction =
       hasInteraction("date_selected") || hasInteraction("date_range_selected");
     if (hasDateInteraction && canShowWidget("travelersSelector").valid) {

@@ -151,8 +151,8 @@ export function persistExtractedEntities(
   },
   updateMemory?: (partial: Partial<FlightMemory>) => void,
   currentMemory?: Partial<FlightMemory>,
-) {
-  if (!intentEntities && !flightData?.legs) return;
+): Partial<FlightMemory> {
+  if (!intentEntities && !flightData?.legs) return {};
 
   const hasFlightData = flightData != null && Object.keys(flightData).length > 0;
   const baseMem: Partial<FlightMemory> = currentMemory ?? {};
@@ -216,4 +216,6 @@ export function persistExtractedEntities(
   if (Object.keys(formBatch).length > 0) {
     eventBus.emit("flight:updateFormData", formBatch as import("@/types/flight").FlightFormData);
   }
+
+  return memoryBatch;
 }

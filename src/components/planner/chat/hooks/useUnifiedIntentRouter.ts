@@ -62,8 +62,8 @@ export interface UseUnifiedIntentRouterOptions {
  * Hook return type
  */
 export interface UseUnifiedIntentRouterReturn {
-  /** Process a backend intent classification */
-  processIntent: (intent: IntentClassification | null) => IntentProcessResult;
+  /** Process a backend intent classification, optionally with fresh flow state */
+  processIntent: (intent: IntentClassification | null, flowStateOverride?: FlowState) => IntentProcessResult;
   /** Validate if a widget can be shown */
   canShowWidget: (widgetType: WidgetType) => WidgetValidation;
   /** Check if user already provided data for this widget type */
@@ -156,9 +156,11 @@ export function useUnifiedIntentRouter({
    * This is the main entry point - trusts the backend as source of truth
    * Now enhanced with frontend confidence boosting
    */
-  const processIntent = useCallback((intent: IntentClassification | null): IntentProcessResult => {
+  const processIntent = useCallback((intent: IntentClassification | null, flowStateOverride?: FlowState): IntentProcessResult => {
     lastIntentRef.current = intent;
-    
+    // Use fresh flowState if provided (avoids stale memoized state after entity persistence)
+    const effectiveFlowState = flowStateOverride || flowState;
+
     if (!intent) {
       return { shouldShowWidget: false, widgetType: null, action: "none" };
     }
@@ -220,10 +222,10 @@ export function useUnifiedIntentRouter({
         }
         
         // Widget can't be shown, use suggested fallback or next required
-        let fallbackWidget = validation.suggestedWidget || getNextRequiredWidget();
+        let fallbackWidget = validation.suggestedWidget || (flowStateOverride ? getNextRequiredWidgetCore(effectiveFlowState, widgetInteractions) : getNextRequiredWidget());
 
         // Guard: don't fallback to citySelector if no country is selected
-        if (fallbackWidget === "citySelector" && !flowState.hasDestination) {
+        if (fallbackWidget === "citySelector" && !effectiveFlowState.hasDestination) {
           if (import.meta.env.DEV) console.log("[UnifiedIntentRouter] Fallback citySelector blocked — no country selected");
           const hasPreferences = widgetInteractions.some(i => 
             i.interactionType === "style_configured" || i.interactionType === "interests_selected"
@@ -291,8 +293,8 @@ export function useUnifiedIntentRouter({
     
     // Intent-specific: if this intent triggers widgets AND there's a next required widget, show it
     if (isWidgetTriggeringIntent(intent.primaryIntent)) {
-      const nextRequired = getNextRequiredWidget();
-      
+      const nextRequired = flowStateOverride ? getNextRequiredWidgetCore(effectiveFlowState, widgetInteractions) : getNextRequiredWidget();
+
       if (nextRequired) {
         const widgetData: Record<string, unknown> = {};
         if (intent.entities.preferredMonth) widgetData.preferredMonth = intent.entities.preferredMonth;
@@ -322,7 +324,7 @@ export function useUnifiedIntentRouter({
     // regardless of what the intent classifier returned.
     // Pass flightSearchTrigger status to prevent search + widget conflicts
     const isSearchIntent = intent.primaryIntent === "trigger_search" || intent.primaryIntent === "confirm_selection";
-    const phaseTransition = evaluatePhaseTransition(flowState, widgetInteractions, canShowWidget, isSearchIntent);
+    const phaseTransition = evaluatePhaseTransition(effectiveFlowState, widgetInteractions, canShowWidget, isSearchIntent);
     if (phaseTransition) {
       if (import.meta.env.DEV) console.log("[UnifiedIntentRouter] Phase transition triggered:", phaseTransition.reason);
       if (phaseTransition.widgetType && onWidgetTriggered) {

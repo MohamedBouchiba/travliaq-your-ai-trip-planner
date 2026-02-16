@@ -25,7 +25,7 @@ import { useChatDestinationFlow } from "./chat/hooks/useChatDestinationFlow";
 import { useChatReset } from "./chat/hooks/useChatReset";
 import { useReadyMessage } from "./chat/hooks/useReadyMessage";
 import { useDebugEventBusCapture } from "@/hooks/useDebugEventBusCapture";
-import { IntentDebugPanel } from "./chat/IntentDebugPanel";
+
 import { getMissingFieldLabel, isDismissalMessage } from "./chat/utils";
 import type { ChatMessage } from "./chat/types";
 import { MemoizedSmartSuggestions, type InspireFlowStep } from "./chat/MemoizedSmartSuggestions";
@@ -1008,12 +1008,6 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
           />
       </div>
       
-      {/* Intent Debug Panel - only visible in development */}
-      <IntentDebugPanel
-        intent={lastIntentClassification}
-        flowState={intentRouter.flowState}
-        widgetTriggered={lastWidgetTriggered}
-      />
     </aside>
   );
 });

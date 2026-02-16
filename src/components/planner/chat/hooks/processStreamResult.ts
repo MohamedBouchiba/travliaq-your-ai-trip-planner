@@ -107,6 +107,25 @@ export function processFlightData(
   return { nextMem, showDateWidget, showTravelersWidget };
 }
 
+// ─── B5: Trip duration → date widget synthesis ───
+
+interface DateWidgetSynthesisInput {
+  showDateWidget: boolean;
+  hasDepartureDate: boolean;
+  intentTripDuration: string | undefined | null;
+  flightDataTripDuration: string | undefined | null;
+}
+
+/**
+ * B5: Force date widget when tripDuration was extracted but no dates exist yet.
+ * Returns the (possibly overridden) showDateWidget value.
+ */
+export function shouldForceShowDateWidget(input: DateWidgetSynthesisInput): boolean {
+  if (input.showDateWidget) return true;
+  if (input.hasDepartureDate) return false;
+  return !!(input.intentTripDuration || input.flightDataTripDuration);
+}
+
 // ─── Action processing ───
 
 /**

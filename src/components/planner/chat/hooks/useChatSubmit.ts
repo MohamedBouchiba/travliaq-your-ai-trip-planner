@@ -20,7 +20,8 @@ import { geocodeCity } from "@/utils/geocodeCity";
 import { eventBus } from "@/lib/eventBus";
 import { usePlannerStoreV2 } from "@/stores/plannerStoreV2";
 import { buildLLMContext } from "./buildLLMContext";
-import { processFlightData, processAction, buildCombinedSuggestions } from "./processStreamResult";
+import { processFlightData, processAction, buildCombinedSuggestions, shouldForceShowDateWidget } from "./processStreamResult";
+import { computeFlowState, type IntentProcessResult } from "./intentRouterCore";
 import { fetchTopCities } from "../utils/fetchTopCities";
 
 // ─── Departure city validation (Bug D fix) ───
@@ -238,6 +239,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
         );
 
       // Process intent classification
+      let intentResult: IntentProcessResult | undefined;
       if (intentClassification) {
         if (import.meta.env.DEV) console.log("[useChatSubmit] Intent:", intentClassification.primaryIntent);
         opts.setLastIntentClassification(intentClassification);
@@ -256,7 +258,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
 
         // F7: Persist all extracted entities (travelers, location, dates) via declarative pipeline
         // Must run BEFORE processIntent so memory/flowState reflects new entities
-        persistExtractedEntities(
+        const memoryPatch = persistExtractedEntities(
           sanitizedEntities as Record<string, unknown> | undefined,
           flightData,
           opts.widgetFlow,
@@ -264,29 +266,11 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
           opts.memory,
         );
 
-        // Pre-fill budget preferences before widget routing so the preferenceStyle widget renders pre-filled
-        if (intentClassification.entities?.budgetLevel) {
-          const level = intentClassification.entities.budgetLevel as string;
-          const ecoValue =
-            level === "budget" ? 10 :
-            level === "comfort" ? 40 :
-            level === "premium" ? 70 : 90;
-          opts.preFillBudgetPreferences(ecoValue);
-          if (import.meta.env.DEV) console.log("[useChatSubmit] Pre-filled budget:", level, "→ ecoVsLuxury:", ecoValue);
-        }
+        // Compute fresh flowState from merged memory (avoids stale memoized state)
+        const freshMemory = { ...opts.memory, ...memoryPatch } as FlightMemory;
+        const freshFlowState = computeFlowState(freshMemory);
 
-        // Sync extracted interests to preference store (only if store is empty)
-        const intentInterests = intentClassification.entities?.interests;
-        if (Array.isArray(intentInterests) && intentInterests.length > 0) {
-          const currentPrefs = opts.getPreferenceMemory?.();
-          const existingInterests = currentPrefs?.interests as string[] | undefined;
-          if (!existingInterests?.length) {
-            opts.imperativeHandlers.handlePreferencesDetection({ interests: intentInterests });
-            if (import.meta.env.DEV) console.log("[useChatSubmit] Synced interests from intent:", intentInterests);
-          }
-        }
-
-        const intentResult = opts.intentRouter.processIntent(intentClassification);
+        intentResult = opts.intentRouter.processIntent(intentClassification, freshFlowState);
         if (intentResult.widgetType) {
           opts.setLastWidgetTriggered(intentResult.widgetType);
 
@@ -358,7 +342,30 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
         }
       }
 
-      // Handle detected preferences
+      // Deferred preference pre-fill: only apply when processIntent did NOT trigger
+      // a preference widget (avoids pre-filling store before user sees the widget)
+      if (intentClassification && intentResult) {
+        if (intentResult.widgetType !== "preferenceStyle" && intentClassification.entities?.budgetLevel) {
+          const level = intentClassification.entities.budgetLevel as string;
+          const ecoValue =
+            level === "budget" ? 10 :
+            level === "comfort" ? 40 :
+            level === "premium" ? 70 : 90;
+          opts.preFillBudgetPreferences(ecoValue);
+          if (import.meta.env.DEV) console.log("[useChatSubmit] Pre-filled budget:", level, "→ ecoVsLuxury:", ecoValue);
+        }
+        const intentInterests = intentClassification.entities?.interests;
+        if (intentResult.widgetType !== "preferenceInterests" && Array.isArray(intentInterests) && intentInterests.length > 0) {
+          const currentPrefs = opts.getPreferenceMemory?.();
+          const existingInterests = currentPrefs?.interests as string[] | undefined;
+          if (!existingInterests?.length) {
+            opts.imperativeHandlers.handlePreferencesDetection({ interests: intentInterests });
+            if (import.meta.env.DEV) console.log("[useChatSubmit] Synced interests from intent:", intentInterests);
+          }
+        }
+      }
+
+      // Handle detected preferences from SSE stream
       if (preferencesData && Object.keys(preferencesData).length > 0) {
         if (import.meta.env.DEV) console.log("[useChatSubmit] Preferences detected:", preferencesData);
         opts.imperativeHandlers.handlePreferencesDetection(preferencesData);
@@ -414,14 +421,13 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
         });
       }
 
-      // B5: If tripDuration was extracted but no dates exist, force date widget
-      if (!showDateWidget && !nextMem.departureDate) {
-        const hasTripDuration = intentClassification?.entities?.tripDuration
-          || flightData?.tripDuration;
-        if (hasTripDuration) {
-          showDateWidget = true;
-        }
-      }
+      // B5: Force date widget when tripDuration extracted but no dates exist
+      showDateWidget = shouldForceShowDateWidget({
+        showDateWidget,
+        hasDepartureDate: !!nextMem.departureDate,
+        intentTripDuration: intentClassification?.entities?.tripDuration as string | undefined,
+        flightDataTripDuration: flightData?.tripDuration as string | undefined,
+      });
 
       // Determine widget from flight flow
       widget = opts.widgetFlow.determineNextWidget(showDateWidget, showTravelersWidget, nextMem);

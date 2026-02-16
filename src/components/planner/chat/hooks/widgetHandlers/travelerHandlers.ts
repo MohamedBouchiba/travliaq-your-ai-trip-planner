@@ -46,15 +46,19 @@ export function handleTravelersSelect(
   };
   setMessages((prev) => [...prev, userChoiceMessage]);
 
-  setMessages((prev) => [
-    ...prev,
-    {
-      id: `confirm-travelers-${Date.now()}`,
-      role: "assistant",
-      text: t("planner.widget.confirm.travelersWithTripType", { label: travelersLabel }),
-      widget: "tripTypeConfirm",
-    },
-  ]);
+  // Only show tripTypeConfirm if trip type hasn't been explicitly set (default is "roundtrip")
+  // Skip redundant confirmation when the default is already correct
+  if (deps.memory.tripType !== "roundtrip") {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `confirm-travelers-${Date.now()}`,
+        role: "assistant",
+        text: t("planner.widget.confirm.travelersWithTripType", { label: travelersLabel }),
+        widget: "tripTypeConfirm",
+      },
+    ]);
+  }
 }
 
 /**
