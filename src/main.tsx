@@ -6,7 +6,8 @@ import "./index.css";
 import "./i18n/config";
 
 // Build Sentry tunnel URL via Supabase Edge Functions (public)
-const SENTRY_TUNNEL = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.functions.supabase.co/sentry-tunnel`;
+// Use hardcoded project ref to avoid undefined env var in some build environments
+const SENTRY_TUNNEL = "https://cinbnmlfpffmyjmkwbco.functions.supabase.co/sentry-tunnel";
 
 Sentry.init({
   dsn: "https://1b9edfe2871f3976f2bb29233636e5c4@o4510257788616704.ingest.de.sentry.io/4510262563045456",
