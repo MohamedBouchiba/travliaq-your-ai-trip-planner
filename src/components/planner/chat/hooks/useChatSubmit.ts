@@ -21,7 +21,7 @@ import { eventBus } from "@/lib/eventBus";
 import { usePlannerStoreV2 } from "@/stores/plannerStoreV2";
 import { buildLLMContext } from "./buildLLMContext";
 import { processFlightData, processAction, buildCombinedSuggestions, shouldForceShowDateWidget } from "./processStreamResult";
-import { computeFlowState, type IntentProcessResult } from "./intentRouterCore";
+import { computeFlowState, type IntentProcessResult, type FlowState } from "./intentRouterCore";
 import { fetchTopCities } from "../utils/fetchTopCities";
 
 // ─── Departure city validation (Bug D fix) ───
@@ -67,7 +67,7 @@ interface WidgetTrackingShape {
 }
 
 interface IntentRouterShape {
-  processIntent: (intent: IntentClassification) => {
+  processIntent: (intent: IntentClassification, flowStateOverride?: FlowState) => {
     shouldShowWidget: boolean;
     widgetType: WidgetType | null;
     widgetData?: Record<string, unknown>;

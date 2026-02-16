@@ -5,7 +5,7 @@
  * Flow: instant upload on click → returns reportId → optional comment upload.
  */
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useDebugStore } from "@/stores/debugStore";
 import { toast } from "sonner";
@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 
 const LS_KEY_LAST_TS = "bugReport_lastTimestamp";
 const LS_KEY_MSG_SINCE = "bugReport_messagesSince";
-const MIN_MESSAGES_BETWEEN_REPORTS = 5;
+const MIN_MESSAGES_BETWEEN_REPORTS = 3;
 
 interface UseBugReportOptions {
   activeSessionId: string | null;
@@ -23,6 +23,7 @@ interface UseBugReportOptions {
 export function useBugReport({ activeSessionId, userMessageCount }: UseBugReportOptions) {
   const { t } = useTranslation();
   const [isUploading, setIsUploading] = useState(false);
+  const lastUploadRef = useRef<{ filePath: string; payload: Record<string, unknown>; userId: string } | null>(null);
 
   // Rate limit: check messages sent since last report
   const canReport = useMemo(() => {
@@ -57,12 +58,9 @@ export function useBugReport({ activeSessionId, userMessageCount }: UseBugReport
         return null;
       }
 
-      // Grab the entire debug store state
       const debugState = useDebugStore.getState();
 
-      // Build exhaustive payload
       const payload = {
-        // Metadata
         meta: {
           user_id: user.id,
           user_email: user.email,
@@ -84,50 +82,26 @@ export function useBugReport({ activeSessionId, userMessageCount }: UseBugReport
               }
             : null,
         },
-
-        // Full message timeline with complete text
+        userComment: null as string | null,
         messageTimeline: debugState.messageTimeline,
-
-        // Intent
         lastIntent: debugState.lastIntent,
         intentHistory: debugState.intentHistory,
-
-        // Reasoning
         reasoning: debugState.reasoning,
-
-        // Flow state
         flowState: debugState.flowState,
-
-        // Memory context
         memoryContext: debugState.memoryContext,
-
-        // Phase transitions
         phaseHistory: debugState.phaseHistory,
-
-        // Tool executions
         toolExecutions: debugState.toolExecutions,
-
-        // Errors
         streamErrors: debugState.streamErrors,
         widgetErrors: debugState.widgetErrors,
         sseParseErrors: debugState.sseParseErrors,
         retryAttempts: debugState.retryAttempts,
-
-        // User interactions
         userInteractions: debugState.userInteractions,
         blockedActions: debugState.blockedActions,
-
-        // EventBus log
         eventBusLog: debugState.eventBusLog,
-
-        // Raw responses
         rawResponses: debugState.rawResponses,
-
-        // Chronological timeline (merge all timestamped entries)
         chronologicalTimeline: buildChronologicalTimeline(debugState),
       };
 
-      // Upload
       const random = Math.random().toString(36).substring(2, 8);
       const ts = new Date().toISOString().replace(/[:.]/g, "-");
       const filePath = `${user.id}/${ts}_${random}.json`;
@@ -145,11 +119,12 @@ export function useBugReport({ activeSessionId, userMessageCount }: UseBugReport
         return null;
       }
 
-      // Update rate limit tracking
       localStorage.setItem(LS_KEY_LAST_TS, String(Date.now()));
       localStorage.setItem(LS_KEY_MSG_SINCE, "0");
 
       const reportId = `${ts}_${random}`;
+      // Store for potential comment re-upload
+      lastUploadRef.current = { filePath, payload, userId: user.id };
       toast.success(t("planner.chat.reportBugSent"));
       return reportId;
     } catch (err) {
@@ -161,31 +136,23 @@ export function useBugReport({ activeSessionId, userMessageCount }: UseBugReport
     }
   }, [isUploading, activeSessionId, t]);
 
-  /** Upload an optional comment linked to a report */
+  /** Re-upload the same file with user comment added */
   const submitComment = useCallback(
-    async (reportId: string, comment: string) => {
-      if (!comment.trim()) return;
+    async (_reportId: string, comment: string) => {
+      if (!comment.trim() || !lastUploadRef.current) return;
 
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        const { filePath, payload } = lastUploadRef.current;
+        const updatedPayload = { ...payload, userComment: comment.trim() };
 
-        const payload = {
-          reportId,
-          comment: comment.trim(),
-          timestamp: new Date().toISOString(),
-          user_id: user.id,
-        };
-
-        const filePath = `${user.id}/${reportId}_comment.json`;
         await supabase.storage
           .from("bug-reports")
-          .upload(filePath, JSON.stringify(payload, null, 2), {
+          .upload(filePath, JSON.stringify(updatedPayload, null, 2), {
             contentType: "application/json",
-            upsert: false,
+            upsert: true,
           });
       } catch (err) {
-        console.error("[useBugReport] Comment upload error:", err);
+        console.error("[useBugReport] Comment re-upload error:", err);
       }
     },
     []
