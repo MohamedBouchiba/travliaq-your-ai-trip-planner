@@ -169,6 +169,7 @@ function processToolCall(
   collectedData: CollectedToolData,
   log: RequestLogger,
   preferencesState: { interests: string[]; style: string | null; pace: string | null },
+  blockedWidgets: string[] = [],
 ): { result: ToolExecutionResult; updatedData: Partial<CollectedToolData> } {
   const toolRunId = generateToolRunId(requestId, toolCall.id);
   const toolName = toolCall.function?.name || "unknown";
@@ -205,7 +206,7 @@ function processToolCall(
         let intentClassification = parseIntentClassification(toolCall.function.arguments);
         if (intentClassification) {
           // Apply deterministic preference-first override (CR2: applyWidgetForcingLogic removed)
-          intentClassification = applyPreferenceFirstLogic(intentClassification, preferencesState, log);
+          intentClassification = applyPreferenceFirstLogic(intentClassification, preferencesState, log, blockedWidgets);
           // B5: Correct budget/style confusion
           intentClassification = applyBudgetStyleGuard(intentClassification, log);
           updatedData.intentClassification = intentClassification;
@@ -419,7 +420,8 @@ function processToolCall(
 function applyPreferenceFirstLogic(
   intentClassification: IntentClassificationResult,
   preferencesState: { interests: string[]; style: string | null },
-  log: RequestLogger
+  log: RequestLogger,
+  blockedWidgets: string[] = [],
 ): IntentClassificationResult {
   // GUARD: Never override conversational intents (CR2)
   const CONVERSATIONAL_INTENTS = [
@@ -475,24 +477,34 @@ function applyPreferenceFirstLogic(
     intentClassification.primaryIntent === "ask_inspiration";
 
   if ((isIndecisIntent || isDestinationSuggestion) && !preferencesState.styleAxesConfigured) {
-    log.info("preference_first", "Overriding to preferenceStyle (styleAxes not configured)");
-    intentClassification.primaryIntent = "gather_preferences";
-    intentClassification.widgetToShow = {
-      type: "preferenceStyle",
-      reason: "Travel style needed before suggesting destinations",
-    };
-    return intentClassification;
+    // FIX: If preferenceStyle is blocked (already confirmed by user), do NOT force it again
+    if (blockedWidgets.includes("preferenceStyle")) {
+      log.info("preference_first", "preferenceStyle blocked (already confirmed), skipping override");
+    } else {
+      log.info("preference_first", "Overriding to preferenceStyle (styleAxes not configured)");
+      intentClassification.primaryIntent = "gather_preferences";
+      intentClassification.widgetToShow = {
+        type: "preferenceStyle",
+        reason: "Travel style needed before suggesting destinations",
+      };
+      return intentClassification;
+    }
   }
 
   if ((isIndecisIntent || isDestinationSuggestion) && 
       (!preferencesState.interests || preferencesState.interests.length === 0)) {
-    log.info("preference_first", "Overriding to preferenceInterests (empty interests)");
-    intentClassification.primaryIntent = "gather_preferences";
-    intentClassification.widgetToShow = {
-      type: "preferenceInterests",
-      reason: "Preferences must be collected before suggesting destinations",
-    };
-    return intentClassification;
+    // FIX: If preferenceInterests is blocked (already confirmed), do NOT force it again
+    if (blockedWidgets.includes("preferenceInterests")) {
+      log.info("preference_first", "preferenceInterests blocked (already confirmed), skipping override");
+    } else {
+      log.info("preference_first", "Overriding to preferenceInterests (empty interests)");
+      intentClassification.primaryIntent = "gather_preferences";
+      intentClassification.widgetToShow = {
+        type: "preferenceInterests",
+        reason: "Preferences must be collected before suggesting destinations",
+      };
+      return intentClassification;
+    }
   }
 
   return intentClassification;
@@ -887,7 +899,7 @@ serve(async (req) => {
           const classifyToolCall = classifyData.choices?.[0]?.message?.tool_calls?.[0];
           
           if (classifyToolCall?.function?.name === "classify_intent") {
-            const { result, updatedData } = processToolCall(classifyToolCall, requestId, collectedData, log, preferencesState);
+            const { result, updatedData } = processToolCall(classifyToolCall, requestId, collectedData, log, preferencesState, blockedWidgets);
             collectedData = mergeToolData(collectedData, updatedData);
             
             toolExecutionLog.push({
@@ -1010,7 +1022,7 @@ serve(async (req) => {
       const toolResponses: { role: "tool"; tool_call_id: string; content: string }[] = [];
       for (const toolCall of toolCalls) {
         const toolStartTime = Date.now();
-        const { result, updatedData } = processToolCall(toolCall, requestId, collectedData, log, preferencesState);
+        const { result, updatedData } = processToolCall(toolCall, requestId, collectedData, log, preferencesState, blockedWidgets);
         const toolLatency = Date.now() - toolStartTime;
         
         toolExecutionLog.push({
@@ -1120,7 +1132,7 @@ serve(async (req) => {
         if (finalChoice?.message?.tool_calls) {
           for (const tc of finalChoice.message.tool_calls) {
             if (tc.function?.name === "generate_quick_replies") {
-              const { result, updatedData } = processToolCall(tc, requestId, collectedData, log, preferencesState);
+              const { result, updatedData } = processToolCall(tc, requestId, collectedData, log, preferencesState, blockedWidgets);
               if (result.success) {
                 collectedData = mergeToolData(collectedData, updatedData);
                 log.info("quick_replies", "Quick replies generated in final call");
