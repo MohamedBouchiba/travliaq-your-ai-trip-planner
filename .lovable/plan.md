@@ -1,42 +1,59 @@
 
 
-# Amelioration du widget "Style de voyage"
+# Corrections restantes post-audit
 
-## Probleme actuel
+## Probleme critique (crash bloquant)
 
-Les labels ont des longueurs differentes ("Relax" vs "Economique", "Intense" vs "Authentique"), ce qui desaligne les sliders entre eux. Le screenshot montre clairement que les barres de couleur n'ont pas la meme longueur visible.
+**"Cannot access 'isStreaming' before initialization"** dans `PlannerChat.tsx`
 
-## Corrections prevues
+Le `useEffect` aux lignes 138-145 reference `isStreaming` dans son tableau de dependances (`[isStreaming]`), mais `isStreaming` est declare plus bas a la ligne 230 via `const { streamResponse, isStreaming } = useChatStream(...)`. Le tableau de dependances est evalue pendant le rendu, avant que la variable ne soit initialisee -- c'est une erreur de "Temporal Dead Zone" (TDZ).
 
-### 1. Alignement parfait des sliders (2 fichiers)
+**Correction** : Deplacer le `useEffect` (lignes 137-145) apres la declaration de `useChatStream` (apres la ligne 230), ou mieux, deplacer l'appel a `useChatStream` avant ce `useEffect`.
 
-Remplacer le layout actuel (`min-w-[90px]` cote gauche / `min-w-[90px]` cote droit) par une largeur fixe identique `w-[100px]` des deux cotes, pour les deux composants :
+---
 
-- **`PreferenceStyleWidget.tsx`** (widget chat) : `min-w-[90px]` -> `w-[100px]`
-- **`StyleEqualizer.tsx`** (panneau preferences) : `min-w-[80px]` -> `w-[100px]` (et compact : `w-[80px]`)
+## Corrections P2 restantes
 
-`w-[100px]` suffit pour le mot le plus long ("Economique" / "Touristique" / "Authentique" / "Relaxation" en anglais) a `text-xs`.
+### 1. Texte "Depart" code en dur (`FlightPriceMarkers.tsx`)
 
-### 2. Bulle info explicative
+Deux occurrences du texte `"Départ"` (lignes 72 et 168) au lieu d'utiliser `i18next`. Le composant est un `memo` vanilla sans acces a `useTranslation`. 
 
-Ajouter un bouton icone `HelpCircle` (lucide) en haut a droite du header, avec un `Tooltip` (Radix) qui affiche :
+**Correction** : Ajouter une prop `departureLabel` au composant, fournie par le parent via `t("planner.map.departure")`, et l'utiliser a la place du texte brut. Ajouter la cle i18n correspondante dans les fichiers de traduction FR/EN.
 
-> "Ajustez chaque curseur pour indiquer vos preferences.
-> Glissez les lignes pour les reorganiser par priorite : la premiere ligne compte le plus."
+### 2. Devise EUR codee en dur (`FlightPriceMarkers.tsx`)
 
-Cle i18n : `planner.preferences.style.helpTooltip`
+Le signe `€` est code en dur dans les prix (lignes 77, 174). La devise devrait etre dynamique.
 
-Ce tooltip sera ajoute dans les deux composants (chat widget + panneau preferences).
+**Correction** : Ajouter une prop `currencySymbol` (defaut: `"€"`) et l'utiliser dans le formatage des prix.
 
-### 3. Espacement uniforme
+### 3. Dictionnaire `cityCoordinates` statique (`map/constants.ts`)
 
-Ajouter `py-1` sur chaque `Reorder.Item` et un `bg-muted/5 rounded-lg` pour creer des "rails" visuels uniformes, rendant la structure plus lisible.
+166 lignes de coordonnees codees en dur, viole le principe "no-hardcode". Cependant, ce dictionnaire sert de **fallback** quand l'index de destinations n'est pas charge. Le supprimer completement casserait la carte pour les activites sans coordonnees.
 
-## Fichiers modifies
+**Correction** : Ce dictionnaire sera conserve temporairement en tant que fallback explicitement documente, avec un commentaire `// FALLBACK: will be replaced by destinationIndex geocoding API`. La migration complete vers une API de geocodage est un chantier plus large hors scope ici.
 
-| Fichier | Changement |
-|---|---|
-| `PreferenceStyleWidget.tsx` | Labels `w-[100px]`, ajout tooltip info, espacement uniforme |
-| `StyleEqualizer.tsx` | Labels `w-[100px]` (compact: `w-[80px]`), ajout tooltip info, espacement uniforme |
-| `src/i18n/config.ts` | Ajout cle `planner.preferences.style.helpTooltip` (FR + EN) |
+### 4. `CITY_COORDINATES` dans `types.ts` (lignes 256-298)
+
+Meme probleme de hardcoding, doublon partiel avec `map/constants.ts`.
+
+**Correction** : Faire pointer `getCityCoords()` vers `cityCoordinates` de `map/constants.ts` au lieu de maintenir un second dictionnaire. Supprimer `CITY_COORDINATES` de `types.ts`. Adapter le test suite `chatTypes.suite.ts` en consequence.
+
+### 5. `MONTH_MAP` dans `types.ts` (lignes 303-325)
+
+Mapping statique des noms de mois FR/EN. Ce mapping est utilise pour parser les entrees utilisateur ("mars", "january"...) -- c'est une table de lookup de parsing, pas de l'affichage. `date-fns/locale` ne fournit pas de parser inverse (nom -> index).
+
+**Correction** : Conserver `MONTH_MAP` tel quel -- c'est un mapping de parsing lexical, pas un cas de hardcoding d'affichage. Ajouter un commentaire explicatif.
+
+---
+
+## Resume des modifications
+
+| Fichier | Action |
+|---------|--------|
+| `PlannerChat.tsx` | Deplacer `useChatStream()` avant le `useEffect` qui utilise `isStreaming` |
+| `FlightPriceMarkers.tsx` | Ajouter props `departureLabel` + `currencySymbol`, supprimer texte FR en dur |
+| `types.ts` | Supprimer `CITY_COORDINATES`, rediriger `getCityCoords` vers `map/constants.ts` |
+| `chatTypes.suite.ts` | Adapter tests pour importer depuis `map/constants` |
+| Fichiers i18n (FR/EN) | Ajouter cle `planner.map.departure` |
+| Parent de FlightPriceMarkers | Passer `departureLabel={t("planner.map.departure")}` |
 
