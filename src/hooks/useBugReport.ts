@@ -53,17 +53,14 @@ export function useBugReport({ activeSessionId, userMessageCount }: UseBugReport
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error(t("planner.error.auth"));
-        return null;
-      }
+      const userId = user?.id ?? "anonymous";
 
       const debugState = useDebugStore.getState();
 
       const payload = {
         meta: {
-          user_id: user.id,
-          user_email: user.email,
+          user_id: userId,
+          user_email: user?.email ?? null,
           session_id: activeSessionId,
           timestamp: new Date().toISOString(),
           user_agent: navigator.userAgent,
@@ -104,7 +101,7 @@ export function useBugReport({ activeSessionId, userMessageCount }: UseBugReport
 
       const random = Math.random().toString(36).substring(2, 8);
       const ts = new Date().toISOString().replace(/[:.]/g, "-");
-      const filePath = `${user.id}/${ts}_${random}.json`;
+      const filePath = `${userId}/${ts}_${random}.json`;
 
       const { error } = await supabase.storage
         .from("bug-reports")
@@ -124,7 +121,7 @@ export function useBugReport({ activeSessionId, userMessageCount }: UseBugReport
 
       const reportId = `${ts}_${random}`;
       // Store for potential comment re-upload
-      lastUploadRef.current = { filePath, payload, userId: user.id };
+      lastUploadRef.current = { filePath, payload, userId };
       toast.success(t("planner.chat.reportBugSent"));
       return reportId;
     } catch (err) {
