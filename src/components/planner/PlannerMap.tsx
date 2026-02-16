@@ -110,7 +110,7 @@ const PlannerMap = ({
 
   return (
     <div className="absolute inset-0 w-full h-full relative" data-tour="map-area">
-      <div ref={mapContainer} className="absolute inset-0 w-full h-full" style={{ minHeight: "100%" }} />
+      <div ref={mapContainer} className="absolute inset-0 w-full h-full [&_.mapboxgl-ctrl-bottom-left]:!bottom-10 [&_.mapboxgl-ctrl-bottom-right]:!bottom-10" style={{ minHeight: "100%" }} />
 
       {/* Flight Price Markers - React Portal for stable rendering */}
       <FlightPriceMarkers
