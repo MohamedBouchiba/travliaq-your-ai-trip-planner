@@ -225,21 +225,19 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
           const response = await supabaseFetch("planner-chat", {
             method: "POST",
+            authOptional: true,
             headers: { "X-Request-ID": requestId },
             body: JSON.stringify({
               messages: limitMessages(apiMessages),
               stream: true,
-              requestId, // Also in body for backup
+              requestId,
               memoryContext: contextMessage,
               missingFields: memoryContext.missingFields,
               currentPhase: memoryContext.currentPhase || "research",
               negativePreferences: negativeContext,
               widgetHistory: memoryContext.widgetHistory || "",
-              // CRITICAL: Send active widgets context for "choose for me" functionality
               activeWidgetsContext: memoryContext.activeWidgetsContext || "",
-              // Anti-loop: blocked widgets that should not be re-proposed
               blockedWidgets: memoryContext.blockedWidgets || [],
-              // Deterministic preference-first logic: send current preferences state
               preferencesState: memoryContext.preferencesState || { interests: [], style: null, pace: null },
             }),
             signal: abortController.signal,

@@ -7,13 +7,14 @@ export class AuthExpiredError extends Error {
   }
 }
 
-/** Fetch a Supabase Edge Function with auth + response.ok check */
+/** Fetch a Supabase Edge Function with auth + response.ok check.
+ *  If `authOptional` is true, the request proceeds even without a session. */
 export async function supabaseFetch(
   functionName: string,
-  init?: RequestInit & { params?: Record<string, string> },
+  init?: RequestInit & { params?: Record<string, string>; authOptional?: boolean },
 ): Promise<Response> {
   const session = (await supabase.auth.getSession()).data.session;
-  if (!session?.access_token) throw new AuthExpiredError();
+  if (!session?.access_token && !init?.authOptional) throw new AuthExpiredError();
 
   const url = new URL(`${SUPABASE_URL}/functions/v1/${functionName}`);
   if (init?.params) {
@@ -22,14 +23,19 @@ export async function supabaseFetch(
     }
   }
 
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    apikey: SUPABASE_PUBLISHABLE_KEY,
+    ...((init?.headers as Record<string, string>) ?? {}),
+  };
+
+  if (session?.access_token) {
+    headers.Authorization = `Bearer ${session.access_token}`;
+  }
+
   const response = await fetch(url.toString(), {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: SUPABASE_PUBLISHABLE_KEY,
-      ...init?.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {
