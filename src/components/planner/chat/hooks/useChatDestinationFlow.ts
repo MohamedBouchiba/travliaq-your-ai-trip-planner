@@ -65,6 +65,8 @@ export function useChatDestinationFlow({
   const [inspireFlowStep, setInspireFlowStep] = useState<InspireFlowStep>("idle");
   // F3: Auto-resume destination fetch when departure city becomes available
   const [pendingDestinationFetch, setPendingDestinationFetch] = useState(false);
+  // B2: Inflight-request guard — prevents concurrent destination fetches
+  const isFetchingRef = useRef(false);
 
   // F5: Refs to always have latest departure info (avoids stale closure in async calls)
   const departureCityRef = useRef(departureCity);
@@ -86,6 +88,10 @@ export function useChatDestinationFlow({
 
   // Preference-flow destination fetch (after style/interests widgets)
   const handleFetchDestinations = useCallback(async (loadingMessageId: string) => {
+    // B2: Prevent concurrent destination fetches
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
     setIsLoadingDestinations(true);
     setInspireFlowStep("loading");
 
@@ -128,6 +134,7 @@ export function useChatDestinationFlow({
       setInspireFlowStep("idle");
     } finally {
       setIsLoadingDestinations(false);
+      isFetchingRef.current = false;
     }
   }, [fetchSuggestions, setMessages, t]);
 
@@ -153,6 +160,10 @@ export function useChatDestinationFlow({
     messageId: string,
     requestedCount: number,
   ) => {
+    // B2: Prevent concurrent destination fetches
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
     // A4: Dismiss any previous unconfirmed destination suggestion widgets
     setMessages((prev) =>
       prev.map((m) =>
@@ -183,6 +194,7 @@ export function useChatDestinationFlow({
       });
       // F3: Mark pending so fetch auto-resumes when departureCity becomes available
       setPendingDestinationFetch(true);
+      isFetchingRef.current = false;
       return;
     }
 
@@ -239,6 +251,8 @@ export function useChatDestinationFlow({
     } catch (apiError) {
       console.error("Error fetching destination suggestions:", apiError);
       setMessages(updateMessageById(messageId, { text: t("planner.messages.errorDestinations"), isTyping: false, isStreaming: false }));
+    } finally {
+      isFetchingRef.current = false;
     }
   }, [fetchSuggestions, setMessages, t]);
 

@@ -26,6 +26,8 @@ interface EntityPersistAction {
   toWidgetRef?: "tripDuration" | "preferredMonth";
   /** Only apply when flightData is null (avoids overriding the more precise flightData path) */
   onlyWithoutFlightData?: boolean;
+  /** B1: Only skip when a specific flightData field is already set (finer than onlyWithoutFlightData) */
+  skipWhenFlightDataHas?: keyof FlightFormData;
 }
 
 /**
@@ -91,13 +93,15 @@ const ENTITY_PERSISTERS: Record<string, EntityPersistAction> = {
   },
 
   // --- Location (departure) --------------------------------------------
+  // B1: Use skipWhenFlightDataHas instead of onlyWithoutFlightData — only skip
+  // when flightData.from is already set, not when any flightData field exists.
   departureCity: {
-    onlyWithoutFlightData: true,
+    skipWhenFlightDataHas: "from",
     toMemory: (v, cur) => ({ departure: { ...cur.departure, city: v as string } }),
     toFormEvent: (v) => ({ from: v }),
   },
   departureCountryCode: {
-    onlyWithoutFlightData: true,
+    skipWhenFlightDataHas: "from",
     toMemory: (v, cur) => ({ departure: { ...cur.departure, countryCode: v as string } }),
   },
 
@@ -163,6 +167,8 @@ export function persistExtractedEntities(
       const persister = ENTITY_PERSISTERS[key];
       if (!persister) continue;
       if (persister.onlyWithoutFlightData && hasFlightData) continue;
+      // B1: Field-specific guard — skip only when flightData already has that field
+      if (persister.skipWhenFlightDataHas && flightData?.[persister.skipWhenFlightDataHas]) continue;
 
       // Widget ref path
       if (persister.toWidgetRef === "tripDuration" && typeof value === "string") {

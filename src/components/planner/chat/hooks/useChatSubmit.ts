@@ -21,6 +21,7 @@ import { eventBus } from "@/lib/eventBus";
 import { usePlannerStoreV2 } from "@/stores/plannerStoreV2";
 import { buildLLMContext } from "./buildLLMContext";
 import { processFlightData, processAction, buildCombinedSuggestions } from "./processStreamResult";
+import { fetchTopCities } from "../utils/fetchTopCities";
 
 // ─── Departure city validation (Bug D fix) ───
 
@@ -293,7 +294,35 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
             const widgetType = intentResult.widgetType;
             opts.intentWidgetRef.current = widgetType;
             if (import.meta.env.DEV) console.log("[useChatSubmit] Intent widget:", widgetType);
-            opts.setMessages(updateMessageById(messageId, { widget: widgetType, widgetData: intentResult.widgetData, widgetConfirmed: false }));
+
+            // B3: citySelector needs async city fetch — processIntent doesn't populate citySelection
+            if (widgetType === "citySelector") {
+              const countryCode = (intentResult.widgetData as Record<string, unknown>)?.countryCode as string
+                || (intentResult.widgetData as Record<string, unknown>)?.destinationCountryCode as string
+                || opts.memory.arrival?.countryCode;
+              const countryName = (intentResult.widgetData as Record<string, unknown>)?.countryName as string
+                || (intentResult.widgetData as Record<string, unknown>)?.destinationCountry as string
+                || opts.memory.arrival?.country
+                || "";
+
+              if (countryCode) {
+                opts.setMessages(updateMessageById(messageId, { isTyping: true }));
+                fetchTopCities(countryCode, t("planner.systemMessage.importantCity")).then((cities) => {
+                  if (cities) {
+                    opts.setMessages(updateMessageById(messageId, {
+                      widget: "citySelector" as WidgetType,
+                      widgetData: { citySelection: { countryCode, countryName, cities }, isDeparture: false },
+                      widgetConfirmed: false,
+                      isTyping: false,
+                    }));
+                  } else {
+                    opts.setMessages(updateMessageById(messageId, { isTyping: false }));
+                  }
+                });
+              }
+            } else {
+              opts.setMessages(updateMessageById(messageId, { widget: widgetType, widgetData: intentResult.widgetData, widgetConfirmed: false }));
+            }
           }
         }
 
@@ -359,20 +388,39 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
       // destination tracking, map navigation, form data emission
       let widget: WidgetType | undefined;
       const hasFlightData = flightData && Object.keys(flightData).length > 0;
-      const { nextMem, showDateWidget, showTravelersWidget } = hasFlightData
-        ? processFlightData(flightData, !!intentClassification, {
-            widgetFlow: opts.widgetFlow,
-            updateMemory: opts.updateMemory,
-            memory: opts.memory,
-            widgetTracking: opts.widgetTracking,
-          })
-        : { nextMem: { ...opts.memory, passengers: { ...opts.memory.passengers } }, showDateWidget: false, showTravelersWidget: false };
+      let showDateWidget: boolean;
+      let showTravelersWidget: boolean;
+      let nextMem: FlightMemory;
+      if (hasFlightData) {
+        const result = processFlightData(flightData, !!intentClassification, {
+          widgetFlow: opts.widgetFlow,
+          updateMemory: opts.updateMemory,
+          memory: opts.memory,
+          widgetTracking: opts.widgetTracking,
+        });
+        nextMem = result.nextMem;
+        showDateWidget = result.showDateWidget;
+        showTravelersWidget = result.showTravelersWidget;
+      } else {
+        nextMem = { ...opts.memory, passengers: { ...opts.memory.passengers } } as FlightMemory;
+        showDateWidget = false;
+        showTravelersWidget = false;
+      }
 
       if (!hasFlightData && action) {
         processAction(action, {
           widgetActionExecutor: opts.widgetActionExecutor,
           intentClassification,
         });
+      }
+
+      // B5: If tripDuration was extracted but no dates exist, force date widget
+      if (!showDateWidget && !nextMem.departureDate) {
+        const hasTripDuration = intentClassification?.entities?.tripDuration
+          || flightData?.tripDuration;
+        if (hasTripDuration) {
+          showDateWidget = true;
+        }
       }
 
       // Determine widget from flight flow
