@@ -1,59 +1,112 @@
 
+# Bouton "Signaler un probleme" avec envoi immediat + pop-up message optionnel
 
-# Corrections restantes post-audit
+## Flux utilisateur
 
-## Probleme critique (crash bloquant)
+1. Sous le champ de saisie, le texte statique est remplace par : *"Un souci ? [Cliquez ici pour nous aider](lien)"*
+2. **Au clic** : le JSON de debug est immediatement uploade vers Supabase Storage (`bug-reports` bucket). Un toast confirme : "Rapport envoye !"
+3. **Ensuite** : une pop-up (Dialog) s'affiche avec un textarea optionnel : "Souhaitez-vous ajouter un commentaire ?"
+   - Si l'utilisateur ecrit + valide : un second fichier `{report_id}_comment.json` est uploade avec le message + le report_id
+   - Si l'utilisateur ferme sans ecrire : rien de plus n'est envoye
+4. **Rate limit** : le lien est desactive tant que l'utilisateur n'a pas envoye au moins 5 messages depuis le dernier rapport
 
-**"Cannot access 'isStreaming' before initialization"** dans `PlannerChat.tsx`
+## Donnees collectees dans le JSON (maximum de profondeur)
 
-Le `useEffect` aux lignes 138-145 reference `isStreaming` dans son tableau de dependances (`[isStreaming]`), mais `isStreaming` est declare plus bas a la ligne 230 via `const { streamResponse, isStreaming } = useChatStream(...)`. Le tableau de dependances est evalue pendant le rendu, avant que la variable ne soit initialisee -- c'est une erreur de "Temporal Dead Zone" (TDZ).
+Tout le contenu du `debugStore` est inclus, soit :
 
-**Correction** : Deplacer le `useEffect` (lignes 137-145) apres la declaration de `useChatStream` (apres la ligne 230), ou mieux, deplacer l'appel a `useChatStream` avant ce `useEffect`.
+- **Metadonnees** : user_id, session_id (activeSessionId), timestamp, user-agent, URL courante, langue, viewport
+- **Messages** : historique complet (messageTimeline) avec texte integral, widgets, widgetData, widgetConfirmed, suggestionsShown
+- **Intent** : lastIntent + intentHistory complet (primary, confidence, entities, widgetToShow, source)
+- **Reasoning** : understanding, contextAnalysis, responseStrategy, keyInsights, widgetDecision, confidence
+- **Flow state** : hasDestination, hasDepartureDate, hasTravelers, isReadyToSearch, etc.
+- **Memory context** : flightSummary, activityContext, preferenceContext, widgetHistory, blockedWidgets, basketSummary, conversationSummary, currentPhase, missingFields, sessionEntities
+- **Phase** : phaseHistory (from/to/confidence)
+- **Tools** : toolExecutions (tool, status, latency_ms, summary, loopIteration)
+- **Erreurs** : streamErrors, widgetErrors, sseParseErrors, retryAttempts
+- **Interactions** : userInteractions (category, action, detail, widgetType), blockedActions
+- **EventBus** : eventBusLog (event, payload)
+- **Raw responses** : rawResponses (requestId, data)
+- **Timeline chronologique** : tous les elements ci-dessus fusionnes et tries par timestamp (meme format que le bouton Copy du DebugPanel)
 
----
+## Details techniques
 
-## Corrections P2 restantes
+### 1. Migration SQL - Bucket `bug-reports`
 
-### 1. Texte "Depart" code en dur (`FlightPriceMarkers.tsx`)
+```sql
+INSERT INTO storage.buckets (id, name, public) VALUES ('bug-reports', 'bug-reports', false);
 
-Deux occurrences du texte `"Départ"` (lignes 72 et 168) au lieu d'utiliser `i18next`. Le composant est un `memo` vanilla sans acces a `useTranslation`. 
+-- Utilisateurs authentifies peuvent uploader
+CREATE POLICY "Authenticated users can upload bug reports"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'bug-reports');
 
-**Correction** : Ajouter une prop `departureLabel` au composant, fournie par le parent via `t("planner.map.departure")`, et l'utiliser a la place du texte brut. Ajouter la cle i18n correspondante dans les fichiers de traduction FR/EN.
+-- Pas de SELECT/UPDATE/DELETE pour les utilisateurs
+```
 
-### 2. Devise EUR codee en dur (`FlightPriceMarkers.tsx`)
+### 2. Nouveau hook `src/hooks/useBugReport.ts`
 
-Le signe `€` est code en dur dans les prix (lignes 77, 174). La devise devrait etre dynamique.
+Responsabilites :
+- `canReport` : `true` si nombre de messages user depuis le dernier rapport >= 5
+- `isUploading` : etat de chargement pendant l'upload
+- `submitReport()` :
+  1. Collecte l'integralite du `useDebugStore.getState()` (toutes les slices)
+  2. Ajoute les metadonnees (user_id via `supabase.auth.getUser()`, session_id via `useChatSessions`, timestamp, user-agent, URL, langue)
+  3. Reconstruit la timeline chronologique (meme logique que `handleCopyDebugInfo` du DebugPanel)
+  4. Upload vers `bug-reports/{user_id}/{timestamp_iso}_{random}.json`
+  5. Retourne le `reportId` (nom du fichier sans extension)
+- `submitComment(reportId, comment)` : uploade `{reportId}_comment.json` avec `{ reportId, comment, timestamp }`
+- Tracking via `localStorage` : `bugReport_lastTimestamp` + `bugReport_messagesSince`
 
-**Correction** : Ajouter une prop `currencySymbol` (defaut: `"€"`) et l'utiliser dans le formatage des prix.
+### 3. Modification de `ChatInputArea.tsx`
 
-### 3. Dictionnaire `cityCoordinates` statique (`map/constants.ts`)
+- Nouvelles props : `onReportBug`, `canReport`, `isReporting`
+- Le `<p>` statique est remplace par :
+  - Si `canReport` : "Un souci ? **Cliquez ici** pour nous aider" (lien cliquable)
+  - Si pas `canReport` : texte grise "Envoyez encore X messages pour pouvoir signaler un probleme"
+  - Si `isReporting` : spinner "Envoi en cours..."
 
-166 lignes de coordonnees codees en dur, viole le principe "no-hardcode". Cependant, ce dictionnaire sert de **fallback** quand l'index de destinations n'est pas charge. Le supprimer completement casserait la carte pour les activites sans coordonnees.
+### 4. Nouveau composant `src/components/planner/chat/BugReportDialog.tsx`
 
-**Correction** : Ce dictionnaire sera conserve temporairement en tant que fallback explicitement documente, avec un commentaire `// FALLBACK: will be replaced by destinationIndex geocoding API`. La migration complete vers une API de geocodage est un chantier plus large hors scope ici.
+- Dialog Radix (AlertDialog) avec :
+  - Titre : "Merci pour votre aide !"
+  - Description : "Le rapport technique a ete envoye. Souhaitez-vous ajouter un commentaire ?"
+  - Textarea optionnel
+  - Bouton "Envoyer le commentaire" + "Fermer sans commentaire"
+- Gere `isOpen`, `onClose`, `onSubmitComment(text)`
 
-### 4. `CITY_COORDINATES` dans `types.ts` (lignes 256-298)
+### 5. Integration dans `PlannerChat.tsx`
 
-Meme probleme de hardcoding, doublon partiel avec `map/constants.ts`.
+- Importer `useBugReport` + `BugReportDialog`
+- Compter `userMessageCount` = `messages.filter(m => m.role === "user").length`
+- Au clic report : appeler `submitReport()`, ouvrir le dialog
+- Passer props a `ChatInputArea`
 
-**Correction** : Faire pointer `getCityCoords()` vers `cityCoordinates` de `map/constants.ts` au lieu de maintenir un second dictionnaire. Supprimer `CITY_COORDINATES` de `types.ts`. Adapter le test suite `chatTypes.suite.ts` en consequence.
+### 6. Cles i18n
 
-### 5. `MONTH_MAP` dans `types.ts` (lignes 303-325)
+**FR** :
+- `planner.chat.reportBugPrefix` : "Un souci ? "
+- `planner.chat.reportBugLink` : "Cliquez ici pour nous aider"
+- `planner.chat.reportBugSent` : "Rapport envoye, merci !"
+- `planner.chat.reportBugCooldown` : "Envoyez encore {{count}} messages pour signaler un probleme"
+- `planner.chat.reportBugUploading` : "Envoi du rapport..."
+- `planner.chat.reportCommentTitle` : "Merci pour votre aide !"
+- `planner.chat.reportCommentDescription` : "Le rapport a ete envoye. Vous pouvez ajouter un commentaire pour nous aider a comprendre le probleme."
+- `planner.chat.reportCommentPlaceholder` : "Decrivez le probleme rencontre (optionnel)..."
+- `planner.chat.reportCommentSend` : "Envoyer le commentaire"
+- `planner.chat.reportCommentSkip` : "Fermer"
 
-Mapping statique des noms de mois FR/EN. Ce mapping est utilise pour parser les entrees utilisateur ("mars", "january"...) -- c'est une table de lookup de parsing, pas de l'affichage. `date-fns/locale` ne fournit pas de parser inverse (nom -> index).
+**EN** : Equivalents anglais.
 
-**Correction** : Conserver `MONTH_MAP` tel quel -- c'est un mapping de parsing lexical, pas un cas de hardcoding d'affichage. Ajouter un commentaire explicatif.
-
----
-
-## Resume des modifications
+### 7. Resume des fichiers
 
 | Fichier | Action |
 |---------|--------|
-| `PlannerChat.tsx` | Deplacer `useChatStream()` avant le `useEffect` qui utilise `isStreaming` |
-| `FlightPriceMarkers.tsx` | Ajouter props `departureLabel` + `currencySymbol`, supprimer texte FR en dur |
-| `types.ts` | Supprimer `CITY_COORDINATES`, rediriger `getCityCoords` vers `map/constants.ts` |
-| `chatTypes.suite.ts` | Adapter tests pour importer depuis `map/constants` |
-| Fichiers i18n (FR/EN) | Ajouter cle `planner.map.departure` |
-| Parent de FlightPriceMarkers | Passer `departureLabel={t("planner.map.departure")}` |
-
+| Migration SQL | Creer bucket `bug-reports` + RLS INSERT only |
+| `src/hooks/useBugReport.ts` | Creer - collecte exhaustive + upload + rate limit |
+| `src/components/planner/chat/BugReportDialog.tsx` | Creer - dialog commentaire optionnel |
+| `src/components/planner/chat/ChatInputArea.tsx` | Modifier - lien cliquable + props report |
+| `src/components/planner/PlannerChat.tsx` | Modifier - brancher hook + dialog |
+| `src/i18n/locales/fr/planner.json` | Ajouter cles i18n |
+| `src/i18n/locales/en/planner.json` | Ajouter cles i18n |
+| `src/i18n/config.ts` | Ajouter cles i18n fallback |
