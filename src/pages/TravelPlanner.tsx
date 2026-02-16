@@ -5,6 +5,8 @@ import { useTranslation } from "react-i18next";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import type { ImperativePanelHandle } from "react-resizable-panels";
 import PlannerMap, { DestinationClickEvent } from "@/components/planner/PlannerMap";
+import TripPriceBar from "@/components/planner/TripPriceBar";
+import PlannerItineraryView from "@/components/planner/PlannerItineraryView";
 import PlannerPanel, { FlightRoutePoint, CountrySelectionEvent } from "@/components/planner/PlannerPanel";
 import PlannerCard from "@/components/planner/PlannerCard";
 import PlannerChat, { FlightFormData, PlannerChatRef, AirportChoice, DualAirportChoice, AirportConfirmationData, ConfirmedAirports } from "@/components/planner/PlannerChat";
@@ -64,6 +66,7 @@ const TravelPlanner = () => {
   const chatPanelRef = useRef<ImperativePanelHandle>(null);
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
   const [shouldConfirmLeave, setShouldConfirmLeave] = useState(false);
+  const [viewMode, setViewMode] = useState<'map' | 'itinerary'>('map');
   
   // Mobile responsiveness
   const isMobile = useIsMobile();
@@ -288,106 +291,114 @@ const TravelPlanner = () => {
                       ) : (
                         /* Maps View with Widgets at top */
                         <div className="h-full relative">
-                          {/* Map - full height behind everything */}
-                          <PlannerErrorBoundary componentName="PlannerMap">
-                            <PlannerMap
-                              activeTab={activeTab}
-                              center={mapCenter}
-                              zoom={mapZoom}
-                              onPinClick={handlePinClick}
-                              selectedPinId={selectedPin?.id}
-                              flightRoutes={flightRoutes}
-                              animateToUserLocation={onboardingComplete && !initialAnimationDone}
-                              onAnimationComplete={() => {
-                                setInitialAnimationDone(true);
-                                setIsPanelVisible(true);
-                              }}
-                              isPanelOpen={isPanelVisible}
-                              userLocation={userLocation}
-                              userDefaultFocusNonce={userDefaultFocusNonce}
-                              onDestinationClick={handleDestinationClick}
-                              isMobile={true}
-                              mobileWidgetOpen={isPanelVisible}
-                            />
-                          </PlannerErrorBoundary>
-
-                          {/* Widget Panel - positioned at top on mobile (max 35vh) */}
-                          {youtubePanel ? (
-                            <div className="absolute top-0 left-0 right-0 z-10 max-h-[35vh] overflow-hidden animate-fade-in">
-                              <div className="h-full overflow-hidden rounded-b-2xl bg-card/95 backdrop-blur-xl border-b border-x border-border/50 shadow-lg">
-                                <YouTubeShortsPanel
-                                  city={youtubePanel.city}
-                                  countryName={youtubePanel.countryName}
-                                  isOpen={true}
-                                  onClose={() => setYoutubePanel(null)}
+                          {viewMode === 'itinerary' ? (
+                            <PlannerItineraryView onBackToMap={() => setViewMode('map')} />
+                          ) : (
+                            <>
+                              {/* Map - full height behind everything */}
+                              <PlannerErrorBoundary componentName="PlannerMap">
+                                <PlannerMap
+                                  activeTab={activeTab}
+                                  center={mapCenter}
+                                  zoom={mapZoom}
+                                  onPinClick={handlePinClick}
+                                  selectedPinId={selectedPin?.id}
+                                  flightRoutes={flightRoutes}
+                                  animateToUserLocation={onboardingComplete && !initialAnimationDone}
+                                  onAnimationComplete={() => {
+                                    setInitialAnimationDone(true);
+                                    setIsPanelVisible(true);
+                                  }}
+                                  isPanelOpen={isPanelVisible}
+                                  userLocation={userLocation}
+                                  userDefaultFocusNonce={userDefaultFocusNonce}
+                                  onDestinationClick={handleDestinationClick}
+                                  isMobile={true}
+                                  mobileWidgetOpen={isPanelVisible}
                                 />
-                              </div>
-                            </div>
-                          ) : isPanelVisible && (
-                            <PlannerErrorBoundary componentName="PlannerPanel">
-                              <PlannerPanel
-                                activeTab={activeTab}
-                                layout="mobile-top"
-                                isVisible={isPanelVisible}
-                                onClose={() => {
-                                  setIsPanelVisible(false);
-                                  if (activeTab === "stays") {
-                                    setTimeout(() => {
-                                      eventBus.emit("hotels:fitToPrices", undefined);
-                                    }, 350);
+                              </PlannerErrorBoundary>
+
+                              {/* Widget Panel - positioned at top on mobile (max 35vh) */}
+                              {youtubePanel ? (
+                                <div className="absolute top-0 left-0 right-0 z-10 max-h-[35vh] overflow-hidden animate-fade-in">
+                                  <div className="h-full overflow-hidden rounded-b-2xl bg-card/95 backdrop-blur-xl border-b border-x border-border/50 shadow-lg">
+                                    <YouTubeShortsPanel
+                                      city={youtubePanel.city}
+                                      countryName={youtubePanel.countryName}
+                                      isOpen={true}
+                                      onClose={() => setYoutubePanel(null)}
+                                    />
+                                  </div>
+                                </div>
+                              ) : isPanelVisible && (
+                                <PlannerErrorBoundary componentName="PlannerPanel">
+                                  <PlannerPanel
+                                    activeTab={activeTab}
+                                    layout="mobile-top"
+                                    isVisible={isPanelVisible}
+                                    onClose={() => {
+                                      setIsPanelVisible(false);
+                                      if (activeTab === "stays") {
+                                        setTimeout(() => {
+                                          eventBus.emit("hotels:fitToPrices", undefined);
+                                        }, 350);
+                                      }
+                                    }}
+                                    mapCenter={mapCenter}
+                                    onMapMove={(center, zoom) => {
+                                      setMapCenter(center);
+                                      setMapZoom(zoom);
+                                    }}
+                                    onFlightRoutesChange={setFlightRoutes}
+                                    flightFormData={flightFormData}
+                                    onFlightFormDataConsumed={() => setFlightFormData(null)}
+                                    onCountrySelected={handleCountrySelected}
+                                    onAskAirportChoice={handleAskAirportChoice}
+                                    onAskDualAirportChoice={handleAskDualAirportChoice}
+                                    onAskAirportConfirmation={handleAskAirportConfirmation}
+                                    selectedAirport={selectedAirport}
+                                    onSelectedAirportConsumed={() => setSelectedAirport(null)}
+                                    onUserLocationDetected={setUserLocation}
+                                    onSearchReady={handleSearchReady}
+                                    triggerSearch={triggerFlightSearch}
+                                    onSearchTriggered={() => setTriggerFlightSearch(false)}
+                                    confirmedMultiAirports={confirmedMultiAirports}
+                                    onConfirmedMultiAirportsConsumed={() => setConfirmedMultiAirports(null)}
+                                  />
+                                </PlannerErrorBoundary>
+                              )}
+
+                              {/* GPS Location Button */}
+                              <MobileLocationButton
+                                onLocate={async () => {
+                                  if (userLocation) {
+                                    setMapCenter([userLocation.lng, userLocation.lat]);
+                                    setMapZoom(12);
                                   }
                                 }}
-                                mapCenter={mapCenter}
-                                onMapMove={(center, zoom) => {
-                                  setMapCenter(center);
-                                  setMapZoom(zoom);
-                                }}
-                                onFlightRoutesChange={setFlightRoutes}
-                                flightFormData={flightFormData}
-                                onFlightFormDataConsumed={() => setFlightFormData(null)}
-                                onCountrySelected={handleCountrySelected}
-                                onAskAirportChoice={handleAskAirportChoice}
-                                onAskDualAirportChoice={handleAskDualAirportChoice}
-                                onAskAirportConfirmation={handleAskAirportConfirmation}
-                                selectedAirport={selectedAirport}
-                                onSelectedAirportConsumed={() => setSelectedAirport(null)}
-                                onUserLocationDetected={setUserLocation}
-                                onSearchReady={handleSearchReady}
-                                triggerSearch={triggerFlightSearch}
-                                onSearchTriggered={() => setTriggerFlightSearch(false)}
-                                confirmedMultiAirports={confirmedMultiAirports}
-                                onConfirmedMultiAirportsConsumed={() => setConfirmedMultiAirports(null)}
+                                widgetOpen={isPanelVisible}
                               />
-                            </PlannerErrorBoundary>
-                          )}
 
-                          {/* GPS Location Button */}
-                          <MobileLocationButton
-                            onLocate={async () => {
-                              if (userLocation) {
-                                setMapCenter([userLocation.lng, userLocation.lat]);
-                                setMapZoom(12);
-                              }
-                            }}
-                            widgetOpen={isPanelVisible}
-                          />
+                              {/* Destination popup */}
+                              <DestinationPopup
+                                cityName={destinationPopup?.cityName || ""}
+                                countryName={destinationPopup?.countryName}
+                                isOpen={!!destinationPopup}
+                                onClose={() => {
+                                  window.dispatchEvent(new Event("destination-popup-close"));
+                                  setDestinationPopup(null);
+                                }}
+                                onDiscoverClick={handleOpenYouTube}
+                                position={destinationPopup?.position}
+                              />
 
-                          {/* Destination popup */}
-                          <DestinationPopup
-                            cityName={destinationPopup?.cityName || ""}
-                            countryName={destinationPopup?.countryName}
-                            isOpen={!!destinationPopup}
-                            onClose={() => {
-                              window.dispatchEvent(new Event("destination-popup-close"));
-                              setDestinationPopup(null);
-                            }}
-                            onDiscoverClick={handleOpenYouTube}
-                            position={destinationPopup?.position}
-                          />
+                              {/* Floating card */}
+                              {selectedPin && (
+                                <PlannerCard pin={selectedPin} onClose={handleCloseCard} onAddToTrip={handleAddToTrip} />
+                              )}
 
-                          {/* Floating card */}
-                          {selectedPin && (
-                            <PlannerCard pin={selectedPin} onClose={handleCloseCard} onAddToTrip={handleAddToTrip} />
+                              <TripPriceBar onPlanTrip={() => setViewMode('itinerary')} />
+                            </>
                           )}
                         </div>
                       )}
@@ -451,106 +462,109 @@ const TravelPlanner = () => {
                     {/* Right: Map workspace - resizable */}
                     <ResizablePanel defaultSize={65} minSize={40}>
                       <main className="relative h-full overflow-hidden pt-12">
-                        <PlannerErrorBoundary componentName="PlannerMap">
-                          <PlannerMap
-                            activeTab={activeTab}
-                            center={mapCenter}
-                            zoom={mapZoom}
-                            onPinClick={handlePinClick}
-                            selectedPinId={selectedPin?.id}
-                            flightRoutes={flightRoutes}
-                            animateToUserLocation={onboardingComplete && !initialAnimationDone}
-                            onAnimationComplete={() => {
-                              setInitialAnimationDone(true);
-                              setIsPanelVisible(true);
-                            }}
-                            isPanelOpen={isPanelVisible}
-                            userLocation={userLocation}
-                            userDefaultFocusNonce={userDefaultFocusNonce}
-                            onDestinationClick={handleDestinationClick}
-                          />
-                        </PlannerErrorBoundary>
-
-                         {/* Overlay tabs */}
-                         <PlannerTopBar
-                           activeTab={activeTab}
-                           onTabChange={handleTabChange}
-                           isChatCollapsed={isChatCollapsed}
-                           onOpenChat={() => chatPanelRef.current?.expand()}
-                           confirmLeave={shouldConfirmLeave}
-                           confirmLeaveMessage={t("planner.leaveConfirmation")}
-                         />
-                        {youtubePanel ? (
-                          <aside className="pointer-events-none absolute top-16 left-4 bottom-4 w-[320px] sm:w-[360px] md:w-[400px] lg:w-[420px] xl:w-[480px] 2xl:w-[540px] z-10">
-                            <div className="pointer-events-auto h-full overflow-hidden rounded-2xl bg-card/95 backdrop-blur-xl border border-border/50 shadow-lg">
-                              <YouTubeShortsPanel
-                                city={youtubePanel.city}
-                                countryName={youtubePanel.countryName}
-                                isOpen={true}
-                                onClose={() => setYoutubePanel(null)}
-                              />
-                            </div>
-                          </aside>
+                        {viewMode === 'itinerary' ? (
+                          <PlannerItineraryView onBackToMap={() => setViewMode('map')} />
                         ) : (
-                          /* Regular Overlay panel */
-                          <div>
-                            <PlannerErrorBoundary componentName="PlannerPanel">
-                              <PlannerPanel
+                          <>
+                            <PlannerErrorBoundary componentName="PlannerMap">
+                              <PlannerMap
                                 activeTab={activeTab}
-                                layout="overlay"
-                                isVisible={isPanelVisible}
-                                onClose={() => {
-                                  // First close panel to update padding
-                                  setIsPanelVisible(false);
-                                  // Then after padding animation completes, fit to prices
-                                  if (activeTab === "stays") {
-                                    setTimeout(() => {
-                                      eventBus.emit("hotels:fitToPrices", undefined);
-                                    }, 350); // After padding animation (300ms) + buffer
-                                  }
+                                center={mapCenter}
+                                zoom={mapZoom}
+                                onPinClick={handlePinClick}
+                                selectedPinId={selectedPin?.id}
+                                flightRoutes={flightRoutes}
+                                animateToUserLocation={onboardingComplete && !initialAnimationDone}
+                                onAnimationComplete={() => {
+                                  setInitialAnimationDone(true);
+                                  setIsPanelVisible(true);
                                 }}
-                                mapCenter={mapCenter}
-                                onMapMove={(center, zoom) => {
-                                  setMapCenter(center);
-                                  setMapZoom(zoom);
-                                }}
-                                onFlightRoutesChange={setFlightRoutes}
-                                flightFormData={flightFormData}
-                                onFlightFormDataConsumed={() => setFlightFormData(null)}
-                                onCountrySelected={handleCountrySelected}
-                                onAskAirportChoice={handleAskAirportChoice}
-                                onAskDualAirportChoice={handleAskDualAirportChoice}
-                                onAskAirportConfirmation={handleAskAirportConfirmation}
-                                selectedAirport={selectedAirport}
-                                onSelectedAirportConsumed={() => setSelectedAirport(null)}
-                                onUserLocationDetected={setUserLocation}
-                                onSearchReady={handleSearchReady}
-                                triggerSearch={triggerFlightSearch}
-                                onSearchTriggered={() => setTriggerFlightSearch(false)}
-                                confirmedMultiAirports={confirmedMultiAirports}
-                                onConfirmedMultiAirportsConsumed={() => setConfirmedMultiAirports(null)}
+                                isPanelOpen={isPanelVisible}
+                                userLocation={userLocation}
+                                userDefaultFocusNonce={userDefaultFocusNonce}
+                                onDestinationClick={handleDestinationClick}
                               />
                             </PlannerErrorBoundary>
-                          </div>
+
+                            {youtubePanel ? (
+                              <aside className="pointer-events-none absolute top-16 left-4 bottom-4 w-[320px] sm:w-[360px] md:w-[400px] lg:w-[420px] xl:w-[480px] 2xl:w-[540px] z-10">
+                                <div className="pointer-events-auto h-full overflow-hidden rounded-2xl bg-card/95 backdrop-blur-xl border border-border/50 shadow-lg">
+                                  <YouTubeShortsPanel
+                                    city={youtubePanel.city}
+                                    countryName={youtubePanel.countryName}
+                                    isOpen={true}
+                                    onClose={() => setYoutubePanel(null)}
+                                  />
+                                </div>
+                              </aside>
+                            ) : (
+                              <div>
+                                <PlannerErrorBoundary componentName="PlannerPanel">
+                                  <PlannerPanel
+                                    activeTab={activeTab}
+                                    layout="overlay"
+                                    isVisible={isPanelVisible}
+                                    onClose={() => {
+                                      setIsPanelVisible(false);
+                                      if (activeTab === "stays") {
+                                        setTimeout(() => {
+                                          eventBus.emit("hotels:fitToPrices", undefined);
+                                        }, 350);
+                                      }
+                                    }}
+                                    mapCenter={mapCenter}
+                                    onMapMove={(center, zoom) => {
+                                      setMapCenter(center);
+                                      setMapZoom(zoom);
+                                    }}
+                                    onFlightRoutesChange={setFlightRoutes}
+                                    flightFormData={flightFormData}
+                                    onFlightFormDataConsumed={() => setFlightFormData(null)}
+                                    onCountrySelected={handleCountrySelected}
+                                    onAskAirportChoice={handleAskAirportChoice}
+                                    onAskDualAirportChoice={handleAskDualAirportChoice}
+                                    onAskAirportConfirmation={handleAskAirportConfirmation}
+                                    selectedAirport={selectedAirport}
+                                    onSelectedAirportConsumed={() => setSelectedAirport(null)}
+                                    onUserLocationDetected={setUserLocation}
+                                    onSearchReady={handleSearchReady}
+                                    triggerSearch={triggerFlightSearch}
+                                    onSearchTriggered={() => setTriggerFlightSearch(false)}
+                                    confirmedMultiAirports={confirmedMultiAirports}
+                                    onConfirmedMultiAirportsConsumed={() => setConfirmedMultiAirports(null)}
+                                  />
+                                </PlannerErrorBoundary>
+                              </div>
+                            )}
+
+                            <DestinationPopup
+                              cityName={destinationPopup?.cityName || ""}
+                              countryName={destinationPopup?.countryName}
+                              isOpen={!!destinationPopup}
+                              onClose={() => {
+                                window.dispatchEvent(new Event("destination-popup-close"));
+                                setDestinationPopup(null);
+                              }}
+                              onDiscoverClick={handleOpenYouTube}
+                              position={destinationPopup?.position}
+                            />
+
+                            {selectedPin && (
+                              <PlannerCard pin={selectedPin} onClose={handleCloseCard} onAddToTrip={handleAddToTrip} />
+                            )}
+
+                            <TripPriceBar onPlanTrip={() => setViewMode('itinerary')} />
+                          </>
                         )}
 
-                        {/* Destination popup on map marker click */}
-                        <DestinationPopup
-                          cityName={destinationPopup?.cityName || ""}
-                          countryName={destinationPopup?.countryName}
-                          isOpen={!!destinationPopup}
-                          onClose={() => {
-                            window.dispatchEvent(new Event("destination-popup-close"));
-                            setDestinationPopup(null);
-                          }}
-                          onDiscoverClick={handleOpenYouTube}
-                          position={destinationPopup?.position}
+                        <PlannerTopBar
+                          activeTab={activeTab}
+                          onTabChange={handleTabChange}
+                          isChatCollapsed={isChatCollapsed}
+                          onOpenChat={() => chatPanelRef.current?.expand()}
+                          confirmLeave={shouldConfirmLeave}
+                          confirmLeaveMessage={t("planner.leaveConfirmation")}
                         />
-
-                        {/* Floating card on map */}
-                        {selectedPin && (
-                          <PlannerCard pin={selectedPin} onClose={handleCloseCard} onAddToTrip={handleAddToTrip} />
-                        )}
                       </main>
                     </ResizablePanel>
                   </ResizablePanelGroup>
