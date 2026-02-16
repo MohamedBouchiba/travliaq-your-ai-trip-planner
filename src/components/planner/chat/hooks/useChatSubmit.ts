@@ -12,7 +12,7 @@ import { useTranslation } from "react-i18next";
 import type { ChatMessage } from "../types";
 import type { WidgetType } from "@/types/flight";
 import type { FlightMemory } from "@/stores/hooks/useFlightMemoryStore";
-import type { IntentClassification, APIMessage, MemoryContext, StreamResult, OnContentUpdate, SessionEntities, StreamError } from "./chatStreamTypes";
+import type { IntentClassification, APIMessage, MemoryContext, StreamResult, OnContentUpdate, StreamError } from "./chatStreamTypes";
 import type { ChooseWidgetAction } from "./useWidgetActionExecutor";
 import { parseAction, generateId, updateMessageById } from "../utils";
 import { persistExtractedEntities } from "./persistExtractedEntities";
@@ -37,10 +37,11 @@ export function isValidDepartureCity(city: string): boolean {
 
 // ─── Types ───
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type StreamResponseFn = (
   messages: APIMessage[],
   messageId: string,
-  context: MemoryContext,
+  context: any,
   onChunk: OnContentUpdate,
 ) => Promise<StreamResult>;
 
@@ -73,7 +74,8 @@ interface IntentRouterShape {
 
 interface SessionContextShape {
   buildConversationSummary: (n: number) => string;
-  sessionEntities: SessionEntities;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sessionEntities: any;
   widgetDecisions: unknown[];
 }
 
@@ -111,7 +113,7 @@ export interface UseChatSubmitOptions {
   intentRouter: IntentRouterShape;
   sessionContext: SessionContextShape;
   mapContext: { buildContextString: () => string };
-  imperativeHandlers: { handlePreferencesDetection: (prefs: Record<string, unknown>) => void };
+  imperativeHandlers: { handlePreferencesDetection: (prefs: unknown) => void };
   preFillBudgetPreferences: (ecoVsLuxuryValue: number) => void;
   handleLLMDestinationRequest: (messageId: string, count?: number) => Promise<void>;
   generateContextualReplies: () => Array<{ id: string; label: string; icon?: string; action: { type: string; message?: string } }>;

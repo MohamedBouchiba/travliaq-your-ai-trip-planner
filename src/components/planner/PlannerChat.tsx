@@ -133,16 +133,6 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
   
   // U3: Tool execution state for ToolStatusIndicator
   const [activeTools, setActiveTools] = useState<ToolExecution[]>([]);
-  // Clear tool list when streaming ends (ToolStatusIndicator auto-fades success items)
-  const prevStreamingRef = useRef(false);
-  useEffect(() => {
-    if (prevStreamingRef.current && !isStreaming) {
-      // Delay clear to allow success animations to complete
-      const t = setTimeout(() => setActiveTools([]), 3000);
-      return () => clearTimeout(t);
-    }
-    prevStreamingRef.current = isStreaming;
-  }, [isStreaming]);
 
   // Intent classification debug state
   const [lastIntentClassification, setLastIntentClassification] = useState<import("./chat/hooks/useChatStream").IntentClassification | null>(null);
@@ -251,8 +241,17 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     }, []),
   });
   const mapContext = useChatMapContext();
-  
-  
+
+  // Clear tool list when streaming ends (ToolStatusIndicator auto-fades success items)
+  const prevStreamingRef = useRef(false);
+  useEffect(() => {
+    if (prevStreamingRef.current && !isStreaming) {
+      const t = setTimeout(() => setActiveTools([]), 3000);
+      return () => clearTimeout(t);
+    }
+    prevStreamingRef.current = isStreaming;
+  }, [isStreaming]);
+
   // Widget cooldown system - prevents infinite widget loops
   const widgetCooldown = useWidgetCooldown();
 

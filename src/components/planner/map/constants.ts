@@ -1,3 +1,5 @@
+// FALLBACK: Static city coordinates used when destinationIndex hasn't loaded yet.
+// Will be replaced by destinationIndex geocoding API in a future iteration.
 // City coordinates mapping (common cities with French & English variants)
 export const cityCoordinates: Record<string, { lat: number; lng: number }> = {
   // France

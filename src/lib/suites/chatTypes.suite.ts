@@ -1,14 +1,14 @@
 /**
  * Chat Types Test Suite
- * Tests parsePreferredMonth, getCityCoords, MONTH_MAP, CITY_COORDINATES
+ * Tests parsePreferredMonth, getCityCoords, MONTH_MAP, cityCoordinates
  */
 import { describe, it, expect, setCategory } from "@/lib/browser-test-runner";
 import {
   parsePreferredMonth,
   getCityCoords,
   MONTH_MAP,
-  CITY_COORDINATES,
 } from "@/components/planner/chat/types";
+import { cityCoordinates } from "@/components/planner/map/constants";
 
 export function registerChatTypesTests() {
   setCategory("chatTypes");
@@ -178,11 +178,11 @@ export function registerChatTypesTests() {
     });
   });
 
-  // ─── CITY_COORDINATES consistency ───
+  // ─── cityCoordinates consistency ───
 
-  describe("CITY_COORDINATES", () => {
-    it("has valid longitude/latitude pairs", () => {
-      for (const [city, [lng, lat]] of Object.entries(CITY_COORDINATES)) {
+  describe("cityCoordinates (map/constants)", () => {
+    it("has valid latitude/longitude pairs", () => {
+      for (const [city, { lat, lng }] of Object.entries(cityCoordinates)) {
         expect(lng).toBeGreaterThanOrEqual(-180);
         expect(lng).toBeLessThanOrEqual(180);
         expect(lat).toBeGreaterThanOrEqual(-90);
@@ -193,12 +193,12 @@ export function registerChatTypesTests() {
     it("has both FR and EN variants for key cities", () => {
       const pairs = [["paris", "paris"], ["barcelone", "barcelona"], ["lisbonne", "lisbon"], ["londres", "london"], ["vienne", "vienna"]];
       for (const [fr, en] of pairs) {
-        const frCoords = CITY_COORDINATES[fr];
-        const enCoords = CITY_COORDINATES[en];
+        const frCoords = cityCoordinates[fr];
+        const enCoords = cityCoordinates[en];
         expect(frCoords).toBeDefined();
         expect(enCoords).toBeDefined();
-        expect(frCoords[0]).toBe(enCoords[0]);
-        expect(frCoords[1]).toBe(enCoords[1]);
+        expect(frCoords.lng).toBe(enCoords.lng);
+        expect(frCoords.lat).toBe(enCoords.lat);
       }
     });
   });

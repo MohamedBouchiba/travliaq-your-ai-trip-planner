@@ -15,6 +15,10 @@ interface FlightPriceMarkersProps {
   departureAirports: string[];
   currentZoom: number;
   isFlightsTab: boolean;
+  /** i18n label for departure marker (e.g. "Départ" / "Departure") */
+  departureLabel?: string;
+  /** Currency symbol for price display (e.g. "€", "$") */
+  currencySymbol?: string;
 }
 
 // Stable hub ID generator
@@ -59,7 +63,9 @@ function createMarkerElement(
   airport: AirportMarker,
   isOrigin: boolean,
   price: number | null | undefined,
-  onClick: (airport: AirportMarker) => void
+  onClick: (airport: AirportMarker) => void,
+  departureLabel: string,
+  currencySymbol: string,
 ): HTMLDivElement | null {
   // Don't create marker for no-flight destinations
   if (price === null && !isOrigin) return null;
@@ -69,12 +75,12 @@ function createMarkerElement(
   let priceColor = "#0369a1";
   
   if (isOrigin) {
-    priceContent = "Départ";
+    priceContent = departureLabel;
     priceColor = "#64748b";
   } else if (price === undefined) {
     priceContent = createLoadingDots();
   } else {
-    priceContent = `${price}€`;
+    priceContent = `${price}${currencySymbol}`;
   }
   
   const el = document.createElement("div");
@@ -160,18 +166,18 @@ function createMarkerElement(
 }
 
 // Update marker price content
-function updateMarkerPrice(el: HTMLElement, price: number | null | undefined, isOrigin: boolean) {
+function updateMarkerPrice(el: HTMLElement, price: number | null | undefined, isOrigin: boolean, departureLabel: string, currencySymbol: string) {
   const priceSpan = el.querySelector(".airport-price") as HTMLElement;
   if (!priceSpan) return;
   
   if (isOrigin) {
-    priceSpan.innerHTML = "Départ";
+    priceSpan.innerHTML = departureLabel;
     priceSpan.style.color = "#64748b";
   } else if (price === undefined) {
     priceSpan.innerHTML = createLoadingDots();
     priceSpan.style.color = "#0369a1";
   } else if (price !== null) {
-    priceSpan.innerHTML = `${price}€`;
+    priceSpan.innerHTML = `${price}${currencySymbol}`;
     priceSpan.style.color = "#0369a1";
   }
 }
@@ -186,6 +192,8 @@ function FlightPriceMarkersInner({
   departureAirports,
   currentZoom,
   isFlightsTab,
+  departureLabel = "Departure",
+  currencySymbol = "€",
 }: FlightPriceMarkersProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const markersRef = useRef<Map<string, { el: HTMLElement; airport: AirportMarker; isOrigin: boolean }>>(new Map());
@@ -280,10 +288,10 @@ function FlightPriceMarkersInner({
       
       if (existing) {
         // Update existing marker's price
-        updateMarkerPrice(existing.el, price, isOrigin);
+        updateMarkerPrice(existing.el, price, isOrigin, departureLabel, currencySymbol);
       } else {
         // Create new marker
-        const el = createMarkerElement(airport, isOrigin, price, handleClick);
+        const el = createMarkerElement(airport, isOrigin, price, handleClick, departureLabel, currencySymbol);
         if (el) {
           containerRef.current!.appendChild(el);
           markersRef.current.set(hubId, { el, airport, isOrigin });

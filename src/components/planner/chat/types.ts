@@ -4,6 +4,7 @@
 
 import type { Airport } from "@/hooks/useNearestAirports";
 import { destinationIndex } from "@/services/destinationIndex";
+import { cityCoordinates } from "../map/constants";
 import type {
   AirportChoice,
   DualAirportChoice,
@@ -159,6 +160,9 @@ export interface WidgetData {
   alert?: unknown;
   onAction?: () => void;
 
+  // Quick filter chips
+  filterGroups?: unknown[];
+
   // Trip recap (E2)
   tripRecap?: TripRecapData;
 }
@@ -251,54 +255,26 @@ export interface ChatRef {
 }
 
 /**
- * City coordinates for map actions
- */
-export const CITY_COORDINATES: Record<string, [number, number]> = {
-  "paris": [2.3522, 48.8566],
-  "new york": [-74.0060, 40.7128],
-  "nyc": [-74.0060, 40.7128],
-  "barcelone": [2.1734, 41.3851],
-  "barcelona": [2.1734, 41.3851],
-  "rome": [12.4964, 41.9028],
-  "tokyo": [139.6503, 35.6762],
-  "londres": [-0.1278, 51.5074],
-  "london": [-0.1278, 51.5074],
-  "berlin": [13.4050, 52.5200],
-  "amsterdam": [4.9041, 52.3676],
-  "lisbonne": [-9.1393, 38.7223],
-  "lisbon": [-9.1393, 38.7223],
-  "bruxelles": [4.3517, 50.8503],
-  "brussels": [4.3517, 50.8503],
-  "madrid": [-3.7038, 40.4168],
-  "vienne": [16.3738, 48.2082],
-  "vienna": [16.3738, 48.2082],
-  "prague": [14.4378, 50.0755],
-  "budapest": [19.0402, 47.4979],
-  "dubai": [55.2708, 25.2048],
-  "singapour": [103.8198, 1.3521],
-  "singapore": [103.8198, 1.3521],
-  "sydney": [151.2093, -33.8688],
-  "bangkok": [100.5018, 13.7563],
-  "marrakech": [-7.9811, 31.6295],
-  "le caire": [31.2357, 30.0444],
-  "cairo": [31.2357, 30.0444],
-};
-
-/**
- * Get city coordinates from name
+ * Get city coordinates from name.
+ * Primary source: DB-backed destinationIndex.
+ * Fallback: static cityCoordinates from map/constants.ts (will be replaced by geocoding API).
  */
 export function getCityCoords(cityName: string): [number, number] | null {
   // Primary: DB-backed index
   const fromIndex = destinationIndex.getCoords(cityName);
   if (fromIndex) return fromIndex;
 
-  // Fallback: static coordinates for when index hasn't loaded yet
+  // FALLBACK: static coordinates from map/constants.ts — will be replaced by destinationIndex geocoding API
   const normalized = cityName.toLowerCase().trim();
-  return CITY_COORDINATES[normalized] || null;
+  const coords = cityCoordinates[normalized];
+  if (coords) return [coords.lng, coords.lat];
+  return null;
 }
 
 /**
- * Month name to index mapping (French/English)
+ * Lexical parsing lookup: maps month/season names (FR/EN) to month indices.
+ * This is NOT display text — it's used to parse user input like "mars" or "july" into Date objects.
+ * date-fns/locale does not provide a reverse parser (name → index), so this mapping is required.
  */
 export const MONTH_MAP: Record<string, number> = {
   "janvier": 0, "january": 0, "jan": 0,

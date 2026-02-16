@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { useTranslation } from "react-i18next";
 import FlightPriceMarkers from "./FlightPriceMarkers";
 
 // Re-export types for backward compatibility (TravelPlanner.tsx imports DestinationClickEvent from here)
@@ -31,6 +32,7 @@ const PlannerMap = ({
   isMobile = false,
   mobileWidgetOpen = false,
 }: PlannerMapProps) => {
+  const { t } = useTranslation();
 
   // 1. Initialize map instance, container ref, resize observer, event bus bounds
   const {
@@ -120,6 +122,8 @@ const PlannerMap = ({
         departureAirports={departureAirports}
         currentZoom={currentZoom}
         isFlightsTab={activeTab === "flights"}
+        departureLabel={t("planner.flights.departureMarker")}
+        currencySymbol="€"
       />
 
       {/* Search in Area Button - Only visible on activities tab */}

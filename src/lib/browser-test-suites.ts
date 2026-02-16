@@ -76,7 +76,7 @@ export const TEST_CATEGORIES: CategoryInfo[] = [
     id: "chatTypes",
     label: "Chat Types",
     emoji: "📝",
-    description: "parsePreferredMonth, getCityCoords, MONTH_MAP, CITY_COORDINATES",
+    description: "parsePreferredMonth, getCityCoords, MONTH_MAP, cityCoordinates",
   },
   {
     id: "widgetCooldown",
