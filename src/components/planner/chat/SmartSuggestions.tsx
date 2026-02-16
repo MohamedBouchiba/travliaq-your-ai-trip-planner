@@ -8,7 +8,7 @@
  * - User preferences and trip data
  */
 
-import { useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Sparkles, 
@@ -29,6 +29,7 @@ import {
   Search,
   Clock,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { getSuggestions, type SuggestionContext, type Suggestion } from "./services/suggestionEngine";
 
@@ -68,12 +69,15 @@ interface SmartSuggestionsProps {
   isLoading?: boolean;
 }
 
-export function SmartSuggestions({ 
-  context, 
+export function SmartSuggestions({
+  context,
   dynamicSuggestions = [],
   onSuggestionClick,
-  isLoading = false 
+  isLoading = false
 }: SmartSuggestionsProps) {
+  const { t } = useTranslation();
+  const toolbarRef = useRef<HTMLDivElement>(null);
+
   // Prioritize dynamic suggestions from AI, fallback to static ones
   const displayItems = useMemo(() => {
     if (dynamicSuggestions.length > 0) {
@@ -85,7 +89,7 @@ export function SmartSuggestions({
         isDynamic: true,
       }));
     }
-    
+
     // Fallback to static context-based suggestions
     const staticSuggestions = getSuggestions(context);
     return staticSuggestions.map(s => ({
@@ -97,6 +101,20 @@ export function SmartSuggestions({
       isDynamic: false,
     }));
   }, [context, dynamicSuggestions]);
+
+  // AC6: Arrow-key navigation between suggestion chips
+  const handleToolbarKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const buttons = toolbarRef.current?.querySelectorAll<HTMLButtonElement>("button");
+    if (!buttons?.length) return;
+    const idx = Array.from(buttons).indexOf(e.target as HTMLButtonElement);
+    if (idx < 0) return;
+    e.preventDefault();
+    const next = e.key === "ArrowRight"
+      ? buttons[(idx + 1) % buttons.length]
+      : buttons[(idx - 1 + buttons.length) % buttons.length];
+    next.focus();
+  }, []);
 
   if (displayItems.length === 0 || isLoading) {
     return null;
@@ -112,7 +130,11 @@ export function SmartSuggestions({
 
   return (
     <div className="px-4 py-2">
-      <div 
+      <div
+        ref={toolbarRef}
+        role="toolbar"
+        aria-label={t("planner.chat.suggestions")}
+        onKeyDown={handleToolbarKeyDown}
         onWheel={handleWheel}
         className="flex gap-2 overflow-x-auto pb-1 themed-scroll"
         style={{ scrollbarWidth: 'thin' }}

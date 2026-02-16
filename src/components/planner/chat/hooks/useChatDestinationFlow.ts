@@ -13,8 +13,8 @@ import type { TripPreferences } from "@/stores/slices/preferenceTypes";
 import type { ChatMessage } from "../types";
 import { getDestinationSuggestions } from "@/services/destinations";
 import { buildDestinationPayload } from "../utils/buildDestinationPayload";
-import { supabaseFetch } from "@/utils/supabaseFetch";
 import { generateId, updateMessageById } from "../utils/messageHelpers";
+import { fetchTopCities } from "../utils/fetchTopCities";
 import type { InspireFlowStep } from "../MemoizedSmartSuggestions";
 
 interface UseChatDestinationFlowOptions {
@@ -282,44 +282,26 @@ export function useChatDestinationFlow({
     ]);
 
     // Fetch cities for the selected country
-    try {
-      const response = await supabaseFetch("top-cities-by-country", {
-        method: "GET",
-        params: { country_code: destination.countryCode, limit: "5" },
-      });
+    const fallbackMsg = `${t("planner.chat.excellentChoice", { country: destination.countryName })}\n\n${t("planner.chat.whichCityToVisit")} ${t("planner.chat.typeInChat")}`;
+    const cities = await fetchTopCities(destination.countryCode, t("planner.chat.importantCity"));
 
-      const data = await response.json();
-
-      if (data.cities && data.cities.length > 0) {
-        const cities = data.cities.map((c: { name: string; description?: string; population?: number }) => ({
-          name: c.name,
-          description: c.description || t("planner.chat.importantCity"),
-          population: c.population,
-        }));
-
-        setMessages(updateMessageById(loadingId, {
-          text: `${t("planner.chat.excellentChoice", { country: destination.countryName })}\n\n${destination.description}\n\n${t("planner.chat.whichCityToVisit")}`,
-          isTyping: false,
-          widget: "citySelector" as WidgetType,
-          widgetData: {
-            citySelection: {
-              countryCode: destination.countryCode,
-              countryName: destination.countryName,
-              cities,
-            },
-            isDeparture: false,
-          },
-        }));
-      } else {
-        setMessages(updateMessageById(loadingId, {
-          text: `${t("planner.chat.excellentChoice", { country: destination.countryName })}\n\n${t("planner.chat.whichCityToVisit")} ${t("planner.chat.typeInChat")}`,
-          isTyping: false,
-        }));
-      }
-    } catch (error) {
-      console.error("Error fetching cities:", error);
+    if (cities) {
       setMessages(updateMessageById(loadingId, {
-        text: `${t("planner.chat.excellentChoice", { country: destination.countryName })}\n\n${t("planner.chat.whichCityToVisit")} ${t("planner.chat.typeInChat")}`,
+        text: `${t("planner.chat.excellentChoice", { country: destination.countryName })}\n\n${destination.description}\n\n${t("planner.chat.whichCityToVisit")}`,
+        isTyping: false,
+        widget: "citySelector" as WidgetType,
+        widgetData: {
+          citySelection: {
+            countryCode: destination.countryCode,
+            countryName: destination.countryName,
+            cities,
+          },
+          isDeparture: false,
+        },
+      }));
+    } else {
+      setMessages(updateMessageById(loadingId, {
+        text: fallbackMsg,
         isTyping: false,
       }));
     }

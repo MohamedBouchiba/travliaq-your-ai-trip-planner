@@ -44,6 +44,21 @@ const LazyDestinationSuggestionsGrid = lazy(() =>
 const LazyBudgetRangeSlider = lazy(() =>
   import("./selection/BudgetRangeSlider").then(m => ({ default: m.BudgetRangeSlider }))
 );
+const LazyQuickFilterChips = lazy(() =>
+  import("./selection/QuickFilterChips").then(m => ({ default: m.QuickFilterChips }))
+);
+const LazyStarRatingSelector = lazy(() =>
+  import("./selection/StarRatingSelector").then(m => ({ default: m.StarRatingSelector }))
+);
+const LazyDurationChips = lazy(() =>
+  import("./selection/DurationChips").then(m => ({ default: m.DurationChips }))
+);
+const LazyCabinClassSelector = lazy(() =>
+  import("./selection/CabinClassSelector").then(m => ({ default: m.CabinClassSelector }))
+);
+const LazyDirectFlightToggle = lazy(() =>
+  import("./selection/DirectFlightToggle").then(m => ({ default: m.DirectFlightToggle }))
+);
 
 interface WidgetFlowHandlers {
   handleDateSelect: (messageId: string, dateType: "departure" | "return", date: Date) => void;
@@ -375,6 +390,54 @@ function WidgetSwitch({
     case "tripRecap":
       if (!m.widgetData?.tripRecap) return null;
       return <TripRecapWidget data={m.widgetData.tripRecap} />;
+
+    case "quickFilterChips":
+      if (!m.widgetData?.filterGroups) return null;
+      return (
+        <Suspense fallback={<GenericWidgetSkeleton rows={2} />}>
+          <LazyQuickFilterChips
+            groups={m.widgetData.filterGroups as import("./selection/QuickFilterChips").FilterChipGroup[]}
+            onFilterChange={(filters) => eventBus.emit("filters:quickChips", { filters })}
+          />
+        </Suspense>
+      );
+
+    case "starRatingSelector":
+      return (
+        <Suspense fallback={<GenericWidgetSkeleton rows={1} />}>
+          <LazyStarRatingSelector
+            onRatingChange={(ratings) => eventBus.emit("filters:starRating", { ratings })}
+            label={m.widgetData?.label as string | undefined}
+          />
+        </Suspense>
+      );
+
+    case "durationChips":
+      return (
+        <Suspense fallback={<GenericWidgetSkeleton rows={1} />}>
+          <LazyDurationChips
+            onDurationChange={(durations) => eventBus.emit("activities:durationChips", { durations: durations.map(d => ({ id: d.id, minMinutes: d.minMinutes, maxMinutes: d.maxMinutes })) })}
+          />
+        </Suspense>
+      );
+
+    case "cabinClassSelector":
+      return (
+        <Suspense fallback={<GenericWidgetSkeleton rows={1} />}>
+          <LazyCabinClassSelector
+            onCabinChange={(cabin) => eventBus.emit("filters:cabinClass", { cabin: cabin ? { id: cabin.id, value: cabin.value } : null })}
+          />
+        </Suspense>
+      );
+
+    case "directFlightToggle":
+      return (
+        <Suspense fallback={<GenericWidgetSkeleton rows={1} />}>
+          <LazyDirectFlightToggle
+            onChange={(directOnly) => eventBus.emit("flights:directOnly", { directOnly })}
+          />
+        </Suspense>
+      );
 
     default:
       return null;

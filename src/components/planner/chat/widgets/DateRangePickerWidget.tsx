@@ -4,7 +4,7 @@
  * Fully i18n-enabled with locale-aware formatting
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, memo } from "react";
 import { useTranslation } from "react-i18next";
 import { CalendarIcon } from "lucide-react";
 import { format, addMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameDay, isSameMonth, isBefore } from "date-fns";
@@ -21,7 +21,7 @@ interface DateRangePickerWidgetProps {
   skipStoreSync?: boolean;
 }
 
-export function DateRangePickerWidget({
+export const DateRangePickerWidget = memo(function DateRangePickerWidget({
   onConfirm,
   tripDuration,
   preferredMonth,
@@ -172,6 +172,7 @@ export function DateRangePickerWidget({
           type="button"
           className="h-8 w-8 rounded-lg border border-border hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-foreground transition-all"
           onClick={() => setBaseMonth(addMonths(baseMonth, -1))}
+          aria-label={t("planner.datePicker.previousMonth")}
         >
           ‹
         </button>
@@ -182,6 +183,7 @@ export function DateRangePickerWidget({
           type="button"
           className="h-8 w-8 rounded-lg border border-border hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-foreground transition-all"
           onClick={() => setBaseMonth(addMonths(baseMonth, 1))}
+          aria-label={t("planner.datePicker.nextMonth")}
         >
           ›
         </button>
@@ -212,6 +214,9 @@ export function DateRangePickerWidget({
               type="button"
               onClick={() => handleDayClick(day)}
               disabled={isDisabled}
+              aria-label={format(day, "d MMMM yyyy", { locale: dateFnsLocale })}
+              aria-selected={!!(isDeparture || isReturn)}
+              aria-current={isToday ? "date" : undefined}
               className={cn(
                 "aspect-square w-9 h-9 flex items-center justify-center rounded-lg text-xs transition-all",
                 "hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/50",
@@ -252,4 +257,4 @@ export function DateRangePickerWidget({
       </button>
     </div>
   );
-}
+});

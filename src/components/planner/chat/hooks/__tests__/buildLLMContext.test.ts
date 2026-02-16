@@ -1,10 +1,10 @@
 /**
  * Tests for buildLLMContext pure function
- * Tests: phase detection, context assembly, preferences state
+ * Tests: phase detection, context assembly, preferences state, truncation
  */
 
 import { describe, it, expect } from "vitest";
-import { buildLLMContext } from "../buildLLMContext";
+import { buildLLMContext, truncateField } from "../buildLLMContext";
 import type { ChatMessage } from "../../types";
 
 // ─── Helpers ───
@@ -221,5 +221,42 @@ describe("buildLLMContext — preferencesState", () => {
     });
     const result = buildLLMContext(sources as any);
     expect((result.preferencesState as any).styleAxesConfigured).toBe(false);
+  });
+});
+
+// ─── R3: truncateField ───
+
+describe("truncateField", () => {
+  it("returns short strings unchanged", () => {
+    expect(truncateField("hello", 100)).toBe("hello");
+  });
+
+  it("returns empty string unchanged", () => {
+    expect(truncateField("", 100)).toBe("");
+  });
+
+  it("truncates strings exceeding maxChars", () => {
+    const long = "a".repeat(500);
+    const result = truncateField(long, 100);
+    expect(result.length).toBeLessThanOrEqual(100);
+    expect(result).toContain("… [tronqué]");
+  });
+
+  it("returns string at exact boundary unchanged", () => {
+    const exact = "a".repeat(100);
+    expect(truncateField(exact, 100)).toBe(exact);
+  });
+
+  it("truncates context fields in buildLLMContext", () => {
+    const longHistory = "x".repeat(2000);
+    const sources = makeMinimalSources({
+      widgetTracking: {
+        getActiveWidgetsContext: () => "",
+        getContextForLLM: () => longHistory,
+      },
+    });
+    const result = buildLLMContext(sources as any);
+    expect((result.widgetHistory as string).length).toBeLessThanOrEqual(800);
+    expect(result.widgetHistory).toContain("… [tronqué]");
   });
 });

@@ -3,69 +3,8 @@ import { useTranslation } from "react-i18next";
 import { Plane, ChevronDown, ChevronUp, Luggage, Star, Zap, Moon, Clock, Leaf, Info, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Flight segment with enriched data
-export interface FlightSegment {
-  departureTime: string;
-  arrivalTime: string;
-  departureAirport: string;
-  departureAirportName?: string;
-  arrivalAirport: string;
-  arrivalAirportName?: string;
-  duration: string;
-  durationMinutes?: number;
-  airline: string;
-  airlineCode?: string;
-  airlineLogo?: string;
-  flightNumber: string;
-  aircraft?: string;
-  legroom?: string;
-  seatInfo?: string;
-  extensions?: string[];
-}
-
-export interface Layover {
-  duration: number;
-  durationLabel: string;
-  airportCode: string;
-  airportName: string;
-  city: string;
-  overnight: boolean;
-}
-
-export interface CarbonEmissions {
-  co2e: number;
-  typicalForRoute: number;
-  differencePercent: number;
-  isLower: boolean;
-}
-
-export interface Baggage {
-  carryOn: number;
-  checked: number;
-}
-
-export interface FlightOffer {
-  id: string;
-  price: number;
-  currency: string;
-  outbound: FlightSegment[];
-  inbound?: FlightSegment[];
-  layovers?: Layover[];
-  stops: number;
-  totalDuration: string;
-  totalDurationMinutes?: number;
-  cabinClass: string;
-  airlineLogo?: string;
-  airline?: string;
-  carbonEmissions?: CarbonEmissions;
-  baggage?: Baggage;
-  selfTransfer?: boolean;
-  isBestPrice?: boolean;
-  isFastest?: boolean;
-  isLowestEmissions?: boolean;
-  hasNightLayover?: boolean;
-  layoverDuration?: string; // Legacy support
-}
+// C1: Re-export flight result types from canonical location
+export type { FlightSegment, Layover, CarbonEmissions, Baggage, FlightOffer } from "@/types/flight";
 
 interface FlightResultsProps {
   flights: FlightOffer[];

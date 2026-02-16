@@ -11,7 +11,7 @@ export {
 } from "./flightDataToMemory";
 
 // Message helpers - ID generation, message update utilities
-export { generateId, updateMessageById } from "./messageHelpers";
+export { generateId, updateMessageById, isDismissalMessage } from "./messageHelpers";
 
 // Security utilities - XSS protection, sanitization
 export {

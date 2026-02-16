@@ -22,12 +22,14 @@ function CounterButton({
   min = 0,
   max = 9,
   disabled = false,
+  label,
 }: {
   value: number;
   onChange: (v: number) => void;
   min?: number;
   max?: number;
   disabled?: boolean;
+  label: string;
 }) {
   return (
     <div className="flex items-center gap-3">
@@ -35,15 +37,17 @@ function CounterButton({
         type="button"
         onClick={() => onChange(Math.max(min, value - 1))}
         disabled={value <= min || disabled}
+        aria-label={`${label} −`}
         className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center text-lg font-medium hover:bg-muted/80 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
       >
         −
       </button>
-      <span className="w-6 text-center font-semibold text-lg">{value}</span>
+      <span className="w-6 text-center font-semibold text-lg" aria-live="polite">{value}</span>
       <button
         type="button"
         onClick={() => onChange(Math.min(max, value + 1))}
         disabled={value >= max || disabled}
+        aria-label={`${label} +`}
         className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center text-lg font-medium hover:bg-muted/80 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
       >
         +
@@ -112,7 +116,7 @@ export function TravelersWidget({
           <div className="font-medium text-sm">{t("planner.travelers.adults")}</div>
           <div className="text-xs text-muted-foreground">{t("planner.travelers.adultsDesc")}</div>
         </div>
-        <CounterButton value={adults} onChange={handleAdultsChange} min={1} />
+        <CounterButton value={adults} onChange={handleAdultsChange} min={1} label={t("planner.travelers.adults")} />
       </div>
 
       {/* Children */}
@@ -121,7 +125,7 @@ export function TravelersWidget({
           <div className="font-medium text-sm">{t("planner.travelers.children")}</div>
           <div className="text-xs text-muted-foreground">{t("planner.travelers.childrenDesc")}</div>
         </div>
-        <CounterButton value={children} onChange={setChildren} />
+        <CounterButton value={children} onChange={setChildren} label={t("planner.travelers.children")} />
       </div>
 
       {/* Infants */}
@@ -130,7 +134,7 @@ export function TravelersWidget({
           <div className="font-medium text-sm">{t("planner.travelers.infants")}</div>
           <div className="text-xs text-muted-foreground">{t("planner.travelers.infantsDesc")}</div>
         </div>
-        <CounterButton value={infants} onChange={setInfants} max={adults} />
+        <CounterButton value={infants} onChange={setInfants} max={adults} label={t("planner.travelers.infants")} />
       </div>
 
       {/* Confirm button */}
@@ -222,7 +226,7 @@ export function TravelersConfirmBeforeSearchWidget({
             <div className="font-medium text-sm">{t("planner.travelers.adults")}</div>
             <div className="text-xs text-muted-foreground">{t("planner.travelers.adultsDesc")}</div>
           </div>
-          <CounterButton value={adults} onChange={handleAdultsChange} min={1} />
+          <CounterButton value={adults} onChange={handleAdultsChange} min={1} label={t("planner.travelers.adults")} />
         </div>
 
         <div className="flex items-center justify-between">
@@ -230,7 +234,7 @@ export function TravelersConfirmBeforeSearchWidget({
             <div className="font-medium text-sm">{t("planner.travelers.children")}</div>
             <div className="text-xs text-muted-foreground">{t("planner.travelers.childrenDesc")}</div>
           </div>
-          <CounterButton value={children} onChange={setChildren} />
+          <CounterButton value={children} onChange={setChildren} label={t("planner.travelers.children")} />
         </div>
 
         <div className="flex items-center justify-between">
@@ -238,7 +242,7 @@ export function TravelersConfirmBeforeSearchWidget({
             <div className="font-medium text-sm">{t("planner.travelers.infants")}</div>
             <div className="text-xs text-muted-foreground">{t("planner.travelers.infantsDesc")}</div>
           </div>
-          <CounterButton value={infants} onChange={setInfants} max={adults} />
+          <CounterButton value={infants} onChange={setInfants} max={adults} label={t("planner.travelers.infants")} />
         </div>
 
         <button

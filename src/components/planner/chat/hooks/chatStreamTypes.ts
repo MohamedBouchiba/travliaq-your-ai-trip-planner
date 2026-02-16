@@ -7,6 +7,8 @@
 import type { FlightFormData } from "@/types/flight";
 import type { MissingField } from "@/stores/hooks";
 import type { TripRecapData } from "../types";
+import type { AccommodationEntry } from "@/stores/slices/accommodationTypes";
+import type { AIPreferencesData } from "./useChatImperativeHandlers";
 
 /**
  * Maximum messages to send to API to prevent context overflow
@@ -78,8 +80,8 @@ export type OnToolStatusUpdate = (event: ToolStatusEvent) => void;
 export interface StreamResult {
   content: string;
   flightData: FlightFormData | null;
-  accommodationData: any | null;
-  preferencesData: any | null;
+  accommodationData: Partial<AccommodationEntry> | null;
+  preferencesData: AIPreferencesData | null;
   quickReplies: QuickReplyData | null;
   destinationSuggestionRequest: DestinationSuggestionRequest | null;
   intentClassification: IntentClassification | null;

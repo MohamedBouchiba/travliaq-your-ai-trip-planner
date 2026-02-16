@@ -7,21 +7,20 @@
  */
 
 import { useCallback, useRef } from "react";
+import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
 import type { ChatMessage } from "../types";
-import type { FlightFormData, ChatQuickAction, WidgetType } from "@/types/flight";
+import type { WidgetType } from "@/types/flight";
 import type { FlightMemory } from "@/stores/hooks/useFlightMemoryStore";
 import type { IntentClassification, APIMessage, MemoryContext, StreamResult, OnContentUpdate, SessionEntities, StreamError } from "./chatStreamTypes";
 import type { ChooseWidgetAction } from "./useWidgetActionExecutor";
-import { parseAction, flightDataToMemory, generateId, updateMessageById } from "../utils";
-import { getCityCoords } from "../types";
+import { parseAction, generateId, updateMessageById } from "../utils";
 import { persistExtractedEntities } from "./persistExtractedEntities";
 import { geocodeCity } from "@/utils/geocodeCity";
-import { eventBus, emitTabChange, emitTabAndZoom } from "@/lib/eventBus";
-import { FLIGHTS_ZOOM } from "@/constants/mapSettings";
-import { useDebugStore } from "@/stores/debugStore";
+import { eventBus } from "@/lib/eventBus";
 import { usePlannerStoreV2 } from "@/stores/plannerStoreV2";
 import { buildLLMContext } from "./buildLLMContext";
+import { processFlightData, processAction, buildCombinedSuggestions } from "./processStreamResult";
 
 // ─── Departure city validation (Bug D fix) ───
 
@@ -38,11 +37,10 @@ export function isValidDepartureCity(city: string): boolean {
 
 // ─── Types ───
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type StreamResponseFn = (
   messages: APIMessage[],
   messageId: string,
-  context: any,
+  context: MemoryContext,
   onChunk: OnContentUpdate,
 ) => Promise<StreamResult>;
 
@@ -73,10 +71,9 @@ interface IntentRouterShape {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface SessionContextShape {
   buildConversationSummary: (n: number) => string;
-  sessionEntities: any;
+  sessionEntities: SessionEntities;
   widgetDecisions: unknown[];
 }
 
@@ -125,11 +122,27 @@ export interface UseChatSubmitOptions {
 
 export function useChatSubmit(opts: UseChatSubmitOptions) {
   const { t } = useTranslation();
-  // B4: Read hotel search results from store to feed phase detection
+  // B4: Read search results from store to feed phase detection
   const hasHotelResults = usePlannerStoreV2((s) => s.hotelSearchResults.length > 0);
+  const hasFlightResults = usePlannerStoreV2((s) => s.flightSearchResults.length > 0);
+
+  // P5: Stable ref to avoid recreating sendText on every render (~21 deps → 0)
+  const stableRef = useRef({ opts, t, hasHotelResults, hasFlightResults });
+  stableRef.current = { opts, t, hasHotelResults, hasFlightResults };
+
+  // R4: Client-side rate limiting — minimum 1s between submissions
+  const lastSendTimeRef = useRef(0);
+  const SEND_COOLDOWN_MS = 1000;
 
   const sendText = useCallback(async (text: string) => {
+    // Read latest values from ref at call-time (not creation-time)
+    const { opts, t, hasHotelResults, hasFlightResults } = stableRef.current;
     if (!text.trim() || opts.isLoading) return;
+
+    // R4: Rate limiting guard — reject rapid submissions
+    const now = Date.now();
+    if (now - lastSendTimeRef.current < SEND_COOLDOWN_MS) return;
+    lastSendTimeRef.current = now;
 
     const userText = text.trim();
 
@@ -197,7 +210,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
           hasDestination: !!(opts.memory.arrival?.city || opts.memory.arrival?.countryCode),
           hasDates: !!opts.memory.departureDate,
           hasTravelers: opts.memory.passengers.adults > 0,
-          hasFlightResults: false, // TODO: No flight results tracking in store yet
+          hasFlightResults,        // C1: Wired from flight store
           hasHotelResults,         // B4: Wired from accommodation store
         },
       });
@@ -333,108 +346,31 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
         return;
       }
 
-      // Dynamic suggestions
-      const aiReplies =
-        quickReplies?.replies?.map((r, i) => ({
-          id: `dyn-${Date.now()}-${i}`,
-          label: r.label,
-          emoji: r.emoji || "✈️",
-          message: r.message,
-        })) || [];
-
-      const contextualReplies = opts.generateContextualReplies();
-      const contextualSuggestions = contextualReplies
-        .filter((r) => r.action.type === "fillInput")
-        .map((r) => ({
-          id: r.id,
-          label: r.label,
-          emoji: r.icon || "✨",
-          message: (r.action as { type: "fillInput"; message: string }).message,
-        }));
-
-      const combinedSuggestions = [...aiReplies, ...contextualSuggestions].slice(0, 4);
+      // Dynamic suggestions (A2: extracted to processStreamResult)
+      const combinedSuggestions = buildCombinedSuggestions(quickReplies, opts.generateContextualReplies());
       opts.setDynamicSuggestions(combinedSuggestions.length > 0 ? combinedSuggestions : []);
 
       const { cleanContent, action } = parseAction(content || t("planner.messages.defaultError"));
 
-      // Process flight data
-      let nextMem: FlightMemory = { ...opts.memory, passengers: { ...opts.memory.passengers } };
+      // A2: Process flight data + actions (extracted to processStreamResult)
+      // processFlightData handles: hallucination guard, memory updates, entity persistence,
+      // destination tracking, map navigation, form data emission
       let widget: WidgetType | undefined;
-      let showDateWidget = false;
-      let showTravelersWidget = false;
+      const hasFlightData = flightData && Object.keys(flightData).length > 0;
+      const { nextMem, showDateWidget, showTravelersWidget } = hasFlightData
+        ? processFlightData(flightData, !!intentClassification, {
+            widgetFlow: opts.widgetFlow,
+            updateMemory: opts.updateMemory,
+            memory: opts.memory,
+            widgetTracking: opts.widgetTracking,
+          })
+        : { nextMem: { ...opts.memory, passengers: { ...opts.memory.passengers } }, showDateWidget: false, showTravelersWidget: false };
 
-      // F7: Entity persistence already executed above (before processIntent).
-      // Only flightData-specific legs/tripDuration persistence remains here for the
-      // case where intentClassification is null but flightData has legs.
-      if (!intentClassification && flightData?.legs) {
-        persistExtractedEntities(undefined, flightData, opts.widgetFlow, opts.updateMemory, opts.memory);
-      }
-
-      if (flightData && Object.keys(flightData).length > 0) {
-        // Mutable copy for hallucination guard
-        const fd = { ...flightData };
-        // Guard: ignore hallucinated toCountryCode when no destination city was provided
-        if (fd.toCountryCode && !fd.to) {
-          if (import.meta.env.DEV) console.warn("[useChatSubmit] Ignoring hallucinated toCountryCode:", fd.toCountryCode);
-          delete fd.toCountryCode;
-        }
-        const needsDestinationCity = fd.needsCitySelection && fd.toCountryCode;
-        const needsDepartureCity = fd.fromCountryCode && !fd.from;
-        const skipDateWidget = needsDestinationCity || needsDepartureCity;
-
-        showDateWidget = fd.needsDateWidget === true && !skipDateWidget;
-        showTravelersWidget = fd.needsTravelersWidget === true;
-
-        if (showDateWidget && showTravelersWidget) {
-          opts.widgetFlow.setPendingTravelersWidget(true);
-        }
-
-        const memoryUpdates = flightDataToMemory(fd, opts.memory);
-        opts.updateMemory(memoryUpdates);
-        nextMem = { ...nextMem, ...memoryUpdates };
-
-        // Track synthetic destination_selected
-        if (fd.toCountryCode && fd.toCountryName) {
-          opts.widgetTracking.trackDestinationSelect(fd.toCountryName, fd.toCountryCode);
-        }
-
-        if (fd.to) {
-          const coords = getCityCoords(fd.to.toLowerCase().split(",")[0].trim());
-          if (coords) {
-            emitTabAndZoom("flights", coords, FLIGHTS_ZOOM);
-          } else {
-            emitTabChange("flights");
-          }
-        }
-
-        eventBus.emit("flight:updateFormData", fd);
-      } else if (action) {
-        if (action.type === "chooseWidget") {
-          // GUARD: Use backend intent classification instead of fragile regex
-          const userAskedForChoice = intentClassification?.primaryIntent === "delegate_choice";
-
-          if (userAskedForChoice) {
-            if (import.meta.env.DEV) console.log("[useChatSubmit] chooseWidget (delegated):", action);
-            const executed = opts.widgetActionExecutor.executeChooseWidgetAction(action);
-            if (import.meta.env.DEV && executed) console.log("[useChatSubmit] Widget action executed");
-          } else {
-            if (import.meta.env.DEV) console.warn("[useChatSubmit] Blocked auto-chooseWidget:", action);
-            const { addBlockedAction } = useDebugStore.getState();
-            addBlockedAction({
-              type: action.type,
-              widgetType: action.widgetType,
-              option: action.option,
-              reason: "Intent not classified as delegate_choice",
-              timestamp: Date.now(),
-            });
-          }
-        } else if (action.type === "tab") {
-          emitTabChange(action.tab);
-        } else if (action.type === "zoom") {
-          eventBus.emit("map:zoom", { center: action.center, zoom: action.zoom });
-        } else if (action.type === "tabAndZoom") {
-          emitTabAndZoom(action.tab, action.center, action.zoom);
-        }
+      if (!hasFlightData && action) {
+        processAction(action, {
+          widgetActionExecutor: opts.widgetActionExecutor,
+          intentClassification,
+        });
       }
 
       // Determine widget from flight flow
@@ -465,39 +401,23 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
       // C2: Classify the error type for user-visible error rendering
       const streamErr = err instanceof Error && "type" in err ? (err as StreamError) : null;
       const errorType = streamErr?.type ?? "unknown";
-      opts.setMessages(updateMessageById(messageId, { text: t("planner.chat.errorOccurred"), isTyping: false, isStreaming: false, errorType }));
+      // Use type-specific i18n key if available, fallback to generic
+      const errorMessageKey = streamErr?.message?.startsWith("planner.error.")
+        ? streamErr.message
+        : "planner.chat.errorOccurred";
+      opts.setMessages(updateMessageById(messageId, { text: t(errorMessageKey), isTyping: false, isStreaming: false, errorType }));
     } finally {
       opts.setIsLoading(false);
       setTimeout(() => opts.inputRef.current?.focus(), 0);
     }
-  }, [
-    opts.isLoading,
-    opts.messages,
-    opts.memory,
-    opts.missingFields,
-    t,
-    opts.streamResponse,
-    opts.getMemorySummary,
-    opts.getActivityMemory,
-    opts.getPreferenceMemory,
-    opts.getBasketSummary,
-    opts.mapContext,
-    opts.widgetTracking,
-    opts.widgetActionExecutor,
-    opts.widgetCooldown,
-    opts.intentRouter,
-    opts.sessionContext,
-    opts.widgetFlow,
-    opts.imperativeHandlers,
-    opts.handleLLMDestinationRequest,
-    opts.generateContextualReplies,
-    hasHotelResults,
-  ]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P5: reads from stableRef.current at call-time
+  }, []);
 
   /**
    * Regenerate the last assistant response by re-sending the last user message.
    */
   const regenerateLastResponse = useCallback(async () => {
+    const { opts } = stableRef.current;
     if (opts.isLoading) return;
 
     // Find the last user message
@@ -506,15 +426,14 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
     const realIdx = opts.messages.length - 1 - lastUserIdx;
     const lastUserMessage = opts.messages[realIdx];
 
-    // Remove all assistant messages after the last user message
-    opts.setMessages((prev) => prev.filter((_, i) => i <= realIdx));
+    // R2: flushSync ensures state is committed before sendText reads it via stableRef
+    flushSync(() => {
+      opts.setMessages((prev) => prev.filter((_, i) => i <= realIdx));
+    });
 
-    // Re-send the same text through the normal flow
-    // Small delay to let state settle after removal
-    setTimeout(() => {
-      sendText(lastUserMessage.text);
-    }, 50);
-  }, [opts.isLoading, opts.messages, opts.setMessages, sendText]);
+    sendText(lastUserMessage.text);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- reads from stableRef.current
+  }, [sendText]);
 
   return { sendText, regenerateLastResponse };
 }

@@ -10,67 +10,40 @@
  */
 
 import { useState, useRef, useEffect, useImperativeHandle, forwardRef, useCallback, memo, useMemo } from "react";
-import { Plane, History, Send, PanelLeftClose, RefreshCw, AlertTriangle, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
-import logo from "@/assets/logo-travliaq.png";
 import { ChatHistorySidebar } from "./ChatHistorySidebar";
 import { useChatSessions, type StoredMessage, type ChatTranslations } from "@/hooks/useChatSessions";
 import { useChatScroll } from "@/hooks/useChatScroll";
 import { useChatMapContext } from "@/hooks/useChatMapContext";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import { fr, enUS } from "date-fns/locale";
 
 // Chat module imports
-import {
-  AirportButton,
-  DualAirportSelection,
-  MarkdownMessage,
-  WidgetRenderer,
-} from "./chat/widgets";
-import { QuickReplies, useDynamicQuickReplies } from "./chat/QuickReplies";
-import { useChatStream, useChatWidgetFlow, useChatImperativeHandlers, useWidgetTracking, useWidgetActionExecutor, usePreferenceWidgetCallbacks, useUnifiedIntentRouter, useSessionContext, useThinkingState, useWidgetCooldown, useChatSubmit } from "./chat/hooks";
+import { useDynamicQuickReplies } from "./chat/QuickReplies";
+import { useChatStream, useChatWidgetFlow, useChatImperativeHandlers, useWidgetTracking, useWidgetActionExecutor, usePreferenceWidgetCallbacks, useUnifiedIntentRouter, useSessionContext, useWidgetCooldown, useChatSubmit } from "./chat/hooks";
 import { useChatDestinationFlow } from "./chat/hooks/useChatDestinationFlow";
 import { useChatReset } from "./chat/hooks/useChatReset";
+import { useReadyMessage } from "./chat/hooks/useReadyMessage";
 import { useDebugEventBusCapture } from "@/hooks/useDebugEventBusCapture";
-import { ThinkingIndicator } from "./chat/ThinkingIndicator";
 import { IntentDebugPanel } from "./chat/IntentDebugPanel";
-import { getMissingFieldLabel } from "./chat/utils";
+import { getMissingFieldLabel, isDismissalMessage } from "./chat/utils";
 import type { ChatMessage } from "./chat/types";
 import { MemoizedSmartSuggestions, type InspireFlowStep } from "./chat/MemoizedSmartSuggestions";
-import { MessageBubble } from "./chat/MessageBubble";
-import { MessageActions } from "./chat/MessageActions";
+import { ChatHeader } from "./chat/ChatHeader";
+import { ChatInputArea } from "./chat/ChatInputArea";
+import { ChatMessageBubble } from "./chat/ChatMessageBubble";
+import type { ToolExecution } from "./chat/ToolStatusIndicator";
 import type { DestinationSuggestion } from "@/types/destinations";
 import { ScrollToBottomButton } from "./chat/ScrollToBottomButton";
 import { TripStatusBar } from "./chat/TripStatusBar";
 
 // Context imports
 import type { CountrySelectionEvent } from "@/types/flight";
-import { findNearestAirports } from "@/hooks/useNearestAirports";
 import { useFlightMemoryStore, useTravelMemoryStore, useAccommodationMemoryStore, useActivityMemoryStore, usePreferenceMemoryStore, useTripBasketStore, type AccommodationEntry } from "@/stores/hooks";
 import { useDebugStore } from "@/stores/debugStore";
 import { useLocale } from "@/hooks/useLocale";
 import { eventBus } from "@/lib/eventBus";
 import { STORAGE_KEYS as SK } from "@/config/storageKeys";
-
-// --- Scalable dismissal detection (F6) ---
-// Word sets for FR/EN dismissal phrases — any short combination is matched.
-// To support a new word, just add it to the relevant set.
-const DISMISSAL_WORDS = new Set([
-  // FR
-  "non", "rien", "pas", "plus", "nope", "ok", "d'autre", "de",
-  "c'est", "tout", "bon", "merci", "voila", "voilà",
-  // EN
-  "no", "nothing", "that's", "all", "else", "fine", "done", "good", "thanks",
-]);
-
-/** Detect short dismissal messages regardless of word order */
-function isDismissalMessage(text: string): boolean {
-  const cleaned = text.trim().toLowerCase().replace(/[,.'!?]/g, "");
-  const words = cleaned.split(/\s+/).filter(Boolean);
-  return words.length > 0 && words.length <= 6 && words.every((w) => DISMISSAL_WORDS.has(w));
-}
 
 // Re-export types for external consumers
 export type {
@@ -148,8 +121,6 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
   
   // Track completed message IDs to prevent late streaming updates from resetting isStreaming
   const completedMessageIdsRef = useRef<Set<string>>(new Set());
-  // Track "inspire" intent to trigger preference widgets flow
-  const lastIntentRef = useRef<string | null>(null);
   // Hard reset guard (new conversation / delete all): suppress auto-effects that can spam messages
   const isHardResetRef = useRef(false);
   // Safeguard: store intent-router widget to prevent loss between setMessages calls
@@ -160,6 +131,19 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
   // are now managed inside useChatDestinationFlow — see below.
   
   
+  // U3: Tool execution state for ToolStatusIndicator
+  const [activeTools, setActiveTools] = useState<ToolExecution[]>([]);
+  // Clear tool list when streaming ends (ToolStatusIndicator auto-fades success items)
+  const prevStreamingRef = useRef(false);
+  useEffect(() => {
+    if (prevStreamingRef.current && !isStreaming) {
+      // Delay clear to allow success animations to complete
+      const t = setTimeout(() => setActiveTools([]), 3000);
+      return () => clearTimeout(t);
+    }
+    prevStreamingRef.current = isStreaming;
+  }, [isStreaming]);
+
   // Intent classification debug state
   const [lastIntentClassification, setLastIntentClassification] = useState<import("./chat/hooks/useChatStream").IntentClassification | null>(null);
   const [lastWidgetTriggered, setLastWidgetTriggered] = useState<string | null>(null);
@@ -201,9 +185,6 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     }
     setMessageTimeline(updated);
   }, [dynamicSuggestions]);
-
-  // Prevent repeated airport fetch loops (same inputs => only fetch once)
-  const airportFetchKeyRef = useRef<string | null>(null);
 
   // Refs
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -250,11 +231,27 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     onRetry: useCallback((attempt: number, maxRetries: number) => {
       toast.info(t("planner.chat.retrying", { attempt, max: maxRetries }));
     }, [t]),
+    // U3: Wire tool status events to ToolStatusIndicator
+    onToolStatus: useCallback((event: import("./chat/hooks/chatStreamTypes").ToolStatusEvent) => {
+      setActiveTools(prev => {
+        const idx = prev.findIndex(t => t.name === event.tool && t.status === "running");
+        if (event.status === "started") {
+          return [...prev, { name: event.tool, status: "running" as const, startTime: event.timestamp, reason: event.reason }];
+        }
+        if (idx === -1) return prev;
+        const updated = [...prev];
+        updated[idx] = {
+          ...updated[idx],
+          status: event.status === "finished" ? "success" as const : "error" as const,
+          duration: event.latency_ms,
+          summary: event.summary,
+        };
+        return updated;
+      });
+    }, []),
   });
   const mapContext = useChatMapContext();
   
-  // Chain of Thought thinking state
-  const thinkingState = useThinkingState();
   
   // Widget cooldown system - prevents infinite widget loops
   const widgetCooldown = useWidgetCooldown();
@@ -532,6 +529,14 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
               });
             }
           }
+          // U1: Restore dynamic suggestions (quick replies) from snapshot
+          if (Array.isArray(snapshot.dynamicSuggestions) && snapshot.dynamicSuggestions.length > 0) {
+            setDynamicSuggestions(snapshot.dynamicSuggestions);
+          } else {
+            setDynamicSuggestions([]);
+          }
+        } else {
+          setDynamicSuggestions([]);
         }
       } catch { /* corrupt snapshot — non-critical */ }
     } else {
@@ -564,12 +569,13 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
           const snapshot = {
             flight: getFlightMemory(),
             preferences: getPreferenceMemory(),
+            dynamicSuggestions,
           };
           localStorage.setItem(SK.CHAT_SESSION_STATE_PREFIX + activeSessionId, JSON.stringify(snapshot));
         } catch { /* quota exceeded — non-critical */ }
       }
     },
-    [updateStoredMessages, storedMessages, areStoredMessagesEqual, toStoredMessages, activeSessionId, getFlightMemory, getPreferenceMemory]
+    [updateStoredMessages, storedMessages, areStoredMessagesEqual, toStoredMessages, activeSessionId, getFlightMemory, getPreferenceMemory, dynamicSuggestions]
   );
 
   useEffect(() => {
@@ -614,138 +620,31 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     prevMessageCountRef.current = messages.length;
   }, [messages.length, isUserScrolling]);
 
-  // Show ready message when complete - use primitive deps to avoid loops
-  const arrivalCity = memory.arrival?.city;
-  const arrivalIata = memory.arrival?.iata;
-  const arrivalCountryCode = memory.arrival?.countryCode;
-  const departureIata = memory.departure?.iata;
-  const departureCountryCodeForReady = memory.departure?.countryCode;
-  const departureDateForReady = memory.departureDate;
-  const returnDateForReady = memory.returnDate;
-  const passengersTotal = memory.passengers.adults + memory.passengers.children;
-  const tripTypeForReady = memory.tripType;
-  const needsDepartureAirport = needsAirportSelection.departure;
-  const needsArrivalAirport = needsAirportSelection.arrival;
-  
-  useEffect(() => {
-    // During hard resets/session switching, suppress auto-messages (prevents "typing" spam + crashes)
-    if (isSwitchingSessionRef.current || isHardResetRef.current) return;
-    if (!hasCompleteInfo || widgetFlow.isSearchButtonShown()) return;
-
-    const departure = departureCity || t("planner.departure");
-    const arrival = arrivalCity || t("planner.askDestination");
-    const depCode = departureIata ? ` (${departureIata})` : "";
-    const arrCode = arrivalIata ? ` (${arrivalIata})` : "";
-    const depDate = departureDateForReady ? format(departureDateForReady, "d MMMM yyyy", { locale: dateFnsLocale }) : "-";
-    const retDate = returnDateForReady ? format(returnDateForReady, "d MMMM yyyy", { locale: dateFnsLocale }) : null;
-    const travelers = passengersTotal;
-
-    if (needsDepartureAirport || needsArrivalAirport) {
-      // Guard: avoid re-triggering the same airport fetch in a loop
-      const fetchKey = `${departureCity || ""}|${arrivalCity || ""}|${needsDepartureAirport ? 1 : 0}|${needsArrivalAirport ? 1 : 0}`;
-      if (airportFetchKeyRef.current === fetchKey) return;
-      airportFetchKeyRef.current = fetchKey;
-
-      widgetFlow.markSearchButtonShown();
-      const messageId = `airport-selection-${Date.now()}`;
-
-      setMessages((prev) => [
-        ...prev,
-        { id: messageId, role: "assistant", text: "", isTyping: true },
-      ]);
-
-      // Fetch airports
-      const fetchAirports = async () => {
-        try {
-          const [fromAirports, toAirports] = await Promise.all([
-            needsDepartureAirport && departureCity
-              ? findNearestAirports(departureCity, 3, departureCountryCodeForReady)
-              : null,
-            needsArrivalAirport && arrivalCity
-              ? findNearestAirports(arrivalCity, 3, arrivalCountryCode)
-              : null,
-          ]);
-
-          let dualChoices: import("@/types/flight").DualAirportChoice | undefined;
-          if (fromAirports?.airports?.length || toAirports?.airports?.length) {
-            dualChoices = {};
-            if (fromAirports?.airports?.length) {
-              dualChoices.from = {
-                field: "from",
-                cityName: departureCity || departure,
-                airports: fromAirports.airports,
-              };
-            }
-            if (toAirports?.airports?.length) {
-              dualChoices.to = {
-                field: "to",
-                cityName: arrivalCity || arrival,
-                airports: toAirports.airports,
-              };
-            }
-          }
-
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === messageId
-                ? {
-                    ...m,
-                    text: `${t("planner.messages.tripConfigured", { from: departure, to: arrival })}\n\n${t("planner.messages.departureDate", { date: depDate })}${retDate ? `\n${t("planner.messages.returnDate", { date: retDate })}` : ""}\n${t(travelers > 1 ? "planner.messages.travelersPlural" : "planner.messages.travelers", { count: travelers })}\n\n${t("planner.messages.selectAirports")}`,
-                    isTyping: false,
-                    dualAirportChoices: dualChoices,
-                  }
-                : m
-            )
-          );
-        } catch (error) {
-          console.error("Error fetching airports:", error);
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === messageId
-                ? {
-                    ...m,
-                    text: `${t("planner.messages.tripConfigured", { from: departure, to: arrival })}\n\n${t("planner.messages.selectAirportsPanel")}`,
-                    isTyping: false,
-                  }
-                : m
-            )
-          );
-        }
-      };
-
-      fetchAirports();
-    } else {
-      widgetFlow.markSearchButtonShown();
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `search-ready-auto-${Date.now()}`,
-          role: "assistant",
-          text: `${t("planner.messages.searchReady", { from: `${departure}${depCode}`, to: `${arrival}${arrCode}` })}\n\n${t("planner.messages.departureDate", { date: depDate })}${retDate ? `\n${t("planner.messages.returnDate", { date: retDate })}` : ""}\n${t(travelers > 1 ? "planner.messages.travelersPlural" : "planner.messages.travelers", { count: travelers })}\n\n${t("planner.messages.clickToSearch")}`,
-          hasSearchButton: true,
-        },
-      ]);
-    }
-  }, [
+  // A1: Ready-message + airport fetch logic extracted to useReadyMessage
+  const { airportFetchKeyRef } = useReadyMessage({
     hasCompleteInfo,
     departureCity,
-    arrivalCity,
-    departureIata,
-    arrivalIata,
-    arrivalCountryCode,
-    departureCountryCodeForReady,
-    departureDateForReady,
-    returnDateForReady,
-    passengersTotal,
-    needsDepartureAirport,
-    needsArrivalAirport,
-    widgetFlow,
-  ]);
+    arrivalCity: memory.arrival?.city,
+    departureIata: memory.departure?.iata,
+    arrivalIata: memory.arrival?.iata,
+    arrivalCountryCode: memory.arrival?.countryCode,
+    departureCountryCode: memory.departure?.countryCode,
+    departureDateMs: memory.departureDate?.getTime(),
+    returnDateMs: memory.returnDate?.getTime(),
+    passengersTotal: memory.passengers.adults + memory.passengers.children,
+    needsDepartureAirport: needsAirportSelection.departure,
+    needsArrivalAirport: needsAirportSelection.arrival,
+    isSearchButtonShown: widgetFlow.isSearchButtonShown,
+    markSearchButtonShown: widgetFlow.markSearchButtonShown,
+    setMessages,
+    isSwitchingSessionRef,
+    isHardResetRef,
+  });
 
   // Hard reset logic (shared between new session and delete all)
   const { performHardReset, finishReset } = useChatReset({
     setIsLoading, setDynamicSuggestions, setInput,
-    lastIntentRef, completedMessageIdsRef, userMessageCountRef, airportFetchKeyRef,
+    completedMessageIdsRef, userMessageCountRef, airportFetchKeyRef,
     isHardResetRef, isSwitchingSessionRef,
     widgetFlow, widgetCooldown,
     resetFlightMemory, resetTravelMemory, resetAccommodationMemory, resetActivityMemory, resetPreferenceMemory,
@@ -859,6 +758,114 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     [messages],
   );
 
+  // A1: Stable callbacks for ChatMessageBubble (avoid re-creating on each render)
+  const handleFillInput = useCallback((message: string) => {
+    setInput(message);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, [setInput, inputRef]);
+
+  const handleTriggerWidget = useCallback((widget: string) => {
+    if (widget === "preferenceInterests") {
+      const widgetId = `interests-widget-${Date.now()}`;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: widgetId,
+          role: "assistant",
+          text: t("planner.chat.selectInterests"),
+          widget: "preferenceInterests" as import("@/types/flight").WidgetType,
+        },
+      ]);
+    } else if (widget === "preferenceStyle") {
+      const widgetId = `style-widget-${Date.now()}`;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: widgetId,
+          role: "assistant",
+          text: t("planner.chat.adjustTravelStyle"),
+          widget: "preferenceStyle" as import("@/types/flight").WidgetType,
+        },
+      ]);
+    }
+  }, [setMessages, t]);
+
+  // A1: Extracted from inline JSX → stable callback for MemoizedSmartSuggestions
+  const handleSuggestionClick = useCallback((message: string) => {
+    if (import.meta.env.DEV) {
+      useDebugStore.getState().addUserInteraction({
+        timestamp: Date.now(),
+        category: "suggestion",
+        action: "clicked",
+        detail: `Suggestion: "${message.slice(0, 60)}"`,
+      });
+    }
+
+    // === CASE 1: Direct widget triggering ===
+    if (message.startsWith("__WIDGET__")) {
+      const widgetType = message.replace("__WIDGET__", "") as import("@/types/flight").WidgetType;
+
+      if (!widgetCooldown.canShowWidget(widgetType)) {
+        toast.info(t("planner.widget.alreadyConfigured"));
+        setDynamicSuggestions([]);
+        return;
+      }
+
+      widgetCooldown.recordWidgetShown(widgetType);
+
+      const widgetIntros: Record<string, string> = {
+        dietary: t("planner.preference.configureDietary"),
+        mustHaves: t("planner.preference.configureMustHaves"),
+        preferenceStyle: t("planner.preference.configureStyle"),
+        preferenceInterests: t("planner.preference.selectInterests"),
+      };
+
+      const widgetId = `widget-${widgetType}-${Date.now()}`;
+      setMessages((prev) => [
+        ...prev,
+        { id: widgetId, role: "assistant", text: widgetIntros[widgetType] || "", widget: widgetType },
+      ]);
+
+      setDynamicSuggestions([]);
+      return;
+    }
+
+    // === CASE 2: Direct destination fetch (with departure check) ===
+    if (message === "__FETCH_DESTINATIONS__") {
+      if (!departureCity) {
+        const askId = `ask-departure-${Date.now()}`;
+        setMessages((prev) => [
+          ...prev,
+          { id: askId, role: "assistant", text: t("planner.preference.askDepartureCity") },
+        ]);
+        setDynamicSuggestions([]);
+        return;
+      }
+
+      const loadingId = `fetching-${Date.now()}`;
+      setMessages((prev) => [
+        ...prev,
+        { id: loadingId, role: "assistant", text: t("planner.preference.searchingDestinations"), isTyping: true },
+      ]);
+      handleFetchDestinations(loadingId);
+      setDynamicSuggestions([]);
+      return;
+    }
+
+    // === CASE 3: Choose for me ===
+    if (message === "__CHOOSE_FOR_ME__") {
+      setInput(t("planner.suggestions.chooseForMeMessage"));
+      setDynamicSuggestions([]);
+      setTimeout(() => inputRef.current?.focus(), 0);
+      return;
+    }
+
+    // === DEFAULT: Fill input only, let user review & send ===
+    setDynamicSuggestions([]);
+    setInput(message);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, [widgetCooldown, departureCity, handleFetchDestinations, setMessages, setDynamicSuggestions, setInput, inputRef, t]);
+
   return (
     <aside
       className={cn(
@@ -884,45 +891,12 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
 
       {/* Header - only show when not collapsed */}
       {!isCollapsed && (
-        <div className="flex items-center justify-between h-12 px-3 border-b border-border shrink-0 bg-background animate-fade-in">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <img src={logo} alt="Travliaq" className="h-6 w-6 object-contain shrink-0" />
-            <span className="font-medium text-foreground text-sm truncate max-w-[240px]">
-              {(() => {
-                const title = sessions.find((s) => s.id === activeSessionId)?.title || t("planner.chat.newConversation");
-                const titleWithoutEmoji = title.replace(/^\p{Extended_Pictographic}\s*/u, "");
-                // Normalize default titles to current locale
-                const defaultTitles = ["Nouvelle conversation", "New conversation"];
-                if (defaultTitles.includes(titleWithoutEmoji)) {
-                  return t("planner.chat.newConversation");
-                }
-                return titleWithoutEmoji;
-              })()}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={() => setIsHistoryOpen(true)}
-              className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-              title={t("planner.chat.history")}
-              aria-label={t("planner.chat.history")}
-            >
-              <History className="h-4 w-4" />
-            </button>
-
-            {onToggleCollapse && (
-              <button
-                onClick={onToggleCollapse}
-                className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                title={t("planner.chat.closeChat")}
-                aria-label={t("planner.chat.closeChat")}
-              >
-                <PanelLeftClose className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        </div>
+        <ChatHeader
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          onHistoryOpen={() => setIsHistoryOpen(true)}
+          onToggleCollapse={onToggleCollapse}
+        />
       )}
 
       {/* Collapsible content */}
@@ -943,144 +917,23 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
             aria-live="polite"
           >
             <div className="max-w-3xl mx-auto py-6 px-4 space-y-6">
-              {/* Memoized: filter once per messages change */}
               {visibleMessages.map((m) => (
-                <div key={m.id} className={cn("flex gap-2", m.role === "user" ? "flex-row-reverse" : "")}>
-                  {/* Content - no avatars */}
-                  <div className={cn("flex-1 min-w-0", m.role === "user" ? "text-right" : "")}>
-                    <div className={cn(
-                      "inline-block text-sm leading-relaxed px-4 py-3 rounded-2xl max-w-[85%]",
-                      m.errorType
-                        ? "bg-destructive/10 text-destructive border border-destructive/20 text-left"
-                        : m.role === "user" ? "bg-primary text-primary-foreground text-left" : "bg-muted text-foreground text-left"
-                    )}>
-                      {m.isTyping ? (
-                        <div className="flex gap-1 py-1" role="status" aria-label={t("planner.chat.assistantTyping")}>
-                          <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                          <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                          <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                        </div>
-                      ) : m.errorType ? (
-                        <div className="flex items-start gap-2">
-                          {m.errorType === "network" ? (
-                            <WifiOff className="h-4 w-4 mt-0.5 shrink-0" />
-                          ) : (
-                            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                          )}
-                          <div>
-                            <p className="font-medium">{m.text}</p>
-                            <button
-                              onClick={regenerateLastResponse}
-                              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive text-xs font-medium transition-colors"
-                            >
-                              <RefreshCw className="h-3 w-3" />
-                              {t("planner.chat.retry")}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <MarkdownMessage content={m.text} />
-                          {m.isStreaming && <span className="inline-block w-1.5 h-4 bg-current ml-0.5 animate-pulse" />}
-                        </>
-                      )}
-                    </div>
-
-                    {/* Copy / Like / Dislike actions for assistant messages */}
-                    {m.role === "assistant" && !m.isTyping && !m.isStreaming && m.text && (
-                      <MessageActions messageId={m.id} text={m.text} onRegenerate={regenerateLastResponse} />
-                    )}
-
-                    {/* Airport choices */}
-                    {m.airportChoices && (
-                      <div className="mt-2 flex flex-wrap gap-2 max-w-[85%]">
-                        {m.airportChoices.airports.map((airport) => (
-                          <AirportButton
-                            key={airport.iata}
-                            airport={airport}
-                            onClick={() => widgetFlow.handleAirportSelect(m.id, m.airportChoices!.field, airport, false)}
-                            disabled={isLoading}
-                          />
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Dual airport selection */}
-                    {m.dualAirportChoices && (
-                      <DualAirportSelection
-                        choices={m.dualAirportChoices}
-                        onSelect={(field, airport) => widgetFlow.handleAirportSelect(m.id, field, airport, true)}
-                        disabled={isLoading}
-                      />
-                    )}
-
-                    {/* Widgets */}
-                    {m.widget && !m.widgetDismissed && (
-                      <WidgetRenderer
-                        message={m}
-                        widgetFlow={widgetFlow}
-                        preferenceCallbacks={preferenceCallbacks}
-                        handleDestinationSelect={handleDestinationSelect}
-                        isLoadingDestinations={isLoadingDestinations}
-                        memory={memory}
-                        t={t}
-                        onWidgetReopen={handleWidgetReopen}
-                      />
-                    )}
-
-                    {/* Search button */}
-                    {m.hasSearchButton && (
-                      <div className="mt-3">
-                        <button
-                          onClick={() => widgetFlow.handleSearchButtonClick(m.id)}
-                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-primary/20"
-                        >
-                          <Plane className="h-4 w-4" />
-                          {t("planner.chat.searchFlightsNow")}
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Quick Replies */}
-                    {m.quickReplies && m.quickReplies.length > 0 && (
-                      <QuickReplies
-                        replies={m.quickReplies}
-                        onSendMessage={(message) => handleSend(message)}
-                        onFillInput={(message) => {
-                          setInput(message);
-                          setTimeout(() => inputRef.current?.focus(), 0);
-                        }}
-                        onTriggerWidget={(widget) => {
-                          // Trigger preference widgets on demand
-                          if (widget === "preferenceInterests") {
-                            const widgetId = `interests-widget-${Date.now()}`;
-                            setMessages((prev) => [
-                              ...prev,
-                              {
-                                id: widgetId,
-                                role: "assistant",
-                                text: t("planner.chat.selectInterests"),
-                                widget: "preferenceInterests" as import("@/types/flight").WidgetType,
-                              },
-                            ]);
-                          } else if (widget === "preferenceStyle") {
-                            const widgetId = `style-widget-${Date.now()}`;
-                            setMessages((prev) => [
-                              ...prev,
-                              {
-                                id: widgetId,
-                                role: "assistant",
-                                text: t("planner.chat.adjustTravelStyle"),
-                                widget: "preferenceStyle" as import("@/types/flight").WidgetType,
-                              },
-                            ]);
-                          }
-                        }}
-                        disabled={isLoading}
-                      />
-                    )}
-                  </div>
-                </div>
+                <ChatMessageBubble
+                  key={m.id}
+                  message={m}
+                  activeTools={activeTools}
+                  isLoading={isLoading}
+                  memory={memory}
+                  widgetFlow={widgetFlow}
+                  preferenceCallbacks={preferenceCallbacks}
+                  handleDestinationSelect={handleDestinationSelect}
+                  isLoadingDestinations={isLoadingDestinations}
+                  onWidgetReopen={handleWidgetReopen}
+                  onRegenerate={regenerateLastResponse}
+                  onSend={handleSend}
+                  onFillInput={handleFillInput}
+                  onTriggerWidget={handleTriggerWidget}
+                />
               ))}
               <div ref={messagesEndRef} />
             </div>
@@ -1104,173 +957,23 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
               mapContext={mapContext}
               inspireFlowStep={inspireFlowStep}
               destinationSuggestions={destinationSuggestions}
-              messages={messages}
+              lastAssistantMessage={messages.filter(m => m.role === 'assistant' && !m.isTyping && m.text && m.text.length > 10).at(-1)?.text}
+              lastUserMessage={messages.filter(m => m.role === 'user').at(-1)?.text}
+              conversationTurn={messages.filter(m => m.role === 'user').length}
               dynamicSuggestions={dynamicSuggestions}
-              onSuggestionClick={(message) => {
-                if (import.meta.env.DEV) {
-                  useDebugStore.getState().addUserInteraction({
-                    timestamp: Date.now(),
-                    category: "suggestion",
-                    action: "clicked",
-                    detail: `Suggestion: "${message.slice(0, 60)}"`,
-                  });
-                }
-                // Handle special tokens that trigger widgets or actions directly
-                
-                // === CASE 1: Direct widget triggering ===
-                if (message.startsWith("__WIDGET__")) {
-                  const widgetType = message.replace("__WIDGET__", "") as import("@/types/flight").WidgetType;
-                  
-                  // Check cooldown before showing widget
-                  if (!widgetCooldown.canShowWidget(widgetType)) {
-                    toast.info(t("planner.widget.alreadyConfigured"));
-                    setDynamicSuggestions([]);
-                    return;
-                  }
-                  
-                  // Record widget shown in cooldown system
-                  widgetCooldown.recordWidgetShown(widgetType);
-                  
-                  // Get appropriate intro text for the widget
-                  const widgetIntros: Record<string, string> = {
-                    dietary: t("planner.preference.configureDietary"),
-                    mustHaves: t("planner.preference.configureMustHaves"),
-                    preferenceStyle: t("planner.preference.configureStyle"),
-                    preferenceInterests: t("planner.preference.selectInterests"),
-                  };
-                  
-                  const widgetId = `widget-${widgetType}-${Date.now()}`;
-                  setMessages((prev) => [
-                    ...prev,
-                    {
-                      id: widgetId,
-                      role: "assistant",
-                      text: widgetIntros[widgetType] || "",
-                      widget: widgetType,
-                    },
-                  ]);
-                  
-                  setDynamicSuggestions([]);
-                  return;
-                }
-                
-                // === CASE 2: Direct destination fetch (with departure check) ===
-                if (message === "__FETCH_DESTINATIONS__") {
-                  // Check if departure city is set first
-                  if (!departureCity) {
-                    const askId = `ask-departure-${Date.now()}`;
-                    setMessages((prev) => [
-                      ...prev,
-                      {
-                        id: askId,
-                        role: "assistant",
-                        text: t("planner.preference.askDepartureCity"),
-                      },
-                    ]);
-                    setDynamicSuggestions([]);
-                    return;
-                  }
-                  
-                  const loadingId = `fetching-${Date.now()}`;
-                  setMessages((prev) => [
-                    ...prev,
-                    {
-                      id: loadingId,
-                      role: "assistant",
-                      text: t("planner.preference.searchingDestinations"),
-                      isTyping: true,
-                    },
-                  ]);
-                  handleFetchDestinations(loadingId);
-                  setDynamicSuggestions([]);
-                  return;
-                }
-                
-                // === CASE 3: Choose for me ===
-                if (message === "__CHOOSE_FOR_ME__") {
-                  setInput(t("planner.suggestions.chooseForMeMessage"));
-                  setDynamicSuggestions([]);
-                  setTimeout(() => inputRef.current?.focus(), 0);
-                  return;
-                }
-                
-                // === DEFAULT: Fill input only, let user review & send ===
-                setDynamicSuggestions([]);
-                setInput(message);
-                setTimeout(() => inputRef.current?.focus(), 0);
-              }}
+              onSuggestionClick={handleSuggestionClick}
               isLoading={isLoading}
             />
 
             <TripStatusBar memory={memory} t={t} />
 
-            <div className="relative z-20 max-w-3xl mx-auto p-4 pt-0">
-              <div className="relative z-20 flex items-end gap-2 rounded-2xl border border-border bg-muted/30 p-2 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20">
-                <textarea
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => {
-                    setInput(e.target.value);
-                    e.target.style.height = "auto";
-                    e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
-                  }}
-                  onPointerDown={(e) => {
-                    const { clientX, clientY } = e;
-                    requestAnimationFrame(() => {
-                      // If a layer is capturing clicks, the textarea won't become the active element.
-                      if (document.activeElement !== inputRef.current) {
-                        const el = document.elementFromPoint(clientX, clientY);
-                        const cs = el ? window.getComputedStyle(el) : null;
-                        // eslint-disable-next-line no-console
-                        console.warn("[ChatInputBlock] click not reaching textarea", {
-                          x: clientX,
-                          y: clientY,
-                          topElement: el ? `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}${el.className ? `.${String(el.className).split(" ").slice(0, 3).join(".")}` : ""}` : null,
-                          pointerEvents: cs?.pointerEvents,
-                          zIndex: cs?.zIndex,
-                          position: cs?.position,
-                        });
-                      }
-                    });
-                  }}
-                  onFocus={() => {
-                    // Safety net: if driver.js ever leaves pointer-events blocked, restore interactivity.
-                    document.body.classList.remove("driver-active");
-                    document.documentElement.classList.remove("driver-active");
-                  }}
-                  placeholder={isLoading ? t("planner.chat.inputLoading") : t("planner.chat.inputPlaceholder")}
-                  aria-label={t("planner.chat.inputPlaceholder")}
-                  rows={1}
-                  disabled={false}
-                  className="pointer-events-auto flex-1 resize-none bg-transparent px-2 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-                  style={{ minHeight: "40px", maxHeight: "120px" }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend(input);
-                      setTimeout(() => inputRef.current?.focus(), 0);
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => handleSend(input)}
-                  disabled={!input.trim() || isLoading}
-                  className={cn(
-                    "h-9 w-9 shrink-0 rounded-lg flex items-center justify-center transition-all",
-                    input.trim() && !isLoading
-                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                      : "bg-muted text-muted-foreground cursor-not-allowed"
-                  )}
-                  aria-label={t("planner.chat.send")}
-                >
-                  <Send className="h-4 w-4" />
-                </button>
-              </div>
-              <p className="text-[10px] text-muted-foreground/70 text-center mt-1.5">
-                {t("planner.chat.inputHelper")}
-              </p>
-            </div>
+            <ChatInputArea
+              input={input}
+              setInput={setInput}
+              inputRef={inputRef}
+              isLoading={isLoading}
+              onSend={handleSend}
+            />
           </div>
       </div>
       

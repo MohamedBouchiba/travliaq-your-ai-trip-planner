@@ -5,7 +5,6 @@
 
 import { memo, useMemo } from "react";
 import { SmartSuggestions, type DynamicSuggestion } from "./SmartSuggestions";
-import type { ChatMessage } from "./types";
 import type { DestinationSuggestion } from "@/types/destinations";
 
 // Type for inspire flow step
@@ -34,7 +33,12 @@ interface MemoizedSmartSuggestionsProps {
   mapContext: MapContextForSuggestions;
   inspireFlowStep: InspireFlowStep;
   destinationSuggestions: DestinationSuggestion[];
-  messages: ChatMessage[];
+  /** Last assistant message text (primitive, avoids array-ref invalidation) */
+  lastAssistantMessage: string | undefined;
+  /** Last user message text (primitive) */
+  lastUserMessage: string | undefined;
+  /** Number of user messages (primitive) */
+  conversationTurn: number;
   dynamicSuggestions: DynamicSuggestion[];
   onSuggestionClick: (message: string) => void;
   isLoading: boolean;
@@ -45,19 +49,21 @@ export const MemoizedSmartSuggestions = memo(function MemoizedSmartSuggestions({
   mapContext,
   inspireFlowStep,
   destinationSuggestions,
-  messages,
+  lastAssistantMessage,
+  lastUserMessage,
+  conversationTurn,
   dynamicSuggestions,
   onSuggestionClick,
   isLoading,
 }: MemoizedSmartSuggestionsProps) {
   // Memoize the context object with primitive dependencies to avoid re-creation
   const context = useMemo(() => {
-    const step: 'inspiration' | 'destination' | 'dates' | 'travelers' | 'search' | 'compare' | 'book' = 
+    const step: 'inspiration' | 'destination' | 'dates' | 'travelers' | 'search' | 'compare' | 'book' =
       !memory.arrival?.city ? "inspiration"
         : !memory.departureDate ? "destination"
         : memory.passengers.adults === 0 ? "dates"
         : "compare";
-    
+
     return {
       workflowStep: step,
       hasDestination: !!memory.arrival?.city,
@@ -77,14 +83,10 @@ export const MemoizedSmartSuggestions = memo(function MemoizedSmartSuggestions({
       inspireFlowStep,
       hasProposedDestinations: destinationSuggestions.length > 0,
       proposedDestinationNames: destinationSuggestions.map(d => d.countryName),
-      // Conversation context for intelligent anticipation - memoized slices
-      lastAssistantMessage: messages
-        .filter(m => m.role === 'assistant' && !m.isTyping && m.text && m.text.length > 10)
-        .slice(-1)[0]?.text,
-      lastUserMessage: messages
-        .filter(m => m.role === 'user')
-        .slice(-1)[0]?.text,
-      conversationTurn: messages.filter(m => m.role === 'user').length,
+      // P4: Conversation context — primitives only (no array ref dependency)
+      lastAssistantMessage,
+      lastUserMessage,
+      conversationTurn,
     };
   }, [
     memory.arrival?.city,
@@ -99,7 +101,9 @@ export const MemoizedSmartSuggestions = memo(function MemoizedSmartSuggestions({
     mapContext.getCheapestHotelPrice,
     inspireFlowStep,
     destinationSuggestions,
-    messages,
+    lastAssistantMessage,
+    lastUserMessage,
+    conversationTurn,
   ]);
 
   return (

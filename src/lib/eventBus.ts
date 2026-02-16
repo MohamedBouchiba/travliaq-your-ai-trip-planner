@@ -90,8 +90,12 @@ export type PlannerEvents = {
   "budget:selected": { range: { min: number; max: number }; perPerson: boolean };
   "filters:changed": { filterId: string; selected: boolean };
   "filters:cleared": void;
+  "filters:quickChips": { filters: Record<string, (string | number | boolean)[]> };
+  "filters:starRating": { ratings: number[] };
+  "filters:cabinClass": { cabin: { id: string; value: string } | null };
   "flights:directOnly": { directOnly: boolean };
   "activities:duration": { duration: string };
+  "activities:durationChips": { durations: Array<{ id: string; minMinutes: number; maxMinutes: number | null }> };
   "activities:timeOfDay": { timeSlot: string };
 
   // Activities-related

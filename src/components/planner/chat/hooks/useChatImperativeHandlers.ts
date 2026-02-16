@@ -10,7 +10,7 @@
  */
 
 import { useCallback } from "react";
-import { supabaseFetch } from "@/utils/supabaseFetch";
+import { fetchTopCities } from "../utils/fetchTopCities";
 import { toastSuccess, toastError } from "@/lib/toast";
 import { eventBus } from "@/lib/eventBus";
 import i18n from "@/i18n/config";
@@ -19,6 +19,26 @@ import type { AccommodationEntry, ActivityEntry, TripPreferences } from "@/store
 import type { ChatMessage } from "../types";
 
 const t = i18n.t.bind(i18n);
+
+/**
+ * AI-extracted preferences shape from the LLM stream.
+ * Used by sseEventParser → useChatStream → useChatSubmit → handlePreferencesDetection.
+ */
+export interface AIPreferencesData {
+  travelStyle?: string;
+  pace?: string;
+  interests?: string[];
+  occasion?: string;
+  dietaryRestrictions?: string[];
+  accessibilityRequired?: boolean;
+  petFriendly?: boolean;
+  familyFriendly?: boolean;
+  needsWifi?: boolean;
+  chillVsIntense?: number;
+  cityVsNature?: number;
+  ecoVsLuxury?: number;
+  touristVsLocal?: number;
+}
 
 /**
  * Options for the imperative handlers hook
@@ -41,32 +61,6 @@ export interface UseChatImperativeHandlersOptions {
   citySelectionShownRef: React.MutableRefObject<string | null>;
 }
 
-/**
- * Fetch top cities for a country
- */
-async function fetchTopCities(countryCode: string): Promise<CitySelectionData["cities"] | null> {
-  try {
-    const response = await supabaseFetch("top-cities-by-country", {
-      method: "GET",
-      params: { country_code: countryCode, limit: "5" },
-    });
-
-    const data = await response.json();
-
-    if (data.cities && data.cities.length > 0) {
-      return data.cities.map((c: any) => ({
-        name: c.name,
-        description: c.description || t("planner.systemMessage.importantCity"),
-        population: c.population,
-      }));
-    }
-
-    return null;
-  } catch (error) {
-    console.error("Error fetching cities:", error);
-    return null;
-  }
-}
 
 /**
  * Hook for imperative handlers
@@ -145,7 +139,7 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
       }
 
       // Fetch cities
-      const cities = await fetchTopCities(countryCode);
+      const cities = await fetchTopCities(countryCode, t("planner.systemMessage.importantCity"));
 
       if (cities) {
         const citySelection: CitySelectionData = {
@@ -415,28 +409,6 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
       .map(r => normalizeMap[r.toLowerCase().trim()] || r.toLowerCase().trim())
       .filter((v, i, arr) => arr.indexOf(v) === i); // unique
   };
-
-  /**
-   * Map flat AI-extracted preferences to store structure
-   */
-  interface AIPreferencesData {
-    // Flat fields from AI extraction
-    travelStyle?: string;
-    pace?: string;
-    interests?: string[];
-    occasion?: string;
-    dietaryRestrictions?: string[];
-    // MustHaves (flat from AI)
-    accessibilityRequired?: boolean;
-    petFriendly?: boolean;
-    familyFriendly?: boolean;
-    needsWifi?: boolean;
-    // StyleAxes (flat from AI)
-    chillVsIntense?: number;
-    cityVsNature?: number;
-    ecoVsLuxury?: number;
-    touristVsLocal?: number;
-  }
 
   /**
    * Handle detected preferences from chat

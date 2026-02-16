@@ -3,6 +3,7 @@
  */
 
 import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import { cn } from "@/lib/utils";
 
 interface MarkdownMessageProps {
@@ -10,10 +11,18 @@ interface MarkdownMessageProps {
   className?: string;
 }
 
+/** Block dangerous URI schemes (javascript:, data:, vbscript:) */
+function sanitizeHref(href: string | undefined): string {
+  if (!href) return "#";
+  if (/^(javascript|data|vbscript):/i.test(href)) return "#";
+  return href;
+}
+
 export function MarkdownMessage({ content, className }: MarkdownMessageProps) {
   return (
     <div className={cn("prose prose-sm dark:prose-invert max-w-none", className)}>
       <ReactMarkdown
+        rehypePlugins={[rehypeSanitize]}
         components={{
           p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
           ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
@@ -22,7 +31,7 @@ export function MarkdownMessage({ content, className }: MarkdownMessageProps) {
           strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
           a: ({ href, children }) => (
             <a
-              href={href}
+              href={sanitizeHref(href)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary underline hover:text-primary/80"

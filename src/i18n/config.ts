@@ -1287,6 +1287,8 @@ const resources = {
       "planner.datePicker.confirmRange": "Confirmer : {{start}} → {{end}}",
       "planner.datePicker.selectReturnDate": "Sélectionnez la date de retour",
       "planner.datePicker.selectDepartureDate": "Sélectionnez la date de départ",
+      "planner.datePicker.previousMonth": "Mois précédent",
+      "planner.datePicker.nextMonth": "Mois suivant",
       // Top bar tabs
       "planner.tabs.flights": "Vols",
       "planner.tabs.stays": "Hébergements",
@@ -2852,6 +2854,13 @@ const resources = {
       "planner.chat.errorMessage": "Désolé, une erreur s'est produite. Veuillez réessayer.",
       "planner.chat.errorOccurred": "Désolé, une erreur s'est produite. Veuillez réessayer.",
       "planner.chat.retry": "Réessayer",
+      "planner.error.cancelled": "Requête annulée.",
+      "planner.error.timeout": "La réponse prend trop de temps. Veuillez réessayer.",
+      "planner.error.network": "Erreur de connexion réseau.",
+      "planner.error.auth": "Session expirée, veuillez vous reconnecter.",
+      "planner.error.rateLimit": "Trop de requêtes, veuillez patienter.",
+      "planner.error.server": "Erreur serveur, réessai en cours...",
+      "planner.error.unknown": "Une erreur inconnue s'est produite.",
       "planner.chat.excellentChoice": "Excellent choix ! **{{country}}** est une destination parfaite pour vous.",
       "planner.chat.searchingCities": "Je recherche les villes principales...",
       "planner.chat.importantCity": "Ville importante",
@@ -2866,6 +2875,8 @@ const resources = {
       "planner.chat.dietaryRestrictions": "J'ai des restrictions alimentaires à préciser.",
       "planner.chat.chooseBestDestination": "Choisis la meilleure destination pour moi parmi celles affichées et explique pourquoi.",
       "planner.chat.typeInChat": "Tapez le nom dans le chat.",
+      "planner.chat.suggestions": "Suggestions",
+      "planner.chat.assistantTyping": "L'assistant est en train d'écrire",
 
       // Planner - Widget Confirmed States
       "planner.widget.dateSelected": "Date sélectionnée",
@@ -4214,6 +4225,8 @@ const resources = {
       "planner.datePicker.confirmRange": "Confirm: {{start}} → {{end}}",
       "planner.datePicker.selectReturnDate": "Select return date",
       "planner.datePicker.selectDepartureDate": "Select departure date",
+      "planner.datePicker.previousMonth": "Previous month",
+      "planner.datePicker.nextMonth": "Next month",
       // Top bar tabs
       "planner.tabs.flights": "Flights",
       "planner.tabs.stays": "Stays",
@@ -5779,6 +5792,13 @@ const resources = {
       "planner.chat.errorMessage": "Sorry, an error occurred. Please try again.",
       "planner.chat.errorOccurred": "Sorry, an error occurred. Please try again.",
       "planner.chat.retry": "Retry",
+      "planner.error.cancelled": "Request cancelled.",
+      "planner.error.timeout": "The response is taking too long. Please try again.",
+      "planner.error.network": "Network connection error.",
+      "planner.error.auth": "Session expired, please log in again.",
+      "planner.error.rateLimit": "Too many requests, please wait.",
+      "planner.error.server": "Server error, retrying...",
+      "planner.error.unknown": "An unknown error occurred.",
       "planner.chat.excellentChoice": "Excellent choice! **{{country}}** is a perfect destination for you.",
       "planner.chat.searchingCities": "Searching for main cities...",
       "planner.chat.importantCity": "Major city",
@@ -5793,6 +5813,8 @@ const resources = {
       "planner.chat.dietaryRestrictions": "I have dietary restrictions to specify.",
       "planner.chat.chooseBestDestination": "Choose the best destination for me from those displayed and explain why.",
       "planner.chat.typeInChat": "Type the name in the chat.",
+      "planner.chat.suggestions": "Suggestions",
+      "planner.chat.assistantTyping": "Assistant is typing",
 
       // Planner - Widget Confirmed States
       "planner.widget.dateSelected": "Date selected",

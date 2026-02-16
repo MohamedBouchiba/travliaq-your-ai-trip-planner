@@ -10,6 +10,22 @@ import type { ChatMessage } from "../types";
 import type { WidgetType } from "@/types/flight";
 import { getSimplePhase, type TravelPhase } from "../services/phaseDetector";
 
+// R3: Per-field character budgets to prevent oversized LLM payloads
+const FIELD_BUDGETS: Record<string, number> = {
+  widgetHistory: 800,
+  activeWidgetsContext: 1500,
+  conversationSummary: 1000,
+  basketSummary: 400,
+  preferenceContext: 400,
+  activityContext: 400,
+};
+
+/** @internal Exported for testing */
+export function truncateField(value: string, maxChars: number): string {
+  if (!value || value.length <= maxChars) return value;
+  return value.slice(0, maxChars - 15) + "… [tronqué]";
+}
+
 // ─── Input shapes (match the interfaces from useChatSubmit) ───
 
 interface PhaseSignalInputs {
@@ -176,18 +192,23 @@ export function buildLLMContext(sources: ContextSources): Record<string, unknown
     currentPhase = getSimplePhase(s.hasDestination, s.hasDates, s.hasTravelers, s.hasFlightResults, s.hasHotelResults);
   }
 
+  // R3: Apply per-field character budgets to prevent oversized payloads
+  const rawActivityContext = activityContext + (visualContext ? `\n${visualContext}` : "");
+  const rawWidgetHistory = sources.widgetTracking.getContextForLLM();
+  const rawConversationSummary = sources.sessionContext.buildConversationSummary(5);
+  const rawBasketSummary = sources.getBasketSummary();
+
   return {
     flightSummary: sources.getMemorySummary(),
-    activityContext:
-      activityContext + (visualContext ? `\n${visualContext}` : ""),
-    preferenceContext,
+    activityContext: truncateField(rawActivityContext, FIELD_BUDGETS.activityContext),
+    preferenceContext: truncateField(preferenceContext, FIELD_BUDGETS.preferenceContext),
     missingFields: sources.missingFields,
-    widgetHistory: sources.widgetTracking.getContextForLLM(),
-    activeWidgetsContext: combinedWidgetContext,
-    conversationSummary: sources.sessionContext.buildConversationSummary(5),
+    widgetHistory: truncateField(rawWidgetHistory, FIELD_BUDGETS.widgetHistory),
+    activeWidgetsContext: truncateField(combinedWidgetContext, FIELD_BUDGETS.activeWidgetsContext),
+    conversationSummary: truncateField(rawConversationSummary, FIELD_BUDGETS.conversationSummary),
     sessionEntities: sources.sessionContext.sessionEntities,
     widgetDecisions: sources.sessionContext.widgetDecisions,
-    basketSummary: sources.getBasketSummary(),
+    basketSummary: truncateField(rawBasketSummary, FIELD_BUDGETS.basketSummary),
     blockedWidgets: sources.widgetCooldown.getBlockedWidgets(),
     preferencesState,
     currentPhase,

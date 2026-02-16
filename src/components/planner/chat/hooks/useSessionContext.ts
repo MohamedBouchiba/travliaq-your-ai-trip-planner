@@ -7,7 +7,7 @@
  * - Widget decisions history
  */
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useRef } from "react";
 import type { ChatMessage } from "../types";
 import type { WidgetInteraction } from "@/contexts/WidgetHistoryContext";
 import type { SessionEntities, WidgetDecision } from "./useChatStream";
@@ -34,9 +34,11 @@ interface UseSessionContextReturn {
 /**
  * Reject filter: candidates matching these words are NOT destinations
  */
-const DESTINATION_REJECT = /\b(cher|chere|chère|chères|chers|cheap|budget|moins|plus|pas|possible|affordable|luxe|luxury|prix|price|economique|économique)\b/i;
+/** @internal Exported for testing */
+export const DESTINATION_REJECT = /\b(cher|chere|chère|chères|chers|cheap|budget|moins|plus|pas|possible|affordable|luxe|luxury|prix|price|economique|économique)\b/i;
 
-const ENTITY_PATTERNS = {
+/** @internal Exported for testing */
+export const ENTITY_PATTERNS = {
   // Destinations: cities, countries
   // NOTE: flag `g` only (not `gi`) — case-sensitive [A-ZÀ-Ü] ensures we only match capitalized words (proper nouns)
   destinations: [
@@ -85,7 +87,8 @@ const ENTITY_PATTERNS = {
  * Extract unique matches from text using patterns
  * @param rejectFilter - optional regex to reject false-positive matches
  */
-function extractEntities(text: string, patterns: RegExp[], minLength = 3, rejectFilter?: RegExp): string[] {
+/** @internal Exported for testing */
+export function extractEntities(text: string, patterns: RegExp[], minLength = 3, rejectFilter?: RegExp): string[] {
   const matches = new Set<string>();
   for (const pattern of patterns) {
     // Reset regex state
@@ -106,10 +109,20 @@ function extractEntities(text: string, patterns: RegExp[], minLength = 3, reject
   return Array.from(matches);
 }
 
+/** Cached per-message extraction result */
+interface CachedEntities {
+  destinations: string[];
+  dates: string[];
+  budgets: string[];
+  constraints: string[];
+}
+
 export function useSessionContext({
   messages,
   widgetInteractions,
 }: UseSessionContextOptions): UseSessionContextReturn {
+  // P6: Cache per-message regex results — only new messages get scanned
+  const entityCacheRef = useRef(new Map<string, CachedEntities>());
   /**
    * Build conversation summary from last N messages
    */
@@ -146,6 +159,7 @@ export function useSessionContext({
    */
   const sessionEntities = useMemo<SessionEntities>(() => {
     // Extract entities per-message to avoid cross-boundary regex matches
+    const cache = entityCacheRef.current;
     const userMessages = messages.filter((m) => m.role === "user" && m.text);
 
     const destinationsSet = new Set<string>();
@@ -154,10 +168,21 @@ export function useSessionContext({
     const constraintsSet = new Set<string>();
 
     for (const msg of userMessages) {
-      for (const d of extractEntities(msg.text, ENTITY_PATTERNS.destinations, 3, DESTINATION_REJECT)) destinationsSet.add(d);
-      for (const d of extractEntities(msg.text, ENTITY_PATTERNS.dates, 1)) datesSet.add(d);
-      for (const b of extractEntities(msg.text, ENTITY_PATTERNS.budgets)) budgetsSet.add(b);
-      for (const c of extractEntities(msg.text, ENTITY_PATTERNS.constraints)) constraintsSet.add(c);
+      // P6: Only run regex on messages not already cached
+      let extracted = cache.get(msg.id);
+      if (!extracted) {
+        extracted = {
+          destinations: extractEntities(msg.text, ENTITY_PATTERNS.destinations, 3, DESTINATION_REJECT),
+          dates: extractEntities(msg.text, ENTITY_PATTERNS.dates, 1),
+          budgets: extractEntities(msg.text, ENTITY_PATTERNS.budgets),
+          constraints: extractEntities(msg.text, ENTITY_PATTERNS.constraints),
+        };
+        cache.set(msg.id, extracted);
+      }
+      for (const d of extracted.destinations) destinationsSet.add(d);
+      for (const d of extracted.dates) datesSet.add(d);
+      for (const b of extracted.budgets) budgetsSet.add(b);
+      for (const c of extracted.constraints) constraintsSet.add(c);
     }
 
     const destinations = Array.from(destinationsSet);

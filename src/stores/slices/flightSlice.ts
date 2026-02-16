@@ -11,6 +11,7 @@ import type {
   TripType,
   CabinClass,
 } from '../types';
+import type { FlightOffer } from '@/types/flight';
 
 // Initial state
 const initialFlightState = {
@@ -28,6 +29,10 @@ const initialFlightState = {
   cabinClass: 'economy' as CabinClass,
   directOnly: false,
   flexibleDates: false,
+  // C1: Flight search results
+  flightSearchResults: [] as FlightOffer[],
+  showFlightResults: false,
+  selectedFlightId: null as string | null,
 };
 
 export interface FlightSlice {
@@ -42,7 +47,11 @@ export interface FlightSlice {
   cabinClass: CabinClass;
   directOnly: boolean;
   flexibleDates: boolean;
-  
+  // C1: Flight search results (mirrors AccommodationSlice hotel pattern)
+  flightSearchResults: FlightOffer[];
+  showFlightResults: boolean;
+  selectedFlightId: string | null;
+
   // Actions
   setTripType: (type: TripType) => void;
   setDeparture: (info: AirportInfo | null) => void;
@@ -57,6 +66,11 @@ export interface FlightSlice {
   updateLeg: (legId: string, update: Partial<FlightLegMemory>) => void;
   setLegs: (legs: FlightLegMemory[]) => void;
   resetFlight: () => void;
+  // C1: Flight results actions
+  setFlightSearchResults: (results: FlightOffer[]) => void;
+  setShowFlightResults: (show: boolean) => void;
+  setSelectedFlightId: (id: string | null) => void;
+  clearFlightSearch: () => void;
 }
 
 export const createFlightSlice: StateCreator<
@@ -213,5 +227,22 @@ export const createFlightSlice: StateCreator<
 
   resetFlight: () => {
     set(initialFlightState, false, 'flight/reset');
+  },
+
+  // C1: Flight results actions (mirrors AccommodationSlice hotel pattern)
+  setFlightSearchResults: (results: FlightOffer[]) => {
+    set({ flightSearchResults: results, showFlightResults: true }, false, 'flight/setSearchResults');
+  },
+
+  setShowFlightResults: (show: boolean) => {
+    set({ showFlightResults: show }, false, 'flight/setShowResults');
+  },
+
+  setSelectedFlightId: (id: string | null) => {
+    set({ selectedFlightId: id }, false, 'flight/setSelectedFlight');
+  },
+
+  clearFlightSearch: () => {
+    set({ flightSearchResults: [], showFlightResults: false, selectedFlightId: null }, false, 'flight/clearSearch');
   },
 });

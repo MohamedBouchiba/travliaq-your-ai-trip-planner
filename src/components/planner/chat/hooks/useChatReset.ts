@@ -12,7 +12,6 @@ interface UseChatResetDeps {
   setIsLoading: (v: boolean) => void;
   setDynamicSuggestions: React.Dispatch<React.SetStateAction<Array<{ id: string; label: string; emoji: string; message: string }>>>;
   setInput: (v: string) => void;
-  lastIntentRef: React.MutableRefObject<string | null>;
   completedMessageIdsRef: React.MutableRefObject<Set<string>>;
   userMessageCountRef: React.MutableRefObject<number>;
   airportFetchKeyRef: React.MutableRefObject<string | null>;
@@ -42,7 +41,6 @@ export function useChatReset(deps: UseChatResetDeps) {
     deps.setIsLoading(false);
     deps.setDynamicSuggestions([]);
     deps.setInput("");
-    deps.lastIntentRef.current = null;
     deps.completedMessageIdsRef.current.clear();
     deps.userMessageCountRef.current = 0;
     deps.airportFetchKeyRef.current = null;

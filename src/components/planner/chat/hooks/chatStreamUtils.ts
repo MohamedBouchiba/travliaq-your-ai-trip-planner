@@ -56,32 +56,39 @@ export function createStreamError(
 }
 
 /**
- * Classify error based on response or exception
+ * Classify error based on response or exception.
+ * Returns i18n keys as messages — consumers must translate via t().
  */
 export function classifyError(error: unknown, statusCode?: number): StreamError {
   if (error instanceof Error) {
+    // Distinguish timeout aborts from user-initiated cancels
     if (error.name === "AbortError") {
-      return createStreamError("Requête annulée", "cancelled");
+      const isTimeout = (error as DOMException).message === "timeout" ||
+        (typeof (error as { reason?: unknown }).reason === "string" && (error as { reason: string }).reason === "timeout");
+      if (isTimeout) {
+        return createStreamError("planner.error.timeout", "timeout");
+      }
+      return createStreamError("planner.error.cancelled", "cancelled");
     }
     if (error.message.includes("fetch") || error.message.includes("network")) {
-      return createStreamError("Erreur de connexion réseau", "network");
+      return createStreamError("planner.error.network", "network");
     }
   }
 
   if (statusCode) {
     if (statusCode === 401 || statusCode === 403) {
-      return createStreamError("Session expirée, veuillez vous reconnecter", "auth", statusCode);
+      return createStreamError("planner.error.auth", "auth", statusCode);
     }
     if (statusCode === 429) {
-      return createStreamError("Trop de requêtes, veuillez patienter", "rate_limit", statusCode);
+      return createStreamError("planner.error.rateLimit", "rate_limit", statusCode);
     }
     if (statusCode >= 500) {
-      return createStreamError("Erreur serveur, réessai en cours...", "server", statusCode);
+      return createStreamError("planner.error.server", "server", statusCode);
     }
   }
 
   return createStreamError(
-    error instanceof Error ? error.message : "Erreur inconnue",
+    "planner.error.unknown",
     "unknown",
   );
 }

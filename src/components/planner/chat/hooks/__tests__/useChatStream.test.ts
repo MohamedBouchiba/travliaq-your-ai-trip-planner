@@ -109,13 +109,23 @@ describe("classifyError", () => {
     const err = new DOMException("Aborted", "AbortError");
     const result = classifyError(err);
     expect(result.type).toBe("cancelled");
+    expect(result.message).toBe("planner.error.cancelled");
     expect(result.retryable).toBe(false);
+  });
+
+  it("classifies AbortError with timeout reason as timeout (retryable)", () => {
+    const err = new DOMException("timeout", "AbortError");
+    const result = classifyError(err);
+    expect(result.type).toBe("timeout");
+    expect(result.message).toBe("planner.error.timeout");
+    expect(result.retryable).toBe(true);
   });
 
   it("classifies fetch errors as network", () => {
     const err = new Error("fetch failed");
     const result = classifyError(err);
     expect(result.type).toBe("network");
+    expect(result.message).toBe("planner.error.network");
   });
 
   it("classifies network keyword as network", () => {
@@ -127,6 +137,7 @@ describe("classifyError", () => {
   it("classifies 401 as auth", () => {
     const result = classifyError(new Error("Unauthorized"), 401);
     expect(result.type).toBe("auth");
+    expect(result.message).toBe("planner.error.auth");
     expect(result.statusCode).toBe(401);
   });
 
@@ -138,12 +149,14 @@ describe("classifyError", () => {
   it("classifies 429 as rate_limit", () => {
     const result = classifyError(new Error("Too many"), 429);
     expect(result.type).toBe("rate_limit");
+    expect(result.message).toBe("planner.error.rateLimit");
     expect(result.retryable).toBe(false);
   });
 
   it("classifies 500 as server", () => {
     const result = classifyError(new Error("Internal"), 500);
     expect(result.type).toBe("server");
+    expect(result.message).toBe("planner.error.server");
     expect(result.retryable).toBe(true);
   });
 
@@ -155,10 +168,39 @@ describe("classifyError", () => {
   it("classifies unknown errors as unknown", () => {
     const result = classifyError("some string error");
     expect(result.type).toBe("unknown");
+    expect(result.message).toBe("planner.error.unknown");
   });
 
   it("classifies non-Error objects as unknown", () => {
     const result = classifyError({ code: 42 });
+    expect(result.type).toBe("unknown");
+  });
+
+  it("classifies AbortError with reason property 'timeout' as timeout", () => {
+    // AbortController.abort("timeout") sets .reason on the DOMException
+    const err = new DOMException("The operation was aborted", "AbortError");
+    Object.defineProperty(err, "reason", { value: "timeout" });
+    const result = classifyError(err);
+    expect(result.type).toBe("timeout");
+    expect(result.retryable).toBe(true);
+  });
+
+  it("classifies AbortError with non-timeout reason as cancelled", () => {
+    const err = new DOMException("User cancelled", "AbortError");
+    Object.defineProperty(err, "reason", { value: "user" });
+    const result = classifyError(err);
+    expect(result.type).toBe("cancelled");
+    expect(result.retryable).toBe(false);
+  });
+
+  it("classifies 502 as server (retryable)", () => {
+    const result = classifyError(new Error("Bad Gateway"), 502);
+    expect(result.type).toBe("server");
+    expect(result.retryable).toBe(true);
+  });
+
+  it("classifies 499 without status code match as unknown", () => {
+    const result = classifyError(new Error("Client closed"), 499);
     expect(result.type).toBe("unknown");
   });
 });

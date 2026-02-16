@@ -10,12 +10,14 @@
  */
 
 import type { FlightFormData } from "@/types/flight";
+import type { AccommodationEntry } from "@/stores/slices/accommodationTypes";
 import type {
   IntentClassification,
   ReasoningData,
   QuickReplyData,
   DestinationSuggestionRequest,
 } from "./useChatStream";
+import type { AIPreferencesData } from "./useChatImperativeHandlers";
 import type { TripRecapData } from "../types";
 
 // ─── Accumulator ─────────────────────────────────────────────────────────────
@@ -27,8 +29,8 @@ import type { TripRecapData } from "../types";
 export interface SSEAccumulator {
   content: string;
   flightData: FlightFormData | null;
-  accommodationData: any | null;
-  preferencesData: any | null;
+  accommodationData: Partial<AccommodationEntry> | null;
+  preferencesData: AIPreferencesData | null;
   quickReplies: QuickReplyData | null;
   destinationSuggestionRequest: DestinationSuggestionRequest | null;
   intentClassification: IntentClassification | null;
@@ -72,15 +74,15 @@ export interface SSEEventHandlers {
   /** Flight form data extracted by LLM */
   onFlightData?: (data: FlightFormData) => void;
   /** Accommodation data extracted by LLM */
-  onAccommodationData?: (data: any) => void;
+  onAccommodationData?: (data: Partial<AccommodationEntry>) => void;
   /** Preferences data extracted by LLM */
-  onPreferencesData?: (data: any) => void;
+  onPreferencesData?: (data: AIPreferencesData) => void;
   /** Quick reply suggestions */
   onQuickReplies?: (data: QuickReplyData) => void;
   /** Destination suggestion request from LLM */
   onDestinationSuggestionRequest?: (data: DestinationSuggestionRequest) => void;
   /** Flight search trigger */
-  onFlightSearchTrigger?: (trigger: any) => void;
+  onFlightSearchTrigger?: (trigger: boolean) => void;
   /** Trip recap data */
   onTripRecapData?: (data: TripRecapData) => void;
   /** MCP tool started */

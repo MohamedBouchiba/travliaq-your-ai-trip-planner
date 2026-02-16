@@ -13,6 +13,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { createCircuitBreaker } from "./circuitBreaker";
 import { supabaseFetch } from "@/utils/supabaseFetch";
 import type { FlightFormData } from "@/types/flight";
+import type { AccommodationEntry } from "@/stores/slices/accommodationTypes";
 import { useDebugStore } from "@/stores/debugStore";
 import { plannerLogger } from "@/utils/logger";
 import { createAccumulator, parseSSEChunk, type SSEEventHandlers } from "./sseEventParser";
@@ -42,6 +43,27 @@ import {
 } from "./chatStreamUtils";
 
 // (Types, constants, and utility functions have been extracted to chatStreamTypes.ts and chatStreamUtils.ts)
+
+/**
+ * U2: Wait for the browser to come back online before retrying.
+ * Returns immediately if already online. Resolves when `online` event fires.
+ * Rejects if the AbortSignal is aborted while waiting.
+ */
+function waitForOnline(signal: AbortSignal, timeoutMs = 30_000): Promise<void> {
+  if (typeof navigator === "undefined" || navigator.onLine) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const onOnline = () => { cleanup(); resolve(); };
+    const onAbort = () => { cleanup(); reject(createStreamError("planner.error.cancelled", "cancelled")); };
+    const onTimeout = setTimeout(() => { cleanup(); reject(createStreamError("planner.error.network", "network")); }, timeoutMs);
+    function cleanup() {
+      window.removeEventListener("online", onOnline);
+      signal.removeEventListener("abort", onAbort);
+      clearTimeout(onTimeout);
+    }
+    window.addEventListener("online", onOnline);
+    signal.addEventListener("abort", onAbort);
+  });
+}
 
 /**
  * Hook options
@@ -120,6 +142,11 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
 
+      // U2: Reject early with clear message if browser is offline
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        throw createStreamError("planner.error.network", "network");
+      }
+
       // Circuit breaker: reject immediately if server is known to be down
       if (!circuitBreaker.canRequest()) {
         throw createStreamError("Server temporarily unavailable", "server");
@@ -133,7 +160,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       const streamTimeoutId = setTimeout(() => {
         if (!abortController.signal.aborted) {
           plannerLogger.logError("timeout", new Error("Stream timeout after 60s"), { requestId: "pending" });
-          abortController.abort();
+          abortController.abort("timeout");
         }
       }, STREAM_TIMEOUT_MS);
 
@@ -172,14 +199,14 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
       let fullContent = "";
       let flightData: FlightFormData | null = null;
-      let accommodationData: any | null = null;
+      let accommodationData: Partial<AccommodationEntry> | null = null;
       let lastError: StreamError | null = null;
 
       for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
         try {
           // Check if cancelled
           if (abortController.signal.aborted) {
-            throw createStreamError("Requête annulée", "cancelled");
+            throw createStreamError("planner.error.cancelled", "cancelled");
           }
 
           // Notify retry attempt
@@ -217,10 +244,6 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
             }),
             signal: abortController.signal,
           });
-
-          if (!response.ok) {
-            throw classifyError(null, response.status);
-          }
 
           const reader = response.body!.getReader();
           const decoder = new TextDecoder();
@@ -328,7 +351,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
             // Check if cancelled
             if (abortController.signal.aborted) {
               reader.cancel();
-              throw createStreamError("Requête annulée", "cancelled");
+              throw createStreamError("planner.error.cancelled", "cancelled");
             }
 
             const { done, value } = await reader.read();
@@ -430,6 +453,9 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           if (attempt >= retryConfig.maxRetries) {
             break;
           }
+
+          // U2: If offline, wait for reconnection before burning retry attempts
+          await waitForOnline(abortController.signal);
 
           // Wait before retrying
           const delay = calculateBackoffDelay(attempt, retryConfig);
