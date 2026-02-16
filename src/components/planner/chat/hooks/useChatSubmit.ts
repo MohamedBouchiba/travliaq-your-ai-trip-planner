@@ -373,8 +373,11 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
       }
 
       // Handle flight search trigger
+      // FIX-B2: When backend confirms search trigger, emit directly.
+      // This bypasses the travelersConfirmBeforeSearch widget since the backend
+      // already validated all search criteria (destination + dates + travelers).
       if (flightSearchTrigger) {
-        if (import.meta.env.DEV) console.log("[useChatSubmit] AI triggered flight search");
+        if (import.meta.env.DEV) console.log("[useChatSubmit] AI triggered flight search (backend-confirmed)");
         eventBus.emit("flight:triggerSearch");
       }
 

@@ -7,10 +7,13 @@
  * Root causes fixed:
  * 1. applyPreferenceFirstLogic ignored blockedWidgets
  * 2. buildLLMContext treated styleAxes all-at-50 as "not configured"
+ * 3. trigger_flight_search blocked by phase filtering (FIX-B1)
+ * 4. Date extraction incomplete - captured "18" instead of "18 mars" (FIX-B3)
  */
 
 import { describe, it, expect, setCategory } from "@/lib/browser-test-runner";
 import { buildLLMContext, truncateField } from "@/components/planner/chat/hooks/buildLLMContext";
+import { extractEntities, ENTITY_PATTERNS } from "@/components/planner/chat/hooks/useSessionContext";
 
 // ─── Helpers ───
 
@@ -400,6 +403,155 @@ export function registerWidgetAntiLoopTests() {
 
     it("handles empty string", () => {
       expect(truncateField("", 100)).toBe("");
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // FIX-B1: Phase filtering - trigger_flight_search injection tests
+  // ═══════════════════════════════════════════════════════════════════
+
+  describe("FIX-B1: Phase filtering simulation", () => {
+    // Simulate the logic from index.ts: should inject trigger_flight_search
+    // when intent is trigger_search with destination + dates, regardless of phase
+    function shouldInjectSearchTool(
+      phase: string,
+      intent: string,
+      entities: { destinationCity?: string; exactDepartureDate?: string; preferredMonth?: string }
+    ): boolean {
+      const phaseTools: Record<string, Set<string>> = {
+        discovery: new Set(["update_preferences", "request_destination_suggestions", "generate_quick_replies"]),
+        logistics: new Set(["update_flight_widget", "update_preferences", "trigger_flight_search", "generate_quick_replies"]),
+        activities: new Set(["update_preferences", "generate_quick_replies"]),
+      };
+      const tools = phaseTools[phase] ?? new Set();
+      const hasSearchContext = entities.destinationCity && (entities.exactDepartureDate || entities.preferredMonth);
+      if ((intent === "trigger_search" || intent === "confirm_selection") && hasSearchContext) {
+        if (!tools.has("trigger_flight_search")) {
+          return true; // should inject
+        }
+      }
+      return false;
+    }
+
+    it("injects trigger_flight_search in discovery phase when intent=trigger_search + destination + dates", () => {
+      expect(shouldInjectSearchTool("discovery", "trigger_search", {
+        destinationCity: "Frankfurt",
+        exactDepartureDate: "2026-03-15",
+      })).toBe(true);
+    });
+
+    it("injects in activities phase when intent=trigger_search + destination + month", () => {
+      expect(shouldInjectSearchTool("activities", "trigger_search", {
+        destinationCity: "Berlin",
+        preferredMonth: "mars",
+      })).toBe(true);
+    });
+
+    it("does NOT inject in logistics phase (already has trigger_flight_search)", () => {
+      expect(shouldInjectSearchTool("logistics", "trigger_search", {
+        destinationCity: "London",
+        exactDepartureDate: "2026-06-01",
+      })).toBe(false);
+    });
+
+    it("does NOT inject when intent is not trigger_search", () => {
+      expect(shouldInjectSearchTool("discovery", "ask_inspiration", {
+        destinationCity: "Rome",
+        exactDepartureDate: "2026-04-01",
+      })).toBe(false);
+    });
+
+    it("does NOT inject when destination is missing", () => {
+      expect(shouldInjectSearchTool("discovery", "trigger_search", {
+        exactDepartureDate: "2026-03-15",
+      })).toBe(false);
+    });
+
+    it("does NOT inject when dates are missing", () => {
+      expect(shouldInjectSearchTool("discovery", "trigger_search", {
+        destinationCity: "Frankfurt",
+      })).toBe(false);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // FIX-B3: Date extraction - full match instead of just number
+  // ═══════════════════════════════════════════════════════════════════
+
+  describe("FIX-B3: Date extraction completeness", () => {
+    it("extracts 'du 15 au 18 mars' as a single range entity", () => {
+      const result = extractEntities(
+        "Je veux partir du 15 au 18 mars",
+        ENTITY_PATTERNS.dates,
+        2,
+        undefined,
+        true
+      );
+      const hasRange = result.some(d => d.includes("15") && d.includes("18") && d.toLowerCase().includes("mars"));
+      expect(hasRange).toBe(true);
+    });
+
+    it("extracts '15 mars' as full date, not just '15'", () => {
+      const result = extractEntities(
+        "le 15 mars je pars",
+        ENTITY_PATTERNS.dates,
+        2,
+        undefined,
+        true
+      );
+      const hasFullDate = result.some(d => d.toLowerCase().includes("mars"));
+      expect(hasFullDate).toBe(true);
+      // Should NOT have just "15" without context
+      const hasNakedNumber = result.some(d => d.trim() === "15");
+      expect(hasNakedNumber).toBe(false);
+    });
+
+    it("extracts durations like '3 jours' correctly", () => {
+      const result = extractEntities(
+        "un voyage de 3 jours",
+        ENTITY_PATTERNS.dates,
+        2,
+        undefined,
+        true
+      );
+      expect(result.some(d => d.includes("3 jours"))).toBe(true);
+    });
+
+    it("extracts month names like 'en mars'", () => {
+      const result = extractEntities(
+        "je veux partir en mars",
+        ENTITY_PATTERNS.dates,
+        2,
+        undefined,
+        true
+      );
+      expect(result.some(d => d.toLowerCase().includes("mars"))).toBe(true);
+    });
+
+    it("extracts season names", () => {
+      const result = extractEntities(
+        "je préfère partir en été",
+        ENTITY_PATTERNS.dates,
+        2,
+        undefined,
+        true
+      );
+      expect(result.some(d => d.toLowerCase().includes("été"))).toBe(true);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Regression: Full user scenario from bug report
+  // ═══════════════════════════════════════════════════════════════════
+
+  describe("Regression: Paris-Frankfurt search scenario", () => {
+    it("date entities from 'Paris-Francfort du 15 au 18 mars' contain range", () => {
+      const text = "Je veux un vol Paris-Francfort du 15 au 18 mars, vol direct, hotel business";
+      const dates = extractEntities(text, ENTITY_PATTERNS.dates, 2, undefined, true);
+      // Should capture the range, not just individual numbers
+      expect(dates.length).toBeGreaterThan(0);
+      const hasContextualDate = dates.some(d => d.toLowerCase().includes("mars"));
+      expect(hasContextualDate).toBe(true);
     });
   });
 }

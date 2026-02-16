@@ -956,6 +956,29 @@ serve(async (req) => {
       if (!phaseToolNames.has(t.function.name)) return false;
       return true;
     });
+
+    // FIX-B1: Inject trigger_flight_search when intent is trigger_search with sufficient entities,
+    // regardless of current phase. This prevents the tool from being unavailable in discovery/activities.
+    const classifiedIntent = collectedData.intentClassification?.primaryIntent;
+    const classifiedEntities = collectedData.intentClassification?.entities;
+    const hasSearchableContext = classifiedEntities?.destinationCity &&
+      (classifiedEntities?.exactDepartureDate || classifiedEntities?.preferredMonth);
+    if (
+      (classifiedIntent === "trigger_search" || classifiedIntent === "confirm_selection") &&
+      hasSearchableContext
+    ) {
+      const hasTriggerTool = reActTools.some(t => t.function.name === "trigger_flight_search");
+      if (!hasTriggerTool) {
+        reActTools.push(flightSearchTriggerTool);
+        log.info("tool_injection", "Injected trigger_flight_search for search intent outside logistics phase", { phase, intent: classifiedIntent });
+      }
+      // Also inject flight extraction tool if missing (needed to update widget)
+      const hasFlightTool = reActTools.some(t => t.function.name === "update_flight_widget");
+      if (!hasFlightTool) {
+        reActTools.push(flightExtractionTool);
+        log.info("tool_injection", "Injected update_flight_widget for search intent outside logistics phase", { phase });
+      }
+    }
     log.info("tool_filtering", `Phase "${phase}": ${reActTools.length} tools available`, {
       tools: reActTools.map(t => t.function.name),
     });
