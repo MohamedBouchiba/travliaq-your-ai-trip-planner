@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import HeroHeader from '@/components/travel/HeroHeader';
 import DaySection from '@/components/travel/DaySection';
-import FooterSummary from '@/components/travel/FooterSummary';
+import PlannerFooterSummary from '@/components/planner/PlannerFooterSummary';
 
 interface PlannerItineraryViewProps {
   onBackToMap: () => void;
@@ -140,15 +140,12 @@ const PlannerItineraryView = ({ onBackToMap }: PlannerItineraryViewProps) => {
           ))}
         </div>
 
-        {/* Footer summary */}
-        <FooterSummary
+        {/* Compact summary */}
+        <PlannerFooterSummary
           summary={travelData.summary}
           travelers={2}
           activities={regularSteps.length}
-          cities={new Set(regularSteps.map((d) => d.title.split(' ')[0])).size}
-          stopovers={0}
           destination={travelData.destination}
-          tripTitle={`Voyage à ${travelData.destination} - ${travelData.summary.totalDays} jours`}
         />
       </div>
     </div>
