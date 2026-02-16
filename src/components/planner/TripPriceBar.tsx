@@ -77,24 +77,33 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
     <div className="absolute bottom-0 left-0 right-0 z-20 bg-card/90 backdrop-blur-xl border-t border-border/30">
       <div className="flex items-center justify-between px-3 py-1.5 gap-2">
         {/* Step indicators */}
-        <div className="flex items-center gap-2">
-          {visibleSteps.map(({ key, icon: Icon }) => {
+        <div className="flex items-center gap-1">
+          {visibleSteps.map(({ key, icon: Icon, label }, idx) => {
             const done = completedSteps.includes(key);
             return (
-              <div
-                key={key}
-                className={cn(
-                  'relative flex items-center justify-center h-6 w-6 rounded-full border transition-colors',
-                  done
-                    ? 'bg-green-500/15 border-green-500/50 text-green-600 dark:text-green-400'
-                    : 'bg-muted/50 border-border/50 text-muted-foreground/60'
+              <div key={key} className="flex items-center gap-1">
+                {idx > 0 && (
+                  <div className={cn(
+                    'h-px w-3',
+                    completedSteps.includes(visibleSteps[idx - 1].key) ? 'bg-green-500/50' : 'bg-border/50'
+                  )} />
                 )}
-              >
-                {done ? (
-                  <Check className="h-3 w-3" />
-                ) : (
-                  <Icon className="h-3 w-3" />
-                )}
+                <div className="flex items-center gap-1">
+                  <div className={cn(
+                    'flex items-center justify-center h-5 w-5 rounded-full transition-colors',
+                    done
+                      ? 'bg-green-500/20 text-green-600 dark:text-green-400'
+                      : 'bg-muted/40 text-muted-foreground/40'
+                  )}>
+                    {done ? <Check className="h-3 w-3" /> : <Icon className="h-2.5 w-2.5" />}
+                  </div>
+                  <span className={cn(
+                    'text-[10px] font-medium hidden sm:inline',
+                    done ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground/50'
+                  )}>
+                    {label}
+                  </span>
+                </div>
               </div>
             );
           })}
