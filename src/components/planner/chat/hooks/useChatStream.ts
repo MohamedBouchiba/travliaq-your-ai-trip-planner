@@ -422,9 +422,13 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           return { content: fullContent, flightData, accommodationData, preferencesData: acc.preferencesData, quickReplies: acc.quickReplies, destinationSuggestionRequest: acc.destinationSuggestionRequest, intentClassification: acc.intentClassification, reasoning: acc.reasoning, flightSearchTrigger: acc.flightSearchTrigger, tripRecapData: acc.tripRecapData, requestId };
 
         } catch (err) {
+          // Extract statusCode from EdgeFunctionError for proper classification (5xx → retryable)
+          const httpStatus = err instanceof Error && "statusCode" in err
+            ? (err as { statusCode: number }).statusCode
+            : undefined;
           lastError = err instanceof Error && "type" in err
             ? (err as StreamError)
-            : classifyError(err);
+            : classifyError(err, httpStatus);
 
           // Log the error
           plannerLogger.logError(requestId, lastError, {

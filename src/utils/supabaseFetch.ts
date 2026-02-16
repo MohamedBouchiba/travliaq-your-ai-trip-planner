@@ -7,6 +7,15 @@ export class AuthExpiredError extends Error {
   }
 }
 
+export class EdgeFunctionError extends Error {
+  statusCode: number;
+  constructor(functionName: string, statusCode: number) {
+    super(`Edge Function ${functionName} responded ${statusCode}`);
+    this.name = "EdgeFunctionError";
+    this.statusCode = statusCode;
+  }
+}
+
 /** Fetch a Supabase Edge Function with auth + response.ok check.
  *  If `authOptional` is true, the request proceeds even without a session. */
 export async function supabaseFetch(
@@ -39,7 +48,7 @@ export async function supabaseFetch(
   });
 
   if (!response.ok) {
-    throw new Error(`Edge Function ${functionName} responded ${response.status}`);
+    throw new EdgeFunctionError(functionName, response.status);
   }
 
   return response;
