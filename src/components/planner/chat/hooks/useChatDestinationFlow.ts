@@ -65,17 +65,23 @@ export function useChatDestinationFlow({
   // F3: Auto-resume destination fetch when departure city becomes available
   const [pendingDestinationFetch, setPendingDestinationFetch] = useState(false);
 
-  // Shared fetch logic
+  // F5: Refs to always have latest departure info (avoids stale closure in async calls)
+  const departureCityRef = useRef(departureCity);
+  const departureCountryRef = useRef(departureCountry);
+  departureCityRef.current = departureCity;
+  departureCountryRef.current = departureCountry;
+
+  // Shared fetch logic — reads departure from refs to avoid stale closures
   const fetchSuggestions = useCallback(async (limit: number) => {
     const prefs = getPreferences();
     const payload = buildDestinationPayload({
       preferences: prefs,
-      departure: { city: departureCity, country: departureCountry },
+      departure: { city: departureCityRef.current, country: departureCountryRef.current },
       departureDateMs,
       tripDuration,
     });
     return getDestinationSuggestions(payload, { limit });
-  }, [getPreferences, departureCity, departureCountry, departureDateMs, tripDuration]);
+  }, [getPreferences, departureDateMs, tripDuration]);
 
   // Preference-flow destination fetch (after style/interests widgets)
   const handleFetchDestinations = useCallback(async (loadingMessageId: string) => {
@@ -167,8 +173,8 @@ export function useChatDestinationFlow({
       )
     );
 
-    // A6: Guard — ensure we have a departure city before suggesting
-    if (!departureCity) {
+    // A6: Guard — ensure we have a departure city before suggesting (read from ref to avoid stale closure)
+    if (!departureCityRef.current) {
       // Don't overwrite the LLM message — add a NEW assistant message asking for departure city
       const askId = `ask-departure-${Date.now()}`;
       setMessages((prev) => {
@@ -263,7 +269,7 @@ export function useChatDestinationFlow({
         )
       );
     }
-  }, [fetchSuggestions, departureCity, setMessages, t]);
+  }, [fetchSuggestions, setMessages, t]);
 
   // Handle destination selection from DestinationSuggestionsGrid
   const handleDestinationSelect = useCallback(async (messageId: string, destination: DestinationSuggestion) => {
