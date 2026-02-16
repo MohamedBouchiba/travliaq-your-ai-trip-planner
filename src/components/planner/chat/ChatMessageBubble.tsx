@@ -5,13 +5,15 @@
  * React.memo prevents re-rendering unchanged messages during streaming ticks.
  */
 
-import { memo, useCallback } from "react";
+import { memo } from "react";
 import { Plane, RefreshCw, AlertTriangle, WifiOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "./types";
 import type { FlightMemory } from "@/stores/hooks/useFlightMemoryStore";
 import type { ToolExecution } from "./ToolStatusIndicator";
+import type { WidgetRendererProps } from "./widgets/WidgetRenderer";
+import type { Airport } from "@/hooks/useNearestAirports";
 import {
   AirportButton,
   DualAirportSelection,
@@ -27,12 +29,12 @@ interface ChatMessageBubbleProps {
   activeTools: ToolExecution[];
   isLoading: boolean;
   memory: FlightMemory;
-  widgetFlow: {
-    handleAirportSelect: (msgId: string, field: string, airport: { iata: string; name: string; city: string; distance?: number }, isDual: boolean) => void;
+  widgetFlow: WidgetRendererProps["widgetFlow"] & {
+    handleAirportSelect: (msgId: string, field: string, airport: Airport, isDual?: boolean) => void;
     handleSearchButtonClick: (msgId: string) => void;
   };
-  preferenceCallbacks: Record<string, unknown>;
-  handleDestinationSelect: (dest: import("@/types/destinations").DestinationSuggestion) => void;
+  preferenceCallbacks: WidgetRendererProps["preferenceCallbacks"];
+  handleDestinationSelect: WidgetRendererProps["handleDestinationSelect"];
   isLoadingDestinations: boolean;
   onWidgetReopen: (messageId: string) => void;
   onRegenerate: () => void;

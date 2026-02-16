@@ -64,7 +64,7 @@ export function classifyError(error: unknown, statusCode?: number): StreamError 
     // Distinguish timeout aborts from user-initiated cancels
     if (error.name === "AbortError") {
       const isTimeout = (error as DOMException).message === "timeout" ||
-        (typeof (error as { reason?: unknown }).reason === "string" && (error as { reason: string }).reason === "timeout");
+        (typeof (error as unknown as { reason?: unknown }).reason === "string" && (error as unknown as { reason: string }).reason === "timeout");
       if (isTimeout) {
         return createStreamError("planner.error.timeout", "timeout");
       }

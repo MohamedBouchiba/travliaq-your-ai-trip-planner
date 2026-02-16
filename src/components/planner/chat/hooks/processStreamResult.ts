@@ -115,7 +115,7 @@ export function processFlightData(
  * Handles: chooseWidget (with intent guard), tab, zoom, tabAndZoom.
  */
 export function processAction(
-  action: { type: string; tab?: string; center?: { lat: number; lng: number }; zoom?: number; widgetType?: string; option?: string },
+  action: import("@/types/flight").ChatQuickAction,
   deps: ActionDeps,
 ): void {
   if (action.type === "chooseWidget") {
@@ -138,11 +138,11 @@ export function processAction(
       });
     }
   } else if (action.type === "tab") {
-    emitTabChange(action.tab!);
+    emitTabChange(action.tab);
   } else if (action.type === "zoom") {
     eventBus.emit("map:zoom", { center: action.center, zoom: action.zoom });
   } else if (action.type === "tabAndZoom") {
-    emitTabAndZoom(action.tab!, action.center!, action.zoom!);
+    emitTabAndZoom(action.tab, action.center, action.zoom);
   }
 }
 

@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 
 // C1: Re-export flight result types from canonical location
 export type { FlightSegment, Layover, CarbonEmissions, Baggage, FlightOffer } from "@/types/flight";
+import type { FlightOffer, FlightSegment } from "@/types/flight";
 
 interface FlightResultsProps {
   flights: FlightOffer[];
