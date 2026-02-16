@@ -94,11 +94,6 @@ export type PlannerEvents = {
   "activities:duration": { duration: string };
   "activities:timeOfDay": { timeSlot: string };
 
-  // Conflict & comparison events
-  "conflict:resolved": { conflictId: string };
-  "comparison:selected": { itemId: string; itemType: string };
-  "priceAlert:action": { alertId: string };
-
   // Activities-related
   "activities:search": {
     city: string;

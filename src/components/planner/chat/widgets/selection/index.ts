@@ -32,16 +32,6 @@ export {
   getDurationRangeString,
 } from "./DurationChips";
 
-// Time of Day Chips - Activity time filter
-export {
-  TimeOfDayChips,
-  type TimeOfDayOption,
-  DEFAULT_TIME_OPTIONS,
-  SIMPLE_TIME_OPTIONS,
-  isTimeInSlot,
-  getTimeRangeString,
-} from "./TimeOfDayChips";
-
 // Cabin Class Selector - Flight cabin class
 export {
   CabinClassSelector,

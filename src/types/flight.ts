@@ -198,15 +198,9 @@ export type WidgetType =
   | "quickFilterChips"
   | "starRatingSelector"
   | "durationChips"
-  | "timeOfDayChips"
   | "cabinClassSelector"
   | "directFlightToggle"
   | "budgetRangeSlider"
-  // Comparison widgets (Phase 3)
-  | "comparisonWidget"
-  // Alert widgets (Phase 4)
-  | "conflictAlert"
-  | "priceAlert"
   // Trip recap (E2)
   | "tripRecap";
 

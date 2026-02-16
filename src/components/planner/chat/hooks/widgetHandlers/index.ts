@@ -40,12 +40,3 @@ export {
   handleTimeOfDaySelect,
 } from "./selectionHandlers";
 
-// Comparison handlers (Phase 3)
-export { handleComparisonSelect, handleComparisonRemove } from "./comparisonHandlers";
-
-// Alert handlers (Phase 4)
-export {
-  handleConflictResolve,
-  handlePriceAlertAction,
-  handlePriceAlertDismiss,
-} from "./alertHandlers";

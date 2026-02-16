@@ -10,7 +10,7 @@
  */
 
 import { useCallback } from "react";
-import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
+import { supabaseFetch } from "@/utils/supabaseFetch";
 import { toastSuccess, toastError } from "@/lib/toast";
 import { eventBus } from "@/lib/eventBus";
 import i18n from "@/i18n/config";
@@ -46,16 +46,10 @@ export interface UseChatImperativeHandlersOptions {
  */
 async function fetchTopCities(countryCode: string): Promise<CitySelectionData["cities"] | null> {
   try {
-    const response = await fetch(
-      `${SUPABASE_URL}/functions/v1/top-cities-by-country?country_code=${countryCode}&limit=5`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: SUPABASE_PUBLISHABLE_KEY,
-        },
-      }
-    );
+    const response = await supabaseFetch("top-cities-by-country", {
+      method: "GET",
+      params: { country_code: countryCode, limit: "5" },
+    });
 
     const data = await response.json();
 

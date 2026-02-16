@@ -13,7 +13,7 @@ import type { FlightFormData, ChatQuickAction, WidgetType } from "@/types/flight
 import type { FlightMemory } from "@/stores/hooks/useFlightMemoryStore";
 import type { IntentClassification, APIMessage, MemoryContext, StreamResult, OnContentUpdate, SessionEntities, StreamError } from "./chatStreamTypes";
 import type { ChooseWidgetAction } from "./useWidgetActionExecutor";
-import { parseAction, flightDataToMemory } from "../utils";
+import { parseAction, flightDataToMemory, generateId, updateMessageById } from "../utils";
 import { getCityCoords } from "../types";
 import { persistExtractedEntities } from "./persistExtractedEntities";
 import { geocodeCity } from "@/utils/geocodeCity";
@@ -154,7 +154,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
     );
 
     const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
+      id: generateId("user"),
       role: "user",
       text: userText,
       timestamp: Date.now(),
@@ -168,7 +168,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
 
     opts.widgetFlow.citySelectionShownRef.current = null;
 
-    const messageId = `bot-${Date.now()}`;
+    const messageId = generateId("bot");
     opts.setMessages((prev) => [
       ...prev,
       { id: messageId, role: "assistant", text: "", isTyping: true, timestamp: Date.now() },
@@ -217,9 +217,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
             if (opts.completedMessageIdsRef.current.has(id) && !isComplete) return;
             if (isComplete) opts.completedMessageIdsRef.current.add(id);
 
-            opts.setMessages((prev) =>
-              prev.map((m) => (m.id === id ? { ...m, text: text2, isStreaming: !isComplete, isTyping: false } : m))
-            );
+            opts.setMessages(updateMessageById(id, { text: text2, isStreaming: !isComplete, isTyping: false }));
           }
         );
 
@@ -280,13 +278,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
             const widgetType = intentResult.widgetType;
             opts.intentWidgetRef.current = widgetType;
             if (import.meta.env.DEV) console.log("[useChatSubmit] Intent widget:", widgetType);
-            opts.setMessages((prev) =>
-              prev.map((m) =>
-                m.id === messageId
-                  ? { ...m, widget: widgetType, widgetData: intentResult.widgetData, widgetConfirmed: false }
-                  : m
-              )
-            );
+            opts.setMessages(updateMessageById(messageId, { widget: widgetType, widgetData: intentResult.widgetData, widgetConfirmed: false }));
           }
         }
 
@@ -473,11 +465,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
       // C2: Classify the error type for user-visible error rendering
       const streamErr = err instanceof Error && "type" in err ? (err as StreamError) : null;
       const errorType = streamErr?.type ?? "unknown";
-      opts.setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId ? { ...m, text: t("planner.chat.errorOccurred"), isTyping: false, isStreaming: false, errorType } : m
-        )
-      );
+      opts.setMessages(updateMessageById(messageId, { text: t("planner.chat.errorOccurred"), isTyping: false, isStreaming: false, errorType }));
     } finally {
       opts.setIsLoading(false);
       setTimeout(() => opts.inputRef.current?.focus(), 0);

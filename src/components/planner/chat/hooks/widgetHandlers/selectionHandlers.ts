@@ -6,6 +6,7 @@
 import { eventBus } from "@/lib/eventBus";
 import type { FlightMemory } from "@/stores/hooks";
 import type { HandlerDeps } from "./types";
+import { generateId, updateMessageById } from "../../utils/messageHelpers";
 
 /**
  * Handle budget range selection
@@ -18,13 +19,7 @@ export function handleBudgetSelect(
   const { setMessages, tracking, t } = deps;
 
   if (!range) {
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === messageId
-          ? { ...m, widgetConfirmed: false, widgetSelectedValue: undefined, widgetDisplayLabel: undefined }
-          : m
-      )
-    );
+    setMessages(updateMessageById(messageId, { widgetConfirmed: false, widgetSelectedValue: undefined, widgetDisplayLabel: undefined }));
     return;
   }
 
@@ -33,19 +28,13 @@ export function handleBudgetSelect(
     : `${range.min}€ - ${range.max}€`;
 
   tracking.recordInteraction(
-    `budget-${Date.now()}`,
+    generateId("budget"),
     "budget_selected",
     range,
     t("planner.selection.budgetSet", { label: budgetLabel })
   );
 
-  setMessages((prev) =>
-    prev.map((m) =>
-      m.id === messageId
-        ? { ...m, widgetConfirmed: true, widgetSelectedValue: range, widgetDisplayLabel: budgetLabel }
-        : m
-    )
-  );
+  setMessages(updateMessageById(messageId, { widgetConfirmed: true, widgetSelectedValue: range, widgetDisplayLabel: budgetLabel }));
 
   eventBus.emit("budget:selected", { range, perPerson: false });
 }
@@ -61,7 +50,7 @@ export function handleQuickFilterSelect(
   const { setMessages, tracking, t } = deps;
 
   tracking.recordInteraction(
-    `filter-${Date.now()}`,
+    generateId("filter"),
     "filter_selected",
     { chipId },
     t("planner.selection.filterApplied", { chipId })
@@ -98,13 +87,7 @@ export function handleQuickFilterClear(
 ) {
   const { setMessages } = deps;
 
-  setMessages((prev) =>
-    prev.map((m) =>
-      m.id === messageId
-        ? { ...m, widgetSelectedValue: [], widgetDisplayLabel: undefined, widgetConfirmed: false }
-        : m
-    )
-  );
+  setMessages(updateMessageById(messageId, { widgetSelectedValue: [], widgetDisplayLabel: undefined, widgetConfirmed: false }));
   eventBus.emit("filters:cleared");
 }
 
@@ -124,19 +107,13 @@ export function handleStarRatingSelect(
     : t("planner.selection.starsRange", { min: minStars, max: maxStars });
 
   tracking.recordInteraction(
-    `rating-${Date.now()}`,
+    generateId("rating"),
     "rating_selected",
     { minStars, maxStars },
     t("planner.selection.hotelRating", { label: ratingLabel })
   );
 
-  setMessages((prev) =>
-    prev.map((m) =>
-      m.id === messageId
-        ? { ...m, widgetConfirmed: true, widgetSelectedValue: { minStars, maxStars }, widgetDisplayLabel: ratingLabel }
-        : m
-    )
-  );
+  setMessages(updateMessageById(messageId, { widgetConfirmed: true, widgetSelectedValue: { minStars, maxStars }, widgetDisplayLabel: ratingLabel }));
 
   eventBus.emit("hotels:starRating", { min: minStars, max: maxStars });
 }
@@ -160,19 +137,13 @@ export function handleCabinClassSelect(
   const cabinLabel = cabinKeys[cabinClass] ? t(cabinKeys[cabinClass]) : cabinClass;
 
   tracking.recordInteraction(
-    `cabin-${Date.now()}`,
+    generateId("cabin"),
     "cabin_class_selected",
     { cabinClass },
     t("planner.selection.cabinClass", { label: cabinLabel })
   );
 
-  setMessages((prev) =>
-    prev.map((m) =>
-      m.id === messageId
-        ? { ...m, widgetConfirmed: true, widgetSelectedValue: cabinClass, widgetDisplayLabel: cabinLabel }
-        : m
-    )
-  );
+  setMessages(updateMessageById(messageId, { widgetConfirmed: true, widgetSelectedValue: cabinClass, widgetDisplayLabel: cabinLabel }));
 
   updateMemory({ cabinClass: cabinClass as FlightMemory["cabinClass"] });
 }
@@ -192,19 +163,13 @@ export function handleDirectFlightToggle(
     : t("planner.selection.withStops");
 
   tracking.recordInteraction(
-    `direct-${Date.now()}`,
+    generateId("direct"),
     "direct_flight_toggled",
     { directOnly },
     label
   );
 
-  setMessages((prev) =>
-    prev.map((m) =>
-      m.id === messageId
-        ? { ...m, widgetConfirmed: true, widgetSelectedValue: directOnly, widgetDisplayLabel: label }
-        : m
-    )
-  );
+  setMessages(updateMessageById(messageId, { widgetConfirmed: true, widgetSelectedValue: directOnly, widgetDisplayLabel: label }));
 
   eventBus.emit("flights:directOnly", { directOnly });
 }
@@ -220,19 +185,13 @@ export function handleDurationSelect(
   const { setMessages, tracking, t } = deps;
 
   tracking.recordInteraction(
-    `duration-${Date.now()}`,
+    generateId("duration"),
     "duration_selected",
     { durationId },
     t("planner.selection.duration", { id: durationId })
   );
 
-  setMessages((prev) =>
-    prev.map((m) =>
-      m.id === messageId
-        ? { ...m, widgetConfirmed: true, widgetSelectedValue: durationId, widgetDisplayLabel: durationId }
-        : m
-    )
-  );
+  setMessages(updateMessageById(messageId, { widgetConfirmed: true, widgetSelectedValue: durationId, widgetDisplayLabel: durationId }));
 
   eventBus.emit("activities:duration", { duration: durationId });
 }
@@ -256,19 +215,13 @@ export function handleTimeOfDaySelect(
   const timeLabel = timeKeys[timeSlot] ? t(timeKeys[timeSlot]) : timeSlot;
 
   tracking.recordInteraction(
-    `time-${Date.now()}`,
+    generateId("time"),
     "time_of_day_selected",
     { timeSlot },
     t("planner.selection.timeOfDay", { label: timeLabel })
   );
 
-  setMessages((prev) =>
-    prev.map((m) =>
-      m.id === messageId
-        ? { ...m, widgetConfirmed: true, widgetSelectedValue: timeSlot, widgetDisplayLabel: timeLabel }
-        : m
-    )
-  );
+  setMessages(updateMessageById(messageId, { widgetConfirmed: true, widgetSelectedValue: timeSlot, widgetDisplayLabel: timeLabel }));
 
   eventBus.emit("activities:timeOfDay", { timeSlot });
 }

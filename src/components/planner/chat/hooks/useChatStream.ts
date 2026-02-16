@@ -11,7 +11,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { createCircuitBreaker } from "./circuitBreaker";
-import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
+import { supabaseFetch } from "@/utils/supabaseFetch";
 import type { FlightFormData } from "@/types/flight";
 import { useDebugStore } from "@/stores/debugStore";
 import { plannerLogger } from "@/utils/logger";
@@ -196,38 +196,27 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           const contextMessage = buildContextMessage(memoryContext);
           const negativeContext = buildNegativePreferencesContext(memoryContext.negativePreferences || []);
 
-          // Get session
-          const session = (await supabase.auth.getSession()).data.session;
-
-          const response = await fetch(
-            `${SUPABASE_URL}/functions/v1/planner-chat`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${session?.access_token}`,
-                apikey: SUPABASE_PUBLISHABLE_KEY,
-                "X-Request-ID": requestId,
-              },
-              body: JSON.stringify({
-                messages: limitMessages(apiMessages),
-                stream: true,
-                requestId, // Also in body for backup
-                memoryContext: contextMessage,
-                missingFields: memoryContext.missingFields,
-                currentPhase: memoryContext.currentPhase || "research",
-                negativePreferences: negativeContext,
-                widgetHistory: memoryContext.widgetHistory || "",
-                // CRITICAL: Send active widgets context for "choose for me" functionality
-                activeWidgetsContext: memoryContext.activeWidgetsContext || "",
-                // Anti-loop: blocked widgets that should not be re-proposed
-                blockedWidgets: memoryContext.blockedWidgets || [],
-                // Deterministic preference-first logic: send current preferences state
-                preferencesState: memoryContext.preferencesState || { interests: [], style: null, pace: null },
-              }),
-              signal: abortController.signal,
-            }
-          );
+          const response = await supabaseFetch("planner-chat", {
+            method: "POST",
+            headers: { "X-Request-ID": requestId },
+            body: JSON.stringify({
+              messages: limitMessages(apiMessages),
+              stream: true,
+              requestId, // Also in body for backup
+              memoryContext: contextMessage,
+              missingFields: memoryContext.missingFields,
+              currentPhase: memoryContext.currentPhase || "research",
+              negativePreferences: negativeContext,
+              widgetHistory: memoryContext.widgetHistory || "",
+              // CRITICAL: Send active widgets context for "choose for me" functionality
+              activeWidgetsContext: memoryContext.activeWidgetsContext || "",
+              // Anti-loop: blocked widgets that should not be re-proposed
+              blockedWidgets: memoryContext.blockedWidgets || [],
+              // Deterministic preference-first logic: send current preferences state
+              preferencesState: memoryContext.preferencesState || { interests: [], style: null, pace: null },
+            }),
+            signal: abortController.signal,
+          });
 
           if (!response.ok) {
             throw classifyError(null, response.status);

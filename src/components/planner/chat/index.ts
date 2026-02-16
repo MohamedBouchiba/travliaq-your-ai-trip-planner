@@ -8,7 +8,6 @@ export * from "./types";
 export * from "./typeDefs/intent";
 
 // Core components
-export { ChatInput, type ChatInputRef } from "./ChatInput";
 export { ChatMessage } from "./ChatMessage";
 export { ChatMessages } from "./ChatMessages";
 export { QuickReplies, QUICK_REPLY_PRESETS } from "./QuickReplies";
@@ -19,7 +18,6 @@ export { MessageBubble } from "./MessageBubble";
 export { TypingIndicator } from "./TypingIndicator";
 export { MemoizedSmartSuggestions, type InspireFlowStep } from "./MemoizedSmartSuggestions";
 export { SmartSuggestions, type DynamicSuggestion } from "./SmartSuggestions";
-export { ChatMessageItem } from "./ChatMessageItem";
 export { IntentDebugPanel } from "./IntentDebugPanel";
 export { ToolStatusIndicator, type ToolExecution, type ToolStatus } from "./ToolStatusIndicator";
 
@@ -35,15 +33,6 @@ export {
   DualAirportSelection,
   AirportConfirmationWidget,
 } from "./widgets";
-
-// Rich Content
-export {
-  DestinationCard,
-  FlightPreview,
-  FlightPreviewList,
-  ActivityCarousel,
-  HotelCarousel,
-} from "./RichContent";
 
 // Hooks
 export {

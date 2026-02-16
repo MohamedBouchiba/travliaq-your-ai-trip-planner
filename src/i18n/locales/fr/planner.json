@@ -414,5 +414,21 @@
   "planner.basket.type.transfer": "Transfert",
   "planner.basket.type.train": "Train",
   "planner.basket.type.carRental": "Location voiture",
-  "planner.basket.type.cruise": "Croisière"
+  "planner.basket.type.cruise": "Croisière",
+  "planner.confirmed.datePicker": "Date",
+  "planner.confirmed.dateRangePicker": "Dates",
+  "planner.confirmed.returnDatePicker": "Retour",
+  "planner.confirmed.travelersSelector": "Voyageurs",
+  "planner.confirmed.travelersConfirmBeforeSearch": "Voyageurs",
+  "planner.confirmed.tripTypeConfirm": "Type",
+  "planner.confirmed.citySelector": "Destination",
+  "planner.confirmed.destinationSuggestions": "Destination",
+  "planner.confirmed.preferenceStyle": "Style",
+  "planner.confirmed.preferenceInterests": "Intérêts",
+  "planner.confirmed.mustHaves": "Critères",
+  "planner.confirmed.dietary": "Régime",
+  "planner.confirmed.airportConfirmation": "Aéroports",
+  "planner.confirmed.budgetRangeSlider": "Budget",
+  "planner.confirmed.selection": "Sélection",
+  "planner.confirmed.modify": "Modifier"
 }

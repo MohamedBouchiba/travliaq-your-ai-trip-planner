@@ -110,13 +110,9 @@ export const WIDGET_PREREQUISITES: Record<WidgetType, (flow: FlowState) => Widge
   quickFilterChips: () => ({ valid: true }),
   starRatingSelector: () => ({ valid: true }),
   durationChips: () => ({ valid: true }),
-  timeOfDayChips: () => ({ valid: true }),
   cabinClassSelector: () => ({ valid: true }),
   directFlightToggle: () => ({ valid: true }),
   budgetRangeSlider: () => ({ valid: true }),
-  comparisonWidget: () => ({ valid: true }),
-  conflictAlert: () => ({ valid: true }),
-  priceAlert: () => ({ valid: true }),
   tripRecap: () => ({ valid: true }),
 };
 

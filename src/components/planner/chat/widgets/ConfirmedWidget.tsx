@@ -1,10 +1,11 @@
 /**
  * ConfirmedWidget - Displays a confirmed widget selection in read-only mode
- * 
+ *
  * This component shows the user's selection from a widget after they've made
  * their choice. The widget remains visible in the chat history.
  */
 
+import { useTranslation } from "react-i18next";
 import { Check, Calendar, Users, Plane, MapPin, Heart, Utensils, Sliders, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WidgetType } from "@/types/flight";
@@ -35,23 +36,14 @@ const widgetIcons: Partial<Record<WidgetType, React.ReactNode>> = {
   budgetRangeSlider: <Sliders className="h-3.5 w-3.5" />,
 };
 
-// Map widget types to labels
-const widgetLabels: Partial<Record<WidgetType, string>> = {
-  datePicker: "Date",
-  dateRangePicker: "Dates",
-  returnDatePicker: "Retour",
-  travelersSelector: "Voyageurs",
-  travelersConfirmBeforeSearch: "Voyageurs",
-  tripTypeConfirm: "Type",
-  citySelector: "Destination",
-  destinationSuggestions: "Destination",
-  preferenceStyle: "Style",
-  preferenceInterests: "Intérêts",
-  mustHaves: "Critères",
-  dietary: "Régime",
-  airportConfirmation: "Aéroports",
-  budgetRangeSlider: "Budget",
-};
+// Widget types that have i18n label keys
+const LABELED_WIDGET_TYPES = [
+  "datePicker", "dateRangePicker", "returnDatePicker",
+  "travelersSelector", "travelersConfirmBeforeSearch", "tripTypeConfirm",
+  "citySelector", "destinationSuggestions",
+  "preferenceStyle", "preferenceInterests", "mustHaves", "dietary",
+  "airportConfirmation", "budgetRangeSlider",
+] as const;
 
 export function ConfirmedWidget({
   widgetType,
@@ -59,8 +51,12 @@ export function ConfirmedWidget({
   className,
   onModify,
 }: ConfirmedWidgetProps) {
+  const { t } = useTranslation();
+
   const icon = widgetIcons[widgetType] || <Check className="h-3.5 w-3.5" />;
-  const typeLabel = widgetLabels[widgetType] || "Sélection";
+  const typeLabel = (LABELED_WIDGET_TYPES as readonly string[]).includes(widgetType)
+    ? t(`planner.confirmed.${widgetType}`)
+    : t("planner.confirmed.selection");
 
   return (
     <div
@@ -82,10 +78,10 @@ export function ConfirmedWidget({
         <button
           onClick={onModify}
           className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-          aria-label="Modifier"
+          aria-label={t("planner.confirmed.modify")}
         >
           <Pencil className="h-3 w-3" />
-          <span>Modifier</span>
+          <span>{t("planner.confirmed.modify")}</span>
         </button>
       )}
     </div>

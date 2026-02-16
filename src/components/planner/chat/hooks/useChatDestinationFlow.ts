@@ -13,7 +13,8 @@ import type { TripPreferences } from "@/stores/slices/preferenceTypes";
 import type { ChatMessage } from "../types";
 import { getDestinationSuggestions } from "@/services/destinations";
 import { buildDestinationPayload } from "../utils/buildDestinationPayload";
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
+import { supabaseFetch } from "@/utils/supabaseFetch";
+import { generateId, updateMessageById } from "../utils/messageHelpers";
 import type { InspireFlowStep } from "../MemoizedSmartSuggestions";
 
 interface UseChatDestinationFlowOptions {
@@ -118,24 +119,12 @@ export function useChatDestinationFlow({
         );
         setInspireFlowStep("results");
       } else {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === loadingMessageId
-              ? { ...m, text: t("planner.messages.noDestinations"), isTyping: false }
-              : m
-          )
-        );
+        setMessages(updateMessageById(loadingMessageId, { text: t("planner.messages.noDestinations"), isTyping: false }));
         setInspireFlowStep("idle");
       }
     } catch (error) {
       console.error("Error fetching destination suggestions:", error);
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === loadingMessageId
-            ? { ...m, text: t("planner.messages.errorDestinations"), isTyping: false }
-            : m
-        )
-      );
+      setMessages(updateMessageById(loadingMessageId, { text: t("planner.messages.errorDestinations"), isTyping: false }));
       setInspireFlowStep("idle");
     } finally {
       setIsLoadingDestinations(false);
@@ -150,7 +139,7 @@ export function useChatDestinationFlow({
   useEffect(() => {
     if (pendingDestinationFetch && departureCity) {
       setPendingDestinationFetch(false);
-      const loadingId = `fetching-${Date.now()}`;
+      const loadingId = generateId("fetching");
       setMessages((prev) => [
         ...prev,
         { id: loadingId, role: "assistant" as const, text: t("planner.preference.searchingDestinations"), isTyping: true },
@@ -176,7 +165,7 @@ export function useChatDestinationFlow({
     // A6: Guard — ensure we have a departure city before suggesting (read from ref to avoid stale closure)
     if (!departureCityRef.current) {
       // Don't overwrite the LLM message — add a NEW assistant message asking for departure city
-      const askId = `ask-departure-${Date.now()}`;
+      const askId = generateId("ask-departure");
       setMessages((prev) => {
         const cleaned = prev.map((m) =>
           m.id === messageId
@@ -198,13 +187,7 @@ export function useChatDestinationFlow({
     }
 
     // Show loading state on the existing message
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === messageId
-          ? { ...m, isStreaming: false, isTyping: true }
-          : m
-      )
-    );
+    setMessages(updateMessageById(messageId, { isStreaming: false, isTyping: true }));
 
     try {
       const limit = Math.min(requestedCount, 5);
@@ -218,14 +201,14 @@ export function useChatDestinationFlow({
         // Build conditional quick replies for low profile scores
         const profileQuickReplies: import("../types").QuickReply[] = completionScore < 50 ? [
           {
-            id: `profile-prefs-${Date.now()}`,
+            id: generateId("profile-prefs"),
             label: t("planner.suggestions.fillPreferences"),
             icon: "⚙️",
             action: { type: "navigate" as const, tab: "preferences" as const },
             variant: "primary" as const,
           },
           {
-            id: `profile-ok-${Date.now()}`,
+            id: generateId("profile-ok"),
             label: t("planner.suggestions.keepGoing"),
             icon: "👍",
             action: { type: "sendMessage" as const, message: t("planner.suggestions.keepGoing") },
@@ -251,23 +234,11 @@ export function useChatDestinationFlow({
         );
         setInspireFlowStep("results");
       } else {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === messageId
-              ? { ...m, text: t("planner.messages.noDestinationsHint"), isTyping: false, isStreaming: false }
-              : m
-          )
-        );
+        setMessages(updateMessageById(messageId, { text: t("planner.messages.noDestinationsHint"), isTyping: false, isStreaming: false }));
       }
     } catch (apiError) {
       console.error("Error fetching destination suggestions:", apiError);
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId
-            ? { ...m, text: t("planner.messages.errorDestinations"), isTyping: false, isStreaming: false }
-            : m
-        )
-      );
+      setMessages(updateMessageById(messageId, { text: t("planner.messages.errorDestinations"), isTyping: false, isStreaming: false }));
     }
   }, [fetchSuggestions, setMessages, t]);
 
@@ -277,18 +248,11 @@ export function useChatDestinationFlow({
     widgetTracking.trackDestinationSelect(destination.countryName, destination.countryCode);
 
     // Mark widget as confirmed
-    setMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === messageId
-          ? {
-              ...msg,
-              widgetConfirmed: true,
-              widgetSelectedValue: destination,
-              widgetDisplayLabel: destination.countryName,
-            }
-          : msg
-      )
-    );
+    setMessages(updateMessageById(messageId, {
+      widgetConfirmed: true,
+      widgetSelectedValue: destination,
+      widgetDisplayLabel: destination.countryName,
+    }));
 
     // Store country info — clear city to prevent stale data
     updateMemory({
@@ -306,7 +270,7 @@ export function useChatDestinationFlow({
     setDestinationSuggestions([]);
 
     // Add loading message for city fetch
-    const loadingId = `city-loading-${Date.now()}`;
+    const loadingId = generateId("city-loading");
     setMessages((prev) => [
       ...prev,
       {
@@ -319,16 +283,10 @@ export function useChatDestinationFlow({
 
     // Fetch cities for the selected country
     try {
-      const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/top-cities-by-country?country_code=${destination.countryCode}&limit=5`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: SUPABASE_PUBLISHABLE_KEY,
-          },
-        }
-      );
+      const response = await supabaseFetch("top-cities-by-country", {
+        method: "GET",
+        params: { country_code: destination.countryCode, limit: "5" },
+      });
 
       const data = await response.json();
 
@@ -339,52 +297,31 @@ export function useChatDestinationFlow({
           population: c.population,
         }));
 
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === loadingId
-              ? {
-                  ...m,
-                  text: `${t("planner.chat.excellentChoice", { country: destination.countryName })}\n\n${destination.description}\n\n${t("planner.chat.whichCityToVisit")}`,
-                  isTyping: false,
-                  widget: "citySelector" as WidgetType,
-                  widgetData: {
-                    citySelection: {
-                      countryCode: destination.countryCode,
-                      countryName: destination.countryName,
-                      cities,
-                    },
-                    isDeparture: false,
-                  },
-                }
-              : m
-          )
-        );
+        setMessages(updateMessageById(loadingId, {
+          text: `${t("planner.chat.excellentChoice", { country: destination.countryName })}\n\n${destination.description}\n\n${t("planner.chat.whichCityToVisit")}`,
+          isTyping: false,
+          widget: "citySelector" as WidgetType,
+          widgetData: {
+            citySelection: {
+              countryCode: destination.countryCode,
+              countryName: destination.countryName,
+              cities,
+            },
+            isDeparture: false,
+          },
+        }));
       } else {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === loadingId
-              ? {
-                  ...m,
-                  text: `${t("planner.chat.excellentChoice", { country: destination.countryName })}\n\n${t("planner.chat.whichCityToVisit")} ${t("planner.chat.typeInChat")}`,
-                  isTyping: false,
-                }
-              : m
-          )
-        );
+        setMessages(updateMessageById(loadingId, {
+          text: `${t("planner.chat.excellentChoice", { country: destination.countryName })}\n\n${t("planner.chat.whichCityToVisit")} ${t("planner.chat.typeInChat")}`,
+          isTyping: false,
+        }));
       }
     } catch (error) {
       console.error("Error fetching cities:", error);
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === loadingId
-            ? {
-                ...m,
-                text: `${t("planner.chat.excellentChoice", { country: destination.countryName })}\n\n${t("planner.chat.whichCityToVisit")} ${t("planner.chat.typeInChat")}`,
-                isTyping: false,
-              }
-            : m
-        )
-      );
+      setMessages(updateMessageById(loadingId, {
+        text: `${t("planner.chat.excellentChoice", { country: destination.countryName })}\n\n${t("planner.chat.whichCityToVisit")} ${t("planner.chat.typeInChat")}`,
+        isTyping: false,
+      }));
     }
   }, [widgetTracking, updateMemory, setMessages, t]);
 

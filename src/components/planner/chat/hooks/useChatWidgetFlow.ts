@@ -33,11 +33,6 @@ import {
   handleDirectFlightToggle as _handleDirectFlightToggle,
   handleDurationSelect as _handleDurationSelect,
   handleTimeOfDaySelect as _handleTimeOfDaySelect,
-  handleComparisonSelect as _handleComparisonSelect,
-  handleComparisonRemove as _handleComparisonRemove,
-  handleConflictResolve as _handleConflictResolve,
-  handlePriceAlertAction as _handlePriceAlertAction,
-  handlePriceAlertDismiss as _handlePriceAlertDismiss,
 } from "./widgetHandlers";
 
 /**
@@ -318,49 +313,6 @@ export function useChatWidgetFlow(options: UseChatWidgetFlowOptions) {
   );
 
   // ============================================================
-  // Comparison Handlers (Phase 3)
-  // ============================================================
-
-  const handleComparisonSelect = useCallback(
-    (messageId: string, itemId: string) => {
-      _handleComparisonSelect(depsRef.current, messageId, itemId);
-    },
-    []
-  );
-
-  const handleComparisonRemove = useCallback(
-    (messageId: string, itemId: string) => {
-      _handleComparisonRemove(depsRef.current, messageId, itemId);
-    },
-    []
-  );
-
-  // ============================================================
-  // Alert Handlers (Phase 4)
-  // ============================================================
-
-  const handleConflictResolve = useCallback(
-    (messageId: string, conflictId: string) => {
-      _handleConflictResolve(depsRef.current, messageId, conflictId);
-    },
-    []
-  );
-
-  const handlePriceAlertAction = useCallback(
-    (messageId: string) => {
-      _handlePriceAlertAction(depsRef.current, messageId);
-    },
-    []
-  );
-
-  const handlePriceAlertDismiss = useCallback(
-    (messageId: string) => {
-      _handlePriceAlertDismiss(depsRef.current, messageId);
-    },
-    []
-  );
-
-  // ============================================================
   // Widget determination (stays in hook - uses refs directly)
   // ============================================================
 
@@ -432,15 +384,6 @@ export function useChatWidgetFlow(options: UseChatWidgetFlowOptions) {
     handleDirectFlightToggle,
     handleDurationSelect,
     handleTimeOfDaySelect,
-
-    // Comparison widget handlers (Phase 3)
-    handleComparisonSelect,
-    handleComparisonRemove,
-
-    // Alert widget handlers (Phase 4)
-    handleConflictResolve,
-    handlePriceAlertAction,
-    handlePriceAlertDismiss,
 
     // Widget determination
     determineNextWidget,

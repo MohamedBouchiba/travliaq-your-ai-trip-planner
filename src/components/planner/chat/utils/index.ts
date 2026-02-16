@@ -10,6 +10,9 @@ export {
   type FlightMemoryUpdate,
 } from "./flightDataToMemory";
 
+// Message helpers - ID generation, message update utilities
+export { generateId, updateMessageById } from "./messageHelpers";
+
 // Security utilities - XSS protection, sanitization
 export {
   escapeHtml,
