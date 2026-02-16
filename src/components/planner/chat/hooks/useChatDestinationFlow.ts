@@ -42,6 +42,7 @@ export interface UseChatDestinationFlowReturn {
   handleLLMDestinationRequest: (
     messageId: string,
     requestedCount: number,
+    departureCityOverride?: string,
   ) => Promise<void>;
   /** Handle user selecting a destination from the grid */
   handleDestinationSelect: (messageId: string, destination: DestinationSuggestion) => Promise<void>;
@@ -149,7 +150,7 @@ export function useChatDestinationFlow({
       const loadingId = generateId("fetching");
       setMessages((prev) => [
         ...prev,
-        { id: loadingId, role: "assistant" as const, text: t("planner.preference.searchingDestinations"), isTyping: true },
+        { id: loadingId, role: "assistant" as const, text: t("planner.preference.searchingDestinations"), isTyping: true, timestamp: Date.now() },
       ]);
       handleFetchRef.current(loadingId);
     }
@@ -159,10 +160,16 @@ export function useChatDestinationFlow({
   const handleLLMDestinationRequest = useCallback(async (
     messageId: string,
     requestedCount: number,
+    departureCityOverride?: string,
   ) => {
     // B2: Prevent concurrent destination fetches
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
+
+    // B6: Apply departure city override from freshMemory (avoids stale ref during same-tick execution)
+    if (departureCityOverride && !departureCityRef.current) {
+      departureCityRef.current = departureCityOverride;
+    }
 
     // A4: Dismiss any previous unconfirmed destination suggestion widgets
     setMessages((prev) =>
@@ -189,6 +196,7 @@ export function useChatDestinationFlow({
             id: askId,
             role: "assistant" as const,
             text: t("planner.messages.needDepartureCityFirst"),
+            timestamp: Date.now(),
           },
         ];
       });

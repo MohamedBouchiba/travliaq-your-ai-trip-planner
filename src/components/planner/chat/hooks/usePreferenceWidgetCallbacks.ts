@@ -87,6 +87,7 @@ export function usePreferenceWidgetCallbacks({
         id: askId,
         role: "assistant" as const,
         text: t("planner.preference.askDepartureCity"),
+        timestamp: Date.now(),
       },
     ]);
     setDynamicSuggestions([]);

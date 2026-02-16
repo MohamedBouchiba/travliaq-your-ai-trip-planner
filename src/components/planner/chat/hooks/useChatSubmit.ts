@@ -117,7 +117,7 @@ export interface UseChatSubmitOptions {
   mapContext: { buildContextString: () => string };
   imperativeHandlers: { handlePreferencesDetection: (prefs: unknown) => void };
   preFillBudgetPreferences: (ecoVsLuxuryValue: number) => void;
-  handleLLMDestinationRequest: (messageId: string, count?: number) => Promise<void>;
+  handleLLMDestinationRequest: (messageId: string, count?: number, departureCityOverride?: string) => Promise<void>;
   generateContextualReplies: () => Array<{ id: string; label: string; icon?: string; action: { type: string; message?: string } }>;
   completedMessageIdsRef: React.MutableRefObject<Set<string>>;
   intentWidgetRef: React.MutableRefObject<WidgetType | null>;
@@ -240,6 +240,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
 
       // Process intent classification
       let intentResult: IntentProcessResult | undefined;
+      let freshMemory: FlightMemory | undefined;
       if (intentClassification) {
         if (import.meta.env.DEV) console.log("[useChatSubmit] Intent:", intentClassification.primaryIntent);
         opts.setLastIntentClassification(intentClassification);
@@ -267,7 +268,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
         );
 
         // Compute fresh flowState from merged memory (avoids stale memoized state)
-        const freshMemory = { ...opts.memory, ...memoryPatch } as FlightMemory;
+        freshMemory = { ...opts.memory, ...memoryPatch } as FlightMemory;
         const freshFlowState = computeFlowState(freshMemory);
 
         intentResult = opts.intentRouter.processIntent(intentClassification, freshFlowState);
@@ -379,7 +380,9 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
 
       if (destinationSuggestionRequest) {
         if (import.meta.env.DEV) console.log("[useChatSubmit] LLM destination suggestions requested");
-        await opts.handleLLMDestinationRequest(messageId, destinationSuggestionRequest.requestedCount);
+        // B6: Pass fresh departure city to avoid stale departureCityRef (not yet updated by React re-render)
+        const freshDeparture = freshMemory?.departure?.city;
+        await opts.handleLLMDestinationRequest(messageId, destinationSuggestionRequest.requestedCount, freshDeparture);
         opts.setIsLoading(false);
         return;
       }

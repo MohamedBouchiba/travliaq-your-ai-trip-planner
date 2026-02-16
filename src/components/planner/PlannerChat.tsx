@@ -747,8 +747,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
         const askId = `ask-departure-${Date.now()}`;
         setMessages((prev) => [
           ...prev,
-          { id: userMsgId, role: "user" as const, text: text.trim() },
-          { id: askId, role: "assistant" as const, text: t("planner.preference.askDepartureCity") },
+          { id: userMsgId, role: "user" as const, text: text.trim(), timestamp: Date.now() },
+          { id: askId, role: "assistant" as const, text: t("planner.preference.askDepartureCity"), timestamp: Date.now() },
         ]);
         setDynamicSuggestions([]);
         setInput("");
@@ -758,8 +758,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
       const loadingId = `fetching-${Date.now()}`;
       setMessages((prev) => [
         ...prev,
-        { id: userMsgId, role: "user" as const, text: text.trim() },
-        { id: loadingId, role: "assistant" as const, text: t("planner.preference.searchingDestinations"), isTyping: true },
+        { id: userMsgId, role: "user" as const, text: text.trim(), timestamp: Date.now() },
+        { id: loadingId, role: "assistant" as const, text: t("planner.preference.searchingDestinations"), isTyping: true, timestamp: Date.now() },
       ]);
       handleFetchDestinations(loadingId);
       setDynamicSuggestions([]);
@@ -841,7 +841,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
       const widgetId = `widget-${widgetType}-${Date.now()}`;
       setMessages((prev) => [
         ...prev,
-        { id: widgetId, role: "assistant", text: widgetIntros[widgetType] || "", widget: widgetType },
+        { id: widgetId, role: "assistant", text: widgetIntros[widgetType] || "", widget: widgetType, timestamp: Date.now() },
       ]);
 
       setDynamicSuggestions([]);
@@ -854,7 +854,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
         const askId = `ask-departure-${Date.now()}`;
         setMessages((prev) => [
           ...prev,
-          { id: askId, role: "assistant", text: t("planner.preference.askDepartureCity") },
+          { id: askId, role: "assistant", text: t("planner.preference.askDepartureCity"), timestamp: Date.now() },
         ]);
         setDynamicSuggestions([]);
         return;
@@ -863,7 +863,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
       const loadingId = `fetching-${Date.now()}`;
       setMessages((prev) => [
         ...prev,
-        { id: loadingId, role: "assistant", text: t("planner.preference.searchingDestinations"), isTyping: true },
+        { id: loadingId, role: "assistant", text: t("planner.preference.searchingDestinations"), isTyping: true, timestamp: Date.now() },
       ]);
       handleFetchDestinations(loadingId);
       setDynamicSuggestions([]);
