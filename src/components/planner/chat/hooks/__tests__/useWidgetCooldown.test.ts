@@ -68,7 +68,7 @@ describe("useWidgetCooldown", () => {
     expect(result.current.canShowWidget("dateRangePicker" as WidgetType)).toBe(false);
   });
 
-  it("allows confirmed REFINABLE widget after cooldown (preferenceInterests)", () => {
+  it("permanently blocks confirmed preference widget (F8: no more REFINABLE_WIDGETS)", () => {
     const { result } = renderHook(() => useWidgetCooldown());
 
     act(() => {
@@ -76,15 +76,15 @@ describe("useWidgetCooldown", () => {
       result.current.recordWidgetConfirmed("preferenceInterests" as WidgetType);
     });
 
-    // Blocked during cooldown
+    // Blocked immediately
     expect(result.current.canShowWidget("preferenceInterests" as WidgetType)).toBe(false);
 
-    // Unblocked after 61s (refinable widgets use standard cooldown, not permanent block)
-    act(() => { vi.advanceTimersByTime(61_000); });
-    expect(result.current.canShowWidget("preferenceInterests" as WidgetType)).toBe(true);
+    // Still blocked after 5 minutes (permanent, not just cooldown)
+    act(() => { vi.advanceTimersByTime(300_000); });
+    expect(result.current.canShowWidget("preferenceInterests" as WidgetType)).toBe(false);
   });
 
-  it("allows confirmed REFINABLE widget after cooldown (preferenceStyle)", () => {
+  it("permanently blocks confirmed preferenceStyle (F8: no more REFINABLE_WIDGETS)", () => {
     const { result } = renderHook(() => useWidgetCooldown());
 
     act(() => {
@@ -94,8 +94,9 @@ describe("useWidgetCooldown", () => {
 
     expect(result.current.canShowWidget("preferenceStyle" as WidgetType)).toBe(false);
 
-    act(() => { vi.advanceTimersByTime(61_000); });
-    expect(result.current.canShowWidget("preferenceStyle" as WidgetType)).toBe(true);
+    // Still blocked after 5 minutes
+    act(() => { vi.advanceTimersByTime(300_000); });
+    expect(result.current.canShowWidget("preferenceStyle" as WidgetType)).toBe(false);
   });
 
   it("blocks after max attempts (2)", () => {

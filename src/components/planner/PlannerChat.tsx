@@ -54,6 +54,24 @@ import { useLocale } from "@/hooks/useLocale";
 import { eventBus } from "@/lib/eventBus";
 import { STORAGE_KEYS as SK } from "@/config/storageKeys";
 
+// --- Scalable dismissal detection (F6) ---
+// Word sets for FR/EN dismissal phrases — any short combination is matched.
+// To support a new word, just add it to the relevant set.
+const DISMISSAL_WORDS = new Set([
+  // FR
+  "non", "rien", "pas", "plus", "nope", "ok", "d'autre", "de",
+  "c'est", "tout", "bon", "merci", "voila", "voilà",
+  // EN
+  "no", "nothing", "that's", "all", "else", "fine", "done", "good", "thanks",
+]);
+
+/** Detect short dismissal messages regardless of word order */
+function isDismissalMessage(text: string): boolean {
+  const cleaned = text.trim().toLowerCase().replace(/[,.'!?]/g, "");
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  return words.length > 0 && words.length <= 6 && words.every((w) => DISMISSAL_WORDS.has(w));
+}
+
 // Re-export types for external consumers
 export type {
   ChatQuickAction,
@@ -801,12 +819,11 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
   });
 
   // Wrapper around sendText: intercept "nothing else" responses during inspire flow
-  const NOTHING_ELSE_RE = /^(rien d'autre|rien|non|c'est tout|nothing else|no|that's all|c'est bon|non merci|nope|pas d'autre|rien de plus)$/i;
   const handleSend = useCallback((text: string) => {
     if (!text.trim()) return;
 
     // During inspire flow "extra" step, intercept "nothing else" text → trigger destination fetch
-    if (inspireFlowStep === "extra" && NOTHING_ELSE_RE.test(text.trim())) {
+    if (inspireFlowStep === "extra" && isDismissalMessage(text)) {
       // Show the user message in chat
       const userMsgId = `user-${Date.now()}`;
       if (!departureCity) {

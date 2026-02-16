@@ -15,7 +15,7 @@ const MAX_WIDGET_ATTEMPTS = 2; // Max times to show same widget per session
 const USER_TYPED_PENALTY_MS = 120000; // 2 min penalty if user typed instead of using widget
 
 /** Widgets that can be re-shown after confirmation (standard cooldown, not permanent block) */
-const REFINABLE_WIDGETS = new Set<string>(["preferenceInterests", "preferenceStyle"]);
+const REFINABLE_WIDGETS = new Set<string>([]);
 
 /**
  * Widget interaction record

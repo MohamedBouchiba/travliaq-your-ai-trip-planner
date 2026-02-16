@@ -228,17 +228,27 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
         if (import.meta.env.DEV) console.log("[useChatSubmit] Intent:", intentClassification.primaryIntent);
         opts.setLastIntentClassification(intentClassification);
 
-        // Extract departureCity from intent when flightData is null
-        if (!flightData && intentClassification.entities?.departureCity) {
-          const depCity = intentClassification.entities.departureCity as string;
-          if (isValidDepartureCity(depCity)) {
-            if (import.meta.env.DEV) console.log("[useChatSubmit] departureCity from intent:", depCity);
-            opts.updateMemory({ departure: { city: depCity } });
-            eventBus.emit("flight:updateFormData", { from: depCity });
-          } else if (import.meta.env.DEV) {
-            console.warn("[useChatSubmit] Rejected invalid departureCity:", depCity);
+        // Sanitize departureCity before entity persistence (Bug D guard)
+        const sanitizedEntities = intentClassification.entities
+          ? { ...intentClassification.entities }
+          : undefined;
+        if (sanitizedEntities?.departureCity) {
+          const depCity = sanitizedEntities.departureCity as string;
+          if (!isValidDepartureCity(depCity)) {
+            if (import.meta.env.DEV) console.warn("[useChatSubmit] Rejected invalid departureCity:", depCity);
+            delete sanitizedEntities.departureCity;
           }
         }
+
+        // F7: Persist all extracted entities (travelers, location, dates) via declarative pipeline
+        // Must run BEFORE processIntent so memory/flowState reflects new entities
+        persistExtractedEntities(
+          sanitizedEntities as Record<string, unknown> | undefined,
+          flightData,
+          opts.widgetFlow,
+          opts.updateMemory,
+          opts.memory,
+        );
 
         // Pre-fill budget preferences before widget routing so the preferenceStyle widget renders pre-filled
         if (intentClassification.entities?.budgetLevel) {
@@ -361,13 +371,12 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
       let showDateWidget = false;
       let showTravelersWidget = false;
 
-      // Unified Entity Pipeline
-      persistExtractedEntities(
-        intentClassification?.entities as Record<string, unknown> | undefined,
-        flightData,
-        opts.widgetFlow,
-        opts.updateMemory
-      );
+      // F7: Entity persistence already executed above (before processIntent).
+      // Only flightData-specific legs/tripDuration persistence remains here for the
+      // case where intentClassification is null but flightData has legs.
+      if (!intentClassification && flightData?.legs) {
+        persistExtractedEntities(undefined, flightData, opts.widgetFlow, opts.updateMemory, opts.memory);
+      }
 
       if (flightData && Object.keys(flightData).length > 0) {
         // Mutable copy for hallucination guard
