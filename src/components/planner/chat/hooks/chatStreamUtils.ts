@@ -61,6 +61,10 @@ export function createStreamError(
  */
 export function classifyError(error: unknown, statusCode?: number): StreamError {
   if (error instanceof Error) {
+    // Auth errors (e.g. AuthExpiredError from supabaseFetch)
+    if (error.name === "AuthExpiredError" || error.message.toLowerCase().includes("session expired")) {
+      return createStreamError("planner.error.auth", "auth", 401);
+    }
     // Distinguish timeout aborts from user-initiated cancels
     if (error.name === "AbortError") {
       const isTimeout = (error as DOMException).message === "timeout" ||
