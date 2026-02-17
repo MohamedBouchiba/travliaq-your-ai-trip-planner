@@ -1,51 +1,63 @@
 
-## Fix : Widget preferenceStyle non affiché quand l'utilisateur demande "Inspire-moi"
 
-### Diagnostic
+## Rendre les interactions widgets plus fluides
 
-Le backend classe correctement l'intention comme `gather_preferences` avec `widgetToShow: preferenceStyle` (confirmé dans les logs). Le widget est bien renvoyé au frontend et traité. **Le vrai probleme** est que le LLM de l'etape 2 (ReAct) ne sait pas qu'un widget a ete selectionne en etape 1. Il genere donc un texte long avec des listes d'options ("Plage et detente, Culture et musees...") qui duplique le role du widget.
+### Probleme identifie
 
-Le prompt systeme dit "Quand widgetToShow est defini, ton texte doit etre TRES COURT", mais le LLM du ReAct n'a aucun moyen de savoir que `widgetToShow` a ete defini car cette info n'est pas injectee dans ses messages.
+Apres qu'un utilisateur confirme un widget (ex: budget), deux choses se passent mal :
 
-### Correction
+1. **Silence radio** : Le widget passe en mode "confirme" (coche verte) mais rien ne se passe ensuite. L'utilisateur ne sait pas que c'est a lui de parler ou que le systeme va continuer.
+2. **Re-proposition du meme widget** : Le budget n'est jamais enregistre comme "bloque" dans le systeme anti-boucle (widgetCooldown), donc l'IA le repropose au message suivant.
 
-**Fichier : `supabase/functions/planner-chat/index.ts`**
+### Solution
 
-Apres l'etape 1 (classification) et avant l'etape 2 (ReAct loop), injecter un message systeme dans `conversationMessages` informant le LLM du widget selectionne. Cela lui permettra de :
-- Generer un texte court (1-2 phrases)
-- Ne pas lister d'options en texte
-- Ne pas dupliquer le contenu du widget
+Deux corrections complementaires :
 
-```text
-// Injection entre Step 1 et Step 2 (avant la construction de rawMessages)
-Si collectedData.intentClassification?.widgetToShow?.type existe :
-  Ajouter un message systeme dans conversationMessages :
-  "[WIDGET ACTIF] Le widget '{widgetType}' sera affiche apres ce message.
-   REGLE : Ton texte doit etre TRES COURT (1-2 phrases max).
-   NE FAIS PAS de liste a puces. Le widget affiche deja les options.
-   Exemples : 'On va d'abord cerner ton style de voyage :' ou 'Selectionne ce qui te tente le plus :'"
-```
+**1. Enregistrer les widgets selection dans le cooldown**
 
-Concretement, entre les lignes ~1000 et ~1005, apres le filtrage des outils et avant la boucle ReAct :
+Fichier : `src/components/planner/chat/hooks/widgetHandlers/selectionHandlers.ts`
 
-1. Verifier si `collectedData.intentClassification?.widgetToShow?.type` est defini
-2. Si oui, ajouter un message systeme a la fin de `rawMessages` (juste avant le dernier message utilisateur) avec le contexte du widget
-3. Cela garantit que le LLM sait quel widget sera montre et adapte sa reponse
+Actuellement, `handleBudgetSelect` (et les autres handlers de selection) ne signalent jamais au systeme de cooldown que le widget a ete confirme. Il faut ajouter l'appel `widgetCooldown.recordWidgetConfirmed(...)` dans chaque handler de selection pour que le widget soit bloque apres confirmation.
 
-### Test de non-regression
+Le probleme est que `HandlerDeps` ne contient pas `widgetCooldown`. Il faut :
+- Ajouter `widgetCooldown` au type `HandlerDeps` (fichier `types.ts`)
+- Le passer depuis `useChatWidgetFlow.ts` via `depsRef`
+- L'appeler dans `handleBudgetSelect`, `handleStarRatingSelect`, `handleCabinClassSelect`, etc.
 
-**Fichier : `src/__tests__/bug-fixes.test.ts`**
+**2. Ajouter un message de suivi automatique apres confirmation**
 
-Ajouter un test verifiant que lorsque le backend retourne `widgetToShow: preferenceStyle`, le message de l'assistant ne contient PAS de liste a puces ni d'enumeration d'options.
+Fichier : `src/components/planner/chat/hooks/widgetHandlers/selectionHandlers.ts`
+
+Apres la confirmation du budget, ajouter automatiquement un message assistant court et contextuel (ex: "Budget note ! Dis-moi la suite, ou pose-moi une question.") pour que l'utilisateur comprenne que la conversation continue.
+
+Alternative plus elegante : envoyer automatiquement un message utilisateur invisible au backend (comme le font les preference widgets avec `sendMessage`) pour que l'IA enchaine naturellement avec l'etape suivante.
+
+Concretement, pour `handleBudgetSelect` :
+- Apres `setMessages(updateMessageById(...))`, ajouter un nouveau message assistant de suivi
+- Generer des quick replies contextuels (ex: "Chercher des vols", "Definir les dates")
+
+Meme pattern pour `handleStarRatingSelect`, `handleCabinClassSelect`, etc.
+
+**3. Passer le widgetCooldown dans les deps**
+
+Fichier : `src/components/planner/chat/hooks/widgetHandlers/types.ts`
+
+Ajouter `widgetCooldown` optionnel dans le type `HandlerDeps`.
+
+Fichier : `src/components/planner/chat/hooks/useChatWidgetFlow.ts`
+
+S'assurer que `depsRef.current` inclut le `widgetCooldown`.
 
 ### Fichiers modifies
 
 | Fichier | Action |
 |---|---|
-| `supabase/functions/planner-chat/index.ts` | Injecter le contexte widget dans les messages ReAct |
-| `src/__tests__/bug-fixes.test.ts` | Test de non-regression pour le texte court avec widget |
+| `src/components/planner/chat/hooks/widgetHandlers/types.ts` | Ajouter widgetCooldown au type HandlerDeps |
+| `src/components/planner/chat/hooks/widgetHandlers/selectionHandlers.ts` | Appeler recordWidgetConfirmed + ajouter message de suivi |
+| `src/components/planner/chat/hooks/useChatWidgetFlow.ts` | Passer widgetCooldown dans depsRef |
 
-### Impact attendu
+### Resultat attendu
 
-- Quand l'utilisateur dit "Inspire-moi", le LLM genere un texte court comme "On va d'abord cerner ton style de voyage pour te faire les meilleures recommandations :" et le widget `preferenceStyle` s'affiche en dessous
-- Plus de liste "Plage et detente / Culture et musees / Aventure" dans le texte
+- Apres confirmation d'un widget budget, l'utilisateur voit un message de suivi clair
+- Le meme widget ne sera plus repropose grace au cooldown
+- L'experience est fluide : widget confirme, message de suivi, conversation qui continue
