@@ -142,7 +142,7 @@ export const DEFAULT_TRIP_CONTEXT: TripContext = {
 
 export const DEFAULT_PREFERENCES: TripPreferences = {
   id: crypto.randomUUID(),
-  travelStyle: "couple",
+  travelStyle: "solo",
   styleAxes: DEFAULT_STYLE_AXES,
   styleAxesOrder: DEFAULT_STYLE_AXES_ORDER,
   interests: [],
@@ -204,7 +204,7 @@ export function selectProfileCompletion(prefs: TripPreferences): number {
   const weights = { travelStyle: 15, interests: 25, styleAxes: 30, mustHaves: 15, occasion: 15 };
 
   // Travel style selected (not default)
-  if (prefs.travelStyle !== "couple") score += weights.travelStyle;
+  if (prefs.travelStyle !== "solo") score += weights.travelStyle;
   else score += weights.travelStyle * 0.5; // Default still counts partially
 
   // Interests (at least 2)
