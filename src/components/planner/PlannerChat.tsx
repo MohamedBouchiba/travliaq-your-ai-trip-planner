@@ -617,11 +617,35 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     }
   }, [messages, persistMessages]);
 
+  // Force-flush any pending debounced save before the page unloads (refresh/close)
+  const messagesForFlushRef = useRef(messages);
+  messagesForFlushRef.current = messages;
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (!activeSessionId) return;
+      const msgs = messagesForFlushRef.current;
+      if (msgs.some((m) => m.isStreaming || m.isTyping)) return;
+      const toStore = toStoredMessages(msgs);
+      // Direct localStorage write - no debounce
+      try {
+        localStorage.setItem(SK.CHAT_SESSION_PREFIX + activeSessionId, JSON.stringify(toStore));
+      } catch { /* ignore */ }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [activeSessionId, toStoredMessages]);
+
   // Reset transient UI state on session change
   // IMPORTANT: Do NOT wipe the input here; it causes "type then instantly cleared" if session ID churns.
+  // FIX: widgetFlow was in deps but changes identity every render (no useMemo), causing
+  // isSwitchingSessionRef to be perpetually true → persistMessages never saved to localStorage.
+  // widgetFlow.resetFlowState is a stable useCallback, so we access it via ref.
+  const resetFlowStateRef = useRef(widgetFlow.resetFlowState);
+  resetFlowStateRef.current = widgetFlow.resetFlowState;
+
   useEffect(() => {
     isSwitchingSessionRef.current = true;
-    widgetFlow.resetFlowState();
+    resetFlowStateRef.current();
     setIsLoading(false);
     airportFetchKeyRef.current = null;
     // B7: Clear completed message IDs to prevent stale IDs from previous session
@@ -631,7 +655,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
       isSwitchingSessionRef.current = false;
     }, 100);
     return () => clearTimeout(timer);
-  }, [activeSessionId, widgetFlow]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId]);
 
   // Notify outside world whether the chat has user content (for leave confirmations)
   const lastDirtyRef = useRef<boolean | null>(null);

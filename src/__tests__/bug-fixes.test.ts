@@ -169,3 +169,41 @@ describe('Location autocomplete result formatting', () => {
     expect(result.display_name).toBe('France');
   });
 });
+
+// --- Test 4: Session switching ref stability ---
+describe('isSwitchingSessionRef stability', () => {
+  it('effect with unstable dep in deps array fires every render (simulates bug)', () => {
+    // This test documents the bug: if widgetFlow (which changes identity every render)
+    // is in the deps array of the session-switch effect, isSwitchingSessionRef stays true forever.
+    let renderCount = 0;
+    let effectCount = 0;
+
+    // Simulate: each "render" creates a new object (like widgetFlow return)
+    const simulateRenders = (numRenders: number, deps: () => unknown[]) => {
+      let prevDeps: unknown[] | null = null;
+      for (let i = 0; i < numRenders; i++) {
+        renderCount++;
+        const currentDeps = deps();
+        // Effect fires if deps changed
+        if (!prevDeps || currentDeps.some((d, idx) => d !== prevDeps![idx])) {
+          effectCount++;
+        }
+        prevDeps = currentDeps;
+      }
+    };
+
+    const stableSessionId = 'session-1';
+
+    // BUG scenario: widgetFlow changes every render
+    simulateRenders(5, () => [stableSessionId, { resetFlowState: () => {} }]);
+    // Effect fires every render because object identity changes
+    expect(effectCount).toBe(5);
+
+    // FIXED scenario: only activeSessionId in deps
+    renderCount = 0;
+    effectCount = 0;
+    simulateRenders(5, () => [stableSessionId]);
+    // Effect fires only once (first render)
+    expect(effectCount).toBe(1);
+  });
+});
