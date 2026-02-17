@@ -99,7 +99,11 @@ const ENTITY_PERSISTERS: Record<string, EntityPersistAction> = {
   // when flightData.from is already set, not when any flightData field exists.
   departureCity: {
     skipWhenFlightDataHas: "from",
-    toMemory: (v, cur) => ({ departure: { ...cur.departure, city: v as string } }),
+    toMemory: (v, cur) => {
+      // Bug 2 fix: When user explicitly provides departure city, mark it as user-provided
+      // so auto-detect won't overwrite it later
+      return { departure: { ...cur.departure, city: v as string, userProvided: true } };
+    },
     toFormEvent: (v) => ({ from: v }),
   },
   departureCountryCode: {

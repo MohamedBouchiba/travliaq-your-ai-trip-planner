@@ -283,6 +283,11 @@ que tout a été dit. Ne PAS classifier comme "other" dans ces cas.
         clarificationQuestion: {
           type: "string",
           description: "Question à poser si clarification nécessaire"
+        },
+        detectedLanguage: {
+          type: "string",
+          enum: ["fr", "en", "es", "de", "it", "pt", "nl", "other"],
+          description: "Langue détectée du dernier message utilisateur (fr=français, en=anglais, etc.)"
         }
       },
       required: ["primaryIntent", "confidence", "entities"]
@@ -327,6 +332,7 @@ export interface IntentClassificationResult {
   nextExpectedIntent?: string;
   requiresClarification?: boolean;
   clarificationQuestion?: string;
+  detectedLanguage?: string;
 }
 
 /**

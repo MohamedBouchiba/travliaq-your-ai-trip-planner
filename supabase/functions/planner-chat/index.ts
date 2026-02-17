@@ -593,7 +593,10 @@ et que l'utilisateur répond uniquement par un nombre ("2", "1", "3") :
 → entities.selectedOption: "[le numéro]"
 → NE PAS interpréter comme provide_travelers ou adults
 Un nombre SEUL n'est JAMAIS un nombre de voyageurs sauf si le contexte 
-parle explicitement de voyageurs/passagers/personnes.`;
+parle explicitement de voyageurs/passagers/personnes.
+
+RÈGLE LANGUE: Détecte la langue du DERNIER message utilisateur et renseigne detectedLanguage.
+Exemples: "Bonjour, je cherche un vol" → "fr", "Hi I want to travel" → "en", "Hola quiero viajar" → "es".`;
 }
 
 /**
@@ -1210,8 +1213,20 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("planner-chat error:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
+    // Bug 5: Enhanced error logging for 500 diagnosis
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    const errorName = error instanceof Error ? error.name : "UnknownError";
+    console.error("[planner-chat] FATAL ERROR:", {
+      name: errorName,
+      message: errorMessage,
+      stack: errorStack?.split("\n").slice(0, 5).join("\n"),
+      timestamp: new Date().toISOString(),
+    });
+    return new Response(JSON.stringify({ 
+      error: errorMessage,
+      errorType: errorName,
+    }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

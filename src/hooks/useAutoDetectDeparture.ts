@@ -25,8 +25,8 @@ export function useAutoDetectDeparture() {
     // Only run once per component lifecycle
     if (hasRunRef.current) return;
     
-    // Don't override if user already has a departure set
-    if (memory.departure?.iata || memory.departure?.city) {
+    // Don't override if user already has a departure set (especially if user-provided)
+    if (memory.departure?.iata || memory.departure?.city || (memory.departure as Record<string, unknown>)?.userProvided) {
       console.log('[useAutoDetectDeparture] Departure already set, skipping auto-detection');
       return;
     }

@@ -70,7 +70,8 @@ export async function findNearestAirports(
   city: string,
   limit: number = 3,
   countryCode?: string,
-  coords?: { lat: number; lon: number }
+  coords?: { lat: number; lon: number },
+  preferredRegion?: string,
 ): Promise<NearestAirportsResponse | null> {
   // Guard: don't call API with country names (unless we have coords fallback)
   if (!coords && isCountryName(city)) {
@@ -79,7 +80,7 @@ export async function findNearestAirports(
   }
 
   try {
-    const body: { city?: string; lat?: number; lon?: number; limit: number; country_code?: string } = { limit };
+    const body: { city?: string; lat?: number; lon?: number; limit: number; country_code?: string; preferred_region?: string } = { limit };
     
     // Prefer coords if provided (more reliable than city name lookup)
     if (coords) {
@@ -94,6 +95,11 @@ export async function findNearestAirports(
     
     if (countryCode) {
       body.country_code = countryCode;
+    }
+
+    // Bug 2: Pass preferred_region to disambiguate homonyms (Paris FR vs Paris CA)
+    if (preferredRegion) {
+      body.preferred_region = preferredRegion;
     }
 
     const { data, error } = await supabase.functions.invoke("nearest-airports", {
