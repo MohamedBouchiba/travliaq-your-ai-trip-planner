@@ -13,6 +13,7 @@ import type { Airport } from "@/hooks/useNearestAirports";
 import type { WidgetType } from "@/types/flight";
 import type { ChatMessage } from "../types";
 import { useWidgetTracking } from "./useWidgetTracking";
+import type { UseWidgetCooldownReturn } from "./useWidgetCooldown";
 import type { HandlerDeps } from "./widgetHandlers/types";
 import {
   handleDateSelect as _handleDateSelect,
@@ -74,13 +75,15 @@ export interface UseChatWidgetFlowOptions {
   t: TFunction;
   /** date-fns locale for date formatting */
   dateFnsLocale: Locale;
+  /** Widget cooldown system */
+  widgetCooldown?: UseWidgetCooldownReturn;
 }
 
 /**
  * Hook for managing widget flow in chat
  */
 export function useChatWidgetFlow(options: UseChatWidgetFlowOptions) {
-  const { memory, updateMemory, updateTravelers, setMessages, t, dateFnsLocale } = options;
+  const { memory, updateMemory, updateTravelers, setMessages, t, dateFnsLocale, widgetCooldown } = options;
 
   /** Build i18n-aware travelers label */
   const buildTravelersLabel = useCallback((travelers: { adults: number; children: number; infants: number }): string => {
@@ -123,6 +126,7 @@ export function useChatWidgetFlow(options: UseChatWidgetFlowOptions) {
     t,
     dateFnsLocale,
     buildTravelersLabel,
+    widgetCooldown,
     refs: {
       pendingTravelersWidget: pendingTravelersWidgetRef,
       travelersConfirmed: travelersConfirmedRef,

@@ -371,6 +371,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     setMessages,
     t,
     dateFnsLocale,
+    widgetCooldown,
   });
 
   // Widget action executor for LLM "choose for me" functionality
