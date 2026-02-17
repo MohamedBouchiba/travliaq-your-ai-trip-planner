@@ -73,32 +73,54 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
   // Only show steps that are required for this trip type
   const visibleSteps = STEP_CONFIG.filter((s) => requiredSteps.includes(s.key));
 
+  // Progress percentage
+  const doneCount = visibleSteps.filter((s) => completedSteps.includes(s.key)).length;
+  const progressPercent = visibleSteps.length > 0 ? Math.round((doneCount / visibleSteps.length) * 100) : 0;
+
   return (
     <div className="absolute bottom-0 left-0 right-0 z-20 bg-card/90 backdrop-blur-xl border-t border-border/30">
+      {/* Progress bar */}
+      <div className="h-0.5 w-full bg-muted/30">
+        <div
+          className={cn(
+            "h-full transition-all duration-500 ease-out",
+            isComplete ? "bg-green-500" : "bg-primary"
+          )}
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
+
       <div className="flex items-center justify-between px-3 py-1.5 gap-2">
-        {/* Step indicators */}
-        <div className="flex items-center gap-1">
+        {/* Step progression */}
+        <div className="flex items-center gap-0.5">
           {visibleSteps.map(({ key, icon: Icon, label }, idx) => {
             const done = completedSteps.includes(key);
             return (
-              <div key={key} className="flex items-center gap-1">
+              <div key={key} className="flex items-center">
                 {idx > 0 && (
                   <div className={cn(
-                    'h-px w-3',
-                    completedSteps.includes(visibleSteps[idx - 1].key) ? 'bg-green-500/50' : 'bg-border/50'
+                    'w-4 h-px transition-colors duration-300',
+                    completedSteps.includes(visibleSteps[idx - 1].key) && done
+                      ? 'bg-green-500/60'
+                      : completedSteps.includes(visibleSteps[idx - 1].key)
+                        ? 'bg-primary/40'
+                        : 'bg-border/40'
                   )} />
                 )}
-                <div className="flex items-center gap-1">
+                <div className={cn(
+                  "flex items-center gap-1 px-1.5 py-0.5 rounded-md transition-all duration-300",
+                  done && "bg-green-500/10"
+                )}>
                   <div className={cn(
-                    'flex items-center justify-center h-5 w-5 rounded-full transition-colors',
+                    'flex items-center justify-center h-4 w-4 rounded-full transition-all duration-300 text-[10px] font-bold',
                     done
                       ? 'bg-green-500/20 text-green-600 dark:text-green-400'
-                      : 'bg-muted/40 text-muted-foreground/40'
+                      : 'bg-muted/50 text-muted-foreground/40'
                   )}>
-                    {done ? <Check className="h-3 w-3" /> : <Icon className="h-2.5 w-2.5" />}
+                    {done ? <Check className="h-2.5 w-2.5" /> : <span>{idx + 1}</span>}
                   </div>
                   <span className={cn(
-                    'text-[10px] font-medium hidden sm:inline',
+                    'text-[10px] font-medium hidden sm:inline transition-colors duration-300',
                     done ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground/50'
                   )}>
                     {label}
