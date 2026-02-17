@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePlannerStoreV2 } from "@/stores/plannerStoreV2";
 import { useTranslation } from "react-i18next";
 import type { DestinationSuggestion } from "@/types/destinations";
 import type { WidgetType } from "@/types/flight";
@@ -180,11 +181,22 @@ export function useChatDestinationFlow({
       )
     );
 
-    // A6: Guard — ensure we have a departure city before suggesting (read from ref to avoid stale closure)
-    if (!departureCityRef.current) {
-      // Don't overwrite the LLM message — add a NEW assistant message asking for departure city
-      const askId = generateId("ask-departure");
+    // A6: Guard — ensure we have a departure city before suggesting
+    // Bug A fix: Read Zustand store directly to avoid stale React ref timing issues
+    const storeCity = departureCityRef.current || usePlannerStoreV2.getState().departure?.city;
+    if (!storeCity) {
+      // Bug 11 fix: Deduplicate — don't add ask-departure if one exists in recent messages
       setMessages((prev) => {
+        const recentAskDeparture = prev.slice(-3).some(
+          (m) => m.id.startsWith("ask-departure") && m.role === "assistant"
+        );
+        if (recentAskDeparture) {
+          // Just clean the loading state on the current message
+          return prev.map((m) =>
+            m.id === messageId ? { ...m, isTyping: false, isStreaming: false } : m
+          );
+        }
+        const askId = generateId("ask-departure");
         const cleaned = prev.map((m) =>
           m.id === messageId
             ? { ...m, isTyping: false, isStreaming: false }
@@ -204,6 +216,10 @@ export function useChatDestinationFlow({
       setPendingDestinationFetch(true);
       isFetchingRef.current = false;
       return;
+    }
+    // Update ref with store value for downstream use
+    if (!departureCityRef.current && storeCity) {
+      departureCityRef.current = storeCity;
     }
 
     // Show loading state on the existing message

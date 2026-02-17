@@ -7,7 +7,7 @@
 import { useState, useMemo, memo } from "react";
 import { useTranslation } from "react-i18next";
 import { CalendarIcon } from "lucide-react";
-import { format, addMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameDay, isSameMonth, isBefore } from "date-fns";
+import { format, addMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameDay, isSameMonth, isBefore, isEqual } from "date-fns";
 import { cn } from "@/lib/utils";
 import { parsePreferredMonth } from "../types";
 import { usePlannerStoreV2 } from "@/stores/plannerStoreV2";
@@ -119,7 +119,8 @@ export const DateRangePickerWidget = memo(function DateRangePickerWidget({
   };
 
   const handleConfirm = () => {
-    if (departureDate && returnDate) {
+    // Bug 6 fix: Block confirmation when departure === return (same day)
+    if (departureDate && returnDate && !isSameDay(departureDate, returnDate)) {
       setConfirmed(true);
       // Sync to Zustand store
       if (!skipStoreSync) {

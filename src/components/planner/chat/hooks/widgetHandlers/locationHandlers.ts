@@ -10,6 +10,7 @@ import type { WidgetType } from "@/types/flight";
 import type { ChatMessage } from "../../types";
 import type { HandlerDeps } from "./types";
 import { parseDurationToDays } from "./helpers";
+import { useDebugStore } from "@/stores/debugStore";
 
 /**
  * Handle airport selection
@@ -85,6 +86,15 @@ export function handleCitySelect(
   countryCode: string
 ) {
   const { memory, updateMemory, setMessages, tracking, t, dateFnsLocale, refs } = deps;
+
+  // Bug 9: Track user interaction
+  useDebugStore.getState().addUserInteraction({
+    timestamp: Date.now(),
+    category: "widget",
+    action: "confirmed",
+    widgetType: "citySelector",
+    detail: `${cityName}, ${countryName}`,
+  });
 
   refs.citySelectionShownForCountry.current = null;
   updateMemory({ arrival: { city: cityName, country: countryName, countryCode } });

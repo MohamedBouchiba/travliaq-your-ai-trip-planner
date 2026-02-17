@@ -290,7 +290,7 @@ que tout a été dit. Ne PAS classifier comme "other" dans ces cas.
           description: "Langue détectée du dernier message utilisateur (fr=français, en=anglais, etc.)"
         }
       },
-      required: ["primaryIntent", "confidence", "entities"]
+      required: ["primaryIntent", "confidence", "entities", "detectedLanguage"]
     }
   }
 };

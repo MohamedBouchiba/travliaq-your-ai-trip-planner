@@ -174,6 +174,19 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     );
   }, [messages]);
 
+  // Bug C fix: Re-translate welcome message when i18n language changes
+  const { i18n } = useTranslation();
+  const prevLangRef = useRef(i18n.language);
+  useEffect(() => {
+    if (prevLangRef.current !== i18n.language) {
+      prevLangRef.current = i18n.language;
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === "welcome" ? { ...m, text: chatTranslations.welcomeMessage } : m
+        )
+      );
+    }
+  }, [i18n.language, chatTranslations.welcomeMessage]);
 
 
   // Sync current suggestions to the last assistant message in debug store
