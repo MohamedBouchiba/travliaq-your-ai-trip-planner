@@ -121,7 +121,7 @@ const PlannerPanel = ({ activeTab, onMapMove, mapCenter, layout = "sidebar", onC
         <div 
           className={cn(
             "flex-1 overflow-y-auto themed-scroll p-4",
-            layout === "mobile-top" ? "max-h-[calc(35vh-4.5rem)]" : "max-h-[calc(100vh-8rem)]"
+            layout === "mobile-top" ? "max-h-[calc(35vh-4.5rem)]" : "max-h-[calc(100vh-10rem)]"
           )}
           data-tour="widget-container"
         >
