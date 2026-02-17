@@ -164,20 +164,7 @@ export function buildLLMContext(sources: ContextSources): Record<string, unknown
       typeof preferenceMemoryState?.pace === "string"
         ? preferenceMemoryState.pace
         : null,
-    styleAxesConfigured: (() => {
-      const axes = preferenceMemoryState?.styleAxes as
-        | {
-            chillVsIntense: number;
-            cityVsNature: number;
-            ecoVsLuxury: number;
-            touristVsLocal: number;
-          }
-        | undefined;
-      // If axes exist at all, the user has interacted with the style widget
-      // (even if all values are 50/balanced — that's a valid choice)
-      if (!axes) return false;
-      return true;
-    })(),
+    styleAxesConfigured: preferenceMemoryState?.styleAxesUserConfirmed === true,
   };
 
   // ── Phase detection ──
