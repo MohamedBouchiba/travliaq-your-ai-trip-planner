@@ -45,20 +45,6 @@ const PlannerMap = ({
     webglSupported,
   } = useMapInit(center, zoom);
 
-  // Fallback when WebGL is not available
-  if (!webglSupported) {
-    return (
-      <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-muted/30">
-        <div className="text-center space-y-3 p-6 max-w-sm">
-          <MapPin className="h-12 w-12 text-muted-foreground mx-auto" />
-          <p className="text-sm text-muted-foreground">
-            {t("planner.map.webglNotSupported", "La carte interactive n'est pas disponible dans cet environnement. Votre navigateur ne supporte pas WebGL.")}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   // 2. Camera management: tab-switch zoom, user location focus, panel offsets, animation
   const { suppressNextStaysAutoZoomRef } = useMapCamera({
     map,
@@ -123,6 +109,20 @@ const PlannerMap = ({
     mapLoaded,
     userLocation,
   });
+
+  // Fallback when WebGL is not available (after all hooks)
+  if (!webglSupported) {
+    return (
+      <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-muted/30">
+        <div className="text-center space-y-3 p-6 max-w-sm">
+          <MapPin className="h-12 w-12 text-muted-foreground mx-auto" />
+          <p className="text-sm text-muted-foreground">
+            {t("planner.map.webglNotSupported", "La carte interactive n'est pas disponible dans cet environnement. Votre navigateur ne supporte pas WebGL.")}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="absolute inset-0 w-full h-full relative" data-tour="map-area">
