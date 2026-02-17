@@ -25,11 +25,14 @@ export function useAutoDetectDeparture() {
     // Only run once per component lifecycle
     if (hasRunRef.current) return;
     
-    // Don't override if user already has a departure set (especially if user-provided)
-    if (memory.departure?.iata || memory.departure?.city || (memory.departure as Record<string, unknown>)?.userProvided) {
-      console.log('[useAutoDetectDeparture] Departure already set, skipping auto-detection');
+    // Don't override if user already has a valid departure set
+    const dep = memory.departure;
+    const hasValidDeparture = dep && typeof dep.iata === 'string' && dep.iata.trim() !== '' && typeof dep.city === 'string' && dep.city.trim() !== '';
+    if (hasValidDeparture || (dep as Record<string, unknown>)?.userProvided) {
+      console.log('[useAutoDetectDeparture] Departure already set (iata=%s, city=%s), skipping', dep?.iata, dep?.city);
       return;
     }
+    console.log('[useAutoDetectDeparture] No valid departure found, launching auto-detection...');
 
     // Check cache first
     try {
