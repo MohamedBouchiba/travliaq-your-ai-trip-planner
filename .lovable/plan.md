@@ -1,61 +1,51 @@
 
-## Corrections : Autocomplete, Géolocalisation et Redesign TripPriceBar
+## Fix : Widget preferenceStyle non affiché quand l'utilisateur demande "Inspire-moi"
 
-### Bug 1 : Autocomplétion cassée (CRITIQUE)
+### Diagnostic
 
-**Cause racine identifiée** : L'edge function `location-autocomplete` importe `cleanupRateLimitMap` depuis `rateLimit.ts`, mais cette fonction n'existe pas (elle s'appelle `cleanupRateLimits`). De plus, `checkRateLimit` est appelée avec 2 arguments mais la signature en requiert 3 (le `functionName` est obligatoire).
+Le backend classe correctement l'intention comme `gather_preferences` avec `widgetToShow: preferenceStyle` (confirmé dans les logs). Le widget est bien renvoyé au frontend et traité. **Le vrai probleme** est que le LLM de l'etape 2 (ReAct) ne sait pas qu'un widget a ete selectionne en etape 1. Il genere donc un texte long avec des listes d'options ("Plage et detente, Culture et musees...") qui duplique le role du widget.
 
-Cela provoque un **BootFailure** systématique -- aucune requête d'autocomplétion ne peut aboutir.
+Le prompt systeme dit "Quand widgetToShow est defini, ton texte doit etre TRES COURT", mais le LLM du ReAct n'a aucun moyen de savoir que `widgetToShow` a ete defini car cette info n'est pas injectee dans ses messages.
 
-**Correction** dans `supabase/functions/location-autocomplete/index.ts` :
-- Renommer l'import `cleanupRateLimitMap` en `cleanupRateLimits`
-- Ajouter le paramètre `"location-autocomplete"` à l'appel `checkRateLimit`
-- Adapter l'appel `cleanupRateLimits()` (qui est maintenant async)
+### Correction
 
----
+**Fichier : `supabase/functions/planner-chat/index.ts`**
 
-### Bug 2 : Géolocalisation / Auto-detect departure
+Apres l'etape 1 (classification) et avant l'etape 2 (ReAct loop), injecter un message systeme dans `conversationMessages` informant le LLM du widget selectionne. Cela lui permettra de :
+- Generer un texte court (1-2 phrases)
+- Ne pas lister d'options en texte
+- Ne pas dupliquer le contenu du widget
 
-L'edge function `reverse-geocode` fonctionne correctement (confirmé par les logs). Le hook `useAutoDetectDeparture` est bien monté dans `TravelPlanner.tsx`.
+```text
+// Injection entre Step 1 et Step 2 (avant la construction de rawMessages)
+Si collectedData.intentClassification?.widgetToShow?.type existe :
+  Ajouter un message systeme dans conversationMessages :
+  "[WIDGET ACTIF] Le widget '{widgetType}' sera affiche apres ce message.
+   REGLE : Ton texte doit etre TRES COURT (1-2 phrases max).
+   NE FAIS PAS de liste a puces. Le widget affiche deja les options.
+   Exemples : 'On va d'abord cerner ton style de voyage :' ou 'Selectionne ce qui te tente le plus :'"
+```
 
-**Hypothèse** : Le store `flightMemory` persiste via `zustand/persist` dans localStorage. Si `memory.departure` contient un objet vide ou partiel (sans `iata` ni `city`) d'une session précédente, le hook saute la détection car la condition vérifie `memory.departure?.iata || memory.departure?.city`.
+Concretement, entre les lignes ~1000 et ~1005, apres le filtrage des outils et avant la boucle ReAct :
 
-**Correction** dans `src/hooks/useAutoDetectDeparture.ts` :
-- Renforcer la condition de skip : vérifier que `departure` a une valeur réellement exploitable (iata ET city non vides), pas juste un objet truthy
-- Ajouter un log explicite quand la détection est lancée vs skippée
+1. Verifier si `collectedData.intentClassification?.widgetToShow?.type` est defini
+2. Si oui, ajouter un message systeme a la fin de `rawMessages` (juste avant le dernier message utilisateur) avec le contexte du widget
+3. Cela garantit que le LLM sait quel widget sera montre et adapte sa reponse
 
----
+### Test de non-regression
 
-### Redesign TripPriceBar : Progression de planification
+**Fichier : `src/__tests__/bug-fixes.test.ts`**
 
-Refonte complète du stepper pour un design plus premium et user-friendly :
+Ajouter un test verifiant que lorsque le backend retourne `widgetToShow: preferenceStyle`, le message de l'assistant ne contient PAS de liste a puces ni d'enumeration d'options.
 
-- Remplacer les cercles numérotés "1, 2, 3" par les **icones** de chaque étape (Plane, Hotel, Compass)
-- Ajouter un style "pill" compact avec le label toujours visible (pas seulement sur desktop)
-- Ligne de connexion plus élégante entre les étapes (pointillée quand en attente, solide quand complétée)
-- Réduire le padding vertical (`py-1` au lieu de `py-1.5`) pour une barre plus fine
-- Le prix et le bouton restent alignés à droite
-- Couleurs : gris subtil pour les étapes en attente, primary/accent pour l'étape en cours, vert pour les étapes complétées
-
----
-
-### Tests de non-régression
-
-Ajouter des tests dans un fichier dédié pour :
-1. **Autocomplétion** : vérifier que le hook `useLocationAutocomplete` appelle bien l'edge function et retourne des résultats formatés
-2. **Auto-detect departure** : vérifier que le hook ne skip pas quand departure est vide, et skip bien quand departure est définie
-3. **TripPriceBar** : vérifier le calcul des étapes complétées et du pourcentage de progression
-
----
-
-### Fichiers modifiés
+### Fichiers modifies
 
 | Fichier | Action |
 |---|---|
-| `supabase/functions/location-autocomplete/index.ts` | Fix import `cleanupRateLimits` + ajouter `functionName` à `checkRateLimit` |
-| `src/hooks/useAutoDetectDeparture.ts` | Renforcer la condition de skip pour departure vide/partielle |
-| `src/components/planner/TripPriceBar.tsx` | Redesign stepper avec icones, pills, ligne élégante, barre plus fine |
-| `src/__tests__/bug-fixes.test.ts` | Tests de non-régression pour autocomplete, auto-detect, et TripPriceBar |
+| `supabase/functions/planner-chat/index.ts` | Injecter le contexte widget dans les messages ReAct |
+| `src/__tests__/bug-fixes.test.ts` | Test de non-regression pour le texte court avec widget |
 
-### Redéploiement
-- Déployer `location-autocomplete` après le fix
+### Impact attendu
+
+- Quand l'utilisateur dit "Inspire-moi", le LLM genere un texte court comme "On va d'abord cerner ton style de voyage pour te faire les meilleures recommandations :" et le widget `preferenceStyle` s'affiche en dessous
+- Plus de liste "Plage et detente / Culture et musees / Aventure" dans le texte
