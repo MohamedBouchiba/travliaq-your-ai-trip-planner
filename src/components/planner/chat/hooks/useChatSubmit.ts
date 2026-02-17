@@ -391,6 +391,19 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
 
       if (destinationSuggestionRequest) {
         if (import.meta.env.DEV) console.log("[useChatSubmit] LLM destination suggestions requested");
+        // Bug 1 fix: Clean LLM hallucinated destination lists from streamed content
+        // Remove numbered lists (1. **Barcelone** ...), widget tags, and blocked widget re-solicitation
+        const rawContent = content || "";
+        const cleanedContent = rawContent
+          .replace(/\d+\.\s*\*\*[^*]+\*\*[^\n]*/g, "") // numbered bold lists
+          .replace(/<widget\s+\w+\s*\/>/g, "")           // raw <widget> tags
+          .replace(/Sélectionne[z]?\s+(ci-dessous|vos centres|les activités)[^\n]*/gi, "") // blocked widget prompts
+          .replace(/Autre chose à mentionner[^\n]*/gi, "") // follow-up prompts
+          .replace(/\n{3,}/g, "\n\n")                     // collapse extra newlines
+          .trim();
+        if (cleanedContent !== rawContent.trim()) {
+          opts.setMessages(updateMessageById(messageId, { text: cleanedContent || rawContent.trim() }));
+        }
         // B6: Pass fresh departure city to avoid stale departureCityRef (not yet updated by React re-render)
         const freshDeparture = freshMemory?.departure?.city;
         await opts.handleLLMDestinationRequest(messageId, destinationSuggestionRequest.requestedCount, freshDeparture);

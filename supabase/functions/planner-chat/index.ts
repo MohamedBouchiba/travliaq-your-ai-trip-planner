@@ -577,8 +577,13 @@ CONTEXTE PRÉFÉRENCES ACTUELLES:
 - Intérêts: ${interestsStr}
 - Style: ${styleStr}
 
-[WIDGETS DÉJÀ CONFIRMÉS] ${blockedStr}
-RÈGLE: Ne JAMAIS suggérer un widget qui est dans la liste ci-dessus. Ces widgets ont déjà été complétés par l'utilisateur.
+[WIDGETS DÉJÀ CONFIRMÉS/BLOQUÉS] ${blockedStr}
+RÈGLE CRITIQUE : Ne JAMAIS suggérer un widget qui est dans la liste ci-dessus. Ces widgets ont déjà été complétés par l'utilisateur.
+Si un widget est dans cette liste, tu ne dois JAMAIS :
+- Mentionner ce widget ou son contenu dans ton texte
+- Demander à l'utilisateur de remplir ce qui correspond à ce widget
+- Générer du contenu qui duplique la fonction de ce widget (ex: "Sélectionnez vos centres d'intérêt" si preferenceInterests est bloqué)
+- Inclure des tags comme <widget ...> dans ton texte
 
 RÈGLE CRITIQUE: Si l'utilisateur hésite / ne sait pas et que le style est NON DÉFINI, 
 primaryIntent = "gather_preferences", widgetType = "preferenceStyle".
@@ -673,6 +678,13 @@ Après avoir collecté les préférences, pose la question :
 Attends la réponse AVANT d'appeler l'outil.
 Si l'utilisateur dit "non", "pas pour l'instant", ou mentionne directement une destination, ne propose PAS de suggestions.
 
+## RÈGLE CRITIQUE : QUAND TU APPELLES request_destination_suggestions
+- Ne liste AUCUNE destination dans ton texte (pas de liste numérotée, pas de noms de villes/pays)
+- Ton texte doit être UNIQUEMENT un court message d'accompagnement (ex: "Voici mes suggestions personnalisées pour toi ! ✨")
+- L'outil affiche automatiquement les cartes de destinations côté client, tu ne dois PAS les dupliquer
+- INTERDIT : lister des villes/pays/destinations dans le texte quand l'outil est appelé
+- INTERDIT : ajouter des descriptions de destinations dans le texte
+
 ## STYLE
 - Chaleureux et bienveillant
 - Emojis avec modération (1-2 max)
@@ -695,6 +707,8 @@ Exemples INTERDITS (NE FAIS JAMAIS ÇA) :
 - "Indique ce qui t'attire : 🏖️ Plage, 🏛️ Culture, 🌲 Aventure, 🛍️ Shopping" ← INTERDIT : c'est une liste qui duplique le widget
 - "Voici les options : - Option A - Option B - Option C" ← INTERDIT : le widget montre déjà les options
 - Tout texte contenant des tirets (-), puces (•) ou emojis listant des catégories quand un widget est visible ← INTERDIT
+- "<widget preferenceInterests />" ou tout tag <widget ...> dans le texte ← INTERDIT : ce sont des directives internes, pas du texte
+- "Sélectionnez vos centres d'intérêt" quand preferenceInterests est dans [WIDGETS BLOQUÉS] ← INTERDIT
 
 ## INFOS TECHNIQUES
 - Date actuelle : ${currentDate}
@@ -1181,7 +1195,8 @@ serve(async (req) => {
     // Normalize extracted years (safety net against LLM hallucinating past years)
     normalizeExtractedYears(collectedData, currentDate);
 
-    // Strip <action> tags from content (LLM sometimes generates these instead of using tools)
+    // Strip <action> and <widget> tags from content (LLM sometimes generates these instead of using tools)
+    finalContent = finalContent.replace(/<widget\s+\w+\s*\/>/g, "").trim();
     finalContent = finalContent.replace(/<action>[\s\S]*?<\/action>/g, "").trim();
 
     // Handle streaming for collected data
