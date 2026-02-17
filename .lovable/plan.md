@@ -1,43 +1,113 @@
 
+## Fix des incohérences du chat planner
 
-## Migration Azure OpenAI -> OpenAI direct
+### Problèmes identifiés (3 bugs distincts)
 
-### 1. Ajouter les secrets manquants
+**Bug 1 : Double suggestion de destinations**
+Quand l'utilisateur dit "oui" pour les suggestions, le LLM fait deux choses contradictoires :
+- Il génère dans son texte une liste hardcodée (Barcelone, Lisbonne, Athènes)
+- Il appelle `request_destination_suggestions` qui déclenche l'API réelle (Egypte, Cambodge, RD)
 
-- `OPENAI_API_KEY` : demander la valeur via l'outil add_secret
-- `OPENAI_MODEL` : valeur `gpt-4o-mini`
+L'utilisateur voit les deux, ce qui est confus et incohérent.
 
-Note : le secret `OPENAI_API_KEY` existe deja dans Supabase (visible dans la config). Il faut verifier s'il contient la bonne valeur ou le mettre a jour. Le secret `OPENAI_MODEL` existe aussi -- il faut le mettre a jour avec `gpt-4o-mini`.
+**Bug 2 : Le LLM réaffiche `preferenceInterests` après les suggestions**
+Après avoir appelé `request_destination_suggestions`, le LLM génère dans sa réponse finale un texte contenant "Sélectionnez vos centres d'intérêt" et "Autre chose à mentionner ?", relançant le flux de préférences alors que les suggestions sont déjà affichées. La protection `blockedWidgets` fonctionne côté classification d'intention, mais pas sur le texte libre du LLM dans la boucle de contenu final.
 
-### 2. Nettoyer les references Azure restantes
+**Bug 3 : Le texte du LLM contient des tags `<widget>` bruts**
+La première réponse contient `<widget preferenceInterests />` dans le texte brut, qui ne sont pas des directives valides mais du texte généré par le LLM.
 
-**Fichier `supabase/functions/planner-chat/index.ts`** :
-- Renommer les variables `azureStartTime`, `azureLatency` en `llmStartTime`, `llmLatency`
-- Remplacer les appels `log.azureCall(...)` par des appels equivalents `log.info("openai", ...)` ou garder `azureCall` tel quel (c'est un nom de methode du logger, pas une reference fonctionnelle)
-- Mettre a jour les commentaires mentionnant "Azure"
+---
 
-**Fichier `supabase/functions/planner-chat/utils/fetchWithRetry.ts`** :
-- Changer le label par defaut de `"azure_openai"` a `"openai"`
+### Corrections prévues
 
-**Fichier `supabase/functions/_shared/logger.ts`** :
-- Renommer le type `LogCategory` : remplacer `"azure_openai"` par `"openai"` (et mettre a jour tous les usages)
-- Renommer la methode `azureCall` en `llmCall` (et mettre a jour tous les appels dans index.ts)
+#### 1. System prompt : interdire les listes de destinations dans le texte (Bug 1)
 
-**Fichier `supabase/functions/destination-fact/index.ts`** :
-- Migrer aussi vers OpenAI direct (meme pattern : `OPENAI_API_KEY` + `OPENAI_MODEL` + endpoint `https://api.openai.com/v1/chat/completions`)
-- Supprimer les references aux variables Azure (`AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`, etc.)
+**Fichier : `supabase/functions/planner-chat/index.ts`** (dans `buildSystemPrompt`)
 
-### 3. Redeployer
+Ajouter une règle explicite :
+```
+RÈGLE : QUAND TU APPELLES request_destination_suggestions
+- Ne liste AUCUNE destination dans ton texte
+- Ton texte doit être un court message d'accompagnement (ex: "Voici mes suggestions personnalisées pour toi !")
+- L'outil affiche automatiquement les cartes de destinations, tu ne dois PAS les dupliquer
+- INTERDIT : lister des villes/pays dans le texte quand l'outil est appelé
+```
 
-- Deployer `planner-chat` et `destination-fact`
-- Tester avec "Inspire-moi !" dans le chat
+#### 2. System prompt : interdire la re-sollicitation de widgets bloqués (Bug 2)
 
-### Fichiers modifies
+**Fichier : `supabase/functions/planner-chat/index.ts`** (dans `buildSystemPrompt`)
+
+Renforcer la règle sur les widgets bloqués :
+```
+RÈGLE CRITIQUE : WIDGETS BLOQUÉS
+Si un widget apparaît dans [WIDGETS BLOQUÉS], tu ne dois JAMAIS :
+- Mentionner ce widget dans ton texte
+- Demander à l'utilisateur de remplir ce qui correspond à ce widget
+- Générer du contenu qui duplique la fonction de ce widget
+```
+
+#### 3. Nettoyage du contenu côté client quand `destinationSuggestionRequest` (Bug 1+2)
+
+**Fichier : `src/components/planner/chat/hooks/useChatDestinationFlow.ts`**
+
+Dans `handleLLMDestinationRequest`, lors de la mise à jour du message (ligne 258-274), remplacer aussi le texte du message par un court texte d'accompagnement pour éliminer le contenu LLM incohérent :
+
+```typescript
+setMessages((prev) =>
+  prev.map((m) =>
+    m.id === messageId
+      ? {
+          ...m,
+          text: m.text, // Keep LLM text as-is (will be cleaned below)
+          isTyping: false,
+          isStreaming: false,
+          widget: "destinationSuggestions",
+          widgetData: { suggestions, basedOnProfile },
+        }
+      : m
+  )
+);
+```
+
+Ajouter un nettoyage du texte : supprimer les listes numérotées de destinations et les mentions de widgets bloqués du contenu textuel avant de l'afficher.
+
+#### 4. Strip des tags `<widget>` du contenu LLM (Bug 3)
+
+**Fichier : `supabase/functions/planner-chat/index.ts`** (ligne ~1185)
+
+Le code strip déjà les tags `<action>`. Ajouter un strip pour les tags `<widget>` :
+```typescript
+finalContent = finalContent.replace(/<widget\s+\w+\s*\/>/g, "").trim();
+finalContent = finalContent.replace(/<action>[\s\S]*?<\/action>/g, "").trim();
+```
+
+#### 5. Nettoyage côté client du texte quand destinationSuggestions (fallback)
+
+**Fichier : `src/components/planner/chat/hooks/useChatSubmit.ts`**
+
+Avant le early-return à la ligne 398, nettoyer le contenu du message pour retirer les listes de destinations halllucinées :
+```typescript
+if (destinationSuggestionRequest) {
+  // Clean LLM hallucinated destination lists from streamed content
+  const cleanedContent = (content || "").replace(/\d+\.\s*\*\*[^*]+\*\*[^\n]*/g, "").trim();
+  if (cleanedContent && cleanedContent !== content) {
+    opts.setMessages(updateMessageById(messageId, { text: cleanedContent }));
+  }
+  await opts.handleLLMDestinationRequest(messageId, ...);
+  return;
+}
+```
+
+---
+
+### Fichiers modifiés
 
 | Fichier | Action |
 |---|---|
-| `supabase/functions/planner-chat/index.ts` | Renommer variables Azure, mettre a jour commentaires |
-| `supabase/functions/planner-chat/utils/fetchWithRetry.ts` | Label par defaut `"openai"` |
-| `supabase/functions/_shared/logger.ts` | Renommer `azure_openai` -> `openai`, `azureCall` -> `llmCall` |
-| `supabase/functions/destination-fact/index.ts` | Migrer vers OpenAI direct |
+| `supabase/functions/planner-chat/index.ts` | Ajouter règles system prompt + strip `<widget>` tags |
+| `src/components/planner/chat/hooks/useChatSubmit.ts` | Nettoyer le texte streamé avant early-return destination suggestions |
+| `src/components/planner/chat/hooks/useChatDestinationFlow.ts` | Nettoyage optionnel du texte dans handleLLMDestinationRequest |
 
+### Redéploiement
+- Déployer `planner-chat`
+- Tester avec le flux "Inspire-moi !" complet
