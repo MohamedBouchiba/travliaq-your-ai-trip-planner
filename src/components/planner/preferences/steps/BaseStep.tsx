@@ -145,6 +145,7 @@ export const BaseStep = memo(function BaseStep({ onNextStep }: BaseStepProps) {
         ...preset.styleAxes,
       },
       interests: preset.interests,
+      styleAxesUserConfirmed: true,
       tripContext: {
         ...preferences.tripContext,
         occasion: preset.occasion,

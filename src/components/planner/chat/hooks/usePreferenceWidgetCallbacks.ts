@@ -47,6 +47,8 @@ interface UsePreferenceWidgetCallbacksOptions {
   widgetCooldown?: UseWidgetCooldownReturn;
   /** Departure city from flight memory - used to check if we need to ask before fetching destinations */
   departureCityName?: string | null;
+  /** Update preferences in the store (used to set styleAxesUserConfirmed) */
+  updatePreferences?: (patch: Record<string, unknown>, emit?: boolean) => void;
 }
 
 interface PreferenceWidgetCallbacks {
@@ -65,6 +67,7 @@ export function usePreferenceWidgetCallbacks({
   handleFetchDestinations,
   widgetCooldown,
   departureCityName,
+  updatePreferences,
 }: UsePreferenceWidgetCallbacksOptions): PreferenceWidgetCallbacks {
   const { t } = useTranslation();
 
@@ -102,6 +105,9 @@ export function usePreferenceWidgetCallbacks({
       // CRITICAL: Record widget confirmation to prevent re-triggering
       widgetCooldown?.recordWidgetConfirmed("preferenceStyle");
       
+      // Mark style axes as explicitly confirmed by the user
+      updatePreferences?.({ styleAxesUserConfirmed: true }, false);
+
       // Track style configuration
       const styleAxes = prefMemory.preferences.styleAxes;
       widgetTracking.trackStyleConfig({ ...styleAxes });
@@ -149,7 +155,7 @@ export function usePreferenceWidgetCallbacks({
       console.error("[PreferenceCallbacks] onStyleContinue error:", error);
       toast.error(t("common.error"));
     }
-  }, [prefMemory.preferences.styleAxes, widgetTracking, setInspireFlowStep, setMessages, t, widgetCooldown]);
+  }, [prefMemory.preferences.styleAxes, widgetTracking, setInspireFlowStep, setMessages, t, widgetCooldown, updatePreferences]);
 
   /**
    * Called when user completes interests widget

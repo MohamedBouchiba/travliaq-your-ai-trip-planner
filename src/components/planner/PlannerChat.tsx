@@ -451,6 +451,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     handleFetchDestinations,
     widgetCooldown, // Pass cooldown system
     departureCityName: departureCity, // Pass departure city for pre-destination check
+    updatePreferences, // Pass updatePreferences for styleAxesUserConfirmed flag
   });
 
   // Reopen a confirmed widget so the user can modify their selection

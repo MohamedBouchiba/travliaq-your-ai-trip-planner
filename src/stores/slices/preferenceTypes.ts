@@ -61,6 +61,9 @@ export interface TripPreferences {
   dietaryRestrictions: string[];
   accessibilityNeeds: string[];
 
+  // === USER CONFIRMATION FLAGS ===
+  styleAxesUserConfirmed: boolean; // true when user explicitly confirmed style widget or chose a preset
+
   // === METADATA ===
   confidenceScore: number; // 0-100 - profile completion
   lastUpdated: Date;
@@ -151,6 +154,8 @@ export const DEFAULT_PREFERENCES: TripPreferences = {
   comfortLevel: 50,
   dietaryRestrictions: [],
   accessibilityNeeds: [],
+  // User confirmation flags
+  styleAxesUserConfirmed: false,
   // Metadata
   confidenceScore: 0,
   lastUpdated: new Date(),

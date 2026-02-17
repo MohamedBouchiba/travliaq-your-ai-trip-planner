@@ -239,3 +239,98 @@ describe("Bug C — welcome re-translation on i18n.language change", () => {
     expect(code).toContain("prevLangRef");
   });
 });
+
+// ─── Style skipped bug: styleAxesUserConfirmed ────────────────────────
+
+describe("Style skipped bug — styleAxesUserConfirmed", () => {
+  it("DEFAULT_PREFERENCES has styleAxesUserConfirmed=false", async () => {
+    const { DEFAULT_PREFERENCES } = await import(
+      "@/stores/slices/preferenceTypes"
+    );
+    expect(DEFAULT_PREFERENCES.styleAxesUserConfirmed).toBe(false);
+  });
+
+  it("buildLLMContext returns styleAxesConfigured=false when user hasn't confirmed", async () => {
+    const { buildLLMContext } = await import(
+      "@/components/planner/chat/hooks/buildLLMContext"
+    );
+    const sources = buildMockSources({ styleAxesUserConfirmed: false });
+    const ctx = buildLLMContext(sources);
+    const state = ctx.preferencesState as { styleAxesConfigured: boolean };
+    expect(state.styleAxesConfigured).toBe(false);
+  });
+
+  it("buildLLMContext returns styleAxesConfigured=true after user confirms", async () => {
+    const { buildLLMContext } = await import(
+      "@/components/planner/chat/hooks/buildLLMContext"
+    );
+    const sources = buildMockSources({ styleAxesUserConfirmed: true });
+    const ctx = buildLLMContext(sources);
+    const state = ctx.preferencesState as { styleAxesConfigured: boolean };
+    expect(state.styleAxesConfigured).toBe(true);
+  });
+
+  it("BaseStep.tsx sets styleAxesUserConfirmed=true in handleApplyPreset", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const code = fs.readFileSync(
+      path.resolve("src/components/planner/preferences/steps/BaseStep.tsx"),
+      "utf-8"
+    );
+    expect(code).toContain("styleAxesUserConfirmed: true");
+  });
+
+  it("usePreferenceWidgetCallbacks sets styleAxesUserConfirmed on style continue", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const code = fs.readFileSync(
+      path.resolve("src/components/planner/chat/hooks/usePreferenceWidgetCallbacks.ts"),
+      "utf-8"
+    );
+    expect(code).toContain("styleAxesUserConfirmed: true");
+  });
+
+  it("buildLLMContext source uses styleAxesUserConfirmed instead of axes existence check", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const code = fs.readFileSync(
+      path.resolve("src/components/planner/chat/hooks/buildLLMContext.ts"),
+      "utf-8"
+    );
+    expect(code).toContain("styleAxesUserConfirmed");
+    // Must NOT contain the old broken logic
+    expect(code).not.toContain("if (!axes) return false");
+  });
+});
+
+// ─── Helper for buildLLMContext tests ─────────────────────────────────
+
+function buildMockSources(prefOverrides: Record<string, unknown> = {}) {
+  return {
+    messages: [],
+    getActivityMemory: () => null,
+    getPreferenceMemory: () => ({
+      travelStyle: "couple",
+      pace: "moderate",
+      comfortLabel: "Confort",
+      interests: [],
+      styleAxes: { chillVsIntense: 50, cityVsNature: 50, ecoVsLuxury: 50, touristVsLocal: 50 },
+      ...prefOverrides,
+    }),
+    mapContext: { buildContextString: () => "" },
+    widgetTracking: {
+      getActiveWidgetsContext: () => "",
+      getContextForLLM: () => "",
+    },
+    widgetActionExecutor: { getPendingWidgets: () => [] },
+    getMemorySummary: () => "",
+    missingFields: undefined,
+    sessionContext: {
+      buildConversationSummary: () => "",
+      sessionEntities: {},
+      widgetDecisions: [],
+    },
+    getBasketSummary: () => "",
+    widgetCooldown: { getBlockedWidgets: () => [] },
+  };
+}
