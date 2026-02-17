@@ -30,7 +30,7 @@ const CAPTURED_EVENTS: (keyof PlannerEvents)[] = [
 
 export function useDebugEventBusCapture() {
   useEffect(() => {
-    if (!import.meta.env.DEV) return;
+    // Bug 9 fix: Remove DEV-only guard so debug reports capture events in preview/prod too
 
     const handlers = new Map<string, (data: unknown) => void>();
 

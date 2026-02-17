@@ -2,10 +2,11 @@
  * Date widget handlers - handleDateSelect, handleDateRangeSelect
  */
 
-import { format, addDays } from "date-fns";
+import { format, addDays, isSameDay } from "date-fns";
 import type { ChatMessage } from "../../types";
 import type { HandlerDeps } from "./types";
 import { parseDurationToDays } from "./helpers";
+import { useDebugStore } from "@/stores/debugStore";
 
 /**
  * Handle single date selection
@@ -17,6 +18,16 @@ export function handleDateSelect(
   date: Date
 ) {
   const { memory, updateMemory, setMessages, tracking, t, dateFnsLocale, refs } = deps;
+
+  // Bug 9: Track user interaction
+  useDebugStore.getState().addUserInteraction({
+    timestamp: Date.now(),
+    category: "widget",
+    action: "confirmed",
+    widgetType: "datePicker",
+    detail: `${dateType}: ${format(date, "yyyy-MM-dd")}`,
+  });
+
   let nextMem = { ...memory, passengers: { ...memory.passengers } };
 
   if (dateType === "departure") {
@@ -98,7 +109,22 @@ export function handleDateRangeSelect(
   departure: Date,
   returnDate: Date
 ) {
+  // Bug 6 fix: Prevent same-day departure and return
+  if (isSameDay(departure, returnDate)) {
+    console.warn("[handleDateRangeSelect] Same day departure and return, ignoring");
+    return;
+  }
+
   const { updateMemory, setMessages, tracking, t, dateFnsLocale, refs } = deps;
+
+  // Bug 9: Track user interaction
+  useDebugStore.getState().addUserInteraction({
+    timestamp: Date.now(),
+    category: "widget",
+    action: "confirmed",
+    widgetType: "dateRangePicker",
+    detail: `${format(departure, "yyyy-MM-dd")} → ${format(returnDate, "yyyy-MM-dd")}`,
+  });
 
   updateMemory({ departureDate: departure, returnDate: returnDate });
   refs.pendingTripDuration.current = null;

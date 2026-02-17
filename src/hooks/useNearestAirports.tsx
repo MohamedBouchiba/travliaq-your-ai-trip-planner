@@ -71,7 +71,7 @@ export async function findNearestAirports(
   limit: number = 3,
   countryCode?: string,
   coords?: { lat: number; lon: number },
-  preferredRegion?: string,
+  preferredRegion: string = "europe", // Bug D fix: default to "europe" to prioritize European results
 ): Promise<NearestAirportsResponse | null> {
   // Guard: don't call API with country names (unless we have coords fallback)
   if (!coords && isCountryName(city)) {
