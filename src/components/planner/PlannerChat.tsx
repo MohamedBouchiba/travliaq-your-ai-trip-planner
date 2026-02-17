@@ -427,6 +427,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     updateMemory: updateMemory as (partial: Record<string, unknown>) => void,
     setMessages,
     widgetTracking,
+    geoRegions: sessionContext.sessionEntities.geoRegions,
   });
 
   const {

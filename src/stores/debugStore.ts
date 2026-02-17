@@ -59,6 +59,7 @@ export interface SessionEntities {
   dates?: string[];
   budgets?: string[];
   constraints?: string[];
+  geoRegions?: string[];
 }
 
 export interface MemoryContext {

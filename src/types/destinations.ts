@@ -68,6 +68,7 @@ export interface DestinationSuggestRequest {
   budgetLevel?: BudgetLevel;
   travelMonth?: number;  // 1-12
   tripDuration?: string; // e.g. "weekend", "week", "2_weeks"
+  preferredRegion?: string; // e.g. "Méditerranée", "Europe", "Asie"
 }
 
 // ===== Response Types =====

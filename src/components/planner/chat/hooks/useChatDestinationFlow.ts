@@ -29,6 +29,8 @@ interface UseChatDestinationFlowOptions {
   widgetTracking: {
     trackDestinationSelect: (countryName: string, countryCode: string) => void;
   };
+  /** Geographic regions extracted from user messages (e.g. ["Méditerranée", "Europe"]) */
+  geoRegions?: string[];
 }
 
 export interface UseChatDestinationFlowReturn {
@@ -58,6 +60,7 @@ export function useChatDestinationFlow({
   updateMemory,
   setMessages,
   widgetTracking,
+  geoRegions,
 }: UseChatDestinationFlowOptions): UseChatDestinationFlowReturn {
   const { t } = useTranslation();
 
@@ -84,9 +87,10 @@ export function useChatDestinationFlow({
       departure: { city: departureCityRef.current, country: departureCountryRef.current },
       departureDateMs,
       tripDuration,
+      preferredRegion: geoRegions?.[0],
     });
     return getDestinationSuggestions(payload, { limit });
-  }, [getPreferences, departureDateMs, tripDuration]);
+  }, [getPreferences, departureDateMs, tripDuration, geoRegions]);
 
   // Preference-flow destination fetch (after style/interests widgets)
   const handleFetchDestinations = useCallback(async (loadingMessageId: string) => {
