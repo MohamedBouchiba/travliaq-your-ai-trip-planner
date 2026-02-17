@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { checkRateLimit, getClientIp, cleanupRateLimitMap, rateLimitResponse } from "../_shared/rateLimit.ts";
+import { checkRateLimit, getClientIp, cleanupRateLimits, rateLimitResponse } from "../_shared/rateLimit.ts";
 
 const API_BASE_URL = "https://travliaq-api-production.up.railway.app";
 const MAX_REQUESTS_PER_HOUR = 60; // Autocomplete - high for UX, typing triggers many calls
@@ -17,14 +17,15 @@ Deno.serve(async (req) => {
   try {
     // Rate limiting
     const clientIp = getClientIp(req);
-    if (!checkRateLimit(clientIp, MAX_REQUESTS_PER_HOUR)) {
+    const allowed = await checkRateLimit(clientIp, MAX_REQUESTS_PER_HOUR, "location-autocomplete");
+    if (!allowed) {
       console.warn(`[location-autocomplete] Rate limit exceeded for IP: ${clientIp}`);
       return rateLimitResponse(corsHeaders);
     }
     
     // Periodic cleanup (1% of requests)
     if (Math.random() < 0.01) {
-      cleanupRateLimitMap();
+      await cleanupRateLimits();
     }
     let q = "";
     let limit = "10";

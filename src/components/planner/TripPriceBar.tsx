@@ -70,57 +70,57 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
     };
   }, [basketItems, flexibleTripType]);
 
-  // Only show steps that are required for this trip type
   const visibleSteps = STEP_CONFIG.filter((s) => requiredSteps.includes(s.key));
-
-  // Progress percentage
   const doneCount = visibleSteps.filter((s) => completedSteps.includes(s.key)).length;
   const progressPercent = visibleSteps.length > 0 ? Math.round((doneCount / visibleSteps.length) * 100) : 0;
 
   return (
     <div className="absolute bottom-0 left-0 right-0 z-20 bg-card/90 backdrop-blur-xl border-t border-border/30">
-      {/* Progress bar */}
-      <div className="h-0.5 w-full bg-muted/30">
+      {/* Thin progress bar */}
+      <div className="h-[2px] w-full bg-muted/20">
         <div
           className={cn(
-            "h-full transition-all duration-500 ease-out",
-            isComplete ? "bg-green-500" : "bg-primary"
+            "h-full transition-all duration-700 ease-out",
+            isComplete ? "bg-green-500" : "bg-primary/70"
           )}
           style={{ width: `${progressPercent}%` }}
         />
       </div>
 
-      <div className="flex items-center justify-between px-3 py-1.5 gap-2">
-        {/* Step progression */}
-        <div className="flex items-center gap-0.5">
+      <div className="flex items-center justify-between px-3 py-1 gap-2">
+        {/* Step pills */}
+        <div className="flex items-center gap-0">
           {visibleSteps.map(({ key, icon: Icon, label }, idx) => {
             const done = completedSteps.includes(key);
+            const prevDone = idx > 0 && completedSteps.includes(visibleSteps[idx - 1].key);
             return (
               <div key={key} className="flex items-center">
                 {idx > 0 && (
                   <div className={cn(
-                    'w-4 h-px transition-colors duration-300',
-                    completedSteps.includes(visibleSteps[idx - 1].key) && done
-                      ? 'bg-green-500/60'
-                      : completedSteps.includes(visibleSteps[idx - 1].key)
-                        ? 'bg-primary/40'
-                        : 'bg-border/40'
+                    'w-3 h-[1px] transition-all duration-500',
+                    prevDone && done
+                      ? 'bg-green-500/50'
+                      : prevDone
+                        ? 'bg-primary/30'
+                        : 'border-t border-dashed border-border/40 bg-transparent'
                   )} />
                 )}
                 <div className={cn(
-                  "flex items-center gap-1 px-1.5 py-0.5 rounded-md transition-all duration-300",
-                  done && "bg-green-500/10"
+                  "flex items-center gap-1 px-1.5 py-0.5 rounded-full transition-all duration-300",
+                  done
+                    ? "bg-green-500/10"
+                    : "bg-muted/30"
                 )}>
                   <div className={cn(
-                    'flex items-center justify-center h-4 w-4 rounded-full transition-all duration-300 text-[10px] font-bold',
+                    'flex items-center justify-center h-3.5 w-3.5 rounded-full transition-all duration-300',
                     done
-                      ? 'bg-green-500/20 text-green-600 dark:text-green-400'
-                      : 'bg-muted/50 text-muted-foreground/40'
+                      ? 'text-green-600 dark:text-green-400'
+                      : 'text-muted-foreground/40'
                   )}>
-                    {done ? <Check className="h-2.5 w-2.5" /> : <span>{idx + 1}</span>}
+                    {done ? <Check className="h-2.5 w-2.5" /> : <Icon className="h-2.5 w-2.5" />}
                   </div>
                   <span className={cn(
-                    'text-[10px] font-medium hidden sm:inline transition-colors duration-300',
+                    'text-[9px] font-medium leading-none transition-colors duration-300',
                     done ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground/50'
                   )}>
                     {label}
@@ -132,11 +132,11 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
         </div>
 
         {/* Price */}
-        <div className="flex items-baseline gap-1 min-w-0">
-          <span className="text-sm font-bold text-foreground tabular-nums">
+        <div className="flex items-baseline gap-0.5 min-w-0">
+          <span className="text-xs font-bold text-foreground tabular-nums">
             {formattedPrice}
           </span>
-          <span className="text-[10px] font-medium text-muted-foreground">
+          <span className="text-[9px] font-medium text-muted-foreground">
             {symbol}
           </span>
         </div>
@@ -147,9 +147,9 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
           size="sm"
           disabled={false}
           onClick={onPlanTrip}
-          className="gap-1.5 text-xs h-7 px-3"
+          className="gap-1 text-[10px] h-6 px-2.5"
         >
-          <Plane className="h-3 w-3" />
+          <Plane className="h-2.5 w-2.5" />
           Planifier
         </Button>
       </div>
