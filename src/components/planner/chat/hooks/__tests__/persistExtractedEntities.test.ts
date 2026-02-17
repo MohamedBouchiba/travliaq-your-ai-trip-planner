@@ -21,6 +21,7 @@ function makeWidgetFlow() {
   return {
     setPendingTripDuration: vi.fn(),
     setPendingPreferredMonth: vi.fn(),
+    getPendingTripDuration: vi.fn().mockReturnValue(null),
   };
 }
 
