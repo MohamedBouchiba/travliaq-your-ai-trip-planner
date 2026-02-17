@@ -75,7 +75,7 @@ const PlannerPanel = ({ activeTab, onMapMove, mapCenter, layout = "sidebar", onC
     layout === "mobile-top"
       ? "absolute top-0 left-0 right-0 z-10 max-h-[35vh] animate-fade-in"
       : layout === "overlay"
-      ? "pointer-events-none absolute top-16 left-4 bottom-4 w-[320px] sm:w-[360px] md:w-[400px] lg:w-[420px] xl:w-[480px] 2xl:w-[540px] z-10"
+      ? "pointer-events-none absolute top-16 left-4 bottom-16 w-[320px] sm:w-[360px] md:w-[400px] lg:w-[420px] xl:w-[480px] 2xl:w-[540px] z-10"
       : "w-80 sm:w-96 lg:w-[480px] xl:w-[520px] 2xl:w-[600px] border-l border-border bg-card overflow-y-auto themed-scroll shrink-0";
 
   const innerClass = 
@@ -121,7 +121,7 @@ const PlannerPanel = ({ activeTab, onMapMove, mapCenter, layout = "sidebar", onC
         <div 
           className={cn(
             "flex-1 overflow-y-auto themed-scroll p-4",
-            layout === "mobile-top" ? "max-h-[calc(35vh-4.5rem)]" : "max-h-[calc(100vh-10rem)]"
+            layout === "mobile-top" ? "max-h-[calc(35vh-4.5rem)]" : "max-h-[calc(100vh-11rem)]"
           )}
           data-tour="widget-container"
         >
