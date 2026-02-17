@@ -5,6 +5,7 @@
 import type { Locale } from "date-fns";
 import type { TFunction } from "i18next";
 import type { FlightMemory } from "@/stores/hooks";
+import type { UseWidgetCooldownReturn } from "../useWidgetCooldown";
 import type { ChatMessage } from "../../types";
 
 /** Return type of useWidgetTracking */
@@ -36,6 +37,8 @@ export interface HandlerDeps {
   dateFnsLocale: Locale;
   /** Build i18n-aware travelers label */
   buildTravelersLabel: (travelers: { adults: number; children: number; infants: number }) => string;
+  /** Widget cooldown system to prevent re-showing confirmed widgets */
+  widgetCooldown?: UseWidgetCooldownReturn;
   /** Refs for flow state */
   refs: {
     pendingTravelersWidget: React.MutableRefObject<boolean>;

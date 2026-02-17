@@ -5,8 +5,62 @@
 
 import { eventBus } from "@/lib/eventBus";
 import type { FlightMemory } from "@/stores/hooks";
+import type { WidgetType } from "@/types/flight";
 import type { HandlerDeps } from "./types";
 import { generateId, updateMessageById } from "../../utils/messageHelpers";
+import type { ChatMessage, QuickReply } from "../../types";
+
+// ────────────────────────────────────────────────────────
+// Helpers
+// ────────────────────────────────────────────────────────
+
+/** Map selection handler widget names → WidgetType used by cooldown */
+const WIDGET_TYPE_MAP: Record<string, WidgetType> = {
+  budget: "budgetRangeSlider" as WidgetType,
+  starRating: "starRatingSelector" as WidgetType,
+  cabinClass: "cabinClassSelector" as WidgetType,
+  directFlight: "directFlightToggle" as WidgetType,
+  duration: "durationSelector" as WidgetType,
+  timeOfDay: "timeOfDaySelector" as WidgetType,
+};
+
+/**
+ * Record widget confirmation in cooldown system & append a follow-up assistant message.
+ */
+function finalizeSelection(
+  deps: HandlerDeps,
+  cooldownKey: string,
+  followUpText: string,
+  quickReplyLabels?: string[]
+) {
+  // 1. Mark confirmed in cooldown
+  const widgetType = WIDGET_TYPE_MAP[cooldownKey];
+  if (widgetType && deps.widgetCooldown) {
+    deps.widgetCooldown.recordWidgetConfirmed(widgetType);
+  }
+
+  // 2. Build quick replies
+  const quickReplies: QuickReply[] | undefined = quickReplyLabels?.map((label, i) => ({
+    id: generateId(`qr-${i}`),
+    label,
+    action: { type: "sendMessage" as const, message: label },
+  }));
+
+  // 3. Add follow-up assistant message
+  const followUp: ChatMessage = {
+    id: generateId("followup"),
+    role: "assistant",
+    text: followUpText,
+    timestamp: Date.now(),
+    ...(quickReplies?.length ? { quickReplies } : {}),
+  };
+
+  deps.setMessages((prev) => [...prev, followUp]);
+}
+
+// ────────────────────────────────────────────────────────
+// Handlers
+// ────────────────────────────────────────────────────────
 
 /**
  * Handle budget range selection
@@ -37,6 +91,15 @@ export function handleBudgetSelect(
   setMessages(updateMessageById(messageId, { widgetConfirmed: true, widgetSelectedValue: range, widgetDisplayLabel: budgetLabel }));
 
   eventBus.emit("budget:selected", { range, perPerson: false });
+
+  finalizeSelection(deps, "budget",
+    t("planner.followUp.budgetConfirmed", { defaultValue: "✅ Budget noté ! Quelle est la prochaine étape ?" }),
+    [
+      t("planner.quickReply.searchFlights", { defaultValue: "Chercher des vols" }),
+      t("planner.quickReply.setDates", { defaultValue: "Définir les dates" }),
+      t("planner.quickReply.chooseDestination", { defaultValue: "Choisir la destination" }),
+    ]
+  );
 }
 
 /**
@@ -116,6 +179,14 @@ export function handleStarRatingSelect(
   setMessages(updateMessageById(messageId, { widgetConfirmed: true, widgetSelectedValue: { minStars, maxStars }, widgetDisplayLabel: ratingLabel }));
 
   eventBus.emit("hotels:starRating", { min: minStars, max: maxStars });
+
+  finalizeSelection(deps, "starRating",
+    t("planner.followUp.ratingConfirmed", { defaultValue: "✅ Préférence d'hôtel notée ! On continue ?" }),
+    [
+      t("planner.quickReply.searchHotels", { defaultValue: "Chercher des hôtels" }),
+      t("planner.quickReply.setBudget", { defaultValue: "Définir le budget" }),
+    ]
+  );
 }
 
 /**
@@ -146,6 +217,14 @@ export function handleCabinClassSelect(
   setMessages(updateMessageById(messageId, { widgetConfirmed: true, widgetSelectedValue: cabinClass, widgetDisplayLabel: cabinLabel }));
 
   updateMemory({ cabinClass: cabinClass as FlightMemory["cabinClass"] });
+
+  finalizeSelection(deps, "cabinClass",
+    t("planner.followUp.cabinConfirmed", { defaultValue: "✅ Classe de vol notée !" }),
+    [
+      t("planner.quickReply.searchFlights", { defaultValue: "Chercher des vols" }),
+      t("planner.quickReply.setDates", { defaultValue: "Définir les dates" }),
+    ]
+  );
 }
 
 /**
@@ -172,6 +251,10 @@ export function handleDirectFlightToggle(
   setMessages(updateMessageById(messageId, { widgetConfirmed: true, widgetSelectedValue: directOnly, widgetDisplayLabel: label }));
 
   eventBus.emit("flights:directOnly", { directOnly });
+
+  finalizeSelection(deps, "directFlight",
+    t("planner.followUp.directFlightConfirmed", { defaultValue: "✅ Préférence de vol notée !" })
+  );
 }
 
 /**
@@ -194,6 +277,10 @@ export function handleDurationSelect(
   setMessages(updateMessageById(messageId, { widgetConfirmed: true, widgetSelectedValue: durationId, widgetDisplayLabel: durationId }));
 
   eventBus.emit("activities:duration", { duration: durationId });
+
+  finalizeSelection(deps, "duration",
+    t("planner.followUp.durationConfirmed", { defaultValue: "✅ Durée notée !" })
+  );
 }
 
 /**
@@ -224,4 +311,8 @@ export function handleTimeOfDaySelect(
   setMessages(updateMessageById(messageId, { widgetConfirmed: true, widgetSelectedValue: timeSlot, widgetDisplayLabel: timeLabel }));
 
   eventBus.emit("activities:timeOfDay", { timeSlot });
+
+  finalizeSelection(deps, "timeOfDay",
+    t("planner.followUp.timeConfirmed", { defaultValue: "✅ Créneau noté !" })
+  );
 }
