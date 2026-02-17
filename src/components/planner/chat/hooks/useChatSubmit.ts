@@ -9,6 +9,7 @@
 import { useCallback, useRef } from "react";
 import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
+import i18n from "@/i18n/config";
 import type { ChatMessage } from "../types";
 import type { WidgetType } from "@/types/flight";
 import type { FlightMemory } from "@/stores/hooks/useFlightMemoryStore";
@@ -244,6 +245,13 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
       if (intentClassification) {
         if (import.meta.env.DEV) console.log("[useChatSubmit] Intent:", intentClassification.primaryIntent);
         opts.setLastIntentClassification(intentClassification);
+
+        // Bug 1 fix: Auto-switch i18n language when backend detects user language
+        const detectedLang = (intentClassification as unknown as Record<string, unknown>).detectedLanguage as string | undefined;
+        if (detectedLang && ["fr", "en", "es"].includes(detectedLang) && detectedLang !== i18n.language) {
+          console.log(`[useChatSubmit] Auto-switching i18n language: ${i18n.language} → ${detectedLang}`);
+          i18n.changeLanguage(detectedLang);
+        }
 
         // Sanitize departureCity before entity persistence (Bug D guard)
         const sanitizedEntities = intentClassification.entities

@@ -137,15 +137,37 @@ const cityDescriptions: Record<string, string> = {
   "hong kong": "Skyline spectaculaire, dim sum et shopping paradis.",
 };
 
-// Country code to country name mapping for fallback
+// Country code to country name mapping for fallback (extended to avoid ISO code display)
 const countryNames: Record<string, string> = {
   "FR": "France", "QA": "Qatar", "US": "États-Unis", "JP": "Japon", "ES": "Espagne",
-  "IT": "Italie", "GB": "Royaume-Uni", "DE": "Allemagne", "TH": "Thaïlande", "AE": "Émirats",
+  "IT": "Italie", "GB": "Royaume-Uni", "DE": "Allemagne", "TH": "Thaïlande", "AE": "Émirats Arabes Unis",
   "MA": "Maroc", "EG": "Égypte", "GR": "Grèce", "PT": "Portugal", "NL": "Pays-Bas",
   "BE": "Belgique", "AT": "Autriche", "CZ": "Tchéquie", "HU": "Hongrie", "PL": "Pologne",
   "SG": "Singapour", "AU": "Australie", "BR": "Brésil", "MX": "Mexique", "AR": "Argentine",
   "KR": "Corée du Sud", "IN": "Inde", "TR": "Turquie", "RU": "Russie", "ZA": "Afrique du Sud",
   "ID": "Indonésie", "VN": "Vietnam", "CN": "Chine", "CA": "Canada",
+  // Extended coverage — countries observed in sessions
+  "OM": "Oman", "CV": "Cap-Vert", "TZ": "Tanzanie", "KH": "Cambodge", "JM": "Jamaïque",
+  "LK": "Sri Lanka", "CR": "Costa Rica", "PE": "Pérou", "CL": "Chili", "CO": "Colombie",
+  "CU": "Cuba", "DO": "République Dominicaine", "PA": "Panama", "EC": "Équateur",
+  "HR": "Croatie", "ME": "Monténégro", "AL": "Albanie", "RS": "Serbie", "BA": "Bosnie-Herzégovine",
+  "MK": "Macédoine du Nord", "BG": "Bulgarie", "RO": "Roumanie", "SI": "Slovénie", "SK": "Slovaquie",
+  "LT": "Lituanie", "LV": "Lettonie", "EE": "Estonie", "FI": "Finlande", "SE": "Suède",
+  "NO": "Norvège", "DK": "Danemark", "IS": "Islande", "IE": "Irlande", "LU": "Luxembourg",
+  "CH": "Suisse", "MT": "Malte", "CY": "Chypre",
+  "PH": "Philippines", "MY": "Malaisie", "MM": "Myanmar", "LA": "Laos", "NP": "Népal",
+  "BD": "Bangladesh", "PK": "Pakistan", "AF": "Afghanistan", "UZ": "Ouzbékistan", "KZ": "Kazakhstan",
+  "GE": "Géorgie", "AM": "Arménie", "AZ": "Azerbaïdjan", "JO": "Jordanie", "LB": "Liban",
+  "IL": "Israël", "SA": "Arabie Saoudite", "BH": "Bahreïn", "KW": "Koweït", "IR": "Iran", "IQ": "Irak",
+  "KE": "Kenya", "TN": "Tunisie", "DZ": "Algérie", "NG": "Nigeria", "GH": "Ghana", "SN": "Sénégal",
+  "CI": "Côte d'Ivoire", "CM": "Cameroun", "ET": "Éthiopie", "UG": "Ouganda", "MG": "Madagascar",
+  "MU": "Maurice", "SC": "Seychelles", "MZ": "Mozambique", "NA": "Namibie", "BW": "Botswana",
+  "ZW": "Zimbabwe", "RW": "Rwanda",
+  "NZ": "Nouvelle-Zélande", "FJ": "Fidji", "PF": "Polynésie française",
+  "GT": "Guatemala", "HN": "Honduras", "NI": "Nicaragua", "SV": "Salvador",
+  "BZ": "Belize", "UY": "Uruguay", "PY": "Paraguay", "BO": "Bolivie", "VE": "Venezuela",
+  "TT": "Trinité-et-Tobago", "BB": "Barbade", "BS": "Bahamas",
+  "TW": "Taïwan", "HK": "Hong Kong", "MO": "Macao", "MN": "Mongolie",
 };
 
 // Fallback cities for common countries when API is unavailable
@@ -244,18 +266,19 @@ const fallbackCities: Record<string, CityInfo[]> = {
   ],
 };
 
-function getCityDescription(cityName: string, countryName: string | undefined, countryCode: string): string {
+function getCityDescription(cityName: string, countryDisplayName: string | undefined, countryCode: string): string {
   const normalizedCity = cityName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   
   if (cityDescriptions[normalizedCity]) {
     return cityDescriptions[normalizedCity];
   }
   
-  // Use countryName if available, otherwise lookup by code, fallback to "ce pays"
-  const displayCountry = countryName || countryNames[countryCode.toUpperCase()] || "ce pays";
+  // Priority: API-provided countryDisplayName > local mapping > "ce pays"
+  // This ensures we never show raw ISO codes like "OM" or "CV"
+  const displayCountry = countryDisplayName || countryNames[countryCode.toUpperCase()] || "ce pays";
   
-  // Fallback generic description
-  return `Ville importante de ${displayCountry} offrant une expérience authentique et des découvertes uniques.`;
+  // Fallback description using city name for uniqueness instead of generic text
+  return `Découvrez ${cityName}, une destination authentique en ${displayCountry} offrant culture, paysages et rencontres uniques.`;
 }
 
 serve(async (req) => {

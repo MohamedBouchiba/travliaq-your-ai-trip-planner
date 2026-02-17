@@ -14,6 +14,7 @@ interface NearestAirportsRequest {
   lon?: number;
   limit?: number;
   country_code?: string;
+  preferred_region?: string; // "europe", "north-america", "asia", etc. — disambiguate homonyms
 }
 
 type CityRow = {
@@ -136,6 +137,7 @@ Deno.serve(async (req) => {
     const rawLon = payload?.lon;
     const rawLimit = payload?.limit;
     const rawCountryCode = payload?.country_code;
+    const preferredRegion = typeof payload?.preferred_region === "string" ? payload.preferred_region.toLowerCase() : undefined;
 
     // Either city or coordinates required
     const hasCity = rawCity && typeof rawCity === "string";
@@ -160,7 +162,7 @@ Deno.serve(async (req) => {
     const qNorm = hasCity ? normalizeText(cityQuery) : "";
 
     console.log(
-      `[nearest-airports] query="${cityQuery || 'coords'}", lat=${rawLat}, lon=${rawLon}, country=${countryCode ?? "any"}, limit=${limit}`
+      `[nearest-airports] query="${cityQuery || 'coords'}", lat=${rawLat}, lon=${rawLon}, country=${countryCode ?? "any"}, region=${preferredRegion ?? "any"}, limit=${limit}`
     );
 
     // Supabase (service role for reliable reads)
@@ -197,6 +199,18 @@ Deno.serve(async (req) => {
 
       const candidates = (citiesData ?? []) as CityRow[];
 
+      // Region → country code sets for disambiguation (e.g., "Paris" → FR not CA)
+      const REGION_COUNTRIES: Record<string, Set<string>> = {
+        europe: new Set(["FR","DE","IT","ES","GB","NL","BE","AT","CH","PT","GR","CZ","HU","PL","SE","NO","DK","FI","IE","HR","RO","BG","SK","SI","LT","LV","EE","LU","MT","CY","IS","ME","AL","RS","BA","MK"]),
+        "north-america": new Set(["US","CA","MX"]),
+        asia: new Set(["JP","CN","KR","IN","TH","VN","ID","MY","PH","SG","KH","LA","MM","NP","LK","BD","PK","TW","HK","MO","MN"]),
+        "middle-east": new Set(["AE","SA","QA","BH","KW","OM","JO","LB","IL","IR","IQ"]),
+        africa: new Set(["MA","TN","DZ","EG","ZA","KE","NG","GH","SN","CI","CM","ET","TZ","UG","MG","MU","SC"]),
+        "south-america": new Set(["BR","AR","CL","CO","PE","EC","UY","PY","BO","VE"]),
+        oceania: new Set(["AU","NZ","FJ","PF"]),
+      };
+      const regionCountries = preferredRegion ? REGION_COUNTRIES[preferredRegion] : undefined;
+
       const ranked = candidates
         .map((c) => {
           const nameNorm = normalizeText(c.name);
@@ -212,8 +226,11 @@ Deno.serve(async (req) => {
           // Prefer same country if provided.
           const countryBoost = countryCode && c.country_code === countryCode ? 5 : 0;
 
+          // Prefer region match for disambiguation (Paris FR > Paris CA when region=europe)
+          const regionBoost = regionCountries && c.country_code && regionCountries.has(c.country_code) ? 10 : 0;
+
           // Best score across name/slug.
-          const score = Math.max(scoreName, scoreSlug) + coordsBoost + countryBoost;
+          const score = Math.max(scoreName, scoreSlug) + coordsBoost + countryBoost + regionBoost;
 
           return {
             city: c,
