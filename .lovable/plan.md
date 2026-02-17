@@ -1,72 +1,36 @@
 
 
-# Bug: Style de voyage sauté — `styleAxesConfigured` toujours `true`
+# Fix des 3 tests en echec dans `buildLLMContext.test.ts`
 
-## Cause racine
+## Cause
 
-Le flux "preference-first" dans le backend (`applyPreferenceFirstLogic`, ligne 479) vérifie :
+Les 3 tests echouent car ils ont ete ecrits AVANT le fix `styleAxesUserConfirmed`. Ils testent l'ancienne logique ("axes existent = configured") alors que la nouvelle logique exige `styleAxesUserConfirmed: true` explicitement.
 
-```
-if ((isIndecisIntent || isDestinationSuggestion) && !preferencesState.styleAxesConfigured)
-```
+### Tests en echec
 
-Mais `styleAxesConfigured` est **toujours `true`** dès le démarrage car :
-
-1. `DEFAULT_PREFERENCES` dans `preferenceTypes.ts` (ligne 143) initialise `styleAxes: DEFAULT_STYLE_AXES` avec les 4 axes à 50
-2. `buildLLMContext.ts` (ligne 167-179) calcule : `if (!axes) return false; return true;` — puisque `axes` existe toujours, le résultat est toujours `true`
-3. La condition `!preferencesState.styleAxesConfigured` ne se déclenche donc **jamais**
-4. Le système saute directement au check des intérêts (ligne 494), d'où le widget `preferenceInterests` affiché en premier au lieu de `preferenceStyle`
+1. **"returns true when axes exist with all values at 50"** -- passe `styleAxes` avec valeurs 50/50 mais PAS `styleAxesUserConfirmed: true`
+2. **"returns true when axes have mixed values"** -- passe `styleAxes` avec valeur 30 mais PAS `styleAxesUserConfirmed: true`
+3. **"full scenario: style confirmed -> re-ask inspiration -> NO style loop"** -- meme probleme
 
 ## Correction
 
-### 1. Ajouter un flag `styleAxesUserConfirmed` dans le preference store
+Mettre a jour les 3 tests pour inclure `styleAxesUserConfirmed: true` dans le mock `getPreferenceMemory()` quand on s'attend a `styleAxesConfigured === true`. C'est le comportement correct : les axes seuls ne suffisent plus, il faut la confirmation explicite de l'utilisateur.
 
-Dans `src/stores/slices/preferenceTypes.ts` : ajouter un champ boolean `styleAxesUserConfirmed: boolean` au type `TripPreferences`, initialisé à `false` dans `DEFAULT_PREFERENCES`.
+### Fichier modifie
 
-### 2. Mettre le flag à `true` quand l'utilisateur confirme le widget style
+`src/components/planner/chat/hooks/__tests__/buildLLMContext.test.ts`
 
-Dans `src/components/planner/chat/hooks/usePreferenceWidgetCallbacks.ts` : dans `onStyleContinue()`, appeler `updatePreferences({ styleAxesUserConfirmed: true })`.
+### Modifications
 
-Aussi dans `src/components/planner/preferences/steps/BaseStep.tsx` : dans `handleApplyPreset()`, mettre `styleAxesUserConfirmed: true` (un preset = un choix explicite).
+**Test "detects configured style axes" (ligne 193-208)** : Ajouter `styleAxesUserConfirmed: true` dans le mock retourne par `getPreferenceMemory()`.
 
-### 3. Corriger `buildLLMContext.ts` pour utiliser le flag explicite
+**Test "detects default style axes as configured" (ligne 210-227)** : Ajouter `styleAxesUserConfirmed: true` dans le mock. Le commentaire "balanced is a valid choice" reste vrai -- mais maintenant la validite depend du flag explicite, pas de la valeur des axes.
 
-Remplacer la logique actuelle (lignes 167-179) par :
+**Test "full scenario" (si present plus bas)** : Ajouter `styleAxesUserConfirmed: true` dans le mock apres l'etape de confirmation du style.
 
-```text
-styleAxesConfigured: preferenceMemoryState?.styleAxesUserConfirmed === true
-```
+### Logique validee
 
-Cela garantit que `styleAxesConfigured` est `false` tant que l'utilisateur n'a pas interagi avec le widget style ou choisi un preset.
+- Sans `styleAxesUserConfirmed: true` : `styleAxesConfigured === false` (meme si les axes existent avec des valeurs non-default)
+- Avec `styleAxesUserConfirmed: true` : `styleAxesConfigured === true`
+- C'est coherent avec le fix du bug "style de voyage saute"
 
-### 4. Edge function — pas de changement
-
-`applyPreferenceFirstLogic` dans `planner-chat/index.ts` est déjà correcte. Le bug était dans la valeur envoyée par le frontend (`styleAxesConfigured: true` en permanence).
-
-### 5. Tests de régression
-
-Ajouter dans `src/test/regression/bug-fixes.test.ts` :
-
-- **Test "styleAxesConfigured is false by default"** : importer `DEFAULT_PREFERENCES` et vérifier que `styleAxesUserConfirmed` est `false`
-- **Test "buildLLMContext returns styleAxesConfigured=false when user hasn't confirmed"** : mocker `getPreferenceMemory()` pour retourner des preferences par défaut (sans `styleAxesUserConfirmed: true`) et vérifier que `preferencesState.styleAxesConfigured === false`
-- **Test "buildLLMContext returns styleAxesConfigured=true after user confirms"** : mocker avec `styleAxesUserConfirmed: true` et vérifier que `preferencesState.styleAxesConfigured === true`
-- **Test "applyPreferenceFirstLogic forces preferenceStyle when styleAxesConfigured=false"** : tester unitairement la fonction backend avec `styleAxesConfigured: false` et un intent `ask_inspiration` — doit retourner `widgetToShow.type === "preferenceStyle"`
-- **Test "applyPreferenceFirstLogic skips style when already configured"** : même test avec `styleAxesConfigured: true` — ne doit PAS forcer `preferenceStyle`
-- **Test "preset sets styleAxesUserConfirmed=true"** : vérifier que le code source de `BaseStep.tsx` inclut `styleAxesUserConfirmed: true` dans `handleApplyPreset`
-
-## Fichiers modifiés
-
-| Fichier | Modification |
-|---------|-------------|
-| `src/stores/slices/preferenceTypes.ts` | Ajouter `styleAxesUserConfirmed: boolean` au type + `false` dans defaults |
-| `src/components/planner/chat/hooks/buildLLMContext.ts` | Remplacer la detection par `styleAxesUserConfirmed === true` |
-| `src/components/planner/chat/hooks/usePreferenceWidgetCallbacks.ts` | Mettre `styleAxesUserConfirmed: true` dans `onStyleContinue` |
-| `src/components/planner/preferences/steps/BaseStep.tsx` | Mettre `styleAxesUserConfirmed: true` dans `handleApplyPreset` |
-| `src/test/regression/bug-fixes.test.ts` | 6 nouveaux tests de regression |
-
-## Comportement attendu après correction
-
-- Utilisateur dit "Inspire-moi !" sans avoir configuré son style -> widget `preferenceStyle` affiché en premier
-- Utilisateur confirme le style -> widget `preferenceInterests` affiché ensuite (si intérêts vides)
-- Utilisateur qui a déjà dit "je voyage en couple avec un budget serré" -> `styleAxesUserConfirmed` reste `false` (car le LLM a extrait les prefs mais l'utilisateur n'a pas confirmé le widget) MAIS le LLM peut quand même retourner `preferenceInterests` car les axes sont dans le contexte
-- Utilisateur qui choisit un preset (ex: "Romantique") -> `styleAxesUserConfirmed: true`, passe directement aux intérêts
