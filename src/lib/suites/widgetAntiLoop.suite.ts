@@ -105,6 +105,7 @@ export function registerWidgetAntiLoopTests() {
       const sources = makeContextSources({
         preferenceMemory: {
           styleAxes: { chillVsIntense: 50, cityVsNature: 50, ecoVsLuxury: 50, touristVsLocal: 50 },
+          styleAxesUserConfirmed: true,
           travelStyle: "balanced",
           pace: "moderate",
           interests: ["culture"],
@@ -118,6 +119,7 @@ export function registerWidgetAntiLoopTests() {
       const sources = makeContextSources({
         preferenceMemory: {
           styleAxes: { chillVsIntense: 20, cityVsNature: 80, ecoVsLuxury: 50, touristVsLocal: 30 },
+          styleAxesUserConfirmed: true,
         },
       });
       const ctx = buildLLMContext(sources) as any;
@@ -341,6 +343,7 @@ export function registerWidgetAntiLoopTests() {
       const sources = makeContextSources({
         preferenceMemory: {
           styleAxes: { chillVsIntense: 50, cityVsNature: 50, ecoVsLuxury: 50, touristVsLocal: 50 },
+          styleAxesUserConfirmed: true,
           travelStyle: "balanced",
           interests: [],
         },
