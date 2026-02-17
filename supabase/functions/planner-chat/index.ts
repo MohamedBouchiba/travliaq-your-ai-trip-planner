@@ -804,17 +804,15 @@ serve(async (req) => {
     
     const language: SupportedLanguage = detectLanguage(requestLanguage);
     
-    const AZURE_OPENAI_API_KEY = Deno.env.get("AZURE_OPENAI_API_KEY");
-    const AZURE_OPENAI_ENDPOINT = Deno.env.get("AZURE_OPENAI_ENDPOINT");
-    const AZURE_OPENAI_API_VERSION = Deno.env.get("AZURE_OPENAI_API_VERSION") || "2025-01-01-preview";
-    const AZURE_OPENAI_DEPLOYMENT = Deno.env.get("AZURE_OPENAI_DEPLOYMENT");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") || "gpt-4o-mini";
 
-    if (!AZURE_OPENAI_API_KEY || !AZURE_OPENAI_ENDPOINT || !AZURE_OPENAI_DEPLOYMENT) {
-      log.error("request", "Missing Azure OpenAI configuration");
-      throw new Error("Azure OpenAI configuration is incomplete");
+    if (!OPENAI_API_KEY) {
+      log.error("request", "Missing OPENAI_API_KEY");
+      throw new Error("OPENAI_API_KEY is not configured");
     }
 
-    const url = `${AZURE_OPENAI_ENDPOINT}openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=${AZURE_OPENAI_API_VERSION}`;
+    const url = "https://api.openai.com/v1/chat/completions";
     const currentDate = new Date().toISOString().split('T')[0];
     const phase: TravelPhase = normalizeTravelPhase(currentPhase);
     const systemPrompt = buildSystemPrompt(
@@ -879,10 +877,11 @@ serve(async (req) => {
         const classifyResponse = await fetchWithRetry(url, {
           method: "POST",
           headers: {
-            "api-key": AZURE_OPENAI_API_KEY,
+            "Authorization": `Bearer ${OPENAI_API_KEY}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            model: OPENAI_MODEL,
             messages: [
               { role: "system", content: buildClassificationSystemPrompt(preferencesState, blockedWidgets, currentDate) },
               ...classifyMessages,
@@ -1006,10 +1005,11 @@ serve(async (req) => {
       const response = await fetchWithRetry(url, {
         method: "POST",
         headers: {
-          "api-key": AZURE_OPENAI_API_KEY,
+          "Authorization": `Bearer ${OPENAI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          model: OPENAI_MODEL,
           messages: conversationMessages,
           temperature: 0.7,
           max_tokens: MULTI_TOOL_CONFIG.REACT_MAX_TOKENS,
@@ -1021,8 +1021,8 @@ serve(async (req) => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        log.error("azure_openai", "API error", new Error(errorText), { status: response.status });
-        throw new Error(`Azure OpenAI error: ${errorText}`);
+        log.error("openai", "API error", new Error(errorText), { status: response.status });
+        throw new Error(`OpenAI error: ${errorText}`);
       }
 
       const data = await response.json();
@@ -1125,10 +1125,10 @@ serve(async (req) => {
         const streamingResponse = await fetchWithRetry(url, {
           method: "POST",
           headers: {
-            "api-key": AZURE_OPENAI_API_KEY,
+            "Authorization": `Bearer ${OPENAI_API_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(finalCallBody),
+          body: JSON.stringify({ ...finalCallBody, model: OPENAI_MODEL }),
         }, log, "final_content_stream");
 
         if (streamingResponse.ok) {
@@ -1141,10 +1141,10 @@ serve(async (req) => {
       const finalResponse = await fetchWithRetry(url, {
         method: "POST",
         headers: {
-          "api-key": AZURE_OPENAI_API_KEY,
+          "Authorization": `Bearer ${OPENAI_API_KEY}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ ...finalCallBody, stream: false }),
+        body: JSON.stringify({ ...finalCallBody, model: OPENAI_MODEL, stream: false }),
       }, log, "final_content");
 
       if (!finalResponse.ok) {
