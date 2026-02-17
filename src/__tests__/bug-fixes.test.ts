@@ -208,71 +208,101 @@ describe('isSwitchingSessionRef stability', () => {
   });
 });
 
-// --- Test 5: Widget context injection produces short text ---
-describe('Widget context injection for ReAct messages', () => {
+// --- Test 5: Widget context injection + language override ---
+describe('Widget context injection and language override for ReAct messages', () => {
   interface SimpleMessage {
     role: string;
     content: string;
   }
 
-  /**
-   * Simulates the widget context injection logic from planner-chat/index.ts.
-   * When a widgetToShow is defined, a system message is injected before the last user message.
-   */
-  const injectWidgetContext = (
+  const injectLanguageOverride = (
     messages: SimpleMessage[],
-    widgetType: string | undefined
+    detectedLang: string | undefined,
+    configuredLang: string
   ): SimpleMessage[] => {
     const result = [...messages];
-    if (!widgetType) return result;
-
-    const widgetContextMsg: SimpleMessage = {
+    if (!detectedLang || detectedLang === configuredLang) return result;
+    const langNames: Record<string, string> = { fr: "French", en: "English", es: "Spanish" };
+    const langName = langNames[detectedLang] || detectedLang;
+    const msg: SimpleMessage = {
       role: 'system',
-      content: `[WIDGET ACTIF] Le widget "${widgetType}" sera affiché à l'utilisateur juste après ton message.\n` +
-        `RÈGLE ABSOLUE : Ton texte doit être TRÈS COURT (1-2 phrases max, ≤30 mots).\n` +
-        `NE FAIS PAS de liste à puces, d'énumération d'options, ni de numérotation.`,
+      content: `[LANGUAGE OVERRIDE] The user's last message is in ${langName} (${detectedLang}). You MUST respond ENTIRELY in ${langName}. This overrides any previous language instruction. Do NOT respond in any other language.`,
     };
-
     const lastUserIdx = result.map(m => m.role).lastIndexOf('user');
     if (lastUserIdx > 0) {
-      result.splice(lastUserIdx, 0, widgetContextMsg);
+      result.splice(lastUserIdx, 0, msg);
     } else {
-      result.push(widgetContextMsg);
+      result.push(msg);
     }
     return result;
   };
 
-  it('injects widget context message before last user message', () => {
+  const injectWidgetContext = (
+    messages: SimpleMessage[],
+    widgetType: string | undefined,
+    lang: string = 'fr'
+  ): SimpleMessage[] => {
+    const result = [...messages];
+    if (!widgetType) return result;
+    const content = lang === 'en'
+      ? `[ACTIVE WIDGET] The "${widgetType}" widget will be displayed. ABSOLUTE RULE: VERY SHORT (1-2 sentences). DO NOT make bullet lists.`
+      : `[WIDGET ACTIF] Le widget "${widgetType}" sera affiché. RÈGLE ABSOLUE : TRÈS COURT (1-2 phrases). NE FAIS PAS de liste.`;
+    const msg: SimpleMessage = { role: 'system', content };
+    const lastUserIdx = result.map(m => m.role).lastIndexOf('user');
+    if (lastUserIdx > 0) result.splice(lastUserIdx, 0, msg);
+    else result.push(msg);
+    return result;
+  };
+
+  it('injects language override when detected != configured', () => {
     const messages: SimpleMessage[] = [
-      { role: 'system', content: 'You are a travel assistant.' },
-      { role: 'user', content: 'Inspire-moi' },
+      { role: 'system', content: 'System prompt in French' },
+      { role: 'user', content: 'I work remotely and want suggestions' },
     ];
-    const result = injectWidgetContext(messages, 'preferenceStyle');
+    const result = injectLanguageOverride(messages, 'en', 'fr');
     expect(result.length).toBe(3);
-    expect(result[1].role).toBe('system');
-    expect(result[1].content).toContain('[WIDGET ACTIF]');
-    expect(result[1].content).toContain('preferenceStyle');
+    expect(result[1].content).toContain('[LANGUAGE OVERRIDE]');
+    expect(result[1].content).toContain('English');
     expect(result[2].role).toBe('user');
   });
 
-  it('does NOT inject when widgetType is undefined', () => {
+  it('does NOT inject language override when detected == configured', () => {
+    const messages: SimpleMessage[] = [
+      { role: 'system', content: 'System prompt' },
+      { role: 'user', content: 'Bonjour' },
+    ];
+    const result = injectLanguageOverride(messages, 'fr', 'fr');
+    expect(result.length).toBe(2);
+  });
+
+  it('widget context uses English when lang is en', () => {
+    const messages: SimpleMessage[] = [
+      { role: 'system', content: 'System prompt' },
+      { role: 'user', content: 'Inspire me' },
+    ];
+    const result = injectWidgetContext(messages, 'preferenceStyle', 'en');
+    const injected = result.find(m => m.content.includes('[ACTIVE WIDGET]'));
+    expect(injected).toBeDefined();
+    expect(injected!.content).toContain('VERY SHORT');
+  });
+
+  it('widget context uses French when lang is fr', () => {
+    const messages: SimpleMessage[] = [
+      { role: 'system', content: 'System prompt' },
+      { role: 'user', content: 'Inspire-moi' },
+    ];
+    const result = injectWidgetContext(messages, 'preferenceStyle', 'fr');
+    const injected = result.find(m => m.content.includes('[WIDGET ACTIF]'));
+    expect(injected).toBeDefined();
+    expect(injected!.content).toContain('TRÈS COURT');
+  });
+
+  it('does NOT inject widget context when widgetType is undefined', () => {
     const messages: SimpleMessage[] = [
       { role: 'system', content: 'System prompt' },
       { role: 'user', content: 'Hello' },
     ];
     const result = injectWidgetContext(messages, undefined);
     expect(result.length).toBe(2);
-  });
-
-  it('widget context message forbids bullet lists', () => {
-    const messages: SimpleMessage[] = [
-      { role: 'system', content: 'System prompt' },
-      { role: 'user', content: 'Inspire-moi' },
-    ];
-    const result = injectWidgetContext(messages, 'preferenceStyle');
-    const injected = result.find(m => m.content.includes('[WIDGET ACTIF]'));
-    expect(injected).toBeDefined();
-    expect(injected!.content).toContain('NE FAIS PAS de liste');
-    expect(injected!.content).toContain('TRÈS COURT');
   });
 });

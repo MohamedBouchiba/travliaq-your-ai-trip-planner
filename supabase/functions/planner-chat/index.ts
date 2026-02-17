@@ -1008,21 +1008,53 @@ serve(async (req) => {
     ];
     let conversationMessages = truncateMessages(rawMessages, MAX_CONTEXT_TOKENS, log);
     
+    // ── Language override injection ───────────────────────────────────
+    // Use detectedLanguage from Step 1 classification to force the ReAct LLM
+    // to respond in the user's actual language (not the default system prompt language).
+    const detectedLang = collectedData.intentClassification?.detectedLanguage;
+    if (detectedLang && detectedLang !== language) {
+      const langNames: Record<string, string> = {
+        fr: "French", en: "English", es: "Spanish", de: "German", it: "Italian", pt: "Portuguese", nl: "Dutch",
+      };
+      const langName = langNames[detectedLang] || detectedLang;
+      const langOverrideMsg = {
+        role: "system",
+        content: `[LANGUAGE OVERRIDE] The user's last message is in ${langName} (${detectedLang}). You MUST respond ENTIRELY in ${langName}. This overrides any previous language instruction. Do NOT respond in any other language.`,
+      };
+      const lastUserIdx = conversationMessages.map(m => m.role).lastIndexOf("user");
+      if (lastUserIdx > 0) {
+        conversationMessages.splice(lastUserIdx, 0, langOverrideMsg);
+      } else {
+        conversationMessages.push(langOverrideMsg);
+      }
+      log.info("language_override", `Injected language override: ${detectedLang} (was ${language})`, { detectedLang, configuredLang: language });
+    }
+
     // ── Widget context injection ──────────────────────────────────────
     // When Step 1 (classification) selected a widget, inform the ReAct LLM
     // so it generates SHORT text and does NOT duplicate widget options.
     const activeWidgetType = collectedData.intentClassification?.widgetToShow?.type;
     if (activeWidgetType) {
-      const widgetContextMsg = {
-        role: "system",
-        content: `[WIDGET ACTIF] Le widget "${activeWidgetType}" sera affiché à l'utilisateur juste après ton message.\n` +
+      const effectiveLang = detectedLang || language || "fr";
+      const widgetContextByLang: Record<string, string> = {
+        fr: `[WIDGET ACTIF] Le widget "${activeWidgetType}" sera affiché à l'utilisateur juste après ton message.\n` +
           `RÈGLE ABSOLUE : Ton texte doit être TRÈS COURT (1-2 phrases max, ≤30 mots).\n` +
           `NE FAIS PAS de liste à puces, d'énumération d'options, ni de numérotation.\n` +
           `Le widget affiche déjà toutes les options interactives.\n` +
-          `Exemples de bonnes réponses :\n` +
-          `- "On va d'abord cerner ton style de voyage 🎯"\n` +
-          `- "Sélectionne ce qui te tente le plus :"\n` +
-          `- "Voyons quel type de voyageur tu es !"`,
+          `Exemples : "On va d'abord cerner ton style de voyage 🎯" / "Sélectionne ce qui te tente le plus :"`,
+        en: `[ACTIVE WIDGET] The "${activeWidgetType}" widget will be displayed to the user right after your message.\n` +
+          `ABSOLUTE RULE: Your text must be VERY SHORT (1-2 sentences max, ≤30 words).\n` +
+          `DO NOT make bullet lists, enumerate options, or use numbering.\n` +
+          `The widget already shows all interactive options.\n` +
+          `Examples: "Let's first figure out your travel style 🎯" / "Pick what appeals to you most:"`,
+        es: `[WIDGET ACTIVO] El widget "${activeWidgetType}" se mostrará al usuario justo después de tu mensaje.\n` +
+          `REGLA ABSOLUTA: Tu texto debe ser MUY CORTO (1-2 frases máx, ≤30 palabras).\n` +
+          `NO hagas listas, NO enumeres opciones.\n` +
+          `El widget ya muestra todas las opciones interactivas.`,
+      };
+      const widgetContextMsg = {
+        role: "system",
+        content: widgetContextByLang[effectiveLang] || widgetContextByLang.en,
       };
       // Insert just before the last user message
       const lastUserIdx = conversationMessages.map(m => m.role).lastIndexOf("user");
@@ -1031,7 +1063,7 @@ serve(async (req) => {
       } else {
         conversationMessages.push(widgetContextMsg);
       }
-      log.info("widget_context_injection", `Injected widget context for "${activeWidgetType}"`, { widgetType: activeWidgetType });
+      log.info("widget_context_injection", `Injected widget context for "${activeWidgetType}" in ${effectiveLang}`, { widgetType: activeWidgetType, lang: effectiveLang });
     }
     
     let finalContent = "";
