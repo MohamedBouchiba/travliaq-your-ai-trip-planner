@@ -60,7 +60,7 @@ export const ENTITY_PATTERNS = {
     // ISO-like ranges: "15/03 au 18/03", "15/03/2026"
     /\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s+au\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/gi,
     /(?:en|au mois de|pour)\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)/gi,
-    /(?:du|le)?\s*(\d{1,2})\s*(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)/gi,
+    /(?:du|le)?\s*(\d{1,2})\s*(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)(?:\s+\d{4})?/gi,
     /(printemps|été|automne|hiver)/gi,
     // Duration patterns (FR + EN)
     /(\d+)\s*jours?/gi,

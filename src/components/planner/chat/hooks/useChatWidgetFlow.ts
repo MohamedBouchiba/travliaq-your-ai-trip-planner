@@ -354,6 +354,11 @@ export function useChatWidgetFlow(options: UseChatWidgetFlowOptions) {
     };
   }, []);
 
+  // FIX-B3: Expose getter for persistExtractedEntities auto-return-date computation
+  const getPendingTripDuration = useCallback(() => {
+    return pendingTripDurationRef.current;
+  }, []);
+
   return {
     // Flow state management
     resetFlowState,
@@ -362,6 +367,7 @@ export function useChatWidgetFlow(options: UseChatWidgetFlowOptions) {
     setPendingTravelersWidget,
     markSearchButtonShown,
     isSearchButtonShown,
+    getPendingTripDuration,
 
     // Core Handlers
     handleAirportSelect,

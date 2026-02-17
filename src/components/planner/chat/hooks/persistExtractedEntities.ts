@@ -12,6 +12,8 @@
 import type { FlightFormData } from "@/types/flight";
 import type { FlightMemory } from "@/stores/hooks/useFlightMemoryStore";
 import { eventBus } from "@/lib/eventBus";
+import { addDays } from "date-fns";
+import { parseDurationToDays } from "./widgetHandlers/helpers";
 
 // ---------------------------------------------------------------------------
 // Declarative mapping: entity name → persistence actions
@@ -127,6 +129,7 @@ const ENTITY_PERSISTERS: Record<string, EntityPersistAction> = {
       return isNaN(d.getTime()) ? {} : { departureDate: d };
     },
     toFormEvent: (v) => ({ departureDate: v }),
+    // FIX-B3: Auto-compute return date handled in pipeline executor below
   },
   exactReturnDate: {
     onlyWithoutFlightData: true,
@@ -148,6 +151,7 @@ export function persistExtractedEntities(
   widgetFlow: {
     setPendingTripDuration: (d: string) => void;
     setPendingPreferredMonth: (m: string) => void;
+    getPendingTripDuration?: () => string | null;
   },
   updateMemory?: (partial: Partial<FlightMemory>) => void,
   currentMemory?: Partial<FlightMemory>,
@@ -207,6 +211,24 @@ export function persistExtractedEntities(
       id: `leg-${i}-${Date.now()}`,
     }));
     memoryBatch = { ...memoryBatch, legs: legMemories, tripType: "multi" as const };
+  }
+
+  // --- FIX-B3: Auto-compute return date from departure + pending duration ---
+  const effectiveMem = { ...baseMem, ...memoryBatch };
+  if (effectiveMem.departureDate && !effectiveMem.returnDate) {
+    // Check tripDuration from intent entities or from widgetFlow ref
+    const durationStr =
+      (intentEntities?.tripDuration as string) ||
+      widgetFlow.getPendingTripDuration?.() ||
+      null;
+    if (durationStr) {
+      const days = parseDurationToDays(durationStr);
+      if (days) {
+        const computedReturn = addDays(effectiveMem.departureDate, days);
+        memoryBatch = { ...memoryBatch, returnDate: computedReturn };
+        formBatch = { ...formBatch, returnDate: computedReturn.toISOString().split("T")[0] };
+      }
+    }
   }
 
   // --- Apply batched updates -------------------------------------------
