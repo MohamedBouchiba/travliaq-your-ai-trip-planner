@@ -194,6 +194,7 @@ describe("buildLLMContext — preferencesState", () => {
     const sources = makeMinimalSources({
       getPreferenceMemory: () => ({
         interests: [],
+        styleAxesUserConfirmed: true,
         styleAxes: {
           chillVsIntense: 30,
           cityVsNature: 50,
@@ -211,6 +212,7 @@ describe("buildLLMContext — preferencesState", () => {
     const sources = makeMinimalSources({
       getPreferenceMemory: () => ({
         interests: [],
+        styleAxesUserConfirmed: true,
         styleAxes: {
           chillVsIntense: 50,
           cityVsNature: 50,
