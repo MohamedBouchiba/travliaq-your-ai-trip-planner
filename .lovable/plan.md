@@ -1,144 +1,216 @@
 
-# Plan de correction durable - 5 bugs critiques identifiés
 
-## Synthèse des 3 sessions analysées
+# Plan de correction approfondi -- Analyse exhaustive des 3 fichiers de logs
 
-| Session | Utilisateur | Bugs observés |
-|---------|-------------|---------------|
-| Session 1 (aventure couple) | FR speaker, HeadlessChrome en-US | Welcome EN, ask-departure EN, "Paris" ignoré au profit du GeoIP (YKF Canada), descriptions villes dupliquées (Oman), date range "10 mars -> 10 mars" (même jour), 500 errors, boucle répétitive 6x |
-| Session 2 (digital nomad) | EN speaker | Welcome EN (correct), 2x erreurs 500, descriptions PT dupliquées (Braga/Amadora/Seixal), contenu FR dans conversation EN |
-| Session 3 (famille) | FR speaker, HeadlessChrome en-US | Welcome EN, ask-departure EN, descriptions CV dupliquées, widget dateRangePicker affiché mais jamais utilisé (bloqué 6 min), 3x erreurs 500 |
+Les 3 fichiers de logs sont les memes que precedemment. Cette analyse se concentre sur les bugs NOUVEAUX non couverts par le plan precedent, plus les corrections precises des bugs deja identifies mais dont les fix sont incomplets ou incorrects.
 
 ---
 
-## Bug 1 : Message `ask-departure` toujours en anglais (SYSTÉMIQUE)
+## BUGS DEJA IDENTIFIES (corrections affinee)
 
-**Cause racine** : Le message "To suggest destinations that suit you..." est la traduction EN de `planner.messages.needDepartureCityFirst`. Ce message est injecté par `useChatDestinationFlow.ts` via `t()`. Le problème est que i18n est initialisé avec `en-US` (la langue du navigateur HeadlessChrome) et ne bascule JAMAIS en français, même quand l'utilisateur écrit en français.
+### Bug A : Boucle `ask-departure` (CRITIQUE -- fix incomplet)
 
-Le welcome message a le même problème : `getTranslations()` dans `sessionHelpers.ts` capture l'état de i18n au moment de l'initialisation. Si le navigateur est en-US, tout reste en anglais.
+**Probleme dans le code actuel** : Ligne 184 de `useChatDestinationFlow.ts`, la verification `if (!departureCityRef.current)` est correcte en theorie car les lignes 75-76 font `departureCityRef.current = departureCity`. MAIS le probleme est un probleme de timing React :
 
-**Impact** : Les 3 sessions montrent des messages système en anglais dans des conversations françaises.
+1. `useChatSubmit` appelle `persistExtractedEntities` qui fait `updateMemory({ departure: { city: "Paris" } })`
+2. Cela declenche un re-render de `PlannerChat` qui passe le nouveau `departureCity` a `useChatDestinationFlow`
+3. MAIS dans le meme tick, `useChatSubmit` appelle `handleLLMDestinationRequest` (ligne 396)
+4. A ce moment, React n'a PAS encore re-rendu, donc `departureCityRef.current` est encore `undefined`
 
-**Fix** :
-1. Dans `useChatDestinationFlow.ts` et `PlannerChat.tsx` : les messages `ask-departure` doivent utiliser la langue détectée du premier message utilisateur, pas la langue du navigateur.
-2. Ajouter un mécanisme de détection de langue du premier message utilisateur dans le chat. Quand le bot détecte que l'utilisateur parle français (via le backend qui renvoie déjà la langue dans l'intent), basculer `i18n.changeLanguage()` automatiquement.
-3. Forcer la re-traduction du welcome message quand la langue change (le welcome message est stocké en localStorage avec la langue initiale).
+Le fix B6 (ligne 170) `departureCityOverride` resout partiellement ce probleme quand `freshMemory.departure.city` est dispo. MAIS `freshMemory` (ligne 395) vient de `memoryPatch` qui ne contient `departure.city` que si l'intent COURANT a extrait `departureCity`. Quand l'utilisateur a dit "Paris" dans un message PRECEDENT et demande "recommande-moi" dans le message SUIVANT, le `memoryPatch` courant ne contient PAS `departureCity`.
 
-**Fichiers** :
-- `src/components/planner/PlannerChat.tsx` : Ajouter un `useEffect` qui détecte la langue de la première réponse backend et appelle `i18n.changeLanguage()`.
-- `src/hooks/useChatSessions.ts` : Re-générer le welcome message quand la langue change.
-- `src/components/planner/chat/hooks/useChatDestinationFlow.ts` : Pas de changement nécessaire si i18n est correctement basculé.
+**Fix** : Dans `handleLLMDestinationRequest`, lire directement le store Zustand au lieu de la ref :
+```typescript
+// Ligne 184 : Remplacer
+if (!departureCityRef.current) {
+// Par
+const storeCity = departureCityRef.current 
+  || useFlightMemoryStore.getState().departure?.city;
+if (!storeCity) {
+```
 
----
-
-## Bug 2 : Départ GeoIP écrase le départ utilisateur (Paris -> YKF Canada)
-
-**Cause racine** : Session 1 montre `flightSummary: "Départ: Amsterdam, The Netherlands"` alors que l'utilisateur a dit "Paris". Le système `useAutoDetectDeparture` a auto-détecté un départ basé sur la géolocalisation du HeadlessChrome (qui pointe vers le Canada ou Amsterdam), et cette valeur écrase la ville de départ fournie par l'utilisateur.
-
-Le problème spécifique : quand le backend extrait `departureCity: "Paris"` via l'intent `provide_departure_city`, la logique frontend de `persistExtractedEntities.ts` devrait mettre à jour la mémoire avec "Paris", mais la résolution d'aéroport (`nearest-airports`) utilise le nom "Paris" et tombe sur un résultat canadien car le backend ne filtre pas par pays.
-
-**Preuves** : L'airport suggestion montre `YKF (Waterloo Airport, Canada)` pour "Paris" -- c'est la ville de Waterloo, Ontario, Canada. L'edge function `nearest-airports` a reçu `query="Brussels"` dans les logs récents, ce qui suggère qu'elle fait un lookup textuel sans contexte géographique.
-
-**Fix** :
-1. Dans `persistExtractedEntities.ts` : Quand `departureCity` est extrait, passer le pays de l'utilisateur (ou le continent attendu) comme hint au `nearest-airports` edge function.
-2. Dans `supabase/functions/nearest-airports/index.ts` : Ajouter un paramètre optionnel `preferred_country` ou `region` pour prioriser les résultats européens quand le contexte l'indique. Si "Paris" est recherché et que le site est travliaq.com (plateforme européenne), prioriser CDG/ORY.
-3. Ajouter un fallback dans `top-cities-by-country` pour les villes avec des homonymes internationaux (Paris, London, etc.).
-
-**Fichiers** :
-- `supabase/functions/nearest-airports/index.ts` : Ajouter un filtre de priorité par région/pays.
-- `src/components/planner/chat/hooks/persistExtractedEntities.ts` : Passer le contexte géographique lors de la résolution d'aéroport.
+**Fichier** : `src/components/planner/chat/hooks/useChatDestinationFlow.ts`
 
 ---
 
-## Bug 3 : Descriptions de villes dupliquées ("Ville importante de X")
+### Bug B : `detectedLanguage` jamais retourne par le LLM
 
-**Cause racine** : L'edge function `top-cities-by-country` (ligne 247-258) utilise un dictionnaire hardcodé `cityDescriptions` avec ~60 villes. Pour les villes non référencées, elle génère un fallback générique : `"Ville importante de ${displayCountry} offrant une expérience authentique..."`.
+**Probleme** : Dans `intentClassifier.ts` ligne 293, le `required` array est `["primaryIntent", "confidence", "entities"]`. Le champ `detectedLanguage` n'est PAS required, donc le LLM ne le remplit pas systematiquement.
 
-Pour les pays comme Oman (OM), Cap-Vert (CV), le `countryNames` mapping ne contient pas ces codes, donc `displayCountry` tombe sur le code ISO brut ("OM", "CV") au lieu du nom du pays.
+Les logs confirment qu'aucune des 3 sessions ne contient `detectedLanguage` dans les rawResponses.
 
-**Preuves** :
-- Oman : 5 villes avec "Ville importante de OM" (ligne 400-422 session 1)
-- Cap-Vert : 5 villes avec "Ville importante de CV" (ligne 333-357 session 3)
-- Portugal : Braga/Amadora/Seixal avec la même description (session 2, car pas dans le dictionnaire)
+**Fix** : Ajouter `"detectedLanguage"` dans le tableau `required` :
+```typescript
+required: ["primaryIntent", "confidence", "entities", "detectedLanguage"]
+```
 
-**Fix** :
-1. Dans `supabase/functions/top-cities-by-country/index.ts` :
-   - Étendre le `countryNames` mapping pour couvrir TOUS les pays (ou utiliser le `country_name` retourné par l'API externe).
-   - Remplacer le fallback générique par un appel au LLM pour générer une description unique, OU enrichir le dictionnaire avec plus de villes.
-   - A minima : utiliser `countryDisplayName` (qui vient de l'API) au lieu de `countryNames[upperCode]` dans `getCityDescription()`.
-2. Le fix immédiat : la fonction reçoit déjà `countryDisplayName` de l'API (ligne 298), mais `getCityDescription` reçoit `countryName` qui est undefined quand le code n'est pas dans le mapping. Corriger pour passer `countryDisplayName` à `getCityDescription`.
-
-**Fichiers** :
-- `supabase/functions/top-cities-by-country/index.ts` : Corriger la propagation de `countryDisplayName`, étendre les descriptions.
+**Fichier** : `supabase/functions/planner-chat/tools/intentClassifier.ts` ligne 293
 
 ---
 
-## Bug 4 : Boucle répétitive `ask-departure` (blocage utilisateur)
+### Bug C : Welcome message toujours en anglais
 
-**Cause racine** : Dans les 3 sessions, le pattern est identique :
-1. L'utilisateur demande des suggestions
-2. Le backend appelle `request_destination_suggestions`
-3. Le frontend vérifie `departureCityRef.current` dans `useChatDestinationFlow.ts` (ligne 184)
-4. La departure city n'est PAS dans la ref (même si l'utilisateur l'a dite)
-5. Le message `ask-departure` est injecté
-6. L'utilisateur répond "Paris" 
-7. Le backend extrait `departureCity: "Paris"` avec `provide_departure_city`
-8. Mais `departureCityRef.current` n'est toujours pas mis à jour quand la prochaine suggestion est demandée
+**Probleme** : Le welcome message est genere par `getDefaultWelcomeMessage()` dans `sessionHelpers.ts` ligne 55-60, qui appelle `getTranslations()` qui utilise `i18n.t()`. Le `i18n.language` est initialise par le `LanguageDetector` du navigateur. Pour HeadlessChrome en `en-US`, le welcome est en anglais.
 
-Le problème est un bug de synchronisation : `departureCityRef` dans `useChatDestinationFlow` n'est pas mis à jour quand `persistExtractedEntities` reçoit la departure city du backend. Il y a une déconnexion entre la mémoire de vol (store Zustand) et la ref locale du hook.
+Meme si `detectedLanguage` fonctionnait (Bug B), le welcome est genere AVANT toute interaction utilisateur.
 
-**Preuves** : Session 1 montre 4x `ask-departure` messages consécutifs après que l'utilisateur a dit "Paris". Session 3 montre 2x `ask-departure` après "Paris".
+**Fix en 2 parties** :
+1. Quand i18n change de langue (via le fix de `detectedLanguage`), re-traduire le welcome message. Le code existe deja a la ligne 561-564 de `PlannerChat.tsx` : `prev.map((m) => m.id === "welcome" ? { ...m, text: chatTranslations.welcomeMessage } : m)`. Cela fonctionne car `chatTranslations` depend de `t()` qui est reactif. **MAIS** ce code ne s'execute qu'au changement de `activeSessionId`, pas au changement de langue.
+2. Ajouter un `useEffect` qui watch `i18n.language` et retraduit le welcome message.
 
-**Fix** :
-1. Dans `useChatDestinationFlow.ts` : Synchroniser `departureCityRef` avec le store Zustand `useFlightMemoryStore`. Utiliser un `useEffect` qui watch `memory.departure?.city` et met à jour la ref.
-2. Ajouter un mécanisme `pendingDestinationFetch` : quand la departure city est fournie APRÈS un `ask-departure`, auto-relancer la fetch des destinations sans re-demander.
-3. Vérifier que `persistExtractedEntities` écrit bien la departure city dans le store quand l'intent `provide_departure_city` est reçu.
-
-**Fichiers** :
-- `src/components/planner/chat/hooks/useChatDestinationFlow.ts` : Ajouter un sync effect.
-- `src/components/planner/chat/hooks/persistExtractedEntities.ts` : Vérifier le mapping `departureCity`.
+**Fichier** : `src/components/planner/PlannerChat.tsx`
 
 ---
 
-## Bug 5 : Erreurs 500 récurrentes du backend
+### Bug D : `preferred_region` jamais passe
 
-**Cause** : Les 3 sessions montrent des erreurs 500 (`planner.error.server`) :
-- Session 1 : 2 erreurs 500 (lignes 882-900)
-- Session 2 : 2 erreurs 500 (lignes 582-596) 
-- Session 3 : 3 erreurs 500 (lignes 755-776)
+**Probleme** : `findNearestAirports` accepte `preferredRegion` en parametre, MAIS aucun appelant ne le passe jamais :
+- `useAutoDetectDeparture.ts` ligne 80-85 : passe coords + countryCode mais PAS `preferredRegion`
+- `useReadyMessage.ts` ligne 94 : ne passe PAS `preferredRegion`
+- `PlannerPanel.tsx` lignes 688, 764, 819, 832, 941 : ne passent PAS `preferredRegion`
+- `useDepartureAirports.ts` ligne 112 : ne passe PAS `preferredRegion`
 
-Ces erreurs surviennent typiquement quand le backend (Azure OpenAI) timeout ou retourne une erreur. Le retry automatique fonctionne (1-2 tentatives) mais cause des délais perceptibles.
+Le fix cote edge function est en place (le code gere `preferred_region`), mais le frontend ne l'envoie jamais.
 
-**Fix** :
-1. Dans `supabase/functions/planner-chat/index.ts` : Ajouter un logging plus détaillé des erreurs 500 pour identifier si c'est Azure OpenAI, la base de données, ou un bug de code.
-2. Ajouter un circuit breaker : si 2 erreurs 500 consécutives, réduire la complexité du prompt (moins de contexte) pour la tentative suivante.
+**Fix** : Passer `preferredRegion: "europe"` dans les appels critiques (ou detecter la region via le timezone/locale). Au minimum, dans `persistExtractedEntities` quand on resout un aeroport de depart, et dans `useReadyMessage`.
+
+**Fichiers** : `src/hooks/useNearestAirports.tsx` (ajouter un default "europe" si aucun n'est passe), ou chaque appelant.
 
 ---
 
-## Ordre d'implémentation
+## NOUVEAUX BUGS DETECTES (non couverts par le plan precedent)
 
-1. **Bug 3** (descriptions dupliquées) -- Fix le plus simple, impact visuel immédiat
-2. **Bug 4** (boucle ask-departure) -- Cause racine du blocage utilisateur
-3. **Bug 2** (GeoIP écrase départ) -- Corrige les aéroports hallucinations
-4. **Bug 1** (locale système) -- Corrige les messages en anglais
-5. **Bug 5** (erreurs 500) -- Monitoring et résilience
+### Bug 6 : Date range "10 mars -> 10 mars" (meme jour) -- AUTO-CONFIRMATION ERRONEE
 
-## Détails techniques
+**Preuve** : Session 1, un message auto-genere dit "I travel from 10 March to 10 March 2026" avec `isAutoGenerated: true`. Le widget `dateRangePicker` a ete confirme avec startDate === endDate.
 
-### Fichier 1 : `supabase/functions/top-cities-by-country/index.ts`
-- Ligne 247 : Modifier `getCityDescription` pour accepter et utiliser `countryDisplayName` (déjà disponible à la ligne 298)
-- Ligne 141-148 : Étendre `countryNames` avec les codes manquants (OM, CV, TZ, KH, JM, etc.)
-- Ligne 312-316 : Passer `countryDisplayName` à `getCityDescription` au lieu de undefined
+**Cause racine dans le code** : Le `DateRangePickerWidget` (ligne 121-129) verifie `if (departureDate && returnDate)` avant confirmation. Quand l'utilisateur clique un seul jour ET que `tripDuration` n'est pas passe en prop (ligne 104 : `const suggested = getSuggestedReturnDate(day)` retourne null), le widget est en mode `selectingReturn = true` mais ne bloque PAS la confirmation. 
 
-### Fichier 2 : `src/components/planner/chat/hooks/useChatDestinationFlow.ts`  
-- Ajouter un `useEffect` pour synchroniser `departureCityRef` avec le store Zustand
-- Utiliser le pattern `pendingDestinationFetch` existant (ligne 204) pour auto-relancer après reception de la departure city
+MAIS le vrai probleme n'est pas le widget lui-meme (qui necessite 2 clics pour confirmer). Le probleme est que le `useWidgetActionExecutor` (ligne 228-239) peut auto-confirmer le date range quand le LLM appelle `choose_widget_option` avec departure === return. Le guard `disabled={!departureDate || !returnDate}` n'est que dans le bouton UI, pas dans le handler programmatique.
 
-### Fichier 3 : `supabase/functions/nearest-airports/index.ts`
-- Ajouter un paramètre `preferred_region` pour désambiguïser les villes homonymes (Paris FR vs Paris CA)
+**Fix** : Dans `handleDateRangeSelect` (dateHandlers.ts), ajouter un guard :
+```typescript
+// Ligne 95-100 : Ajouter apres la signature
+if (isSameDay(departure, returnDate)) {
+  console.warn("[handleDateRangeSelect] Same day departure and return, ignoring");
+  return;
+}
+```
 
-### Fichier 4 : `src/components/planner/PlannerChat.tsx`
-- Ajouter un mécanisme de détection/switch de langue basé sur la première réponse backend
+Et dans `DateRangePickerWidget` ligne 121-122 :
+```typescript
+const handleConfirm = () => {
+  if (departureDate && returnDate && !isSameDay(departureDate, returnDate)) {
+```
 
-### Fichier 5 : `supabase/functions/planner-chat/index.ts`
-- Améliorer le logging des erreurs 500 pour diagnostic
+**Fichiers** : 
+- `src/components/planner/chat/hooks/widgetHandlers/dateHandlers.ts`
+- `src/components/planner/chat/widgets/DateRangePickerWidget.tsx`
+
+---
+
+### Bug 7 : Messages `isAutoGenerated` en anglais malgre contexte francais
+
+**Preuve** : Session 1 et 3, les messages auto-generes par le frontend utilisent `t()` pour generer le texte. Exemples :
+- "Excellent choice! Oman is a beautiful destination." (ligne 301 de `useChatDestinationFlow.ts`)
+- "Choose your travel dates:" 
+- "How many travelers?"
+- "I travel from 10 March to 10 March 2026"
+
+Tous ces messages viennent des `t("planner.widget.*")` et `t("planner.chat.excellentChoice")`.
+
+**Cause** : Meme cause racine que Bug B/C -- i18n est en anglais car le navigateur est en-US, et `detectedLanguage` n'est jamais retourne pour basculer. Ce bug est RESOLU par le fix du Bug B (rendre `detectedLanguage` required).
+
+**Pas de fix supplementaire necessaire** -- c'est un symptome du Bug B.
+
+---
+
+### Bug 8 : Erreurs 500 repetees sans diagnostic (3 sessions, 7 erreurs total)
+
+**Preuve** : 
+- Session 1 : 3 erreurs 500 + 2 `cancelled`
+- Session 2 : 2 erreurs 500
+- Session 3 : 3 erreurs 500
+
+Le fix precedent a ajoute un logging ameliore dans `planner-chat/index.ts`, mais on ne peut pas verifier si c'est deploye sans les logs edge function recents.
+
+**Action supplementaire** : Ajouter dans le frontend un compteur d'erreurs 500 consecutives. Apres 3 erreurs 500 consecutives dans la meme session, afficher un message utilisateur expliquant que le service est temporairement indisponible au lieu de retenter silencieusement.
+
+**Fichier** : `src/components/planner/chat/hooks/useChatStream.ts` (ou equivalent du circuit breaker)
+
+---
+
+### Bug 9 : `user interactions: 0` dans les 3 sessions (debug tracking casse)
+
+**Preuve** : Les 3 rapports de debug montrent `User interactions: 0` et `EventBus events: 0`. Pourtant l'utilisateur a interagi avec des widgets (selection de destination, dates, etc.).
+
+**Cause** : `useDebugEventBusCapture.ts` (ligne 7) verifie `if (!import.meta.env.DEV) return;`. En preview/production, le hook ne capture rien. De plus, `userInteractions` dans le debug store n'est JAMAIS alimente -- aucun code n'appelle `addUserInteraction()`.
+
+**Fix** : 
+1. Le tracking `userInteractions` doit etre alimente quand un widget est confirme. Ajouter des appels `addUserInteraction()` dans les widget handlers (`dateHandlers.ts`, `locationHandlers.ts`, etc.).
+2. Pour `eventBusLog` : soit retirer le guard `DEV`, soit accepter qu'il ne fonctionne qu'en dev (le bug report est genere depuis le preview/prod).
+
+**Fichiers** : 
+- `src/components/planner/chat/hooks/widgetHandlers/dateHandlers.ts` (et autres handlers)
+- `src/hooks/useDebugEventBusCapture.ts` (retirer le guard DEV pour le mode debug)
+
+---
+
+### Bug 10 : `missingFields` affiche "destination" meme apres selection d'un pays
+
+**Preuve** : Session 1 apres selection d'Oman, le `missingFields` contient toujours "destination". Session 3 apres selection de Cap-Vert, meme probleme.
+
+**Cause probable** : `missingFields` vient de `useFlightMemoryStore.missingFields`. La selection d'un pays via `handleDestinationSelect` (ligne 280-288 de `useChatDestinationFlow.ts`) ecrit `arrival.countryCode` et `arrival.country`, mais PAS `arrival.city`. Le store considere que la destination manque tant qu'il n'y a pas de ville specifique.
+
+**Ce n'est pas un bug a corriger** -- c'est un comportement attendu (le pays seul ne suffit pas pour la recherche de vol). Mais le label "destination" est trompeur. Il devrait dire "ville de destination" pour etre clair.
+
+**Fix mineur** : Dans `getMissingFieldLabel()` (fichier `src/components/planner/chat/utils`), renommer le label pour "destination" en "ville de destination".
+
+---
+
+### Bug 11 : Auto-generated `ask-departure` messages empilees (spam visuel)
+
+**Preuve** : Session 1 montre 4 messages `ask-departure` consecutifs. Session 3 en montre 2. Chaque fois que `handleLLMDestinationRequest` est appele sans `departureCityRef.current`, un NOUVEAU message `ask-departure` est ajoute (ligne 187-201 de `useChatDestinationFlow.ts`), sans verifier s'il y en a deja un.
+
+**Fix** : Avant d'ajouter un `ask-departure`, verifier qu'il n'y en a pas deja un dans les N derniers messages :
+```typescript
+// Avant ligne 187
+const recentAskDeparture = prev.slice(-3).some(
+  m => m.id.startsWith("ask-departure") && m.role === "assistant"
+);
+if (recentAskDeparture) {
+  isFetchingRef.current = false;
+  return;
+}
+```
+
+**Fichier** : `src/components/planner/chat/hooks/useChatDestinationFlow.ts`
+
+---
+
+## Resume des fichiers a modifier
+
+| Fichier | Bugs couverts |
+|---------|---------------|
+| `useChatDestinationFlow.ts` | A (store direct), 11 (dedup ask-departure) |
+| `intentClassifier.ts` (edge function) | B (detectedLanguage required) |
+| `PlannerChat.tsx` | C (re-traduire welcome sur changement de langue) |
+| `useNearestAirports.tsx` | D (default preferred_region) |
+| `dateHandlers.ts` | 6 (guard meme jour) |
+| `DateRangePickerWidget.tsx` | 6 (guard meme jour UI) |
+| Widget handlers (date, location, travelers) | 9 (user interactions tracking) |
+| `useDebugEventBusCapture.ts` | 9 (retirer guard DEV) |
+| `top-cities-by-country/index.ts` | Redeploiement (code OK mais pas deploye) |
+| `nearest-airports/index.ts` | Redeploiement |
+
+## Ordre d'implementation
+
+1. **Bug A** -- boucle ask-departure (lecture store Zustand directe)
+2. **Bug 11** -- dedup des messages ask-departure
+3. **Bug B** -- detectedLanguage required dans le schema
+4. **Bug C** -- re-traduction welcome message
+5. **Bug 6** -- guard date meme jour
+6. **Bug D** -- preferred_region default
+7. **Bug 9** -- tracking user interactions
+8. **Redeploiement** des edge functions top-cities-by-country et nearest-airports
+
