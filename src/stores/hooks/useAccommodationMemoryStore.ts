@@ -126,12 +126,24 @@ export function useAccommodationMemoryStore(): AccommodationMemoryStoreValue {
   const store = usePlannerStoreV2();
   const { memory: travelMemory } = useTravelMemoryStore();
 
-  // Ensure at least one accommodation exists on mount (after hydration)
+  // Ensure exactly one accommodation exists on mount (after hydration)
+  // Also clean up stale persisted state: if multiple empty accommodations exist, reset to one
   useEffect(() => {
-    if (store.isHydrated && store.accommodations.length === 0) {
+    if (!store.isHydrated) return;
+    if (store.accommodations.length === 0) {
       store.addAccommodation();
+    } else if (store.accommodations.length > 1) {
+      // Check if most accommodations are empty (no city set) — likely stale persisted data
+      const nonEmpty = store.accommodations.filter((a) => a.city && a.city.trim() !== "");
+      if (nonEmpty.length === 0) {
+        // All empty — reset to just one
+        store.updateAccommodationBatch(() => ({
+          accommodations: [store.accommodations[0]],
+          activeAccommodationIndex: 0,
+        }));
+      }
     }
-  }, [store.isHydrated, store.accommodations.length, store.addAccommodation]);
+  }, [store.isHydrated, store.accommodations.length, store.addAccommodation, store.accommodations, store.updateAccommodationBatch]);
 
   // Build memory object (mirrors Context structure)
   const memory = useMemo<AccommodationMemory>(() => ({
