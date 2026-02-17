@@ -9,6 +9,18 @@ import { MAPBOX_ACCESS_TOKEN } from "@/config/mapbox";
  * Initializes the Mapbox GL map instance, handles resize observation,
  * event bus bounds requests, and search-in-area status tracking.
  */
+/** Check if browser supports WebGL */
+function isWebGLSupported(): boolean {
+  try {
+    const canvas = document.createElement("canvas");
+    return !!(
+      canvas.getContext("webgl") || canvas.getContext("webgl2") || canvas.getContext("experimental-webgl")
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function useMapInit(
   initialCenter: [number, number],
   initialZoom: number,
@@ -18,10 +30,17 @@ export function useMapInit(
   const [mapLoaded, setMapLoaded] = useState(false);
   const [currentZoom, setCurrentZoom] = useState(initialZoom);
   const [isSearchingInArea, setIsSearchingInArea] = useState(false);
+  const [webglSupported, setWebglSupported] = useState(true);
 
   // Initialize map
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
+
+    if (!isWebGLSupported()) {
+      console.warn("[useMapInit] WebGL not supported — skipping map init");
+      setWebglSupported(false);
+      return;
+    }
 
     const handlePopupClose = () => {
       const prev = (window as any).__selectedDestinationPinEl as HTMLElement | undefined;
@@ -132,5 +151,6 @@ export function useMapInit(
     mapLoaded,
     currentZoom,
     isSearchingInArea,
+    webglSupported,
   };
 }
