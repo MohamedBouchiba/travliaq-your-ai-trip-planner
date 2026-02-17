@@ -1,102 +1,50 @@
 
-## Fix des incohérences du chat planner
+## Corrections : Autocomplete, Géolocalisation et Redesign TripPriceBar
 
-### Problèmes identifiés (3 bugs distincts)
+### Bug 1 : Autocomplétion cassée (CRITIQUE)
 
-**Bug 1 : Double suggestion de destinations**
-Quand l'utilisateur dit "oui" pour les suggestions, le LLM fait deux choses contradictoires :
-- Il génère dans son texte une liste hardcodée (Barcelone, Lisbonne, Athènes)
-- Il appelle `request_destination_suggestions` qui déclenche l'API réelle (Egypte, Cambodge, RD)
+**Cause racine identifiée** : L'edge function `location-autocomplete` importe `cleanupRateLimitMap` depuis `rateLimit.ts`, mais cette fonction n'existe pas (elle s'appelle `cleanupRateLimits`). De plus, `checkRateLimit` est appelée avec 2 arguments mais la signature en requiert 3 (le `functionName` est obligatoire).
 
-L'utilisateur voit les deux, ce qui est confus et incohérent.
+Cela provoque un **BootFailure** systématique -- aucune requête d'autocomplétion ne peut aboutir.
 
-**Bug 2 : Le LLM réaffiche `preferenceInterests` après les suggestions**
-Après avoir appelé `request_destination_suggestions`, le LLM génère dans sa réponse finale un texte contenant "Sélectionnez vos centres d'intérêt" et "Autre chose à mentionner ?", relançant le flux de préférences alors que les suggestions sont déjà affichées. La protection `blockedWidgets` fonctionne côté classification d'intention, mais pas sur le texte libre du LLM dans la boucle de contenu final.
-
-**Bug 3 : Le texte du LLM contient des tags `<widget>` bruts**
-La première réponse contient `<widget preferenceInterests />` dans le texte brut, qui ne sont pas des directives valides mais du texte généré par le LLM.
+**Correction** dans `supabase/functions/location-autocomplete/index.ts` :
+- Renommer l'import `cleanupRateLimitMap` en `cleanupRateLimits`
+- Ajouter le paramètre `"location-autocomplete"` à l'appel `checkRateLimit`
+- Adapter l'appel `cleanupRateLimits()` (qui est maintenant async)
 
 ---
 
-### Corrections prévues
+### Bug 2 : Géolocalisation / Auto-detect departure
 
-#### 1. System prompt : interdire les listes de destinations dans le texte (Bug 1)
+L'edge function `reverse-geocode` fonctionne correctement (confirmé par les logs). Le hook `useAutoDetectDeparture` est bien monté dans `TravelPlanner.tsx`.
 
-**Fichier : `supabase/functions/planner-chat/index.ts`** (dans `buildSystemPrompt`)
+**Hypothèse** : Le store `flightMemory` persiste via `zustand/persist` dans localStorage. Si `memory.departure` contient un objet vide ou partiel (sans `iata` ni `city`) d'une session précédente, le hook saute la détection car la condition vérifie `memory.departure?.iata || memory.departure?.city`.
 
-Ajouter une règle explicite :
-```
-RÈGLE : QUAND TU APPELLES request_destination_suggestions
-- Ne liste AUCUNE destination dans ton texte
-- Ton texte doit être un court message d'accompagnement (ex: "Voici mes suggestions personnalisées pour toi !")
-- L'outil affiche automatiquement les cartes de destinations, tu ne dois PAS les dupliquer
-- INTERDIT : lister des villes/pays dans le texte quand l'outil est appelé
-```
+**Correction** dans `src/hooks/useAutoDetectDeparture.ts` :
+- Renforcer la condition de skip : vérifier que `departure` a une valeur réellement exploitable (iata ET city non vides), pas juste un objet truthy
+- Ajouter un log explicite quand la détection est lancée vs skippée
 
-#### 2. System prompt : interdire la re-sollicitation de widgets bloqués (Bug 2)
+---
 
-**Fichier : `supabase/functions/planner-chat/index.ts`** (dans `buildSystemPrompt`)
+### Redesign TripPriceBar : Progression de planification
 
-Renforcer la règle sur les widgets bloqués :
-```
-RÈGLE CRITIQUE : WIDGETS BLOQUÉS
-Si un widget apparaît dans [WIDGETS BLOQUÉS], tu ne dois JAMAIS :
-- Mentionner ce widget dans ton texte
-- Demander à l'utilisateur de remplir ce qui correspond à ce widget
-- Générer du contenu qui duplique la fonction de ce widget
-```
+Refonte complète du stepper pour un design plus premium et user-friendly :
 
-#### 3. Nettoyage du contenu côté client quand `destinationSuggestionRequest` (Bug 1+2)
+- Remplacer les cercles numérotés "1, 2, 3" par les **icones** de chaque étape (Plane, Hotel, Compass)
+- Ajouter un style "pill" compact avec le label toujours visible (pas seulement sur desktop)
+- Ligne de connexion plus élégante entre les étapes (pointillée quand en attente, solide quand complétée)
+- Réduire le padding vertical (`py-1` au lieu de `py-1.5`) pour une barre plus fine
+- Le prix et le bouton restent alignés à droite
+- Couleurs : gris subtil pour les étapes en attente, primary/accent pour l'étape en cours, vert pour les étapes complétées
 
-**Fichier : `src/components/planner/chat/hooks/useChatDestinationFlow.ts`**
+---
 
-Dans `handleLLMDestinationRequest`, lors de la mise à jour du message (ligne 258-274), remplacer aussi le texte du message par un court texte d'accompagnement pour éliminer le contenu LLM incohérent :
+### Tests de non-régression
 
-```typescript
-setMessages((prev) =>
-  prev.map((m) =>
-    m.id === messageId
-      ? {
-          ...m,
-          text: m.text, // Keep LLM text as-is (will be cleaned below)
-          isTyping: false,
-          isStreaming: false,
-          widget: "destinationSuggestions",
-          widgetData: { suggestions, basedOnProfile },
-        }
-      : m
-  )
-);
-```
-
-Ajouter un nettoyage du texte : supprimer les listes numérotées de destinations et les mentions de widgets bloqués du contenu textuel avant de l'afficher.
-
-#### 4. Strip des tags `<widget>` du contenu LLM (Bug 3)
-
-**Fichier : `supabase/functions/planner-chat/index.ts`** (ligne ~1185)
-
-Le code strip déjà les tags `<action>`. Ajouter un strip pour les tags `<widget>` :
-```typescript
-finalContent = finalContent.replace(/<widget\s+\w+\s*\/>/g, "").trim();
-finalContent = finalContent.replace(/<action>[\s\S]*?<\/action>/g, "").trim();
-```
-
-#### 5. Nettoyage côté client du texte quand destinationSuggestions (fallback)
-
-**Fichier : `src/components/planner/chat/hooks/useChatSubmit.ts`**
-
-Avant le early-return à la ligne 398, nettoyer le contenu du message pour retirer les listes de destinations halllucinées :
-```typescript
-if (destinationSuggestionRequest) {
-  // Clean LLM hallucinated destination lists from streamed content
-  const cleanedContent = (content || "").replace(/\d+\.\s*\*\*[^*]+\*\*[^\n]*/g, "").trim();
-  if (cleanedContent && cleanedContent !== content) {
-    opts.setMessages(updateMessageById(messageId, { text: cleanedContent }));
-  }
-  await opts.handleLLMDestinationRequest(messageId, ...);
-  return;
-}
-```
+Ajouter des tests dans un fichier dédié pour :
+1. **Autocomplétion** : vérifier que le hook `useLocationAutocomplete` appelle bien l'edge function et retourne des résultats formatés
+2. **Auto-detect departure** : vérifier que le hook ne skip pas quand departure est vide, et skip bien quand departure est définie
+3. **TripPriceBar** : vérifier le calcul des étapes complétées et du pourcentage de progression
 
 ---
 
@@ -104,10 +52,10 @@ if (destinationSuggestionRequest) {
 
 | Fichier | Action |
 |---|---|
-| `supabase/functions/planner-chat/index.ts` | Ajouter règles system prompt + strip `<widget>` tags |
-| `src/components/planner/chat/hooks/useChatSubmit.ts` | Nettoyer le texte streamé avant early-return destination suggestions |
-| `src/components/planner/chat/hooks/useChatDestinationFlow.ts` | Nettoyage optionnel du texte dans handleLLMDestinationRequest |
+| `supabase/functions/location-autocomplete/index.ts` | Fix import `cleanupRateLimits` + ajouter `functionName` à `checkRateLimit` |
+| `src/hooks/useAutoDetectDeparture.ts` | Renforcer la condition de skip pour departure vide/partielle |
+| `src/components/planner/TripPriceBar.tsx` | Redesign stepper avec icones, pills, ligne élégante, barre plus fine |
+| `src/__tests__/bug-fixes.test.ts` | Tests de non-régression pour autocomplete, auto-detect, et TripPriceBar |
 
 ### Redéploiement
-- Déployer `planner-chat`
-- Tester avec le flux "Inspire-moi !" complet
+- Déployer `location-autocomplete` après le fix
