@@ -1007,6 +1007,33 @@ serve(async (req) => {
       ...limitedMessages,
     ];
     let conversationMessages = truncateMessages(rawMessages, MAX_CONTEXT_TOKENS, log);
+    
+    // ── Widget context injection ──────────────────────────────────────
+    // When Step 1 (classification) selected a widget, inform the ReAct LLM
+    // so it generates SHORT text and does NOT duplicate widget options.
+    const activeWidgetType = collectedData.intentClassification?.widgetToShow?.type;
+    if (activeWidgetType) {
+      const widgetContextMsg = {
+        role: "system",
+        content: `[WIDGET ACTIF] Le widget "${activeWidgetType}" sera affiché à l'utilisateur juste après ton message.\n` +
+          `RÈGLE ABSOLUE : Ton texte doit être TRÈS COURT (1-2 phrases max, ≤30 mots).\n` +
+          `NE FAIS PAS de liste à puces, d'énumération d'options, ni de numérotation.\n` +
+          `Le widget affiche déjà toutes les options interactives.\n` +
+          `Exemples de bonnes réponses :\n` +
+          `- "On va d'abord cerner ton style de voyage 🎯"\n` +
+          `- "Sélectionne ce qui te tente le plus :"\n` +
+          `- "Voyons quel type de voyageur tu es !"`,
+      };
+      // Insert just before the last user message
+      const lastUserIdx = conversationMessages.map(m => m.role).lastIndexOf("user");
+      if (lastUserIdx > 0) {
+        conversationMessages.splice(lastUserIdx, 0, widgetContextMsg);
+      } else {
+        conversationMessages.push(widgetContextMsg);
+      }
+      log.info("widget_context_injection", `Injected widget context for "${activeWidgetType}"`, { widgetType: activeWidgetType });
+    }
+    
     let finalContent = "";
     let lastResponse: unknown = null;
     

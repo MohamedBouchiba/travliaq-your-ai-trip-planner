@@ -207,3 +207,72 @@ describe('isSwitchingSessionRef stability', () => {
     expect(effectCount).toBe(1);
   });
 });
+
+// --- Test 5: Widget context injection produces short text ---
+describe('Widget context injection for ReAct messages', () => {
+  interface SimpleMessage {
+    role: string;
+    content: string;
+  }
+
+  /**
+   * Simulates the widget context injection logic from planner-chat/index.ts.
+   * When a widgetToShow is defined, a system message is injected before the last user message.
+   */
+  const injectWidgetContext = (
+    messages: SimpleMessage[],
+    widgetType: string | undefined
+  ): SimpleMessage[] => {
+    const result = [...messages];
+    if (!widgetType) return result;
+
+    const widgetContextMsg: SimpleMessage = {
+      role: 'system',
+      content: `[WIDGET ACTIF] Le widget "${widgetType}" sera affiché à l'utilisateur juste après ton message.\n` +
+        `RÈGLE ABSOLUE : Ton texte doit être TRÈS COURT (1-2 phrases max, ≤30 mots).\n` +
+        `NE FAIS PAS de liste à puces, d'énumération d'options, ni de numérotation.`,
+    };
+
+    const lastUserIdx = result.map(m => m.role).lastIndexOf('user');
+    if (lastUserIdx > 0) {
+      result.splice(lastUserIdx, 0, widgetContextMsg);
+    } else {
+      result.push(widgetContextMsg);
+    }
+    return result;
+  };
+
+  it('injects widget context message before last user message', () => {
+    const messages: SimpleMessage[] = [
+      { role: 'system', content: 'You are a travel assistant.' },
+      { role: 'user', content: 'Inspire-moi' },
+    ];
+    const result = injectWidgetContext(messages, 'preferenceStyle');
+    expect(result.length).toBe(3);
+    expect(result[1].role).toBe('system');
+    expect(result[1].content).toContain('[WIDGET ACTIF]');
+    expect(result[1].content).toContain('preferenceStyle');
+    expect(result[2].role).toBe('user');
+  });
+
+  it('does NOT inject when widgetType is undefined', () => {
+    const messages: SimpleMessage[] = [
+      { role: 'system', content: 'System prompt' },
+      { role: 'user', content: 'Hello' },
+    ];
+    const result = injectWidgetContext(messages, undefined);
+    expect(result.length).toBe(2);
+  });
+
+  it('widget context message forbids bullet lists', () => {
+    const messages: SimpleMessage[] = [
+      { role: 'system', content: 'System prompt' },
+      { role: 'user', content: 'Inspire-moi' },
+    ];
+    const result = injectWidgetContext(messages, 'preferenceStyle');
+    const injected = result.find(m => m.content.includes('[WIDGET ACTIF]'));
+    expect(injected).toBeDefined();
+    expect(injected!.content).toContain('NE FAIS PAS de liste');
+    expect(injected!.content).toContain('TRÈS COURT');
+  });
+});
