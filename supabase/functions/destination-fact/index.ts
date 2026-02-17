@@ -108,17 +108,15 @@ serve(async (req) => {
       );
     }
 
-    const AZURE_OPENAI_API_KEY = Deno.env.get("AZURE_OPENAI_API_KEY");
-    const AZURE_OPENAI_ENDPOINT = Deno.env.get("AZURE_OPENAI_ENDPOINT");
-    const AZURE_OPENAI_API_VERSION = Deno.env.get("AZURE_OPENAI_API_VERSION") || "2025-01-01-preview";
-    const AZURE_OPENAI_DEPLOYMENT = Deno.env.get("AZURE_OPENAI_DEPLOYMENT");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") || "gpt-4o-mini";
 
-    if (!AZURE_OPENAI_API_KEY || !AZURE_OPENAI_ENDPOINT || !AZURE_OPENAI_DEPLOYMENT) {
-      console.error("Missing Azure OpenAI configuration");
-      throw new Error("Azure OpenAI configuration is incomplete");
+    if (!OPENAI_API_KEY) {
+      console.error("Missing OPENAI_API_KEY");
+      throw new Error("OPENAI_API_KEY is not configured");
     }
 
-    const url = `${AZURE_OPENAI_ENDPOINT}openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=${AZURE_OPENAI_API_VERSION}`;
+    const url = "https://api.openai.com/v1/chat/completions";
 
     const prompt = `Tu es un expert en voyages. Donne un fait unique, intéressant et méconnu sur la ville de ${city}${country ? ` (${country})` : ""}. 
 
@@ -137,15 +135,16 @@ Exemples de bons faits:
 
 Réponds UNIQUEMENT avec le fait, rien d'autre.`;
 
-    console.log(`[destination-fact] Fetching fact from Azure OpenAI for city: ${city}`);
+    console.log(`[destination-fact] Fetching fact from OpenAI for city: ${city}`);
 
     const response = await fetch(url, {
       method: "POST",
       headers: {
-        "api-key": AZURE_OPENAI_API_KEY,
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        model: OPENAI_MODEL,
         messages: [{ role: "user", content: prompt }],
         max_tokens: 100,
         temperature: 0.9,
@@ -154,8 +153,8 @@ Réponds UNIQUEMENT avec le fait, rien d'autre.`;
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Azure OpenAI error:", response.status, errorText);
-      throw new Error("Azure OpenAI error");
+      console.error("OpenAI error:", response.status, errorText);
+      throw new Error("OpenAI error");
     }
 
     const data = await response.json();

@@ -999,8 +999,8 @@ serve(async (req) => {
     while (loopCount <= MULTI_TOOL_CONFIG.MAX_LOOPS) {
       log.info("multi_tool", `Tool loop iteration ${loopCount + 1}`, { loopCount });
       
-      log.azureCall("start");
-      const azureStartTime = Date.now();
+      log.llmCall("start");
+      const llmStartTime = Date.now();
       
       const response = await fetchWithRetry(url, {
         method: "POST",
@@ -1026,8 +1026,8 @@ serve(async (req) => {
       }
 
       const data = await response.json();
-      const azureLatency = Date.now() - azureStartTime;
-      log.azureCall("end", azureLatency, data.usage?.total_tokens);
+      const llmLatency = Date.now() - llmStartTime;
+      log.llmCall("end", llmLatency, data.usage?.total_tokens);
       
       lastResponse = data;
       const choice = data.choices?.[0];
@@ -1116,7 +1116,7 @@ serve(async (req) => {
         finalCallBody.tool_choice = "auto";
       }
 
-      // A3: Real streaming — emit collected data then stream Azure response directly
+      // A3: Real streaming — emit collected data then stream OpenAI response directly
       if (useRealStreaming) {
         log.info("streaming", "Using real streaming for final content");
         // Normalize dates before streaming (won't have access to content after)
@@ -1234,10 +1234,10 @@ serve(async (req) => {
 });
 
 /**
- * Create a streaming response from Azure OpenAI
+ * Create a streaming response from OpenAI
  */
 function createStreamingResponse(
-  azureResponse: Response,
+  openaiResponse: Response,
   collectedData: CollectedToolData,
   log: RequestLogger,
   requestId: string,
@@ -1250,7 +1250,7 @@ function createStreamingResponse(
       // Emit collected data first
       emitCollectedDataEvents(controller, encoder, collectedData, toolLog);
       
-      const reader = azureResponse.body!.getReader();
+      const reader = openaiResponse.body!.getReader();
       const decoder = new TextDecoder();
 
       try {

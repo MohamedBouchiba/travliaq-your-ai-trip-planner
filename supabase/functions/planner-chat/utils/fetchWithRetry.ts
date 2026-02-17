@@ -13,7 +13,7 @@ export async function fetchWithRetry(
   url: string,
   init: RequestInit,
   log: RequestLogger,
-  label = "azure_openai",
+  label = "openai",
 ): Promise<Response> {
   let lastError: Error | null = null;
 

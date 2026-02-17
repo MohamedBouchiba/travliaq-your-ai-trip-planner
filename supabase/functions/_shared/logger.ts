@@ -5,7 +5,7 @@
  * - Structured JSON logging for Supabase logs
  * - Request ID tracing across frontend/backend
  * - Tool execution tracking with latency metrics
- * - Azure OpenAI call tracking with token usage
+ * - LLM call tracking with token usage
  * - Batch buffering for Sentry via existing tunnel
  */
 
@@ -16,7 +16,7 @@ export type LogLevel = "debug" | "info" | "warning" | "error" | "fatal";
 
 export type LogCategory = 
   | "planner_chat"
-  | "azure_openai"
+  | "openai"
   | "tool_execution"
   | "tool_validation"
   | "request"
@@ -141,7 +141,7 @@ function buildSentryEnvelope(events: LogEvent[], requestId: string, userId?: str
   const totalDuration = endTime - startTime;
   
   const toolEvents = events.filter(e => e.category === "tool_execution");
-  const azureEvents = events.filter(e => e.category === "azure_openai");
+  const azureEvents = events.filter(e => e.category === "openai");
   const totalTokens = azureEvents.reduce((sum, e) => sum + (e.tokens_used || 0), 0);
   
   const envelopeItems: string[] = [];
@@ -261,7 +261,7 @@ export interface RequestLogger {
   error: (category: LogCategory, message: string, error?: Error | null, data?: Record<string, unknown>) => void;
   toolStart: (toolName: string) => void;
   toolEnd: (toolName: string, success: boolean, latencyMs: number, result?: unknown) => void;
-  azureCall: (type: "start" | "end", latencyMs?: number, tokens?: number) => void;
+  llmCall: (type: "start" | "end", latencyMs?: number, tokens?: number) => void;
   flush: () => Promise<void>;
   getRequestId: () => string;
 }
@@ -276,7 +276,7 @@ export interface RequestLogger {
 export function createRequestLogger(requestId: string, userId?: string): RequestLogger {
   const events: LogEvent[] = [];
   const startTime = Date.now();
-  let azureCallStartTime: number | null = null;
+  let llmCallStartTime: number | null = null;
   
   const addEvent = (event: Omit<LogEvent, "request_id" | "timestamp" | "user_id">) => {
     const fullEvent: LogEvent = {
@@ -360,25 +360,25 @@ export function createRequestLogger(requestId: string, userId?: string): Request
       });
     },
     
-    azureCall(type: "start" | "end", latencyMs?: number, tokens?: number) {
+    llmCall(type: "start" | "end", latencyMs?: number, tokens?: number) {
       if (type === "start") {
-        azureCallStartTime = Date.now();
+        llmCallStartTime = Date.now();
         addEvent({
           level: "debug",
-          category: "azure_openai",
-          message: "Azure OpenAI call started",
+          category: "openai",
+          message: "OpenAI call started",
         });
       } else {
-        const calculatedLatency = azureCallStartTime ? Date.now() - azureCallStartTime : latencyMs;
+        const calculatedLatency = llmCallStartTime ? Date.now() - llmCallStartTime : latencyMs;
         addEvent({
           level: "info",
-          category: "azure_openai",
-          message: "Azure OpenAI call completed",
+          category: "openai",
+          message: "OpenAI call completed",
           latency_ms: calculatedLatency,
           tokens_used: tokens,
           data: tokens ? { tokens_used: tokens } : undefined,
         });
-        azureCallStartTime = null;
+        llmCallStartTime = null;
       }
     },
     
