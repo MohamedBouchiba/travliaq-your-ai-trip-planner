@@ -452,7 +452,128 @@ describe("Bug H — retry exhaustion produces user-facing error", () => {
   });
 });
 
-// ─── Helper for buildLLMContext tests ─────────────────────────────────
+// ─── Bug I: preferredRegion in destination suggestion payload ─────────
+
+describe("Bug I — preferredRegion in destination payload", () => {
+  it("buildDestinationPayload maps preferredRegion when provided", async () => {
+    const { buildDestinationPayload } = await import(
+      "@/components/planner/chat/utils/buildDestinationPayload"
+    );
+    const result = buildDestinationPayload({
+      preferences: {
+        styleAxes: { chillVsIntense: 50, cityVsNature: 50, ecoVsLuxury: 50, touristVsLocal: 50 },
+        interests: [],
+        mustHaves: {},
+        dietaryRestrictions: [],
+      },
+      preferredRegion: "Méditerranée",
+    });
+    expect(result.preferredRegion).toBe("Méditerranée");
+  });
+
+  it("buildDestinationPayload omits preferredRegion when not provided", async () => {
+    const { buildDestinationPayload } = await import(
+      "@/components/planner/chat/utils/buildDestinationPayload"
+    );
+    const result = buildDestinationPayload({
+      preferences: {
+        styleAxes: { chillVsIntense: 50, cityVsNature: 50, ecoVsLuxury: 50, touristVsLocal: 50 },
+        interests: [],
+        mustHaves: {},
+        dietaryRestrictions: [],
+      },
+    });
+    expect(result.preferredRegion).toBeUndefined();
+  });
+
+  it("DestinationSuggestRequest type includes preferredRegion field", async () => {
+    const source = await import("@/types/destinations?raw");
+    const code = (source as unknown as { default: string }).default ?? String(source);
+    expect(code).toContain("preferredRegion");
+  });
+});
+
+// ─── Bug J: destinationSuggestions NOT auto-confirmed ────────────────
+
+describe("Bug J — destinationSuggestions only confirmed on user click", () => {
+  it("handleDestinationSelect is the only place that confirms destinationSuggestions", async () => {
+    const source = await import(
+      "@/components/planner/chat/hooks/useChatDestinationFlow?raw"
+    );
+    const code = (source as unknown as { default: string }).default ?? String(source);
+    // widgetConfirmed: true must only appear inside handleDestinationSelect
+    const confirmMatches = [...code.matchAll(/widgetConfirmed:\s*true/g)];
+    // Should be exactly 1 occurrence (in handleDestinationSelect)
+    expect(confirmMatches.length).toBe(1);
+  });
+
+  it("A4 guard dismisses previous unconfirmed destination widgets", async () => {
+    const source = await import(
+      "@/components/planner/chat/hooks/useChatDestinationFlow?raw"
+    );
+    const code = (source as unknown as { default: string }).default ?? String(source);
+    // Must contain the A4 dismiss logic
+    expect(code).toContain('widget === "destinationSuggestions" && !m.widgetConfirmed');
+  });
+});
+
+// ─── Bug K: citySelector guard for missing data ──────────────────────
+
+describe("Bug K — citySelector not rendered without data", () => {
+  it("WidgetRenderer returns null for citySelector without citySelection data", async () => {
+    const source = await import(
+      "@/components/planner/chat/widgets/WidgetRenderer?raw"
+    );
+    const code = (source as unknown as { default: string }).default ?? String(source);
+    // Must have guard: if (!m.widgetData?.citySelection) return null
+    expect(code).toContain("citySelection");
+    expect(code).toMatch(/!m\.widgetData\?\.citySelection.*return null/s);
+  });
+});
+
+// ─── Bug L: geographic region extraction ─────────────────────────────
+
+describe("Bug L — geographic region extraction from user messages", () => {
+  it("ENTITY_PATTERNS includes geoRegions patterns", async () => {
+    const { ENTITY_PATTERNS } = await import(
+      "@/components/planner/chat/hooks/useSessionContext"
+    );
+    expect(ENTITY_PATTERNS.geoRegions).toBeDefined();
+    expect(ENTITY_PATTERNS.geoRegions.length).toBeGreaterThan(0);
+  });
+
+  it("extractEntities detects 'Méditerranée' from user text", async () => {
+    const { extractEntities, ENTITY_PATTERNS } = await import(
+      "@/components/planner/chat/hooks/useSessionContext"
+    );
+    const result = extractEntities(
+      "On aimerait un beau voyage en Méditerranée",
+      ENTITY_PATTERNS.geoRegions,
+      3,
+    );
+    expect(result).toContain("Méditerranée");
+  });
+
+  it("extractEntities detects 'Europe' from 'rester en Europe'", async () => {
+    const { extractEntities, ENTITY_PATTERNS } = await import(
+      "@/components/planner/chat/hooks/useSessionContext"
+    );
+    const result = extractEntities(
+      "On veut rester en Europe",
+      ENTITY_PATTERNS.geoRegions,
+      3,
+    );
+    expect(result).toContain("Europe");
+  });
+
+  it("SessionEntities type includes geoRegions field", async () => {
+    const source = await import(
+      "@/components/planner/chat/hooks/chatStreamTypes?raw"
+    );
+    const code = (source as unknown as { default: string }).default ?? String(source);
+    expect(code).toContain("geoRegions");
+  });
+});
 
 function buildMockSources(prefOverrides: Record<string, unknown> = {}) {
   return {

@@ -84,6 +84,11 @@ export const ENTITY_PATTERNS = {
     /(?:je veux|il me faut|j'ai besoin de|obligatoire|impératif)\s*:?\s*([^.!?]+)/gi,
     /(?:accessibilité|PMR|animaux|enfants|wifi)/gi,
   ],
+  // Geographic regions: Mediterranean, Europe, Asia, etc.
+  geoRegions: [
+    /(?:en|au|dans|sur)\s+(?:la\s+)?(Méditerranée|Mediterranée|Mediterranee|Europe|Asie|Afrique|Amérique|Amérique du Nord|Amérique du Sud|Océanie|Caraïbes|Scandinavie|Balkans)/gi,
+    /(?:rester|partir|voyager)\s+en\s+(Europe|Asie|Afrique|Amérique|Océanie|Scandinavie|Méditerranée)/gi,
+  ],
 };
 
 /**
@@ -121,6 +126,7 @@ interface CachedEntities {
   dates: string[];
   budgets: string[];
   constraints: string[];
+  geoRegions: string[];
 }
 
 export function useSessionContext({
@@ -172,6 +178,7 @@ export function useSessionContext({
     const datesSet = new Set<string>();
     const budgetsSet = new Set<string>();
     const constraintsSet = new Set<string>();
+    const geoRegionsSet = new Set<string>();
 
     for (const msg of userMessages) {
       // P6: Only run regex on messages not already cached
@@ -182,6 +189,7 @@ export function useSessionContext({
           dates: extractEntities(msg.text, ENTITY_PATTERNS.dates, 2, undefined, true),
           budgets: extractEntities(msg.text, ENTITY_PATTERNS.budgets),
           constraints: extractEntities(msg.text, ENTITY_PATTERNS.constraints),
+          geoRegions: extractEntities(msg.text, ENTITY_PATTERNS.geoRegions, 3),
         };
         cache.set(msg.id, extracted);
       }
@@ -189,6 +197,7 @@ export function useSessionContext({
       for (const d of extracted.dates) datesSet.add(d);
       for (const b of extracted.budgets) budgetsSet.add(b);
       for (const c of extracted.constraints) constraintsSet.add(c);
+      for (const r of extracted.geoRegions) geoRegionsSet.add(r);
     }
 
     const destinations = Array.from(destinationsSet);
@@ -221,11 +230,14 @@ export function useSessionContext({
       }
     }
 
+    const geoRegions = Array.from(geoRegionsSet);
+
     return {
       destinations: destinations.slice(0, 10), // Limit to 10
       dates: dates.slice(0, 5),
       budgets: budgets.slice(0, 3),
       constraints: constraints.slice(0, 5),
+      geoRegions: geoRegions.slice(0, 3),
     };
   }, [messages, widgetInteractions]);
 

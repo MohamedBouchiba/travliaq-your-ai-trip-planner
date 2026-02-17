@@ -39,6 +39,7 @@ interface BuildDestinationPayloadOptions {
   departure?: DepartureInfo;
   departureDateMs?: number | null;
   tripDuration?: string;
+  preferredRegion?: string;
 }
 
 export function buildDestinationPayload({
@@ -46,6 +47,7 @@ export function buildDestinationPayload({
   departure,
   departureDateMs,
   tripDuration,
+  preferredRegion,
 }: BuildDestinationPayloadOptions): DestinationSuggestRequest {
   return {
     userLocation: departure?.city
@@ -93,5 +95,7 @@ export function buildDestinationPayload({
       : new Date().getMonth() + 1,
 
     tripDuration,
+
+    preferredRegion: preferredRegion || undefined,
   };
 }
