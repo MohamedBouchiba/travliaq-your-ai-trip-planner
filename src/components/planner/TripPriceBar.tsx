@@ -87,7 +87,7 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
         />
       </div>
 
-      <div className="flex items-center justify-between px-3 py-1 gap-2">
+      <div className="flex items-center justify-between px-4 py-2.5 gap-3">
         {/* Step pills */}
         <div className="flex items-center gap-0">
           {visibleSteps.map(({ key, icon: Icon, label }, idx) => {
@@ -106,21 +106,21 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
                   )} />
                 )}
                 <div className={cn(
-                  "flex items-center gap-1 px-1.5 py-0.5 rounded-full transition-all duration-300",
+                  "flex items-center gap-1.5 px-2 py-1 rounded-full transition-all duration-300",
                   done
                     ? "bg-green-500/10"
                     : "bg-muted/30"
                 )}>
                   <div className={cn(
-                    'flex items-center justify-center h-3.5 w-3.5 rounded-full transition-all duration-300',
+                    'flex items-center justify-center h-4 w-4 rounded-full transition-all duration-300',
                     done
                       ? 'text-green-600 dark:text-green-400'
                       : 'text-muted-foreground/40'
                   )}>
-                    {done ? <Check className="h-2.5 w-2.5" /> : <Icon className="h-2.5 w-2.5" />}
+                    {done ? <Check className="h-3 w-3" /> : <Icon className="h-3 w-3" />}
                   </div>
                   <span className={cn(
-                    'text-[9px] font-medium leading-none transition-colors duration-300',
+                    'text-[10px] font-medium leading-none transition-colors duration-300',
                     done ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground/50'
                   )}>
                     {label}
@@ -133,10 +133,10 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
 
         {/* Price */}
         <div className="flex items-baseline gap-0.5 min-w-0">
-          <span className="text-xs font-bold text-foreground tabular-nums">
+          <span className="text-sm font-bold text-foreground tabular-nums">
             {formattedPrice}
           </span>
-          <span className="text-[9px] font-medium text-muted-foreground">
+          <span className="text-[10px] font-medium text-muted-foreground">
             {symbol}
           </span>
         </div>
@@ -147,9 +147,9 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
           size="sm"
           disabled={false}
           onClick={onPlanTrip}
-          className="gap-1 text-[10px] h-6 px-2.5"
+          className="gap-1.5 text-xs h-8 px-4"
         >
-          <Plane className="h-2.5 w-2.5" />
+          <Plane className="h-3.5 w-3.5" />
           Planifier
         </Button>
       </div>
