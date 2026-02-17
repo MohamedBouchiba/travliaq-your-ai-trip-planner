@@ -1,216 +1,72 @@
 
 
-# Plan de correction approfondi -- Analyse exhaustive des 3 fichiers de logs
+# Bug: Style de voyage sauté — `styleAxesConfigured` toujours `true`
 
-Les 3 fichiers de logs sont les memes que precedemment. Cette analyse se concentre sur les bugs NOUVEAUX non couverts par le plan precedent, plus les corrections precises des bugs deja identifies mais dont les fix sont incomplets ou incorrects.
+## Cause racine
 
----
+Le flux "preference-first" dans le backend (`applyPreferenceFirstLogic`, ligne 479) vérifie :
 
-## BUGS DEJA IDENTIFIES (corrections affinee)
-
-### Bug A : Boucle `ask-departure` (CRITIQUE -- fix incomplet)
-
-**Probleme dans le code actuel** : Ligne 184 de `useChatDestinationFlow.ts`, la verification `if (!departureCityRef.current)` est correcte en theorie car les lignes 75-76 font `departureCityRef.current = departureCity`. MAIS le probleme est un probleme de timing React :
-
-1. `useChatSubmit` appelle `persistExtractedEntities` qui fait `updateMemory({ departure: { city: "Paris" } })`
-2. Cela declenche un re-render de `PlannerChat` qui passe le nouveau `departureCity` a `useChatDestinationFlow`
-3. MAIS dans le meme tick, `useChatSubmit` appelle `handleLLMDestinationRequest` (ligne 396)
-4. A ce moment, React n'a PAS encore re-rendu, donc `departureCityRef.current` est encore `undefined`
-
-Le fix B6 (ligne 170) `departureCityOverride` resout partiellement ce probleme quand `freshMemory.departure.city` est dispo. MAIS `freshMemory` (ligne 395) vient de `memoryPatch` qui ne contient `departure.city` que si l'intent COURANT a extrait `departureCity`. Quand l'utilisateur a dit "Paris" dans un message PRECEDENT et demande "recommande-moi" dans le message SUIVANT, le `memoryPatch` courant ne contient PAS `departureCity`.
-
-**Fix** : Dans `handleLLMDestinationRequest`, lire directement le store Zustand au lieu de la ref :
-```typescript
-// Ligne 184 : Remplacer
-if (!departureCityRef.current) {
-// Par
-const storeCity = departureCityRef.current 
-  || useFlightMemoryStore.getState().departure?.city;
-if (!storeCity) {
+```
+if ((isIndecisIntent || isDestinationSuggestion) && !preferencesState.styleAxesConfigured)
 ```
 
-**Fichier** : `src/components/planner/chat/hooks/useChatDestinationFlow.ts`
+Mais `styleAxesConfigured` est **toujours `true`** dès le démarrage car :
 
----
+1. `DEFAULT_PREFERENCES` dans `preferenceTypes.ts` (ligne 143) initialise `styleAxes: DEFAULT_STYLE_AXES` avec les 4 axes à 50
+2. `buildLLMContext.ts` (ligne 167-179) calcule : `if (!axes) return false; return true;` — puisque `axes` existe toujours, le résultat est toujours `true`
+3. La condition `!preferencesState.styleAxesConfigured` ne se déclenche donc **jamais**
+4. Le système saute directement au check des intérêts (ligne 494), d'où le widget `preferenceInterests` affiché en premier au lieu de `preferenceStyle`
 
-### Bug B : `detectedLanguage` jamais retourne par le LLM
+## Correction
 
-**Probleme** : Dans `intentClassifier.ts` ligne 293, le `required` array est `["primaryIntent", "confidence", "entities"]`. Le champ `detectedLanguage` n'est PAS required, donc le LLM ne le remplit pas systematiquement.
+### 1. Ajouter un flag `styleAxesUserConfirmed` dans le preference store
 
-Les logs confirment qu'aucune des 3 sessions ne contient `detectedLanguage` dans les rawResponses.
+Dans `src/stores/slices/preferenceTypes.ts` : ajouter un champ boolean `styleAxesUserConfirmed: boolean` au type `TripPreferences`, initialisé à `false` dans `DEFAULT_PREFERENCES`.
 
-**Fix** : Ajouter `"detectedLanguage"` dans le tableau `required` :
-```typescript
-required: ["primaryIntent", "confidence", "entities", "detectedLanguage"]
+### 2. Mettre le flag à `true` quand l'utilisateur confirme le widget style
+
+Dans `src/components/planner/chat/hooks/usePreferenceWidgetCallbacks.ts` : dans `onStyleContinue()`, appeler `updatePreferences({ styleAxesUserConfirmed: true })`.
+
+Aussi dans `src/components/planner/preferences/steps/BaseStep.tsx` : dans `handleApplyPreset()`, mettre `styleAxesUserConfirmed: true` (un preset = un choix explicite).
+
+### 3. Corriger `buildLLMContext.ts` pour utiliser le flag explicite
+
+Remplacer la logique actuelle (lignes 167-179) par :
+
+```text
+styleAxesConfigured: preferenceMemoryState?.styleAxesUserConfirmed === true
 ```
 
-**Fichier** : `supabase/functions/planner-chat/tools/intentClassifier.ts` ligne 293
+Cela garantit que `styleAxesConfigured` est `false` tant que l'utilisateur n'a pas interagi avec le widget style ou choisi un preset.
 
----
+### 4. Edge function — pas de changement
 
-### Bug C : Welcome message toujours en anglais
+`applyPreferenceFirstLogic` dans `planner-chat/index.ts` est déjà correcte. Le bug était dans la valeur envoyée par le frontend (`styleAxesConfigured: true` en permanence).
 
-**Probleme** : Le welcome message est genere par `getDefaultWelcomeMessage()` dans `sessionHelpers.ts` ligne 55-60, qui appelle `getTranslations()` qui utilise `i18n.t()`. Le `i18n.language` est initialise par le `LanguageDetector` du navigateur. Pour HeadlessChrome en `en-US`, le welcome est en anglais.
+### 5. Tests de régression
 
-Meme si `detectedLanguage` fonctionnait (Bug B), le welcome est genere AVANT toute interaction utilisateur.
+Ajouter dans `src/test/regression/bug-fixes.test.ts` :
 
-**Fix en 2 parties** :
-1. Quand i18n change de langue (via le fix de `detectedLanguage`), re-traduire le welcome message. Le code existe deja a la ligne 561-564 de `PlannerChat.tsx` : `prev.map((m) => m.id === "welcome" ? { ...m, text: chatTranslations.welcomeMessage } : m)`. Cela fonctionne car `chatTranslations` depend de `t()` qui est reactif. **MAIS** ce code ne s'execute qu'au changement de `activeSessionId`, pas au changement de langue.
-2. Ajouter un `useEffect` qui watch `i18n.language` et retraduit le welcome message.
+- **Test "styleAxesConfigured is false by default"** : importer `DEFAULT_PREFERENCES` et vérifier que `styleAxesUserConfirmed` est `false`
+- **Test "buildLLMContext returns styleAxesConfigured=false when user hasn't confirmed"** : mocker `getPreferenceMemory()` pour retourner des preferences par défaut (sans `styleAxesUserConfirmed: true`) et vérifier que `preferencesState.styleAxesConfigured === false`
+- **Test "buildLLMContext returns styleAxesConfigured=true after user confirms"** : mocker avec `styleAxesUserConfirmed: true` et vérifier que `preferencesState.styleAxesConfigured === true`
+- **Test "applyPreferenceFirstLogic forces preferenceStyle when styleAxesConfigured=false"** : tester unitairement la fonction backend avec `styleAxesConfigured: false` et un intent `ask_inspiration` — doit retourner `widgetToShow.type === "preferenceStyle"`
+- **Test "applyPreferenceFirstLogic skips style when already configured"** : même test avec `styleAxesConfigured: true` — ne doit PAS forcer `preferenceStyle`
+- **Test "preset sets styleAxesUserConfirmed=true"** : vérifier que le code source de `BaseStep.tsx` inclut `styleAxesUserConfirmed: true` dans `handleApplyPreset`
 
-**Fichier** : `src/components/planner/PlannerChat.tsx`
+## Fichiers modifiés
 
----
+| Fichier | Modification |
+|---------|-------------|
+| `src/stores/slices/preferenceTypes.ts` | Ajouter `styleAxesUserConfirmed: boolean` au type + `false` dans defaults |
+| `src/components/planner/chat/hooks/buildLLMContext.ts` | Remplacer la detection par `styleAxesUserConfirmed === true` |
+| `src/components/planner/chat/hooks/usePreferenceWidgetCallbacks.ts` | Mettre `styleAxesUserConfirmed: true` dans `onStyleContinue` |
+| `src/components/planner/preferences/steps/BaseStep.tsx` | Mettre `styleAxesUserConfirmed: true` dans `handleApplyPreset` |
+| `src/test/regression/bug-fixes.test.ts` | 6 nouveaux tests de regression |
 
-### Bug D : `preferred_region` jamais passe
+## Comportement attendu après correction
 
-**Probleme** : `findNearestAirports` accepte `preferredRegion` en parametre, MAIS aucun appelant ne le passe jamais :
-- `useAutoDetectDeparture.ts` ligne 80-85 : passe coords + countryCode mais PAS `preferredRegion`
-- `useReadyMessage.ts` ligne 94 : ne passe PAS `preferredRegion`
-- `PlannerPanel.tsx` lignes 688, 764, 819, 832, 941 : ne passent PAS `preferredRegion`
-- `useDepartureAirports.ts` ligne 112 : ne passe PAS `preferredRegion`
-
-Le fix cote edge function est en place (le code gere `preferred_region`), mais le frontend ne l'envoie jamais.
-
-**Fix** : Passer `preferredRegion: "europe"` dans les appels critiques (ou detecter la region via le timezone/locale). Au minimum, dans `persistExtractedEntities` quand on resout un aeroport de depart, et dans `useReadyMessage`.
-
-**Fichiers** : `src/hooks/useNearestAirports.tsx` (ajouter un default "europe" si aucun n'est passe), ou chaque appelant.
-
----
-
-## NOUVEAUX BUGS DETECTES (non couverts par le plan precedent)
-
-### Bug 6 : Date range "10 mars -> 10 mars" (meme jour) -- AUTO-CONFIRMATION ERRONEE
-
-**Preuve** : Session 1, un message auto-genere dit "I travel from 10 March to 10 March 2026" avec `isAutoGenerated: true`. Le widget `dateRangePicker` a ete confirme avec startDate === endDate.
-
-**Cause racine dans le code** : Le `DateRangePickerWidget` (ligne 121-129) verifie `if (departureDate && returnDate)` avant confirmation. Quand l'utilisateur clique un seul jour ET que `tripDuration` n'est pas passe en prop (ligne 104 : `const suggested = getSuggestedReturnDate(day)` retourne null), le widget est en mode `selectingReturn = true` mais ne bloque PAS la confirmation. 
-
-MAIS le vrai probleme n'est pas le widget lui-meme (qui necessite 2 clics pour confirmer). Le probleme est que le `useWidgetActionExecutor` (ligne 228-239) peut auto-confirmer le date range quand le LLM appelle `choose_widget_option` avec departure === return. Le guard `disabled={!departureDate || !returnDate}` n'est que dans le bouton UI, pas dans le handler programmatique.
-
-**Fix** : Dans `handleDateRangeSelect` (dateHandlers.ts), ajouter un guard :
-```typescript
-// Ligne 95-100 : Ajouter apres la signature
-if (isSameDay(departure, returnDate)) {
-  console.warn("[handleDateRangeSelect] Same day departure and return, ignoring");
-  return;
-}
-```
-
-Et dans `DateRangePickerWidget` ligne 121-122 :
-```typescript
-const handleConfirm = () => {
-  if (departureDate && returnDate && !isSameDay(departureDate, returnDate)) {
-```
-
-**Fichiers** : 
-- `src/components/planner/chat/hooks/widgetHandlers/dateHandlers.ts`
-- `src/components/planner/chat/widgets/DateRangePickerWidget.tsx`
-
----
-
-### Bug 7 : Messages `isAutoGenerated` en anglais malgre contexte francais
-
-**Preuve** : Session 1 et 3, les messages auto-generes par le frontend utilisent `t()` pour generer le texte. Exemples :
-- "Excellent choice! Oman is a beautiful destination." (ligne 301 de `useChatDestinationFlow.ts`)
-- "Choose your travel dates:" 
-- "How many travelers?"
-- "I travel from 10 March to 10 March 2026"
-
-Tous ces messages viennent des `t("planner.widget.*")` et `t("planner.chat.excellentChoice")`.
-
-**Cause** : Meme cause racine que Bug B/C -- i18n est en anglais car le navigateur est en-US, et `detectedLanguage` n'est jamais retourne pour basculer. Ce bug est RESOLU par le fix du Bug B (rendre `detectedLanguage` required).
-
-**Pas de fix supplementaire necessaire** -- c'est un symptome du Bug B.
-
----
-
-### Bug 8 : Erreurs 500 repetees sans diagnostic (3 sessions, 7 erreurs total)
-
-**Preuve** : 
-- Session 1 : 3 erreurs 500 + 2 `cancelled`
-- Session 2 : 2 erreurs 500
-- Session 3 : 3 erreurs 500
-
-Le fix precedent a ajoute un logging ameliore dans `planner-chat/index.ts`, mais on ne peut pas verifier si c'est deploye sans les logs edge function recents.
-
-**Action supplementaire** : Ajouter dans le frontend un compteur d'erreurs 500 consecutives. Apres 3 erreurs 500 consecutives dans la meme session, afficher un message utilisateur expliquant que le service est temporairement indisponible au lieu de retenter silencieusement.
-
-**Fichier** : `src/components/planner/chat/hooks/useChatStream.ts` (ou equivalent du circuit breaker)
-
----
-
-### Bug 9 : `user interactions: 0` dans les 3 sessions (debug tracking casse)
-
-**Preuve** : Les 3 rapports de debug montrent `User interactions: 0` et `EventBus events: 0`. Pourtant l'utilisateur a interagi avec des widgets (selection de destination, dates, etc.).
-
-**Cause** : `useDebugEventBusCapture.ts` (ligne 7) verifie `if (!import.meta.env.DEV) return;`. En preview/production, le hook ne capture rien. De plus, `userInteractions` dans le debug store n'est JAMAIS alimente -- aucun code n'appelle `addUserInteraction()`.
-
-**Fix** : 
-1. Le tracking `userInteractions` doit etre alimente quand un widget est confirme. Ajouter des appels `addUserInteraction()` dans les widget handlers (`dateHandlers.ts`, `locationHandlers.ts`, etc.).
-2. Pour `eventBusLog` : soit retirer le guard `DEV`, soit accepter qu'il ne fonctionne qu'en dev (le bug report est genere depuis le preview/prod).
-
-**Fichiers** : 
-- `src/components/planner/chat/hooks/widgetHandlers/dateHandlers.ts` (et autres handlers)
-- `src/hooks/useDebugEventBusCapture.ts` (retirer le guard DEV pour le mode debug)
-
----
-
-### Bug 10 : `missingFields` affiche "destination" meme apres selection d'un pays
-
-**Preuve** : Session 1 apres selection d'Oman, le `missingFields` contient toujours "destination". Session 3 apres selection de Cap-Vert, meme probleme.
-
-**Cause probable** : `missingFields` vient de `useFlightMemoryStore.missingFields`. La selection d'un pays via `handleDestinationSelect` (ligne 280-288 de `useChatDestinationFlow.ts`) ecrit `arrival.countryCode` et `arrival.country`, mais PAS `arrival.city`. Le store considere que la destination manque tant qu'il n'y a pas de ville specifique.
-
-**Ce n'est pas un bug a corriger** -- c'est un comportement attendu (le pays seul ne suffit pas pour la recherche de vol). Mais le label "destination" est trompeur. Il devrait dire "ville de destination" pour etre clair.
-
-**Fix mineur** : Dans `getMissingFieldLabel()` (fichier `src/components/planner/chat/utils`), renommer le label pour "destination" en "ville de destination".
-
----
-
-### Bug 11 : Auto-generated `ask-departure` messages empilees (spam visuel)
-
-**Preuve** : Session 1 montre 4 messages `ask-departure` consecutifs. Session 3 en montre 2. Chaque fois que `handleLLMDestinationRequest` est appele sans `departureCityRef.current`, un NOUVEAU message `ask-departure` est ajoute (ligne 187-201 de `useChatDestinationFlow.ts`), sans verifier s'il y en a deja un.
-
-**Fix** : Avant d'ajouter un `ask-departure`, verifier qu'il n'y en a pas deja un dans les N derniers messages :
-```typescript
-// Avant ligne 187
-const recentAskDeparture = prev.slice(-3).some(
-  m => m.id.startsWith("ask-departure") && m.role === "assistant"
-);
-if (recentAskDeparture) {
-  isFetchingRef.current = false;
-  return;
-}
-```
-
-**Fichier** : `src/components/planner/chat/hooks/useChatDestinationFlow.ts`
-
----
-
-## Resume des fichiers a modifier
-
-| Fichier | Bugs couverts |
-|---------|---------------|
-| `useChatDestinationFlow.ts` | A (store direct), 11 (dedup ask-departure) |
-| `intentClassifier.ts` (edge function) | B (detectedLanguage required) |
-| `PlannerChat.tsx` | C (re-traduire welcome sur changement de langue) |
-| `useNearestAirports.tsx` | D (default preferred_region) |
-| `dateHandlers.ts` | 6 (guard meme jour) |
-| `DateRangePickerWidget.tsx` | 6 (guard meme jour UI) |
-| Widget handlers (date, location, travelers) | 9 (user interactions tracking) |
-| `useDebugEventBusCapture.ts` | 9 (retirer guard DEV) |
-| `top-cities-by-country/index.ts` | Redeploiement (code OK mais pas deploye) |
-| `nearest-airports/index.ts` | Redeploiement |
-
-## Ordre d'implementation
-
-1. **Bug A** -- boucle ask-departure (lecture store Zustand directe)
-2. **Bug 11** -- dedup des messages ask-departure
-3. **Bug B** -- detectedLanguage required dans le schema
-4. **Bug C** -- re-traduction welcome message
-5. **Bug 6** -- guard date meme jour
-6. **Bug D** -- preferred_region default
-7. **Bug 9** -- tracking user interactions
-8. **Redeploiement** des edge functions top-cities-by-country et nearest-airports
-
+- Utilisateur dit "Inspire-moi !" sans avoir configuré son style -> widget `preferenceStyle` affiché en premier
+- Utilisateur confirme le style -> widget `preferenceInterests` affiché ensuite (si intérêts vides)
+- Utilisateur qui a déjà dit "je voyage en couple avec un budget serré" -> `styleAxesUserConfirmed` reste `false` (car le LLM a extrait les prefs mais l'utilisateur n'a pas confirmé le widget) MAIS le LLM peut quand même retourner `preferenceInterests` car les axes sont dans le contexte
+- Utilisateur qui choisit un preset (ex: "Romantique") -> `styleAxesUserConfirmed: true`, passe directement aux intérêts
