@@ -352,6 +352,8 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
   );
 
   // Intelligent scroll management
+  // isStreaming (from useChatStream) is used as proxy: RAF-loop keeps scroll pinned to bottom
+  // while the assistant is writing, regardless of messagesCount not changing
   const {
     isUserScrolling,
     showNewMessageIndicator,
@@ -362,6 +364,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
   } = useChatScroll({
     messagesCount: messages.length,
     containerRef: messagesContainerRef,
+    isStreaming,
   });
 
   const widgetFlow = useChatWidgetFlow({

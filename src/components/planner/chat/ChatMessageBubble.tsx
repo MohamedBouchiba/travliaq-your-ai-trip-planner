@@ -94,7 +94,7 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
             </div>
           ) : (
             <>
-              <MarkdownMessage content={m.text} />
+              <MarkdownMessage content={m.text} isStreaming={m.isStreaming} />
             </>
           )}
         </div>
