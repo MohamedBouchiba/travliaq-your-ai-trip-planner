@@ -7,7 +7,6 @@
 
 import { memo } from "react";
 import { MapPin, Calendar, Users, Plane } from "lucide-react";
-import { cn } from "@/lib/utils";
 import type { FlightMemory } from "@/stores/hooks/useFlightMemoryStore";
 import type { TFunction } from "i18next";
 
@@ -45,53 +44,44 @@ export const TripStatusBar = memo(function TripStatusBar({ memory, t }: TripStat
   const hasTravelers = hasNonDefaultTravelers;
   const hasTripType = memory.tripType !== "roundtrip"; // default is roundtrip, only show when changed
 
-  if (!hasDestination && !hasDates && !hasTravelers && !hasTripType) {
-    return null;
-  }
+  // Only render chips that have REAL data — no placeholders
+  const chips = [];
+  if (hasDestination) chips.push(
+    <Chip key="dest" icon={<MapPin className="h-3 w-3" />}>{destination}</Chip>
+  );
+  if (hasDates) chips.push(
+    <Chip key="dates" icon={<Calendar className="h-3 w-3" />}>
+      {retDate ? `${depDate} → ${retDate}` : depDate}
+    </Chip>
+  );
+  if (hasTravelers) chips.push(
+    <Chip key="travelers" icon={<Users className="h-3 w-3" />}>
+      {`${totalTravelers} ${t("planner.status.travelers", "voyageur")}${totalTravelers > 1 ? "s" : ""}`}
+    </Chip>
+  );
+  if (hasTripType) chips.push(
+    <Chip key="triptype" icon={<Plane className="h-3 w-3" />}>{tripTypeLabel}</Chip>
+  );
+
+  if (chips.length === 0) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 px-4 pb-2 max-w-3xl mx-auto">
-      <Chip active={hasDestination} icon={<MapPin className="h-3 w-3" />}>
-        {destination || t("planner.status.destination", "Destination")}
-      </Chip>
-      <Chip active={hasDates} icon={<Calendar className="h-3 w-3" />}>
-        {depDate
-          ? retDate
-            ? `${depDate} → ${retDate}`
-            : depDate
-          : t("planner.status.dates", "Dates")}
-      </Chip>
-      {hasTravelers && (
-        <Chip active icon={<Users className="h-3 w-3" />}>
-          {`${totalTravelers} ${t("planner.status.travelers", "voyageur")}${totalTravelers > 1 ? "s" : ""}`}
-        </Chip>
-      )}
-      {hasTripType && (
-        <Chip active icon={<Plane className="h-3 w-3" />}>
-          {tripTypeLabel}
-        </Chip>
-      )}
+      {chips}
     </div>
   );
 });
 
 function Chip({
-  active,
   icon,
   children,
 }: {
-  active: boolean;
   icon: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <span
-      className={cn(
-        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors",
-        active
-          ? "bg-primary/10 text-primary border border-primary/20"
-          : "bg-muted/50 text-muted-foreground border border-transparent"
-      )}
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-primary/10 text-primary border border-primary/20"
     >
       {icon}
       {children}
