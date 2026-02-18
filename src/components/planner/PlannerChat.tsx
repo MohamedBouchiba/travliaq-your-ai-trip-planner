@@ -1090,19 +1090,21 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                 />
               ))}
 
-              {/* SmartSuggestions — always visible at bottom of message area */}
-              <MemoizedSmartSuggestions
-                memory={memory}
-                mapContext={mapContext}
-                inspireFlowStep={inspireFlowStep}
-                destinationSuggestions={destinationSuggestions}
-                lastAssistantMessage={messages.filter(m => m.role === 'assistant' && !m.isTyping && m.text && m.text.length > 10).at(-1)?.text}
-                lastUserMessage={messages.filter(m => m.role === 'user').at(-1)?.text}
-                conversationTurn={userMessageCount}
-                dynamicSuggestions={dynamicSuggestions}
-                onSuggestionClick={handleSuggestionClick}
-                isLoading={isLoading}
-              />
+              {/* SmartSuggestions — only shown on empty state (no user messages yet) */}
+              {userMessageCount === 0 && (
+                <MemoizedSmartSuggestions
+                  memory={memory}
+                  mapContext={mapContext}
+                  inspireFlowStep={inspireFlowStep}
+                  destinationSuggestions={destinationSuggestions}
+                  lastAssistantMessage={messages.filter(m => m.role === 'assistant' && !m.isTyping && m.text && m.text.length > 10).at(-1)?.text}
+                  lastUserMessage={messages.filter(m => m.role === 'user').at(-1)?.text}
+                  conversationTurn={userMessageCount}
+                  dynamicSuggestions={dynamicSuggestions}
+                  onSuggestionClick={handleSuggestionClick}
+                  isLoading={isLoading}
+                />
+              )}
 
               <div ref={messagesEndRef} />
             </div>
