@@ -559,7 +559,11 @@ export function validateWidgetTextCoherence(
   text: string,
   widgetType: string | null | undefined
 ): string | null {
-  if (!widgetType || !text) return widgetType ?? null;
+  if (!widgetType) return null;
+  // Preference widgets are ALWAYS allowed — they collect initial user data regardless of text
+  const PREFERENCE_EXEMPT = ["preferenceStyle", "preferenceInterests", "mustHaves", "dietary"];
+  if (PREFERENCE_EXEMPT.includes(widgetType)) return widgetType;
+  if (!text) return widgetType ?? null;
 
   for (const rule of WIDGET_COHERENCE_RULES) {
     const textMatches = rule.textPatterns.some((p) => p.test(text));

@@ -10,6 +10,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import i18n from "@/i18n/config";
 import { createCircuitBreaker } from "./circuitBreaker";
 import { supabaseFetch } from "@/utils/supabaseFetch";
 import type { FlightFormData } from "@/types/flight";
@@ -231,6 +232,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
               messages: limitMessages(apiMessages),
               stream: true,
               requestId,
+              language: i18n.language?.split('-')[0] || "en",
               memoryContext: contextMessage,
               missingFields: memoryContext.missingFields,
               currentPhase: memoryContext.currentPhase || "research",
