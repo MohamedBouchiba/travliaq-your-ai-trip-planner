@@ -250,24 +250,13 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       const acc = createAccumulator();
       fullContent = "";
 
-      // RAF-queue approach: schedule ONE update per animation frame (16ms ≈ 60fps).
-      // Problem: multiple SSE tokens can arrive in a single reader.read() call (one TCP packet).
-      // They are processed synchronously, so even flushSync can't interleave browser paints.
-      // Solution: buffer the latest content, then push it to React on the NEXT animation frame.
-      // The browser paints after each RAF → one frame = one visual "step" of typing.
-      // This is exactly how ChatGPT/Claude achieve smooth word-by-word rendering.
-          let pendingRafId: number | null = null;
-          let latestQueuedContent = "";
-
+          // Direct update: call onContentUpdate immediately for each chunk.
+          // The RAF approach was causing flushSync-inside-RAF errors in React 18 (silent crash).
+          // Direct calls let React's scheduler handle batching naturally — the browser paints
+          // between tasks, giving the word-by-word effect without the crash.
           const throttledUpdate = () => {
-            latestQueuedContent = acc.content;
-            if (pendingRafId === null) {
-              pendingRafId = requestAnimationFrame(() => {
-                pendingRafId = null;
-                if (isMountedRef.current) {
-                  onContentUpdate(messageId, latestQueuedContent, false);
-                }
-              });
+            if (isMountedRef.current) {
+              onContentUpdate(messageId, acc.content, false);
             }
           };
 
@@ -393,11 +382,6 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
             sessionEntities: memoryContext.sessionEntities,
           });
 
-          // Cancel any pending RAF update — final content will be sent immediately below
-          if (pendingRafId !== null) {
-            cancelAnimationFrame(pendingRafId);
-            pendingRafId = null;
-          }
 
           // Success - mark streaming as complete
           if (isMountedRef.current) {

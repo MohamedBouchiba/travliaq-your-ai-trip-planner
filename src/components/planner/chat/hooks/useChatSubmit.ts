@@ -234,10 +234,8 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
           (id, text2, isComplete) => {
             if (opts.completedMessageIdsRef.current.has(id) && !isComplete) return;
             if (isComplete) opts.completedMessageIdsRef.current.add(id);
-
-            // flushSync forces React to paint IMMEDIATELY for each RAF tick,
-            // bypassing React 18 automatic batching → true word-by-word streaming.
-            // Without this, React batches multiple RAF callbacks → blocks appear.
+            // flushSync here is called from an async context (not inside RAF/lifecycle),
+            // so it is valid in React 18 and forces an immediate paint for each chunk.
             flushSync(() => {
               opts.setMessages(updateMessageById(id, { text: text2, isStreaming: !isComplete, isTyping: false }));
             });
