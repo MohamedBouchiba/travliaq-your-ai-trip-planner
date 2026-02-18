@@ -319,11 +319,19 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
         : `⬜ 🧭 **Activités** *(optionnelles — ajoute des activités ou clique "Passer" dans la barre du bas)* → [Voir](tab:activities)`;
 
       const missingCount = missingSteps.length;
-      const intro = missingCount === 0
-        ? "Tout est prêt ! 🚀"
-        : `Il te reste **${missingCount} étape${missingCount > 1 ? 's' : ''}** avant de pouvoir planifier :`;
 
-      const messageText = `${intro}\n\n${flightLine}\n${hotelLine}\n${activityLine}\n\n${missingCount > 0 ? '_Complète ces étapes, puis clique sur **Planifier** !_' : ''}`.trim();
+      const lines = `${flightLine}\n${hotelLine}\n${activityLine}`;
+
+      const BLOCKED_VARIATIONS = [
+        (l: string) => `Presque ! 🎯\n\n${l}\n\n_Complète ces étapes pour débloquer **Planifier**._`,
+        (l: string) => `Ton voyage prend forme ✈️\n\n${l}\n\n_Une fois tout sélectionné, **Planifier** sera actif._`,
+        (l: string) => `On y est presque 🚀\n\n${l}\n\n_Ces éléments sont nécessaires pour construire ton itinéraire._`,
+        (l: string) => `Encore quelques étapes !\n\n${l}\n\n_Ton voyage sera planifiable dès que tout est OK._`,
+        (l: string) => `Voici ce qu'il reste à faire 📋\n\n${l}\n\n_Complète ces étapes, puis clique sur **Planifier** !_`,
+      ];
+
+      const variation = BLOCKED_VARIATIONS[Math.floor(Math.random() * BLOCKED_VARIATIONS.length)];
+      const messageText = (missingCount > 0 ? variation(lines) : `Tout est prêt ! 🚀\n\n${lines}`).trim();
 
       const guidanceMessage = {
         id: `planifier-blocked-${Date.now()}`,
@@ -1070,22 +1078,9 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
             }}
           />
 
-          {/* Smart Suggestions + Input */}
+          {/* Input zone */}
           <div className="relative z-20 border-t border-border bg-background" aria-hidden={isCollapsed}>
-            {/* Smart Suggestions - context is memoized to prevent re-renders */}
-            <MemoizedSmartSuggestions
-              memory={memory}
-              mapContext={mapContext}
-              inspireFlowStep={inspireFlowStep}
-              destinationSuggestions={destinationSuggestions}
-              lastAssistantMessage={messages.filter(m => m.role === 'assistant' && !m.isTyping && m.text && m.text.length > 10).at(-1)?.text}
-              lastUserMessage={messages.filter(m => m.role === 'user').at(-1)?.text}
-              conversationTurn={messages.filter(m => m.role === 'user').length}
-              dynamicSuggestions={dynamicSuggestions}
-              onSuggestionClick={handleSuggestionClick}
-              isLoading={isLoading}
-            />
-
+            {/* Trip context chips — shown above input only when data is present */}
             <TripStatusBar memory={memory} t={t} />
 
             <ChatInputArea
@@ -1098,6 +1093,20 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
               canReport={bugReport.canReport}
               isReporting={bugReport.isUploading}
               messagesUntilReport={bugReport.messagesUntilReport}
+            />
+
+            {/* Smart Suggestions — below input, mirroring ChatGPT pattern */}
+            <MemoizedSmartSuggestions
+              memory={memory}
+              mapContext={mapContext}
+              inspireFlowStep={inspireFlowStep}
+              destinationSuggestions={destinationSuggestions}
+              lastAssistantMessage={messages.filter(m => m.role === 'assistant' && !m.isTyping && m.text && m.text.length > 10).at(-1)?.text}
+              lastUserMessage={messages.filter(m => m.role === 'user').at(-1)?.text}
+              conversationTurn={messages.filter(m => m.role === 'user').length}
+              dynamicSuggestions={dynamicSuggestions}
+              onSuggestionClick={handleSuggestionClick}
+              isLoading={isLoading}
             />
           </div>
 

@@ -97,29 +97,27 @@ export const ChatInputArea = memo(function ChatInputArea({
           <Send className="h-4 w-4" />
         </button>
       </div>
-      <p className="text-[10px] text-muted-foreground/70 text-center mt-1.5">
-        {isReporting ? (
-          <span className="inline-flex items-center gap-1">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            {t("planner.chat.reportBugUploading")}
-          </span>
-        ) : canReport ? (
-          <span>
-            {t("planner.chat.reportBugPrefix")}
-            <button
-              type="button"
-              onClick={onReportBug}
-              className="underline text-primary/80 hover:text-primary transition-colors cursor-pointer"
-            >
-              {t("planner.chat.reportBugLink")}
-            </button>
-          </span>
-        ) : messagesUntilReport > 0 ? (
-          <span>{t("planner.chat.reportBugCooldown", { count: messagesUntilReport })}</span>
-        ) : (
-          <span>{t("planner.chat.inputHelper")}</span>
-        )}
-      </p>
+      {(isReporting || canReport) && (
+        <p className="text-[10px] text-muted-foreground/50 text-center mt-1">
+          {isReporting ? (
+            <span className="inline-flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {t("planner.chat.reportBugUploading")}
+            </span>
+          ) : (
+            <span>
+              {t("planner.chat.reportBugPrefix")}
+              <button
+                type="button"
+                onClick={onReportBug}
+                className="underline text-primary/60 hover:text-primary transition-colors cursor-pointer"
+              >
+                {t("planner.chat.reportBugLink")}
+              </button>
+            </span>
+          )}
+        </p>
+      )}
     </div>
   );
 });
