@@ -1,62 +1,35 @@
 /**
  * Airport Selection Widgets with Smart Recommendations
+ * Premium / Futuristic redesign
  */
 
 import { useState } from "react";
-import { Plane, Check, Star, AlertTriangle, Clock, MapPin, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Plane, Check, ChevronDown, ChevronUp, Sparkles, MapPin, Zap } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type { Airport } from "@/hooks/useNearestAirports";
 import type { AirportChoice, DualAirportChoice, AirportConfirmationData, ConfirmedAirports } from "@/types/flight";
 
-/**
- * Get pros/cons for an airport based on its characteristics
- */
-function getAirportProsAndCons(airport: Airport, isRecommended: boolean, allAirports: Airport[], t: (key: string) => string) {
+/* ─────────────────────────── helpers ─────────────────────────── */
+
+function getAirportPros(airport: Airport, allAirports: Airport[], t: (k: string) => string): string[] {
   const pros: string[] = [];
-  const cons: string[] = [];
-  
-  // Distance comparison
   const minDistance = Math.min(...allAirports.map(a => a.distance_km));
-  const maxDistance = Math.max(...allAirports.map(a => a.distance_km));
-  
-  if (airport.distance_km === minDistance && allAirports.length > 1) {
-    pros.push(t("planner.airport.closest"));
-  } else if (airport.distance_km === maxDistance && allAirports.length > 1) {
-    cons.push(t("planner.airport.farthest"));
-  }
-  
-  // Check airport size by name patterns (major airports usually have specific keywords)
+  if (airport.distance_km === minDistance && allAirports.length > 1) pros.push(t("planner.airport.closest"));
   const name = airport.name.toLowerCase();
   if (name.includes("international") || name.includes("charles de gaulle") || name.includes("heathrow") || name.includes("schiphol")) {
     pros.push(t("planner.airport.majorInternational"));
   }
-  
-  if (isRecommended) {
-    pros.push(t("planner.airport.moreFlights"));
-    pros.push(t("planner.airport.betterConnection"));
-  } else {
-    // Potential advantages for smaller airports
-    if (airport.distance_km < 30) {
-      pros.push(t("planner.airport.quickAccess"));
-    }
-    cons.push(t("planner.airport.lessFlightChoice"));
-  }
-  
-  return { pros, cons };
+  pros.push(t("planner.airport.moreFlights"));
+  pros.push(t("planner.airport.betterConnection"));
+  return pros.slice(0, 3);
 }
 
-/**
- * AirportButton - Compact inline airport selection button
- */
-export function AirportButton({
-  airport,
-  onClick,
-  disabled,
-}: {
-  airport: Airport;
-  onClick: () => void;
-  disabled?: boolean;
+/* ─────────────────────── AirportButton (compact) ─────────────── */
+
+export function AirportButton({ airport, onClick, disabled }: {
+  airport: Airport; onClick: () => void; disabled?: boolean;
 }) {
   return (
     <button
@@ -76,20 +49,14 @@ export function AirportButton({
   );
 }
 
-/**
- * DualAirportSelection - Side-by-side departure/arrival airport selection
- */
-export function DualAirportSelection({
-  choices,
-  onSelect,
-  disabled,
-}: {
+/* ─────────────────────── DualAirportSelection ─────────────────── */
+
+export function DualAirportSelection({ choices, onSelect, disabled }: {
   choices: DualAirportChoice;
   onSelect: (field: "from" | "to", airport: Airport) => void;
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
-  
   return (
     <div className="mt-3 grid grid-cols-2 gap-3">
       {choices.from && (
@@ -98,13 +65,8 @@ export function DualAirportSelection({
             <span className="text-primary">✈</span> {t("planner.dualAirport.departure")} · {choices.from.cityName}
           </div>
           <div className="space-y-1">
-            {choices.from.airports.map((airport) => (
-              <AirportButton
-                key={airport.iata}
-                airport={airport}
-                onClick={() => onSelect("from", airport)}
-                disabled={disabled}
-              />
+            {choices.from.airports.map(a => (
+              <AirportButton key={a.iata} airport={a} onClick={() => onSelect("from", a)} disabled={disabled} />
             ))}
           </div>
         </div>
@@ -115,13 +77,8 @@ export function DualAirportSelection({
             <span className="text-primary">🛬</span> {t("planner.dualAirport.arrival")} · {choices.to.cityName}
           </div>
           <div className="space-y-1">
-            {choices.to.airports.map((airport) => (
-              <AirportButton
-                key={airport.iata}
-                airport={airport}
-                onClick={() => onSelect("to", airport)}
-                disabled={disabled}
-              />
+            {choices.to.airports.map(a => (
+              <AirportButton key={a.iata} airport={a} onClick={() => onSelect("to", a)} disabled={disabled} />
             ))}
           </div>
         </div>
@@ -130,175 +87,158 @@ export function DualAirportSelection({
   );
 }
 
-/**
- * RecommendedAirportCard - Displays the recommended airport with explanation
- */
-function RecommendedAirportCard({
+/* ─────────────── PremiumAirportCard (recommended) ───────────────
+   Compact premium card for one airport endpoint (departure OR arrival)
+   ──────────────────────────────────────────────────────────────── */
+
+function PremiumAirportCard({
   airport,
   label,
   allAirports,
-  onAccept,
-  onReject,
+  showAlts,
+  onToggleAlts,
+  onSelect,
   disabled,
 }: {
   airport: Airport;
   label: string;
   allAirports: Airport[];
-  onAccept: () => void;
-  onReject: () => void;
+  showAlts: boolean;
+  onToggleAlts: () => void;
+  onSelect: (a: Airport) => void;
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
-  const { pros } = getAirportProsAndCons(airport, true, allAirports, t);
-  
+  const pros = getAirportPros(airport, allAirports, t);
+
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-2">
+      {/* Label */}
       <div className="flex items-center gap-1.5">
-        <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-        <span className="text-xs font-semibold text-amber-600 uppercase tracking-wide">
-          {label} {t("planner.airport.recommended")}
-        </span>
+        <Sparkles className="w-3 h-3 text-amber-400" />
+        <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">{label}</span>
       </div>
-      
-      <div className={cn(
-        "p-3 rounded-xl border-2 transition-all",
-        "bg-gradient-to-br from-primary/5 to-primary/10",
-        "border-primary/40"
-      )}>
-        <div className="flex items-start gap-3">
-          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center">
-            <Plane className="w-5 h-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-primary text-lg">{airport.iata}</span>
-              <span className="px-2 py-0.5 rounded-full bg-primary text-primary-foreground text-[10px] font-medium">
-                {t("planner.airport.bestChoice")}
+
+      {/* Main card */}
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 380, damping: 28 }}
+        className={cn(
+          "relative overflow-hidden rounded-2xl border p-4",
+          "bg-gradient-to-br from-primary/10 via-card to-primary/5",
+          "border-primary/20 shadow-lg shadow-primary/10",
+        )}
+      >
+        {/* Glow orb */}
+        <div className="pointer-events-none absolute -top-6 -right-6 w-24 h-24 rounded-full bg-primary/15 blur-2xl" />
+
+        {/* IATA + badge */}
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <span className="text-4xl font-black tracking-tight text-primary leading-none">
+              {airport.iata}
+            </span>
+            <div className="flex items-center gap-1 mt-1">
+              <MapPin className="w-3 h-3 text-muted-foreground" />
+              <span className="text-[11px] text-muted-foreground">
+                {airport.distance_km.toFixed(0)} km
               </span>
             </div>
-            <div className="text-sm text-foreground font-medium mt-0.5">
-              {airport.name}
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-              <MapPin className="w-3 h-3" />
-              <span>{t("planner.airport.kmFromCenter", { km: airport.distance_km.toFixed(0) })}</span>
-            </div>
-            
-            {/* Pros */}
-            <div className="mt-2 space-y-1">
-              {pros.slice(0, 3).map((pro, idx) => (
-                <div key={idx} className="flex items-center gap-1.5 text-xs text-emerald-600">
-                  <ThumbsUp className="w-3 h-3" />
-                  <span>{pro}</span>
-                </div>
-              ))}
-            </div>
           </div>
+          <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest bg-primary text-primary-foreground px-2 py-1 rounded-full shadow-sm">
+            <Zap className="w-2.5 h-2.5" />
+            {t("planner.airport.bestChoice")}
+          </span>
         </div>
-        
-        {/* Action buttons */}
-        <div className="flex gap-2 mt-3">
+
+        {/* Airport name */}
+        <p className="text-xs font-semibold text-foreground leading-snug mb-3 line-clamp-2">
+          {airport.name}
+        </p>
+
+        {/* Pros */}
+        <div className="space-y-1 mb-4">
+          {pros.map((pro, i) => (
+            <div key={i} className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+              {pro}
+            </div>
+          ))}
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2">
+          {/* See others */}
           <button
-            onClick={onAccept}
+            onClick={onToggleAlts}
             disabled={disabled}
             className={cn(
-              "flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all",
-              "bg-primary text-primary-foreground hover:bg-primary/90",
-              "disabled:opacity-50 disabled:cursor-not-allowed"
+              "flex-1 flex items-center justify-center gap-1.5",
+              "py-2 rounded-xl border border-border/60 text-xs font-medium",
+              "text-muted-foreground bg-muted/50 hover:bg-muted/80 transition-all",
+              disabled && "opacity-50 cursor-not-allowed"
             )}
           >
-            <Check className="w-4 h-4 inline mr-1.5" />
-            {t("planner.airport.accept")}
-          </button>
-          <button
-            onClick={onReject}
-            disabled={disabled}
-            className={cn(
-              "px-4 py-2 rounded-lg text-sm font-medium transition-all",
-              "bg-muted text-muted-foreground hover:bg-muted/80",
-              "disabled:opacity-50 disabled:cursor-not-allowed"
-            )}
-          >
+            {showAlts ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             {t("planner.airport.seeOthers")}
           </button>
         </div>
-      </div>
+      </motion.div>
+
+      {/* Alternatives dropdown */}
+      <AnimatePresence>
+        {showAlts && (
+          <motion.div
+            key="alts"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.22 }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-1.5 pt-1">
+              {allAirports.map((a, idx) => (
+                <motion.button
+                  key={a.iata}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  onClick={() => onSelect(a)}
+                  disabled={disabled}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left",
+                    a.iata === airport.iata
+                      ? "border-primary/40 bg-primary/10"
+                      : "border-border/40 bg-card hover:bg-muted/50 hover:border-border",
+                    disabled && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  <span className={cn(
+                    "text-sm font-black w-10 shrink-0",
+                    a.iata === airport.iata ? "text-primary" : "text-foreground"
+                  )}>{a.iata}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground truncate">{a.city_name || a.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{a.distance_km.toFixed(0)} km</p>
+                  </div>
+                  {a.iata === airport.iata && (
+                    <Check className="w-3.5 h-3.5 text-primary shrink-0" />
+                  )}
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-/**
- * AlternativeAirportCard - Displays an alternative airport with pros/cons
- */
-function AlternativeAirportCard({
-  airport,
-  index,
-  allAirports,
-  onSelect,
-  disabled,
-}: {
-  airport: Airport;
-  index: number;
-  allAirports: Airport[];
-  onSelect: () => void;
-  disabled?: boolean;
-}) {
-  const { t } = useTranslation();
-  const { pros, cons } = getAirportProsAndCons(airport, false, allAirports, t);
-  
-  return (
-    <button
-      onClick={onSelect}
-      disabled={disabled}
-      className={cn(
-        "w-full text-left p-3 rounded-xl border transition-all",
-        "bg-card hover:bg-muted/50 hover:border-border",
-        "border-border/50 group",
-        disabled && "opacity-50 cursor-not-allowed"
-      )}
-    >
-      <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-sm font-medium">
-          {index + 1}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-primary">{airport.iata}</span>
-            <span className="text-foreground font-medium group-hover:text-primary transition-colors">
-              {airport.city_name || airport.name.split(" ")[0]}
-            </span>
-            <span className="text-xs text-muted-foreground ml-auto">
-              {airport.distance_km.toFixed(0)} km
-            </span>
-          </div>
-          <div className="text-xs text-muted-foreground mt-0.5">
-            {airport.name}
-          </div>
-          
-          {/* Pros and Cons */}
-          <div className="mt-2 flex flex-wrap gap-2">
-            {pros.slice(0, 2).map((pro, idx) => (
-              <span key={`pro-${idx}`} className="inline-flex items-center gap-1 text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
-                <ThumbsUp className="w-2.5 h-2.5" />
-                {pro}
-              </span>
-            ))}
-            {cons.slice(0, 2).map((con, idx) => (
-              <span key={`con-${idx}`} className="inline-flex items-center gap-1 text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
-                <ThumbsDown className="w-2.5 h-2.5" />
-                {con}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    </button>
-  );
-}
+/* ─────────────────── AirportConfirmationWidget ──────────────────
+   Main widget — premium redesign
+   ──────────────────────────────────────────────────────────────── */
 
-/**
- * AirportConfirmationWidget - Multi-destination airport selection with recommendations
- */
 export function AirportConfirmationWidget({
   data,
   onConfirm,
@@ -312,34 +252,17 @@ export function AirportConfirmationWidget({
   const [confirmed, setConfirmed] = useState(false);
   const [showAlternatives, setShowAlternatives] = useState<Record<number, { from: boolean; to: boolean }>>({});
 
-  // Track selected airports for each leg (from and to)
   const [selectedAirports, setSelectedAirports] = useState<Record<number, { from: Airport; to: Airport }>>(() => {
     const initial: Record<number, { from: Airport; to: Airport }> = {};
     data.legs.forEach(leg => {
-      initial[leg.legIndex] = {
-        from: leg.from.suggestedAirport,
-        to: leg.to.suggestedAirport,
-      };
+      initial[leg.legIndex] = { from: leg.from.suggestedAirport, to: leg.to.suggestedAirport };
     });
     return initial;
   });
 
   const handleAirportChange = (legIndex: number, field: "from" | "to", airport: Airport) => {
-    setSelectedAirports(prev => ({
-      ...prev,
-      [legIndex]: {
-        ...prev[legIndex],
-        [field]: airport,
-      },
-    }));
-    // Hide alternatives after selection
-    setShowAlternatives(prev => ({
-      ...prev,
-      [legIndex]: {
-        ...prev[legIndex],
-        [field]: false,
-      },
-    }));
+    setSelectedAirports(prev => ({ ...prev, [legIndex]: { ...prev[legIndex], [field]: airport } }));
+    setShowAlternatives(prev => ({ ...prev, [legIndex]: { ...prev[legIndex], [field]: false } }));
   };
 
   const toggleAlternatives = (legIndex: number, field: "from" | "to") => {
@@ -369,130 +292,142 @@ export function AirportConfirmationWidget({
     onConfirm({ legs: confirmedLegs });
   };
 
+  /* ── Confirmed state ── */
   if (confirmed) {
     return (
-      <div className="mt-3 p-4 rounded-2xl bg-primary/10 border border-primary/30 max-w-md">
-        <div className="flex items-center gap-2 text-primary font-medium text-sm mb-2">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="mt-3 p-4 rounded-2xl bg-primary/10 border border-primary/30 max-w-md"
+      >
+        <div className="flex items-center gap-2 text-primary font-semibold text-sm mb-2">
           <Check className="w-4 h-4" />
           <span>{t("planner.airport.confirmedAirports")}</span>
         </div>
         <div className="space-y-1.5">
           {data.legs.map(leg => {
-            const selected = selectedAirports[leg.legIndex];
+            const s = selectedAirports[leg.legIndex];
             return (
-              <div key={leg.legIndex} className="flex items-center gap-2 text-sm text-foreground">
-                <span className="font-mono font-bold text-primary">{selected.from.iata}</span>
-                <span className="text-muted-foreground">→</span>
-                <span className="font-mono font-bold text-primary">{selected.to.iata}</span>
+              <div key={leg.legIndex} className="flex items-center gap-2 text-sm">
+                <span className="font-black text-primary text-base">{s.from.iata}</span>
+                <Plane className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="font-black text-primary text-base">{s.to.iata}</span>
               </div>
             );
           })}
         </div>
-      </div>
+      </motion.div>
     );
   }
 
+  /* ── Main widget ── */
   return (
-    <div className="mt-3 p-4 rounded-2xl bg-muted/50 border border-border/50 max-w-xl space-y-4">
-      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-        {t("planner.airport.airportSelection")}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 320, damping: 30 }}
+      className="mt-3 max-w-xl w-full"
+    >
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-3 px-1">
+        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/15">
+          <Plane className="w-3.5 h-3.5 text-primary" />
+        </div>
+        <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          {t("planner.airport.airportSelection")}
+        </span>
       </div>
 
       {/* Legs */}
       <div className="space-y-4">
         {data.legs.map((leg, idx) => {
           const selected = selectedAirports[leg.legIndex];
-          const showFromAlts = showAlternatives[leg.legIndex]?.from;
-          const showToAlts = showAlternatives[leg.legIndex]?.to;
+          const showFromAlts = showAlternatives[leg.legIndex]?.from || false;
+          const showToAlts = showAlternatives[leg.legIndex]?.to || false;
           const allFromAirports = [leg.from.suggestedAirport, ...leg.from.alternativeAirports];
           const allToAirports = [leg.to.suggestedAirport, ...leg.to.alternativeAirports];
 
           return (
-            <div key={leg.legIndex} className="p-4 rounded-xl bg-card border border-border/50 space-y-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold">
+            <motion.div
+              key={leg.legIndex}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.08 }}
+              className="rounded-2xl border border-border/50 bg-card/70 backdrop-blur-sm overflow-hidden"
+            >
+              {/* Leg header */}
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40 bg-muted/30">
+                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-primary/20 text-primary text-[10px] font-black">
                   {idx + 1}
                 </span>
-                <span className="font-medium text-foreground">{leg.from.city} → {leg.to.city}</span>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="text-sm font-bold text-foreground truncate">
+                    {leg.from.city}
+                  </span>
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <div className="w-6 h-px bg-border" />
+                    <Plane className="w-3 h-3 rotate-0" />
+                    <div className="w-6 h-px bg-border" />
+                  </div>
+                  <span className="text-sm font-bold text-foreground truncate">
+                    {leg.to.city}
+                  </span>
+                </div>
                 {leg.date && (
-                  <span className="ml-auto text-xs bg-muted px-2 py-0.5 rounded-full">
-                    {(leg.date instanceof Date ? leg.date : new Date(leg.date)).toLocaleDateString(i18n.language === "en" ? "en-US" : "fr-FR", { day: "numeric", month: "short" })}
+                  <span className="text-[11px] font-medium text-muted-foreground bg-muted px-2.5 py-1 rounded-full shrink-0">
+                    {(leg.date instanceof Date ? leg.date : new Date(leg.date))
+                      .toLocaleDateString(i18n.language === "en" ? "en-US" : "fr-FR", { day: "numeric", month: "short" })}
                   </span>
                 )}
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
-                {/* From Airport */}
-                <div className="space-y-2">
-                  {!showFromAlts ? (
-                    <RecommendedAirportCard
-                      airport={selected.from}
-                      label={t("planner.airport.departure")}
-                      allAirports={allFromAirports}
-                      onAccept={() => {}}
-                      onReject={() => toggleAlternatives(leg.legIndex, "from")}
-                      disabled={isLoading}
-                    />
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="text-xs font-medium text-muted-foreground">
-                        {t("planner.airport.availableDeparture")}
-                      </div>
-                      {allFromAirports.map((airport, airportIdx) => (
-                        <AlternativeAirportCard
-                          key={airport.iata}
-                          airport={airport}
-                          index={airportIdx}
-                          allAirports={allFromAirports}
-                          onSelect={() => handleAirportChange(leg.legIndex, "from", airport)}
-                          disabled={isLoading}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* To Airport */}
-                <div className="space-y-2">
-                  {!showToAlts ? (
-                    <RecommendedAirportCard
-                      airport={selected.to}
-                      label={t("planner.airport.arrival")}
-                      allAirports={allToAirports}
-                      onAccept={() => {}}
-                      onReject={() => toggleAlternatives(leg.legIndex, "to")}
-                      disabled={isLoading}
-                    />
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="text-xs font-medium text-muted-foreground">
-                        {t("planner.airport.availableArrival")}
-                      </div>
-                      {allToAirports.map((airport, airportIdx) => (
-                        <AlternativeAirportCard
-                          key={airport.iata}
-                          airport={airport}
-                          index={airportIdx}
-                          allAirports={allToAirports}
-                          onSelect={() => handleAirportChange(leg.legIndex, "to", airport)}
-                          disabled={isLoading}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
+              {/* Cards grid */}
+              <div className="grid grid-cols-2 gap-3 p-4">
+                <PremiumAirportCard
+                  airport={selected.from}
+                  label={t("planner.airport.departure")}
+                  allAirports={allFromAirports}
+                  showAlts={showFromAlts}
+                  onToggleAlts={() => toggleAlternatives(leg.legIndex, "from")}
+                  onSelect={(a) => handleAirportChange(leg.legIndex, "from", a)}
+                  disabled={isLoading}
+                />
+                {/* Divider */}
+                <PremiumAirportCard
+                  airport={selected.to}
+                  label={t("planner.airport.arrival")}
+                  allAirports={allToAirports}
+                  showAlts={showToAlts}
+                  onToggleAlts={() => toggleAlternatives(leg.legIndex, "to")}
+                  onSelect={(a) => handleAirportChange(leg.legIndex, "to", a)}
+                  disabled={isLoading}
+                />
               </div>
-            </div>
+            </motion.div>
           );
         })}
       </div>
 
       {/* Confirm button */}
-      <button
+      <motion.button
         onClick={handleConfirm}
         disabled={isLoading}
-        className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        whileHover={{ scale: 1.015 }}
+        whileTap={{ scale: 0.98 }}
+        className={cn(
+          "relative mt-4 w-full py-3.5 rounded-2xl text-sm font-bold overflow-hidden",
+          "bg-primary text-primary-foreground",
+          "shadow-lg shadow-primary/30",
+          "disabled:opacity-50 disabled:cursor-not-allowed",
+          "flex items-center justify-center gap-2 transition-all"
+        )}
       >
+        {/* Shimmer */}
+        <motion.div
+          className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12"
+          animate={{ x: ["-120%", "120%"] }}
+          transition={{ duration: 2.2, repeat: Infinity, repeatDelay: 1.5, ease: "easeInOut" }}
+        />
         {isLoading ? (
           <>
             <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
@@ -500,13 +435,13 @@ export function AirportConfirmationWidget({
           </>
         ) : (
           <>
-            <Plane className="h-4 w-4" />
-            {data.legs.length > 1 
+            <Plane className="w-4 h-4" />
+            {data.legs.length > 1
               ? t("planner.airport.searchFlightsPlural", { count: data.legs.length })
               : t("planner.airport.searchFlights", { count: data.legs.length })}
           </>
         )}
-      </button>
-    </div>
+      </motion.button>
+    </motion.div>
   );
 }
