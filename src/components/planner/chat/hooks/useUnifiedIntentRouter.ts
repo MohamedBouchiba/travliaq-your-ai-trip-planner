@@ -62,8 +62,8 @@ export interface UseUnifiedIntentRouterOptions {
  * Hook return type
  */
 export interface UseUnifiedIntentRouterReturn {
-  /** Process a backend intent classification, optionally with fresh flow state */
-  processIntent: (intent: IntentClassification | null, flowStateOverride?: FlowState) => IntentProcessResult;
+  /** Process a backend intent classification, optionally with fresh flow state and current assistant message */
+  processIntent: (intent: IntentClassification | null, flowStateOverride?: FlowState, currentAssistantMessage?: string) => IntentProcessResult;
   /** Validate if a widget can be shown */
   canShowWidget: (widgetType: WidgetType) => WidgetValidation;
   /** Check if user already provided data for this widget type */
@@ -156,7 +156,7 @@ export function useUnifiedIntentRouter({
    * This is the main entry point - trusts the backend as source of truth
    * Now enhanced with frontend confidence boosting
    */
-  const processIntent = useCallback((intent: IntentClassification | null, flowStateOverride?: FlowState): IntentProcessResult => {
+  const processIntent = useCallback((intent: IntentClassification | null, flowStateOverride?: FlowState, currentAssistantMessage?: string): IntentProcessResult => {
     lastIntentRef.current = intent;
     // Use fresh flowState if provided (avoids stale memoized state after entity persistence)
     const effectiveFlowState = flowStateOverride || flowState;
@@ -201,8 +201,10 @@ export function useUnifiedIntentRouter({
     }
     
     // TRUST THE BACKEND: If backend specified a widget, validate coherence first
+    // Use currentAssistantMessage (fresh from stream) if provided, otherwise fall back to lastAssistantMessage
     if (intent.widgetToShow?.type) {
-      const coherentWidget = validateWidgetTextCoherence(lastAssistantMessage || "", intent.widgetToShow.type);
+      const messageForCoherence = currentAssistantMessage ?? lastAssistantMessage ?? "";
+      const coherentWidget = validateWidgetTextCoherence(messageForCoherence, intent.widgetToShow.type);
       
       if (coherentWidget) {
         const widgetType = coherentWidget as WidgetType;

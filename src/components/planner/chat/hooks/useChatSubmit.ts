@@ -67,7 +67,7 @@ interface WidgetTrackingShape {
 }
 
 interface IntentRouterShape {
-  processIntent: (intent: IntentClassification, flowStateOverride?: FlowState) => {
+  processIntent: (intent: IntentClassification, flowStateOverride?: FlowState, currentAssistantMessage?: string) => {
     shouldShowWidget: boolean;
     widgetType: WidgetType | null;
     widgetData?: Record<string, unknown>;
@@ -296,7 +296,7 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
         freshMemory = { ...opts.memory, ...memoryPatch } as FlightMemory;
         const freshFlowState = computeFlowState(freshMemory);
 
-        intentResult = opts.intentRouter.processIntent(intentClassification, freshFlowState);
+        intentResult = opts.intentRouter.processIntent(intentClassification, freshFlowState, content || undefined);
         if (intentResult.widgetType) {
           opts.setLastWidgetTriggered(intentResult.widgetType);
 
