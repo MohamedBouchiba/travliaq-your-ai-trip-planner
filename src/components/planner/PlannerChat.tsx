@@ -307,16 +307,19 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
       const activitiesDone = completedSteps.includes('activities') || activitiesSkipped;
 
       // Build clean status lines — NO markdown links (they cause browser navigation)
-      const statusLines: string[] = [];
-      statusLines.push(completedSteps.includes('flights') ? '✅ Vol sélectionné' : '☐ Vol — à sélectionner');
-      statusLines.push(completedSteps.includes('hotels') ? '✅ Hébergement sélectionné' : '☐ Hébergement — à sélectionner');
-      statusLines.push(
-        activitiesDone
-          ? `✅ Activités${activitiesSkipped ? ' (passées)' : ' sélectionnées'}`
-          : '☐ Activités — à ajouter ou passer'
-      );
+      // Each item on its own line with double-newline for proper markdown paragraph breaks
+      const flightDone = completedSteps.includes('flights');
+      const hotelDone = completedSteps.includes('hotels');
 
-      const checklist = statusLines.map(l => `**${l}**`).join('\n');
+      const checklistItems = [
+        flightDone ? '✅ **Vol sélectionné**' : '☐ **Vol** — à sélectionner',
+        hotelDone ? '✅ **Hébergement sélectionné**' : '☐ **Hébergement** — à sélectionner',
+        activitiesDone
+          ? `✅ **Activités**${activitiesSkipped ? ' *(passées)*' : ''}`
+          : '☐ **Activités** — à ajouter ou passer',
+      ];
+
+      const checklist = checklistItems.join('\n\n');
       const missingCount = missingSteps.length;
 
       const BLOCKED_VARIATIONS = [
@@ -1087,21 +1090,19 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                 />
               ))}
 
-              {/* SmartSuggestions — inside message area, ChatGPT-style empty state */}
-              {userMessageCount === 0 && (
-                <MemoizedSmartSuggestions
-                  memory={memory}
-                  mapContext={mapContext}
-                  inspireFlowStep={inspireFlowStep}
-                  destinationSuggestions={destinationSuggestions}
-                  lastAssistantMessage={messages.filter(m => m.role === 'assistant' && !m.isTyping && m.text && m.text.length > 10).at(-1)?.text}
-                  lastUserMessage={messages.filter(m => m.role === 'user').at(-1)?.text}
-                  conversationTurn={0}
-                  dynamicSuggestions={dynamicSuggestions}
-                  onSuggestionClick={handleSuggestionClick}
-                  isLoading={isLoading}
-                />
-              )}
+              {/* SmartSuggestions — always visible at bottom of message area */}
+              <MemoizedSmartSuggestions
+                memory={memory}
+                mapContext={mapContext}
+                inspireFlowStep={inspireFlowStep}
+                destinationSuggestions={destinationSuggestions}
+                lastAssistantMessage={messages.filter(m => m.role === 'assistant' && !m.isTyping && m.text && m.text.length > 10).at(-1)?.text}
+                lastUserMessage={messages.filter(m => m.role === 'user').at(-1)?.text}
+                conversationTurn={userMessageCount}
+                dynamicSuggestions={dynamicSuggestions}
+                onSuggestionClick={handleSuggestionClick}
+                isLoading={isLoading}
+              />
 
               <div ref={messagesEndRef} />
             </div>
