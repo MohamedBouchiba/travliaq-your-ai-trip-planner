@@ -193,7 +193,11 @@ export function buildLLMContext(sources: ContextSources): Record<string, unknown
     sessionEntities: sources.sessionContext.sessionEntities,
     widgetDecisions: sources.sessionContext.widgetDecisions,
     basketSummary: truncateField(rawBasketSummary, FIELD_BUDGETS.basketSummary),
-    blockedWidgets: sources.widgetCooldown.getBlockedWidgets(),
+    blockedWidgets: [
+      ...sources.widgetCooldown.getBlockedWidgets(),
+      // Once the user has confirmed their style, prevent the LLM from re-triggering the widget
+      ...(preferenceMemoryState?.styleAxesUserConfirmed === true ? ["preferenceStyle"] : []),
+    ],
     preferencesState,
     currentPhase,
   };

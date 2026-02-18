@@ -1390,9 +1390,12 @@ function createSimulatedStreamingResponse(
       
       // A3: Stream content in word-sized chunks (not character by character)
       // Split by spaces and punctuation boundaries for natural-looking streaming
+      // CRITICAL: await between each enqueue to yield the Deno event loop and
+      // allow the HTTP stack to flush each word as a separate TCP frame.
       const words = content.match(/\S+\s*/g) || [content];
       for (const word of words) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "content", content: word })}\n\n`));
+        await new Promise(resolve => setTimeout(resolve, 0));
       }
       
       controller.enqueue(encoder.encode("data: [DONE]\n\n"));
