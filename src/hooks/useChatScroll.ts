@@ -14,6 +14,7 @@ interface UseChatScrollOptions {
   messagesCount: number;
   containerRef: RefObject<HTMLDivElement | null>;
   threshold?: number; // Distance from bottom to consider "at bottom"
+  isStreaming?: boolean; // When true, RAF-loop scrolls to bottom continuously
 }
 
 interface UseChatScrollReturn {
@@ -29,6 +30,7 @@ export function useChatScroll({
   messagesCount,
   containerRef,
   threshold = 100,
+  isStreaming = false,
 }: UseChatScrollOptions): UseChatScrollReturn {
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const [newMessageCount, setNewMessageCount] = useState(0);
@@ -105,6 +107,28 @@ export function useChatScroll({
     
     lastMessageCountRef.current = messagesCount;
   }, [messagesCount, isUserScrolling, scrollToBottom]);
+
+  // RAF-loop: continuously scroll to bottom during streaming (content grows but messagesCount stays same)
+  // Uses behavior: "auto" (instant, no jank) — "smooth" causes visible jumping during streaming
+  useEffect(() => {
+    if (!isStreaming || isUserScrolling) return;
+
+    let rafId: number;
+    const scrollLoop = () => {
+      const container = containerRef.current;
+      if (container) {
+        // Only scroll if not already at bottom (avoids unnecessary layout thrashing)
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        if (scrollHeight - scrollTop - clientHeight > 2) {
+          container.scrollTop = scrollHeight;
+        }
+      }
+      rafId = requestAnimationFrame(scrollLoop);
+    };
+    rafId = requestAnimationFrame(scrollLoop);
+
+    return () => cancelAnimationFrame(rafId);
+  }, [isStreaming, isUserScrolling, containerRef]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
