@@ -34,8 +34,6 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
   const explicitRequirements = useTripBasketStore((s) => s.explicitRequirements);
   const setExplicitRequirement = useTripBasketStore((s) => s.setExplicitRequirement);
   const { preferences } = useUserPreferences();
-
-  // Read trip memory directly from store — no prop drilling needed
   const { memory } = useFlightMemoryStore();
 
   const currency = preferences.currency || 'EUR';
@@ -85,7 +83,6 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
 
   const visibleSteps = STEP_CONFIG.filter((s) => requiredSteps.includes(s.key));
 
-  // Find the active (next incomplete) step index
   const activeStepIndex = visibleSteps.findIndex((s) => {
     if (s.key === 'activities') return !activitiesDone;
     return !completedSteps.includes(s.key);
@@ -103,46 +100,59 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
     setExplicitRequirement('wantsActivities', false);
   };
 
-  // Build trip memory chips from FlightMemory
+  // Trip memory — derive contextual chips
   const destination = memory.arrival?.city || memory.arrival?.country;
   const depDate = formatShortDate(memory.departureDate);
   const retDate = formatShortDate(memory.returnDate);
   const totalTravelers = memory.passengers.adults + memory.passengers.children + memory.passengers.infants;
   const hasNonDefaultTravelers = totalTravelers !== 1 || memory.passengers.children > 0 || memory.passengers.infants > 0;
 
-  const memoryChips = [
-    destination && { icon: <MapPin className="h-3 w-3" />, label: destination },
-    depDate && { icon: <Calendar className="h-3 w-3" />, label: retDate ? `${depDate} → ${retDate}` : depDate },
-    hasNonDefaultTravelers && { icon: <Users className="h-3 w-3" />, label: `${totalTravelers} voy.` },
-  ].filter(Boolean) as { icon: React.ReactNode; label: string }[];
+  // Build a compact single-line trip summary
+  const tripSummaryParts: string[] = [];
+  if (destination) tripSummaryParts.push(destination);
+  if (depDate) tripSummaryParts.push(retDate ? `${depDate}→${retDate}` : depDate);
+  if (hasNonDefaultTravelers) tripSummaryParts.push(`${totalTravelers} voy.`);
+  const hasTripMemory = tripSummaryParts.length > 0;
 
   return (
     <div className="absolute bottom-0 left-0 right-0 z-20 bg-card/95 backdrop-blur-xl border-t border-border/40">
+      <div className="flex items-center px-4 py-2.5 gap-3 min-h-[56px]">
 
-      {/* Trip memory row — only shown when there's data */}
-      {memoryChips.length > 0 && (
-        <div className="flex items-center gap-2 px-5 pt-2.5 pb-0">
-          {memoryChips.map((chip, i) => (
-            <span
-              key={i}
-              className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground"
-            >
-              {chip.icon}
-              {chip.label}
-            </span>
-          ))}
-          {totalPrice > 0 && (
-            <span className="ml-auto text-[10px] font-semibold text-foreground tabular-nums">
-              {formattedPrice} {symbol}
-            </span>
-          )}
-        </div>
-      )}
+        {/* ── LEFT: Trip context (destination, dates, travelers) ── */}
+        {hasTripMemory && (
+          <>
+            <div className="flex flex-col justify-center gap-0.5 shrink-0 min-w-0 max-w-[120px]">
+              {destination && (
+                <div className="flex items-center gap-1">
+                  <MapPin className="h-2.5 w-2.5 text-primary shrink-0" />
+                  <span className="text-[10px] font-semibold text-foreground truncate">{destination}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                {depDate && (
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
+                    <span className="text-[9px] text-muted-foreground whitespace-nowrap">
+                      {retDate ? `${depDate}→${retDate}` : depDate}
+                    </span>
+                  </div>
+                )}
+                {hasNonDefaultTravelers && (
+                  <div className="flex items-center gap-1">
+                    <Users className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
+                    <span className="text-[9px] text-muted-foreground">{totalTravelers}</span>
+                  </div>
+                )}
+              </div>
+            </div>
 
-      {/* Main row: steps + price + plan button */}
-      <div className="flex items-center justify-between px-5 py-3 gap-4">
-        {/* Step tracker */}
-        <div className="flex items-center gap-0 flex-1 min-w-0">
+            {/* Thin separator */}
+            <div className="w-px h-8 bg-border/50 shrink-0" />
+          </>
+        )}
+
+        {/* ── CENTER: Step tracker ── */}
+        <div className="flex items-center gap-0 flex-1 min-w-0 justify-center">
           {visibleSteps.map(({ key, label, tab }, idx) => {
             const isActivities = key === 'activities';
             const done = isActivities ? activitiesDone : completedSteps.includes(key);
@@ -156,57 +166,46 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
 
             return (
               <div key={key} className="flex items-center">
-                {/* Connector line between steps */}
                 {idx > 0 && (
                   <div className={cn(
-                    'h-[1.5px] w-8 transition-colors duration-500',
-                    prevDone && done
-                      ? 'bg-green-500'
-                      : prevDone
-                        ? 'bg-border'
-                        : 'bg-border/40'
+                    'h-[1.5px] w-6 transition-colors duration-500',
+                    prevDone && done ? 'bg-green-500' : prevDone ? 'bg-border' : 'bg-border/40'
                   )} />
                 )}
-
-                {/* Step node */}
                 <div className="flex flex-col items-center gap-0.5">
                   <button
                     onClick={() => !done && eventBus.emit('tab:change', { tab })}
                     aria-label={label}
                     className={cn(
-                      'h-7 w-7 rounded-full flex items-center justify-center transition-all duration-300 border-2 text-[11px] font-semibold',
+                      'h-6 w-6 rounded-full flex items-center justify-center transition-all duration-300 border-2 text-[10px] font-semibold',
                       done
                         ? 'bg-green-500 border-green-500 text-white shadow-sm'
                         : isActive
                           ? 'border-primary text-primary bg-primary/5 shadow-sm ring-2 ring-primary/20 ring-offset-1 ring-offset-card'
-                          : 'border-border/40 text-muted-foreground/40 bg-transparent cursor-pointer hover:border-border/70 hover:text-muted-foreground/60'
+                          : 'border-border/40 text-muted-foreground/40 bg-transparent cursor-pointer hover:border-border/70'
                     )}
                   >
                     {skipped ? (
-                      <SkipForward className="h-3 w-3" />
+                      <SkipForward className="h-2.5 w-2.5" />
                     ) : done ? (
-                      <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+                      <Check className="h-3 w-3" strokeWidth={2.5} />
                     ) : (
                       <span>{idx + 1}</span>
                     )}
                   </button>
-
-                  {/* Label + optional "Passer" */}
                   <div className="flex flex-col items-center leading-none gap-0.5">
                     <span className={cn(
-                      'text-[10px] font-medium transition-colors duration-300 whitespace-nowrap',
-                      done
-                        ? 'text-green-600 dark:text-green-400'
-                        : isActive
-                          ? 'text-primary'
-                          : 'text-muted-foreground/40'
+                      'text-[9px] font-medium transition-colors duration-300 whitespace-nowrap',
+                      done ? 'text-green-600 dark:text-green-400'
+                        : isActive ? 'text-primary'
+                        : 'text-muted-foreground/40'
                     )}>
                       {label}
                     </span>
                     {showSkip && (
                       <button
                         onClick={(e) => { e.stopPropagation(); handleSkipActivities(); }}
-                        className="text-[9px] text-primary/60 underline hover:text-primary transition-colors leading-none"
+                        className="text-[8px] text-primary/60 underline hover:text-primary transition-colors leading-none"
                       >
                         Passer
                       </button>
@@ -218,31 +217,30 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
           })}
         </div>
 
-        {/* Price — only shown when memory chips are absent (otherwise shown in memory row) */}
-        {totalPrice > 0 && memoryChips.length === 0 && (
-          <div className="flex items-baseline gap-0.5 shrink-0">
-            <span className="text-sm font-bold text-foreground tabular-nums">
-              {formattedPrice}
-            </span>
-            <span className="text-[10px] font-medium text-muted-foreground ml-0.5">
-              {symbol}
-            </span>
-          </div>
-        )}
-
-        {/* Plan button */}
-        <Button
-          variant={isComplete ? 'hero' : 'secondary'}
-          size="sm"
-          onClick={isComplete ? onPlanTrip : handleBlockedClick}
-          className={cn(
-            "gap-1.5 text-xs h-8 px-4 transition-all duration-300 shrink-0",
-            !isComplete && "opacity-50"
+        {/* ── RIGHT: Price + Plan button ── */}
+        <div className="flex items-center gap-2 shrink-0">
+          {totalPrice > 0 && (
+            <div className="flex flex-col items-end leading-none">
+              <span className="text-xs font-bold text-foreground tabular-nums">
+                {formattedPrice} {symbol}
+              </span>
+              <span className="text-[9px] text-muted-foreground">Total</span>
+            </div>
           )}
-        >
-          <Plane className="h-3.5 w-3.5" />
-          Planifier
-        </Button>
+          <Button
+            variant={isComplete ? 'hero' : 'secondary'}
+            size="sm"
+            onClick={isComplete ? onPlanTrip : handleBlockedClick}
+            className={cn(
+              "gap-1.5 text-xs h-8 px-3 transition-all duration-300 shrink-0",
+              !isComplete && "opacity-50"
+            )}
+          >
+            <Plane className="h-3 w-3" />
+            Planifier
+          </Button>
+        </div>
+
       </div>
     </div>
   );
