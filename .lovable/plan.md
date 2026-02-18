@@ -1,132 +1,126 @@
 
-## Fix : Streaming fluide + scroll professionnel (inspiré ChatGPT/Claude)
+## Diagnosis: Why Streaming Shows as Blocks
 
-### Diagnostic des 3 vrais problèmes
+After reading the full pipeline (`useChatSubmit.ts` → `useChatStream.ts` → `ChatMessageBubble.tsx`), the root cause is now clear.
 
-**Problème 1 — Le texte arrive en blocs, pas mot-à-mot**
+### The Actual Problem
 
-La cause n'est pas le réseau : c'est `ReactMarkdown`. Pendant le streaming, chaque token reçu déclenche un re-rendu de `MarkdownMessage`, qui re-parse tout le markdown depuis zéro. React-markdown utilise remark/rehype en interne — c'est lourd. Le navigateur groupe ces re-rendus et les flush par blocs, ce qui donne l'effet "par paquets".
+The streaming text is stored inside the `messages` array (`useState<ChatMessage[]>`). On every token, `setMessages(updateMessageById(...))` is called, which:
 
-**Solution** : pendant `isStreaming === true`, remplacer `<ReactMarkdown>` par du texte brut `<span>`. Une fois le streaming terminé, on rend le markdown complet. C'est exactement ce que fait Claude.
+1. Creates a **new array copy** of all messages
+2. Finds and replaces the target message object
+3. Triggers a React re-render of the entire list
 
-**Problème 2 — Le scroll ne suit pas le contenu qui grandit**
+Even with `flushSync`, React 18 detects that `setMessages` is being called inside a context that started with other state updates (`setIsLoading(true)` ran just before `streamResponse` was awaited), and **batches the synchronous flushSync calls** — resulting in all tokens being grouped into one paint at the end.
 
-`useChatScroll` écoute `messagesCount` (nombre de messages). Pendant le streaming, ce chiffre ne change pas — seul le contenu d'un message change. Le hook ne se déclenche donc jamais pendant le streaming. L'effet à la ligne 673-679 de PlannerChat a le même problème : il réagit à `messages.length`.
+The `ChatMessageBubble` is wrapped in `React.memo` with a custom comparator, which correctly detects changes to `pm.text`, but the problem is upstream: **React never paints the intermediate states**.
 
-**Solution** : ajouter un `useEffect` dans `useChatScroll` qui observe `isStreaming` et, quand c'est actif + que l'utilisateur n'est pas en train de lire l'historique, scrolle vers le bas avec `behavior: "auto"` à chaque frame via `requestAnimationFrame`. On arrête quand `isStreaming === false`.
+### The Correct Fix: Separate Streaming State
 
-**Problème 3 — Le curseur clignotant**
+The industry-standard solution (used by ChatGPT, Claude, Mistral) is to **decouple the streaming text from the messages array**:
 
-Le plan précédent proposait un `animate-pulse` sur un bloc rectangulaire. L'utilisateur a raison que c'est moche. Au lieu de ça : un léger fondu du dernier mot en cours (opacity légèrement réduite sur le dernier chunk en cours d'arrivée). Alternativement : rien du tout — juste le scroll fluide et le texte progressif donnent déjà la sensation de "vivant". ChatGPT et Claude n'ont pas de curseur visible sur mobile.
+- Keep a **separate `useState<string>`** (`streamingText`) that holds only the in-flight content for the current message
+- Keep a **separate `useState<string>`** (`streamingMessageId`) to know which bubble to render it in
+- During streaming, update `streamingText` directly — this is a single, lightweight state update with no array copy
+- On stream completion, merge the final text back into `messages`
 
-**Décision finale** : pas de curseur visible. Le streaming progressif mot-à-mot suffit. Plus élégant.
+This way, `setMessages` is called only **twice** per exchange (once to add the typing bubble, once to finalize), while `setStreamingText` is called on every token — fast, isolated, batching-free.
+
+### Secondary Fix: Remove Dots During Streaming
+
+Currently `isTyping: true` shows the three dots until the first `onContentUpdate` call. The fix is:
+- Set `isTyping: false` and start showing `streamingText` as soon as the first content chunk arrives (even a single letter)
+- The `ChatMessageBubble` will render the live `streamingText` prop instead of dots
 
 ---
 
-### Plan de correction
+## Implementation Plan
 
-#### Fichier 1 : `src/hooks/useChatScroll.ts`
+### 1. `src/components/planner/PlannerChat.tsx`
 
-Ajouter `isStreaming` comme paramètre optionnel. Quand `isStreaming === true` et `isUserScrolling === false`, lancer un RAF-loop pour scroller automatiquement vers le bas avec `behavior: "auto"` (pas `"smooth"` qui cause des sautes pendant le streaming). Arrêter le loop quand le streaming s'arrête.
-
+Add two new state variables:
 ```
-Nouvelle interface :
-UseChatScrollOptions {
-  messagesCount: number;
-  containerRef: RefObject<HTMLDivElement | null>;
-  threshold?: number;
-  isStreaming?: boolean;  // <-- NOUVEAU
-}
+const [streamingText, setStreamingText] = useState("")
+const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
 ```
 
-Logic interne :
-```
-useEffect(() => {
-  if (!isStreaming || isUserScrolling) return;
-  
-  let rafId: number;
-  const scroll = () => {
-    const container = containerRef.current;
-    if (container && !isAtBottom()) {
-      container.scrollTop = container.scrollHeight; // behavior: "auto" instantané
-    }
-    rafId = requestAnimationFrame(scroll);
-  };
-  rafId = requestAnimationFrame(scroll);
-  
-  return () => cancelAnimationFrame(rafId);
-}, [isStreaming, isUserScrolling, containerRef, isAtBottom]);
-```
+Pass them down to `ChatMessageBubble` via `visibleMessages` — or better, inject them directly into the rendered bubble by checking `m.id === streamingMessageId` and substituting `streamingText` as the text prop.
 
-#### Fichier 2 : `src/components/planner/PlannerChat.tsx`
+### 2. `src/components/planner/chat/hooks/useChatSubmit.ts`
 
-- Récupérer `isStreaming` depuis `useChatStream` (déjà exposé via `streamResponse` mais pas consommé au niveau du composant — il faut le passer depuis `useChatSubmit` ou lire `isStreaming` directement depuis le hook)
-- Passer `isStreaming` à `useChatScroll`
+Modify the `onContentUpdate` callback:
 
-Vérification : `useChatStream` retourne `isStreaming` (ligne 82, 492). Il faut vérifier si `useChatSubmit` l'expose ou si on doit le récupérer autrement. Actuellement dans PlannerChat, `streamResponse` vient de `useChatStream` mais l'état `isStreaming` n'est pas directement accessible dans PlannerChat — il est encapsulé dans le hook. On peut soit :
-- (A) Exposer `isStreaming` depuis `useChatSubmit` 
-- (B) Utiliser `isLoading` comme proxy (déjà accessible dans PlannerChat)
-
-**Option B choisie** : `isLoading` est déjà utilisé comme état global de chargement et est `true` pendant tout le streaming. On l'utilise comme `isStreaming` proxy pour le scroll. C'est plus simple et déjà disponible.
-
-#### Fichier 3 : `src/components/planner/chat/widgets/MarkdownMessage.tsx`
-
-Ajouter une prop `isStreaming?: boolean`. Quand `true`, rendre le contenu en texte simple (pas de markdown parsing) :
-
-```tsx
-export function MarkdownMessage({ content, className, isStreaming }: MarkdownMessageProps) {
-  if (isStreaming) {
-    // Texte brut pendant le streaming = rendu instantané, pas de re-parsing lourd
-    return (
-      <div className={cn("text-sm leading-relaxed whitespace-pre-wrap", className)}>
-        {content}
-      </div>
-    );
+```typescript
+(id, text2, isComplete) => {
+  if (isComplete) {
+    // Finalize: merge into messages array (one update)
+    opts.setStreamingMessageId(null);
+    opts.setStreamingText("");
+    opts.setMessages(updateMessageById(id, { 
+      text: text2, 
+      isStreaming: false, 
+      isTyping: false 
+    }));
+  } else {
+    // Streaming: update ONLY the lightweight string state
+    opts.setStreamingMessageId(id);
+    opts.setStreamingText(text2);
   }
-  
-  return (
-    <div className={cn("prose prose-sm dark:prose-invert max-w-none", className)}>
-      <ReactMarkdown ...>{content}</ReactMarkdown>
-    </div>
-  );
 }
 ```
 
-#### Fichier 4 : `src/components/planner/chat/ChatMessageBubble.tsx`
+No `flushSync` needed. No RAF needed. React will paint each `setStreamingText` update immediately because it's a simple primitive state update on its own.
 
-Passer `isStreaming` à `MarkdownMessage` quand `m.isStreaming === true` :
+### 3. `src/components/planner/chat/ChatMessageBubble.tsx`
+
+Add `streamingText?: string` prop. When the bubble's `m.id` matches the streaming message, render `streamingText` instead of `m.text`:
 
 ```tsx
-<MarkdownMessage content={m.text} isStreaming={m.isStreaming} />
+const displayText = streamingText !== undefined ? streamingText : m.text;
 ```
 
-Aussi : ajouter une transition douce à la fin du streaming. Une légère classe `transition-opacity` sur le wrapper fait que quand le markdown "re-render" en mode riche après la fin du streaming, ça ne flash pas.
+This makes the dots disappear on the very first letter and text appears word-by-word.
 
-#### Fichier 5 (bonus UX) : Empty state engageant
+### 4. `src/components/planner/chat/MarkdownMessage.tsx`
 
-Dans `PlannerChat.tsx`, quand `visibleMessages.length === 0`, afficher un écran d'accueil centré avec 3-4 suggestion cards cliquables — comme ChatGPT. Ces cards disparaissent dès le premier message. Cards suggérées :
-- "✈️ Inspire-moi pour un voyage"  
-- "🏖️ Trouver une destination soleil"
-- "📅 Planifier un week-end rapide"
-- "💰 Voyager avec un petit budget"
-
-Pas de nouveau composant — juste un bloc conditionnel dans le JSX existant du chat.
+No changes needed — it already handles `isStreaming` correctly (renders raw text during stream).
 
 ---
 
-### Fichiers modifiés
+## Flow After Fix
 
-| Fichier | Action |
-|---|---|
-| `src/hooks/useChatScroll.ts` | Ajouter `isStreaming` + RAF-loop de scroll automatique |
-| `src/components/planner/PlannerChat.tsx` | Passer `isLoading` comme `isStreaming` au scroll hook + empty state |
-| `src/components/planner/chat/widgets/MarkdownMessage.tsx` | Mode texte brut pendant le streaming |
-| `src/components/planner/chat/ChatMessageBubble.tsx` | Passer `isStreaming` à MarkdownMessage |
+```text
+User sends message
+  └─► setMessages([...prev, typingBubble])          ← isTyping: true → dots show
+  └─► streamResponse() begins
 
-### Résultat attendu
+First SSE token arrives
+  └─► setStreamingMessageId(messageId)
+  └─► setStreamingText("Bon")                        ← dots vanish, "Bon" appears
+  
+Second token arrives
+  └─► setStreamingText("Bonjour")                    ← "jour" appears immediately
 
-- Chaque mot s'affiche dès réception (pas de bloc) car aucun parsing markdown pendant le streaming
-- La vue scrolle automatiquement vers le bas à chaque nouveau token (RAF-loop)
-- Quand le streaming se termine, le markdown riche s'affiche proprement (gras, listes, etc.)
-- L'écran vide propose des suggestions engageantes pour démarrer
-- Comportement identique à ChatGPT/Claude : scroll fluide, texte progressif, transition propre
+...every token: ONE lightweight setState, ONE React paint
+
+Stream ends
+  └─► setStreamingText("")
+  └─► setStreamingMessageId(null)
+  └─► setMessages(updateMessageById(...))            ← final text persisted
+```
+
+### Why This Works
+
+- `setStreamingText` updates a single `string` primitive — React schedules an immediate paint without batching interference
+- `setMessages` is only called at start and end — no expensive array copies during streaming
+- No `flushSync`, no `requestAnimationFrame`, no `MutationObserver` needed for streaming
+- The scroll hook (`useChatScroll`) continues to work via `MutationObserver` — it watches DOM mutations which will now happen on every token
+
+---
+
+## Files to Modify
+
+1. `src/components/planner/PlannerChat.tsx` — add `streamingText` / `streamingMessageId` state, inject into render
+2. `src/components/planner/chat/hooks/useChatSubmit.ts` — split `onContentUpdate` into streaming vs final path, remove `flushSync`
+3. `src/components/planner/chat/ChatMessageBubble.tsx` — accept and render `streamingText` prop
+4. `src/components/planner/chat/hooks/useChatStream.ts` — remove `flushSync` import (no longer needed there)
