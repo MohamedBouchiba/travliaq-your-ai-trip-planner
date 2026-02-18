@@ -37,7 +37,7 @@ import { ChatMessageBubble } from "./chat/ChatMessageBubble";
 import type { ToolExecution } from "./chat/ToolStatusIndicator";
 import type { DestinationSuggestion } from "@/types/destinations";
 import { ScrollToBottomButton } from "./chat/ScrollToBottomButton";
-import { TripStatusBar } from "./chat/TripStatusBar";
+
 
 // Context imports
 import type { CountrySelectionEvent } from "@/types/flight";
@@ -1132,9 +1132,6 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
               onSuggestionClick={handleSuggestionClick}
               isLoading={isLoading}
             />
-
-            {/* Trip status chips — only real data */}
-            <TripStatusBar memory={memory} t={t} />
 
             <ChatInputArea
               input={input}
