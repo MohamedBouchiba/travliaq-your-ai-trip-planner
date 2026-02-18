@@ -235,7 +235,12 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
             if (opts.completedMessageIdsRef.current.has(id) && !isComplete) return;
             if (isComplete) opts.completedMessageIdsRef.current.add(id);
 
-            opts.setMessages(updateMessageById(id, { text: text2, isStreaming: !isComplete, isTyping: false }));
+            // flushSync forces React to paint IMMEDIATELY for each RAF tick,
+            // bypassing React 18 automatic batching → true word-by-word streaming.
+            // Without this, React batches multiple RAF callbacks → blocks appear.
+            flushSync(() => {
+              opts.setMessages(updateMessageById(id, { text: text2, isStreaming: !isComplete, isTyping: false }));
+            });
           }
         );
 
