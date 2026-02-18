@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useActivityMemoryStore, useTravelMemoryStore } from "@/stores/hooks";
+import { useTripBasketStore } from "@/stores/tripBasketStore";
 import { useLocationAutocomplete, type LocationResult } from "@/hooks/useLocationAutocomplete";
 import { useTranslation } from "react-i18next";
 import { useLocale } from "@/hooks/useLocale";
@@ -250,7 +251,7 @@ const ActivitiesPanel = () => {
   const { dateFnsLocale } = useLocale();
   const {
     state: activityState,
-    allDestinations, // Computed: inherited from accommodations + local
+    allDestinations,
     searchActivities,
     searchActivitiesByBounds,
     clearSearch,
@@ -264,6 +265,8 @@ const ActivitiesPanel = () => {
     addLocalDestination,
     removeLocalDestination,
   } = useActivityMemoryStore();
+
+  const { addBasketItem, removeBasketItem, getItemsByType } = useTripBasketStore();
 
   // Get travelers from travel context
   const { memory: travelMemory } = useTravelMemoryStore();
@@ -474,18 +477,49 @@ const ActivitiesPanel = () => {
         return;
       }
       addActivityFromSearch(viatorActivity, activeCity.id);
+
+      // Sync to basket store
+      const price = viatorActivity.pricing?.from_price ?? 0;
+      const durationFormatted = typeof viatorActivity.duration === 'object'
+        ? (viatorActivity.duration as any)?.formatted
+        : undefined;
+      addBasketItem({
+        type: 'activity',
+        status: 'selected',
+        name: viatorActivity.title,
+        price,
+        currency: 'EUR',
+        description: durationFormatted,
+        destinationCity: activeCity.city,
+        details: {
+          activityName: viatorActivity.title,
+          activityId: viatorActivity.id,
+          city: activeCity.city,
+          category: Array.isArray(viatorActivity.categories) ? viatorActivity.categories[0] : '',
+          description: viatorActivity.description,
+          imageUrl: viatorActivity.images?.[0]?.url,
+          participants: 1,
+        },
+      });
+      eventBus.emit("basket:itemSelected", { type: 'activity', name: viatorActivity.title, price, city: activeCity.city });
       toast.success(t("planner.activities.activityAdded"));
     },
-    [activeCity, addActivityFromSearch, t]
+    [activeCity, addActivityFromSearch, addBasketItem, t]
   );
 
   // Handle remove activity
   const handleRemoveActivity = useCallback(
-    (activityId: string) => {
+    (activityId: string, activityName?: string) => {
       removeActivity(activityId);
+      // Also remove from basket by matching name + type
+      if (activityName) {
+        const basketActivities = getItemsByType('activity');
+        const match = basketActivities.find(i => i.name === activityName);
+        if (match) removeBasketItem(match.id);
+      }
       toast.success(t("planner.activities.activityRemoved"));
     },
-    [removeActivity, t]
+    [removeActivity, removeBasketItem, getItemsByType, t]
   );
 
   // Handle activity click - open detail modal

@@ -11,6 +11,7 @@ import { findNearestAirports, Airport } from "@/hooks/useNearestAirports";
 import FlightResults, { FlightOffer, generateMockFlights } from "./FlightResults";
 import eventBus from "@/lib/eventBus";
 import { useFlightMemoryStore, type AirportInfo } from "@/stores/hooks";
+import { useTripBasketStore } from "@/stores/tripBasketStore";
 import { SUPABASE_URL } from "@/integrations/supabase/client";
 import { ActivitiesPanelSkeleton, AccommodationPanelSkeleton, PreferencesPanelSkeleton } from "./PanelSkeletons";
 
@@ -219,6 +220,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
   onConfirmedMultiAirportsConsumed?: () => void;
 }) => {
   const { t, i18n } = useTranslation();
+  const { replaceItemsByType } = useTripBasketStore();
   
   // Access flight memory for synchronization
   const { memory, updateMemory } = useFlightMemoryStore();
@@ -1386,24 +1388,56 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
 
   // Handle flight selection for multi-destination
   const handleFlightSelect = (flight: FlightOffer) => {
+    const firstSegment = flight.outbound?.[0];
+    const lastOutboundSegment = flight.outbound?.[flight.outbound.length - 1];
+    const legIdx = tripType === "multi" ? viewingLegIndex : 0;
+    const fromLabel = firstSegment?.departureAirport || legs[legIdx]?.from || "?";
+    const toLabel = lastOutboundSegment?.arrivalAirport || legs[legIdx]?.to || "?";
+    const itemName = `${fromLabel} → ${toLabel}`;
+    const totalPassengers = passengers.length;
+
+    const basketDetails = {
+      airline: flight.airline || firstSegment?.airline || '',
+      departure: {
+        airport: fromLabel,
+        iata: firstSegment?.departureAirport || '',
+        city: fromLabel,
+        time: firstSegment?.departureTime || '',
+        date: firstSegment?.departureTime?.split('T')[0] || '',
+      },
+      arrival: {
+        airport: toLabel,
+        iata: lastOutboundSegment?.arrivalAirport || '',
+        city: toLabel,
+        time: lastOutboundSegment?.arrivalTime || '',
+        date: lastOutboundSegment?.arrivalTime?.split('T')[0] || '',
+      },
+      duration: flight.totalDuration,
+      stops: flight.stops ?? 0,
+      passengers: totalPassengers,
+    };
+
+    replaceItemsByType('flight', {
+      type: 'flight',
+      status: 'selected',
+      name: itemName,
+      price: flight.price * totalPassengers,
+      currency: flight.currency || 'EUR',
+      description: `${flight.airline || firstSegment?.airline || 'Vol'} · ${flight.totalDuration} · ${flight.stops ?? 0} escale(s)`,
+      legIndex: legIdx,
+      details: basketDetails,
+    });
+    eventBus.emit("basket:itemSelected", { type: 'flight', name: itemName, price: flight.price * totalPassengers });
+
     if (tripType === "multi") {
-      // Save selected flight for this leg
       setSelectedFlights(prev => ({ ...prev, [viewingLegIndex]: flight }));
-      
-      // Find next leg without a selection
       const legIndices = Object.keys(allLegResults).map(Number).sort((a, b) => a - b);
       const currentIdx = legIndices.indexOf(viewingLegIndex);
       const nextUnselected = legIndices.find((idx, i) => i > currentIdx && !selectedFlights[idx]);
-      
       if (nextUnselected !== undefined) {
-        // Move to next leg
         setViewingLegIndex(nextUnselected);
         setFlightResults(allLegResults[nextUnselected] || []);
       }
-      // If all selected, stay on current view showing the recap
-    } else {
-      // For simple trips, just log
-      console.log("Selected flight:", flight);
     }
   };
 

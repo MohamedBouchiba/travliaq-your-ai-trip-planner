@@ -18,6 +18,7 @@ const STORAGE_KEY = 'travliaq_trip_basket';
 export interface TripBasketStore extends TripBasketState {
   // Item management
   addBasketItem: (item: Omit<BasketItem, 'id' | 'addedAt'>) => string;
+  replaceItemsByType: (type: BasketItemType, item: Omit<BasketItem, 'id' | 'addedAt'>) => string;
   removeBasketItem: (id: string) => void;
   updateBasketItem: (id: string, updates: Partial<BasketItem>) => void;
   clearBasket: () => void;
@@ -73,6 +74,18 @@ export const useTripBasketStore = create<TripBasketStore>()(
           const id = crypto.randomUUID();
           const newItem: BasketItem = { ...item, id, addedAt: new Date() };
           set((state) => ({ basketItems: [...state.basketItems, newItem] }));
+          return id;
+        },
+
+        replaceItemsByType: (type, item) => {
+          const id = crypto.randomUUID();
+          const newItem: BasketItem = { ...item, id, addedAt: new Date() };
+          set((state) => ({
+            basketItems: [
+              ...state.basketItems.filter((i) => i.type !== type),
+              newItem,
+            ],
+          }));
           return id;
         },
 

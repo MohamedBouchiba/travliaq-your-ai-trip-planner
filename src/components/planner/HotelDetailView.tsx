@@ -16,6 +16,7 @@ interface HotelDetailViewProps {
   isLoading?: boolean;
   nights: number;
   onBack: () => void;
+  onSelect?: () => void;
   onBook?: () => void;
 }
 
@@ -354,6 +355,7 @@ const HotelDetailView = ({
   isLoading = false,
   nights,
   onBack,
+  onSelect,
   onBook,
 }: HotelDetailViewProps) => {
   const { t } = useTranslation();
@@ -910,8 +912,19 @@ const HotelDetailView = ({
           <span className="text-xl font-bold text-primary">{totalPrice}€</span>
         </div>
         <div className="flex gap-2">
+          {onSelect && (
+            <Button
+              variant="default"
+              className="flex-1 h-12 text-base font-semibold bg-green-600 hover:bg-green-700 text-white"
+              onClick={onSelect}
+            >
+              <Check className="h-4 w-4 mr-2" />
+              {t("planner.hotels.chooseThisHotel") || "Choisir cet hôtel"}
+            </Button>
+          )}
           <Button
-            className="flex-1 h-12 text-base font-semibold"
+            className={cn("h-12 text-base font-semibold", onSelect ? "flex-none px-4" : "flex-1")}
+            variant={onSelect ? "outline" : "default"}
             onClick={onBook}
           >
             <ExternalLink className="h-4 w-4 mr-2" />

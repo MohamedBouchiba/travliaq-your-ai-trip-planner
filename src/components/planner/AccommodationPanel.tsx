@@ -10,6 +10,7 @@ import { STORAGE_KEYS } from "@/config/storageKeys";
 
 const HOTELS_DEBUG_KEY = STORAGE_KEYS.HOTELS_DEBUG;
 import { useTravelMemoryStore, useFlightMemoryStore, useAccommodationMemoryStore, BUDGET_PRESETS, type BudgetPreset, type AccommodationType, type EssentialAmenity } from "@/stores/hooks";
+import { useTripBasketStore } from "@/stores/tripBasketStore";
 import type { MealPlan } from "@/stores/slices/accommodationTypes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,6 +84,8 @@ const AccommodationPanel = ({ onMapMove, mapCenter }: AccommodationPanelProps) =
     getHotelDetailsFromCache,
     setIsLoadingHotelDetails,
   } = useAccommodationMemoryStore();
+
+  const { replaceItemsByType } = useTripBasketStore();
 
   const { t } = useTranslation();
   
@@ -924,6 +927,42 @@ const AccommodationPanel = ({ onMapMove, mapCenter }: AccommodationPanelProps) =
     eventBus.emit("hotels:hover", { hotel: null, source: "map" });
   };
 
+  // Handle hotel basket selection ("Choisir cet hôtel")
+  const handleHotelBasketSelect = (hotel: HotelResult, hotelDetails: HotelDetails | null | undefined) => {
+    const currentAccommodation = getActiveAccommodation();
+    const checkIn = currentAccommodation?.checkIn ? format(currentAccommodation.checkIn, 'yyyy-MM-dd') : '';
+    const checkOut = currentAccommodation?.checkOut ? format(currentAccommodation.checkOut, 'yyyy-MM-dd') : '';
+    const nights = currentAccommodation?.checkIn && currentAccommodation?.checkOut
+      ? differenceInDays(currentAccommodation.checkOut, currentAccommodation.checkIn)
+      : 0;
+    const totalPrice = hotel.totalPrice ?? hotel.pricePerNight * nights;
+
+    replaceItemsByType('hotel', {
+      type: 'hotel',
+      status: 'selected',
+      name: hotel.name,
+      price: totalPrice,
+      currency: 'EUR',
+      description: `${nights} nuit(s) · ${currentAccommodation?.city || ''}`,
+      destinationCity: currentAccommodation?.city,
+      details: {
+        hotelName: hotel.name,
+        hotelId: hotel.id,
+        address: hotel.address,
+        city: currentAccommodation?.city || '',
+        country: currentAccommodation?.country,
+        checkIn,
+        checkOut,
+        nights,
+        rating: hotel.rating,
+        stars: hotel.stars,
+        amenities: hotel.amenities,
+        imageUrl: hotel.imageUrl,
+      },
+    });
+    eventBus.emit("basket:itemSelected", { type: 'hotel', name: hotel.name, price: totalPrice, city: currentAccommodation?.city });
+  };
+
   // Handle hotel hover
   const handleHotelHover = (hotel: HotelResult | null) => {
     setHoveredHotel(hotel);
@@ -987,6 +1026,7 @@ const AccommodationPanel = ({ onMapMove, mapCenter }: AccommodationPanelProps) =
         isLoading={memory.isLoadingHotelDetails}
         nights={searchNights}
         onBack={handleBackFromDetail}
+        onSelect={() => handleHotelBasketSelect(selectedHotelForDetail, loadedHotelDetails)}
         onBook={() => {
           // Open booking URL or handle booking
           const bookingUrl = loadedHotelDetails?.bookingUrl || selectedHotelForDetail.bookingUrl;

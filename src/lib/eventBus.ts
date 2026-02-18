@@ -138,6 +138,18 @@ export type PlannerEvents = {
   };
   "preferences:conflictDetected": { field: string; chatValue: unknown; manualValue: unknown };
 
+  // Basket events
+  "basket:itemSelected": {
+    type: 'flight' | 'hotel' | 'activity';
+    name: string;
+    price: number;
+    city?: string;
+  };
+  "planifier:blocked": {
+    completedSteps: string[];
+    missingSteps: string[];
+  };
+
   // Chat interactions
   "chat:userMessage": { text: string; messageCount: number };
   "chat:dirty": { dirty: boolean };
