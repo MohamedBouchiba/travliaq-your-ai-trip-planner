@@ -10,6 +10,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { flushSync } from "react-dom";
 import { createCircuitBreaker } from "./circuitBreaker";
 import { supabaseFetch } from "@/utils/supabaseFetch";
 import type { FlightFormData } from "@/types/flight";
@@ -250,12 +251,15 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       const acc = createAccumulator();
       fullContent = "";
 
-      // No throttle: each token triggers an immediate update for word-by-word streaming.
-      // React 18 batches synchronous state updates automatically, but async updates
-      // (inside ReadableStream callbacks) are NOT batched — each chunk renders immediately.
+      // flushSync forces React to render EACH token immediately, bypassing React 18's
+      // automatic batching. Without this, multiple SSE events arriving in one TCP packet
+      // are batched into a single render → text appears in blocks, not word-by-word.
+      // This is the canonical React 18 fix for real-time streaming UIs.
           const throttledUpdate = () => {
             if (isMountedRef.current) {
-              onContentUpdate(messageId, acc.content, false);
+              flushSync(() => {
+                onContentUpdate(messageId, acc.content, false);
+              });
             }
           };
 

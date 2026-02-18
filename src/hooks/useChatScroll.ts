@@ -3,10 +3,9 @@
  *
  * Features:
  * - Detects when user is manually scrolling up to read history
- * - Doesn't force scroll to bottom when user is reading
+ * - During streaming: MutationObserver scrolls to bottom after each DOM update
+ *   (safe: the observer checks a ref synchronously — immediate reaction to user scroll)
  * - Shows new message indicator when messages arrive during history reading
- * - RAF-loop for smooth real-time scroll during streaming (like ChatGPT/Claude)
- * - Uses a ref to stop the RAF-loop IMMEDIATELY on user scroll (no React cycle delay)
  */
 
 import { useState, useRef, useCallback, useEffect, type RefObject } from "react";
@@ -14,8 +13,8 @@ import { useState, useRef, useCallback, useEffect, type RefObject } from "react"
 interface UseChatScrollOptions {
   messagesCount: number;
   containerRef: RefObject<HTMLDivElement | null>;
-  threshold?: number; // Distance from bottom to consider "at bottom"
-  isStreaming?: boolean; // When true, RAF-loop scrolls to bottom continuously
+  threshold?: number;
+  isStreaming?: boolean;
 }
 
 interface UseChatScrollReturn {
@@ -38,12 +37,13 @@ export function useChatScroll({
   const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false);
 
   const lastMessageCountRef = useRef(messagesCount);
-  const isScrollingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Ref-based flag that the RAF loop reads synchronously (no React cycle delay)
-  const isUserScrollingRef = useRef(false);
+  // Ref read synchronously by the MutationObserver — no React cycle latency.
+  // When the user scrolls up, this is set to true IMMEDIATELY so the observer
+  // stops scrolling on the very next DOM mutation.
+  const userScrollingRef = useRef(false);
 
-  // Check if container is scrolled to bottom
   const isAtBottom = useCallback(() => {
     const container = containerRef.current;
     if (!container) return true;
@@ -51,72 +51,69 @@ export function useChatScroll({
     return scrollHeight - scrollTop - clientHeight < threshold;
   }, [containerRef, threshold]);
 
-  // Scroll to bottom with optional animation
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     const container = containerRef.current;
     if (!container) return;
     container.scrollTo({ top: container.scrollHeight, behavior });
-    isUserScrollingRef.current = false;
+    userScrollingRef.current = false;
     setIsUserScrolling(false);
     setNewMessageCount(0);
     setShowNewMessageIndicator(false);
   }, [containerRef]);
 
-  // Handle scroll events — updates ref immediately, state asynchronously
   const handleScroll = useCallback(() => {
     const atBottom = isAtBottom();
 
     if (atBottom) {
-      // Back at bottom: re-enable auto-scroll immediately via ref
-      isUserScrollingRef.current = false;
+      // Back at bottom — immediately unlock auto-scroll
+      userScrollingRef.current = false;
       setIsUserScrolling(false);
       setNewMessageCount(0);
       setShowNewMessageIndicator(false);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     } else {
-      // User scrolled up: stop RAF-loop immediately via ref (no 150ms wait)
-      isUserScrollingRef.current = true;
+      // User scrolled up — IMMEDIATELY block auto-scroll via ref
+      // (the MutationObserver will see this before the next DOM mutation)
+      userScrollingRef.current = true;
 
-      // Update React state slightly debounced (avoids flickering on small scrolls)
-      if (isScrollingTimeoutRef.current) clearTimeout(isScrollingTimeoutRef.current);
-      isScrollingTimeoutRef.current = setTimeout(() => {
-        if (!isAtBottom()) {
-          setIsUserScrolling(true);
-        }
+      // Debounce state update slightly to avoid flicker on tiny scrolls
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        if (!isAtBottom()) setIsUserScrolling(true);
       }, 80);
     }
   }, [isAtBottom]);
 
-  // Mark all messages as read
   const markMessagesAsRead = useCallback(() => {
     setNewMessageCount(0);
     setShowNewMessageIndicator(false);
   }, []);
 
-  // RAF-loop: continuously scroll to bottom during streaming
-  // The loop reads isUserScrollingRef synchronously — stops the instant the user scrolls up
+  // During streaming: MutationObserver watches the scroll container for DOM changes
+  // (new text nodes) and scrolls to bottom if the user hasn't manually scrolled up.
+  // MutationObserver fires AFTER the DOM mutation, AFTER any preceding scroll events,
+  // so `userScrollingRef.current` is always up-to-date at that point.
   useEffect(() => {
     if (!isStreaming) return;
+    const container = containerRef.current;
+    if (!container) return;
 
-    let rafId: number;
-    const scrollLoop = () => {
-      // Check ref (not state) for immediate reaction to user scroll
-      if (!isUserScrollingRef.current) {
-        const container = containerRef.current;
-        if (container) {
-          const { scrollTop, scrollHeight, clientHeight } = container;
-          if (scrollHeight - scrollTop - clientHeight > 2) {
-            container.scrollTop = scrollHeight;
-          }
-        }
+    const observer = new MutationObserver(() => {
+      if (!userScrollingRef.current) {
+        container.scrollTop = container.scrollHeight;
       }
-      rafId = requestAnimationFrame(scrollLoop);
-    };
-    rafId = requestAnimationFrame(scrollLoop);
+    });
 
-    return () => cancelAnimationFrame(rafId);
+    observer.observe(container, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    return () => observer.disconnect();
   }, [isStreaming, containerRef]);
 
-  // Track new messages when user is scrolling up
+  // Track new messages while user is reading history
   useEffect(() => {
     const diff = messagesCount - lastMessageCountRef.current;
 
@@ -124,18 +121,16 @@ export function useChatScroll({
       setNewMessageCount((prev) => prev + diff);
       setShowNewMessageIndicator(true);
     } else if (!isUserScrolling && diff > 0) {
-      requestAnimationFrame(() => {
-        scrollToBottom("smooth");
-      });
+      requestAnimationFrame(() => scrollToBottom("smooth"));
     }
 
     lastMessageCountRef.current = messagesCount;
   }, [messagesCount, isUserScrolling, scrollToBottom]);
 
-  // Cleanup on unmount
+  // Cleanup
   useEffect(() => {
     return () => {
-      if (isScrollingTimeoutRef.current) clearTimeout(isScrollingTimeoutRef.current);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, []);
 
