@@ -5,7 +5,7 @@
  * React.memo prevents re-rendering unchanged messages during streaming ticks.
  */
 
-import { memo } from "react";
+import { memo, useRef, useEffect, useState } from "react";
 import { Plane, RefreshCw, AlertTriangle, WifiOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
@@ -61,13 +61,29 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
   onTriggerWidget,
 }: ChatMessageBubbleProps) {
   const { t } = useTranslation();
+  const [isFlashing, setIsFlashing] = useState(false);
+  const flashKeyRef = useRef(m._flashKey);
+
+  // When _flashKey changes (same message re-triggered), apply a brief highlight + scroll into view
+  useEffect(() => {
+    if (m._flashKey && m._flashKey !== flashKeyRef.current) {
+      flashKeyRef.current = m._flashKey;
+      setIsFlashing(true);
+      bubbleRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      const t = setTimeout(() => setIsFlashing(false), 800);
+      return () => clearTimeout(t);
+    }
+  }, [m._flashKey]);
+
+  const bubbleRef = useRef<HTMLDivElement>(null);
+
   // Use live streamingText when this bubble is the active streaming target;
   // otherwise fall back to m.text (persisted final content).
   const displayText = streamingText !== undefined ? streamingText : m.text;
   const isLiveStreaming = streamingText !== undefined;
 
   return (
-    <div className={cn("flex gap-2", m.role === "user" ? "flex-row-reverse" : "")}>
+    <div ref={bubbleRef} className={cn("flex gap-2 transition-colors duration-300", m.role === "user" ? "flex-row-reverse" : "", isFlashing && "animate-pulse")}>
       <div className={cn("flex-1 min-w-0", m.role === "user" ? "text-right" : "")}>
         <div className={cn(
           "inline-block text-sm leading-relaxed px-4 py-3 rounded-2xl max-w-[85%]",
@@ -188,6 +204,7 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
     pm.widgetDismissed === nm.widgetDismissed &&
     pm.errorType === nm.errorType &&
     pm.hasSearchButton === nm.hasSearchButton &&
+    pm._flashKey === nm._flashKey &&
     prev.activeTools === next.activeTools &&
     prev.isLoading === next.isLoading &&
     prev.streamingText === next.streamingText

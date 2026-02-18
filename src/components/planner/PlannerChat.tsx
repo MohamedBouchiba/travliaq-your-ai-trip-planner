@@ -367,7 +367,19 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
         quickReplies: quickReplies.length > 0 ? quickReplies : undefined,
       };
 
-      setMessages((prev) => [...prev, guidanceMessage]);
+      setMessages((prev) => {
+        // Deduplication: if the last assistant message is already a planifier-blocked,
+        // don't append a new one — just flash the existing one by toggling a key
+        const lastAssistant = [...prev].reverse().find(m => m.role === 'assistant' && !m.isTyping);
+        if (lastAssistant?.id.startsWith('planifier-blocked-')) {
+          return prev.map(m =>
+            m.id === lastAssistant.id
+              ? { ...m, _flashKey: Date.now() }
+              : m
+          );
+        }
+        return [...prev, guidanceMessage];
+      });
     };
 
     eventBus.on('planifier:blocked', handlePlanifierBlocked);
