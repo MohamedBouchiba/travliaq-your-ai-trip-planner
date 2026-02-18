@@ -1,217 +1,84 @@
 
-## Guided Trip Planning Journey — Full Memory Integration + In-Chat Guidance
+## Redesign: Chat Input Area + Progress Bar (TripPriceBar)
 
-### Context & User's Priorities
+The user has identified two distinct UI problems that need to be fixed:
 
-The user has two closely related requests:
-1. **Selection → Memory**: Every user action (flight, hotel, activity, preferences) must be captured in a structured, unified memory object — not just displayed. This object is the foundation for the "Planifier" orchestration job.
-2. **In-chat blocked-step guidance instead of a pop-up**: When the user clicks "Planifier" before completing required steps, the guidance should appear as a chat message (which is already the user's primary interaction surface), not a modal dialog. The user asked for a recommendation here — and the pattern is excellent UX because it's contextual, dismissable, and matches the existing chat-first design.
-
----
-
-### Current State Audit
-
-| Component | Current behavior | What's missing |
-|---|---|---|
-| `PlannerPanel.tsx` `handleFlightSelect` | Simple trip: `console.log`. Multi: saves to local state. | Never writes to `tripBasketStore` |
-| `AccommodationPanel.tsx` | Hotel detail view has an `onBook` button that just opens external URL | No `tripBasketStore.addBasketItem` call |
-| `ActivitiesPanel.tsx` `handleAddActivity` | Writes to `activityMemoryStore` (correct) | Does NOT write to `tripBasketStore` |
-| `TripPriceBar.tsx` | Reads `basketItems` — correct source | Planifier button fires `onPlanTrip` unconditionally; no step validation |
-| Chat (`PlannerChat.tsx`) | Already knows `getBasketSummary()` from `tripBasketStore` | Not listening for a "planifier:blocked" event to inject guidance |
-| `eventBus.ts` | Has `tab:change` event for tab navigation | No `basket:itemSelected` or `planifier:blocked` event |
+1. **TripPriceBar**: The blinking pulse animation is jarring. The pills + progress bar design doesn't clearly communicate the user journey.
+2. **ChatInputArea bottom zone**: The screenshot shows the current design — inspiration chips at top, then travel context chips (Destination, Dates, Voyageurs), then the input box, then the bug report text. It's cluttered and not well-spaced. The bug report text takes unnecessary space and confuses users.
+3. **Blocked guidance message**: Currently always the same text. Should randomize across 4-5 variations.
 
 ---
 
-### Architecture
+### Fix 1 — `TripPriceBar.tsx`: Remove blinking, redesign the progress flow
 
-The fix follows the existing pub/sub pattern via `eventBus`:
+**Current problem**: Pills with `animate-pulse` blink constantly. The thin progress bar + small pill row is hard to understand at a glance.
 
-```text
-User clicks "Sélectionner" on a flight
-   └─► addBasketItem(type:'flight') in tripBasketStore  [memory write]
-   └─► eventBus.emit("basket:itemSelected", {type:'flight'})
+**New design — a clean "step tracker" bar**:
 
-TripPriceBar reads basketStore → pill turns green ✅
+Instead of small pills, use a horizontal step tracker (like Airbnb / Booking onboarding steps). Three numbered circles connected by a line:
 
-User clicks "Planifier" while flights missing
-   └─► TripPriceBar: isComplete === false
-   └─► eventBus.emit("planifier:blocked", {missingSteps, completedSteps})
-
-PlannerChat listens to "planifier:blocked"
-   └─► injects assistant message with step status directly in the chat
-   └─► message includes clickable tab links via eventBus.emit("tab:change")
+```
+  [1 ✓ Vols]────[2 ✓ Hôtels]────[3 Activités]    1 850 €   [Planifier →]
+      ●══════════════●──────────────○
 ```
 
+- **Completed step**: filled circle (green) with a checkmark
+- **Active step**: outlined circle with the step number, slightly larger, a subtle shadow — NO blinking
+- **Future step**: muted outlined circle
+- The connecting lines are solid green when the step before is done, dashed/muted otherwise
+- "Passer" for Activities: shown as a small text link below the circle when flights + hotels are done
+- Zero CSS animations that loop. Only a one-time `transition` when state changes.
+
+The bar itself becomes slightly taller (py-3) to breathe. The price moves to the right, aligned baseline.
+
 ---
 
-### Changes by File
+### Fix 2 — `ChatInputArea.tsx` + `TripStatusBar.tsx`: Redesign the bottom input area
 
-#### 1. `src/lib/eventBus.ts` — Add 2 new typed events
+**Current layout** (screenshot):
+```
+[ ✦ Inspirez-moi ]                    ← suggestion chips (1 row, scrollable)
+[ ⊙ Destination ] [ ☷ Dates ] [ ♟ 2 voyageurs ]   ← TripStatusBar chips
+[ Send a message...                 ↗ ]  ← input
+  Having an issue? Click here to help us fix it     ← bug report text (too visible)
+```
+
+**Problems**:
+- The inspiration/suggestion chips and the travel-context chips (Destination/Dates/Travelers) look identical — user can't distinguish them
+- "Having an issue? Click here..." is shown even when it's just a cooldown hint, takes vertical space unnecessarily
+- The whole zone needs more visual hierarchy
+
+**New layout**:
+```
+[ ⊙ Paris ] [ ☷ 3 jan → 10 jan ] [ ♟ 2 voyageurs ]   ← Trip context chips (only if data)
+────────────────────────────────────────────────────
+[ Send a message...                               ↗ ]   ← input box (rounder, slightly taller)
+[ ✦ Inspirez-moi ] [ ✦ Inspire-moi ] [ ... ]          ← suggestion chips BELOW input (inline, small)
+```
+
+Key changes:
+- **TripStatusBar** moves ABOVE the input box (already is, stays)
+- **SmartSuggestions** move BELOW the input box — this mirrors ChatGPT's pattern where quick suggestions are below the text field
+- **Bug report text**: Make it completely invisible by default (hidden, zero height) unless `canReport === true`. When `canReport` is true, show it as an ultra-subtle `10px` muted line. The cooldown countdown message is removed entirely (no value to user).
+- **Input box styling**: Increase border-radius to `rounded-2xl`, add a slightly more pronounced border, increase internal padding slightly for breathing room
+
+---
+
+### Fix 3 — `PlannerChat.tsx`: Randomize blocked guidance messages
+
+Replace the single static message with a pool of 5 variations, selected randomly when `planifier:blocked` fires:
 
 ```typescript
-"basket:itemSelected": {
-  type: 'flight' | 'hotel' | 'activity';
-  name: string;
-  price: number;
-  city?: string;
-};
-"planifier:blocked": {
-  completedSteps: string[];
-  missingSteps: string[];
-};
+const BLOCKED_VARIATIONS = [
+  (lines) => `Presque ! 🎯\n\n${lines}\n\n_Complète ces étapes pour débloquer **Planifier**._`,
+  (lines) => `Ton voyage prend forme ! ✈️\n\n${lines}\n\n_Une fois tout sélectionné, **Planifier** sera actif._`,
+  (lines) => `On y est presque 🚀\n\n${lines}\n\n_Ces éléments sont nécessaires pour construire ton itinéraire._`,
+  (lines) => `Encore quelques étapes !\n\n${lines}\n\n_Ton voyage sera planifiable dès que tout est OK._`,
+  (lines) => `Voici ce qu'il reste à faire 📋\n\n${lines}\n\n_Complète ces étapes, puis clique sur **Planifier** !_`,
+];
+// Random pick on each call
+const variation = BLOCKED_VARIATIONS[Math.floor(Math.random() * BLOCKED_VARIATIONS.length)];
 ```
-
-These are the only two missing channels. Both follow the exact same mitt pattern already used throughout.
-
----
-
-#### 2. `src/stores/tripBasketStore.ts` — Add `replaceItemsByType` helper
-
-Currently, if the user re-selects a flight, a duplicate is added. We need:
-
-```typescript
-replaceItemsByType: (type: BasketItemType, item: Omit<BasketItem, 'id' | 'addedAt'>) => string;
-```
-
-This removes all existing items of the given type for the same `destinationCity` (or all flights for simplicity), then calls `addBasketItem`. This ensures the basket is always the **single source of truth** with no duplicates.
-
----
-
-#### 3. `src/components/planner/PlannerPanel.tsx` — Wire flights → basket
-
-In `handleFlightSelect`:
-- For **simple trips** (roundtrip / oneway): call `replaceItemsByType('flight', {...})` with the full `FlightDetails` object populated from the `FlightOffer` fields.
-- For **multi-destination**: call `replaceItemsByType('flight', {...legIndex})` per leg after the current leg-tracking logic. A visual recap (already rendered at line 1503) confirms all legs are collected.
-- Emit `eventBus.emit("basket:itemSelected", {type:'flight', name, price})`.
-
-The `FlightDetails` type already has all fields needed (`airline`, `departure.airport`, `arrival.airport`, `duration`, `stops`, etc.) — no schema changes required.
-
----
-
-#### 4. `src/components/planner/HotelDetailView.tsx` — Add "Choisir cet hôtel" button
-
-The detail view already has a sticky footer with an `onBook` prop. We add a second primary action **"Choisir cet hôtel"** next to the external "Réserver" button.
-
-The `onBook` prop in `AccommodationPanel.tsx` (line 907) will be split:
-- `onBook`: external URL → unchanged
-- New `onSelect`: calls `replaceItemsByType('hotel', {...})` with `HotelDetails` populated from the hotel object + accommodation memory dates.
-
-The `AccommodationPanel` passes `onSelect` to `HotelDetailView` and handles the basket write there. This is the correct layer — `AccommodationPanel` already has access to `memory.checkIn`, `memory.checkOut`, `activeAccommodation.city`, etc.
-
-After selection: emit `eventBus.emit("basket:itemSelected", {type:'hotel', name, price, city})`.
-
----
-
-#### 5. `src/components/planner/ActivitiesPanel.tsx` — Wire activities → basket
-
-In `handleAddActivity`, after `addActivityFromSearch(...)` (which writes to `activityMemoryStore`), also call:
-
-```typescript
-addBasketItem({
-  type: 'activity',
-  status: 'selected',
-  name: viatorActivity.title,
-  price: viatorActivity.pricing.from_price,
-  currency: 'EUR',
-  description: viatorActivity.duration?.formatted,
-  destinationCity: activeCity.city,
-  details: { activityName: viatorActivity.title, city: activeCity.city, ... }
-});
-```
-
-And emit `eventBus.emit("basket:itemSelected", {...})`.
-
-Note: Activity removals (`handleRemoveActivity`) should also call `removeBasketItem` for the matching item — we find it by matching `type:'activity'` + `destinationCity` + `name`.
-
----
-
-#### 6. `src/components/planner/TripPriceBar.tsx` — Gating logic + visual step guidance
-
-**a) Activities step: "optional with explicit skip"**
-
-Read `explicitRequirements.wantsActivities` from the store:
-- `null` → step is pending (amber / animated pulse on the Activités pill)
-- `false` → user skipped → step is green (SkipForward icon instead of Check)
-- `true` or items exist → step is green (Check icon)
-
-**b) `isComplete` logic updated:**
-
-```typescript
-const flightsDone = completedSteps.includes('flights');
-const hotelsDone = completedSteps.includes('hotels');
-const activitiesDone = completedSteps.includes('activities') || explicitRequirements.wantsActivities === false;
-const isComplete = flightsDone && hotelsDone && activitiesDone;
-```
-
-**c) "Passer" pill for Activities:**
-
-When `flightsDone && hotelsDone && !activitiesDone`, show a small "Passer →" text inside the Activités pill. Clicking it calls `setExplicitRequirement('wantsActivities', false)`.
-
-**d) Planifier button state:**
-
-```tsx
-<Button
-  variant={isComplete ? 'hero' : 'secondary'}
-  onClick={isComplete ? onPlanTrip : handleBlockedClick}
-  className={cn("...", !isComplete && "opacity-60 cursor-not-allowed")}
->
-```
-
-`handleBlockedClick` emits `eventBus.emit("planifier:blocked", {completedSteps, missingSteps})`.
-
-**e) Active step indicator:**
-
-The first incomplete step gets a subtle `ring-2 ring-primary/40 animate-pulse` around its pill so the user always knows where to act next.
-
----
-
-#### 7. `src/components/planner/PlannerChat.tsx` — Listen for blocked guidance + inject as chat message
-
-Add a `usePlannerEvent("planifier:blocked", ...)` listener (using the existing `usePlannerEvent` hook from `eventBus.ts`).
-
-When fired, inject a structured assistant message into the chat (using the same `setMessages` pattern already used in `useChatImperativeHandlers`):
-
-```
-✈️ Vol         — ✅ Paris → Tokyo sélectionné
-🏨 Hôtel       — ✅ Hôtel Okura Tokyo sélectionné
-🧭 Activités   — ⬜ Pas encore ajouté
-                  → [Voir les activités]  (clickable, emits tab:change)
-
-Ajoute une ou plusieurs activités, ou clique "Passer" dans la barre du bas si tu n'en veux pas. Ensuite, "Planifier" sera disponible ! 🚀
-```
-
-The message is rendered as a regular assistant bubble (`role:'assistant'`, `isTyping:false`) so it streams in with the existing `streamingText` mechanism (or appears instantly since no streaming is needed here — it's a local injection). A `[Voir les activités]` link-style button in the bubble body emits `eventBus.emit("tab:change", { tab: "activities" })` — the same mechanism already used everywhere.
-
-**Why chat instead of a pop-up?** The user's instinct is correct and aligned with the product's chat-first philosophy:
-- The chat is always visible; a pop-up creates modal overhead
-- The message stays in history, so the user can scroll back and click the tab link
-- It's consistent with how the AI already guides the user throughout the flow
-- No new UI component needed — reuses the exact same bubble infrastructure
-
----
-
-### Memory Completeness Guarantee
-
-After these changes, the `tripBasketStore` will contain a structured record of **every selection** the user makes:
-
-```typescript
-// Example basket state when ready to "Planifier":
-basketItems: [
-  { type: 'flight', name: 'CDG → NRT', price: 850, details: { FlightDetails } },
-  { type: 'hotel', name: 'Hôtel Okura', price: 1200, details: { HotelDetails } },
-  { type: 'activity', name: 'Tour Skytree', price: 35, details: { ActivityDetails } },
-]
-// Plus:
-// flightMemoryStore   → departure, arrival, dates, passengers, cabin class
-// accommodationMemoryStore → city, nights, rooms, budget filters
-// activityMemoryStore → full activity entries by destination
-// preferenceMemoryStore → style axes, pace, interests, comfort level
-```
-
-When "Planifier" is clicked with `isComplete === true`:
-- `onPlanTrip()` fires → `setViewMode('itinerary')` in `TravelPlanner.tsx`
-- The itinerary view can read all four stores + the basket to orchestrate the planning job
-- `getBasketSummary()` and `getBasketForLLM()` are already implemented in the store and sent to the LLM via `buildLLMContext.ts`
 
 ---
 
@@ -219,13 +86,30 @@ When "Planifier" is clicked with `isComplete === true`:
 
 | File | Change |
 |---|---|
-| `src/lib/eventBus.ts` | Add `basket:itemSelected` and `planifier:blocked` events |
-| `src/stores/tripBasketStore.ts` | Add `replaceItemsByType` helper method |
-| `src/components/planner/PlannerPanel.tsx` | Wire `handleFlightSelect` → `replaceItemsByType` + emit event |
-| `src/components/planner/HotelDetailView.tsx` | Add `onSelect` prop and "Choisir cet hôtel" button in sticky footer |
-| `src/components/planner/AccommodationPanel.tsx` | Pass `onSelect` to `HotelDetailView`, implement basket write |
-| `src/components/planner/ActivitiesPanel.tsx` | In `handleAddActivity` / `handleRemoveActivity`, sync with `tripBasketStore` |
-| `src/components/planner/TripPriceBar.tsx` | Full step logic: `wantsActivities`, active pulse, "Passer" pill, gated Planifier, emit `planifier:blocked` |
-| `src/components/planner/PlannerChat.tsx` | Listen to `planifier:blocked`, inject structured in-chat guidance message |
+| `src/components/planner/TripPriceBar.tsx` | Remove `animate-pulse`, redesign to step-tracker (numbered circles + connecting lines, no animation loops) |
+| `src/components/planner/chat/ChatInputArea.tsx` | Hide bug report text by default; only show when `canReport` is true (remove cooldown text entirely); polish input box styling |
+| `src/components/planner/PlannerChat.tsx` | Move `MemoizedSmartSuggestions` below `ChatInputArea`; randomize blocked message variations |
+| `src/components/planner/chat/TripStatusBar.tsx` | Visual polish: slightly smaller, clearer distinction between "filled" and "empty" chips |
 
-No new files. No new dependencies.
+No new files, no new dependencies.
+
+---
+
+### Visual Direction for TripPriceBar
+
+The new step-tracker design:
+
+```text
+  ① ✓           ② ✓           ③ ·
+  Vols       Hôtels       Activités         1 240 €   [Planifier]
+  [green]     [green]      [muted, with "Passer" link if prev done]
+     ●══════════●- - - - - -○
+```
+
+- Steps: large `h-6 w-6` circles (not tiny pills)
+- Active step: `ring-2 ring-offset-1 ring-primary` (static — no animation)
+- Done: `bg-green-500 text-white` filled circle with `<Check>`
+- Future: `border-2 border-muted-foreground/30 text-muted-foreground/40`
+- Connector: left half green (solid) when prev done, right half muted (dashed) when next not done
+- Label: below each circle, `text-[10px] font-medium` 
+- "Passer" link appears as `text-[10px] text-primary/60 underline` below "Activités" label when eligible
