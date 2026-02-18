@@ -123,6 +123,17 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
   const [bugReportDialogOpen, setBugReportDialogOpen] = useState(false);
   const [currentReportId, setCurrentReportId] = useState<string | null>(null);
 
+  // Separate streaming state — decoupled from messages array for word-by-word rendering
+  const [streamingText, setStreamingText] = useState("");
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  // Ref version to detect first-token transition inside the callback (no stale closure)
+  const streamingMessageIdRef = useRef<string | null>(null);
+  // Keep ref in sync with state
+  const handleSetStreamingMessageId = useCallback((id: string | null) => {
+    streamingMessageIdRef.current = id;
+    setStreamingMessageId(id);
+  }, []);
+
   // User message count for bug report rate limiting
   const userMessageCount = useMemo(() => messages.filter(m => m.role === "user").length, [messages]);
 
@@ -776,6 +787,9 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     completedMessageIdsRef,
     intentWidgetRef,
     userMessageCountRef,
+    setStreamingText,
+    setStreamingMessageId: handleSetStreamingMessageId,
+    streamingMessageIdRef,
   });
 
   // Wrapper around sendText: intercept "nothing else" responses during inspire flow
@@ -986,6 +1000,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                   activeTools={activeTools}
                   isLoading={isLoading}
                   memory={memory}
+                  streamingText={m.id === streamingMessageId ? streamingText : undefined}
                   widgetFlow={widgetFlow}
                   preferenceCallbacks={preferenceCallbacks}
                   handleDestinationSelect={handleDestinationSelect}
