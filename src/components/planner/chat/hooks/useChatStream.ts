@@ -10,7 +10,6 @@
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { flushSync } from "react-dom";
 import { createCircuitBreaker } from "./circuitBreaker";
 import { supabaseFetch } from "@/utils/supabaseFetch";
 import type { FlightFormData } from "@/types/flight";
@@ -251,14 +250,23 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       const acc = createAccumulator();
       fullContent = "";
 
-      // flushSync forces React to render EACH token immediately, bypassing React 18's
-      // automatic batching. Without this, multiple SSE events arriving in one TCP packet
-      // are batched into a single render → text appears in blocks, not word-by-word.
-      // This is the canonical React 18 fix for real-time streaming UIs.
+      // RAF-queue approach: schedule ONE update per animation frame (16ms ≈ 60fps).
+      // Problem: multiple SSE tokens can arrive in a single reader.read() call (one TCP packet).
+      // They are processed synchronously, so even flushSync can't interleave browser paints.
+      // Solution: buffer the latest content, then push it to React on the NEXT animation frame.
+      // The browser paints after each RAF → one frame = one visual "step" of typing.
+      // This is exactly how ChatGPT/Claude achieve smooth word-by-word rendering.
+          let pendingRafId: number | null = null;
+          let latestQueuedContent = "";
+
           const throttledUpdate = () => {
-            if (isMountedRef.current) {
-              flushSync(() => {
-                onContentUpdate(messageId, acc.content, false);
+            latestQueuedContent = acc.content;
+            if (pendingRafId === null) {
+              pendingRafId = requestAnimationFrame(() => {
+                pendingRafId = null;
+                if (isMountedRef.current) {
+                  onContentUpdate(messageId, latestQueuedContent, false);
+                }
               });
             }
           };
@@ -384,6 +392,12 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
             missingFields: memoryContext.missingFields?.map(getMissingFieldLabel),
             sessionEntities: memoryContext.sessionEntities,
           });
+
+          // Cancel any pending RAF update — final content will be sent immediately below
+          if (pendingRafId !== null) {
+            cancelAnimationFrame(pendingRafId);
+            pendingRafId = null;
+          }
 
           // Success - mark streaming as complete
           if (isMountedRef.current) {
