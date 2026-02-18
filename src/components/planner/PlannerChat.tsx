@@ -1102,21 +1102,6 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                 />
               ))}
 
-              {/* SmartSuggestions — only shown on empty state (no user messages yet) */}
-              {userMessageCount === 0 && (
-                <MemoizedSmartSuggestions
-                  memory={memory}
-                  mapContext={mapContext}
-                  inspireFlowStep={inspireFlowStep}
-                  destinationSuggestions={destinationSuggestions}
-                  lastAssistantMessage={messages.filter(m => m.role === 'assistant' && !m.isTyping && m.text && m.text.length > 10).at(-1)?.text}
-                  lastUserMessage={messages.filter(m => m.role === 'user').at(-1)?.text}
-                  conversationTurn={userMessageCount}
-                  dynamicSuggestions={dynamicSuggestions}
-                  onSuggestionClick={handleSuggestionClick}
-                  isLoading={isLoading}
-                />
-              )}
 
               <div ref={messagesEndRef} />
             </div>
@@ -1132,9 +1117,23 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
             }}
           />
 
-          {/* Input zone */}
-          <div className="relative z-20 border-t border-border bg-background" aria-hidden={isCollapsed}>
-            {/* Trip context chips — shown above input only when data is present */}
+          {/* Input zone — no visible border, suggestions float above input */}
+          <div className="relative z-20 bg-background" aria-hidden={isCollapsed}>
+            {/* Suggestion chips — float just above the input, no separator */}
+            <MemoizedSmartSuggestions
+              memory={memory}
+              mapContext={mapContext}
+              inspireFlowStep={inspireFlowStep}
+              destinationSuggestions={destinationSuggestions}
+              lastAssistantMessage={messages.filter(m => m.role === 'assistant' && !m.isTyping && m.text && m.text.length > 10).at(-1)?.text}
+              lastUserMessage={messages.filter(m => m.role === 'user').at(-1)?.text}
+              conversationTurn={userMessageCount}
+              dynamicSuggestions={dynamicSuggestions}
+              onSuggestionClick={handleSuggestionClick}
+              isLoading={isLoading}
+            />
+
+            {/* Trip status chips — only real data */}
             <TripStatusBar memory={memory} t={t} />
 
             <ChatInputArea

@@ -116,9 +116,7 @@ export function SmartSuggestions({
     next.focus();
   }, []);
 
-  if (displayItems.length === 0 || isLoading) {
-    return null;
-  }
+  if (displayItems.length === 0 || isLoading) return null;
 
   // Handle horizontal scroll with mouse wheel
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
@@ -129,47 +127,44 @@ export function SmartSuggestions({
   };
 
   return (
-    <div className="px-4 py-2">
-      <div
-        ref={toolbarRef}
-        role="toolbar"
-        aria-label={t("planner.chat.suggestions")}
-        onKeyDown={handleToolbarKeyDown}
-        onWheel={handleWheel}
-        className="flex gap-2 overflow-x-auto pb-1 themed-scroll"
-        style={{ scrollbarWidth: 'thin' }}
-      >
-        <AnimatePresence mode="popLayout">
-          {displayItems.map((item, index) => (
-            <motion.button
-              key={item.id}
-              initial={{ opacity: 0, scale: 0.9, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ delay: index * 0.04, duration: 0.15 }}
-              onClick={() => onSuggestionClick(item.message)}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-full shrink-0",
-                "text-xs font-medium whitespace-nowrap",
-                "bg-primary/10 text-primary hover:bg-primary/20",
-                "border border-primary/20 hover:border-primary/40",
-                "transition-all duration-150 hover:scale-[1.02]",
-                "focus:outline-none focus:ring-2 focus:ring-primary/30"
-              )}
-            >
-              {/* Emoji for dynamic/anticipated suggestions, icon for static */}
-              {item.isDynamic ? (
-                <span className="text-sm">{item.emoji}</span>
-              ) : item.emoji ? (
-                <span className="text-sm">{item.emoji}</span>
-              ) : (
-                item.iconName && iconMap[item.iconName as keyof typeof iconMap]
-              )}
-              <span>{item.label}</span>
-            </motion.button>
-          ))}
-        </AnimatePresence>
-      </div>
+    <div
+      ref={toolbarRef}
+      role="toolbar"
+      aria-label={t("planner.chat.suggestions")}
+      onKeyDown={handleToolbarKeyDown}
+      onWheel={handleWheel}
+      className="flex gap-1.5 overflow-x-auto px-4 pt-2 pb-1"
+      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+    >
+      <AnimatePresence mode="popLayout">
+        {displayItems.map((item, index) => (
+          <motion.button
+            key={item.id}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ delay: index * 0.04, duration: 0.12 }}
+            onClick={() => onSuggestionClick(item.message)}
+            className={cn(
+              "flex items-center gap-1 px-2.5 py-1 rounded-full shrink-0",
+              "text-xs font-medium whitespace-nowrap",
+              "bg-muted/70 text-muted-foreground hover:text-foreground hover:bg-muted",
+              "border border-border/50 hover:border-border",
+              "transition-all duration-150",
+              "focus:outline-none focus:ring-1 focus:ring-primary/20"
+            )}
+          >
+            {item.isDynamic ? (
+              <span className="text-xs leading-none">{item.emoji}</span>
+            ) : item.emoji ? (
+              <span className="text-xs leading-none">{item.emoji}</span>
+            ) : (
+              item.iconName && iconMap[item.iconName as keyof typeof iconMap]
+            )}
+            <span>{item.label}</span>
+          </motion.button>
+        ))}
+      </AnimatePresence>
     </div>
   );
 }
