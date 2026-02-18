@@ -250,28 +250,12 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       const acc = createAccumulator();
       fullContent = "";
 
-      // Throttle UI updates to reduce re-renders (max every 50ms)
-          let lastUpdateTime = 0;
-          const THROTTLE_MS = 50;
-          let pendingUpdate = false;
-
+      // No throttle: each token triggers an immediate update for word-by-word streaming.
+      // React 18 batches synchronous state updates automatically, but async updates
+      // (inside ReadableStream callbacks) are NOT batched — each chunk renders immediately.
           const throttledUpdate = () => {
-            const now = Date.now();
-            if (now - lastUpdateTime >= THROTTLE_MS) {
-              lastUpdateTime = now;
-              if (isMountedRef.current) {
-                onContentUpdate(messageId, acc.content, false);
-              }
-              pendingUpdate = false;
-            } else if (!pendingUpdate) {
-              pendingUpdate = true;
-              setTimeout(() => {
-                if (isMountedRef.current && pendingUpdate) {
-                  lastUpdateTime = Date.now();
-                  onContentUpdate(messageId, acc.content, false);
-                  pendingUpdate = false;
-                }
-              }, THROTTLE_MS - (now - lastUpdateTime));
+            if (isMountedRef.current) {
+              onContentUpdate(messageId, acc.content, false);
             }
           };
 
