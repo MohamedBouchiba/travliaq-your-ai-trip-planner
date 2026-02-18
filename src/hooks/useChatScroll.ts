@@ -1,11 +1,12 @@
 /**
  * useChatScroll - Intelligent scroll management for chat
- * 
+ *
  * Features:
  * - Detects when user is manually scrolling up to read history
  * - Doesn't force scroll to bottom when user is reading
  * - Shows new message indicator when messages arrive during history reading
- * - Provides smooth scroll to bottom functionality
+ * - RAF-loop for smooth real-time scroll during streaming (like ChatGPT/Claude)
+ * - Uses a ref to stop the RAF-loop IMMEDIATELY on user scroll (no React cycle delay)
  */
 
 import { useState, useRef, useCallback, useEffect, type RefObject } from "react";
@@ -35,15 +36,17 @@ export function useChatScroll({
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const [newMessageCount, setNewMessageCount] = useState(0);
   const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false);
-  
+
   const lastMessageCountRef = useRef(messagesCount);
   const isScrollingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Ref-based flag that the RAF loop reads synchronously (no React cycle delay)
+  const isUserScrollingRef = useRef(false);
 
   // Check if container is scrolled to bottom
   const isAtBottom = useCallback(() => {
     const container = containerRef.current;
     if (!container) return true;
-    
     const { scrollTop, scrollHeight, clientHeight } = container;
     return scrollHeight - scrollTop - clientHeight < threshold;
   }, [containerRef, threshold]);
@@ -52,36 +55,34 @@ export function useChatScroll({
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     const container = containerRef.current;
     if (!container) return;
-    
-    container.scrollTo({
-      top: container.scrollHeight,
-      behavior,
-    });
-    
+    container.scrollTo({ top: container.scrollHeight, behavior });
+    isUserScrollingRef.current = false;
     setIsUserScrolling(false);
     setNewMessageCount(0);
     setShowNewMessageIndicator(false);
   }, [containerRef]);
 
-  // Handle scroll events
+  // Handle scroll events — updates ref immediately, state asynchronously
   const handleScroll = useCallback(() => {
     const atBottom = isAtBottom();
-    
+
     if (atBottom) {
+      // Back at bottom: re-enable auto-scroll immediately via ref
+      isUserScrollingRef.current = false;
       setIsUserScrolling(false);
       setNewMessageCount(0);
       setShowNewMessageIndicator(false);
     } else {
-      // User is scrolling up - set flag after a small delay to avoid flickering
-      if (isScrollingTimeoutRef.current) {
-        clearTimeout(isScrollingTimeoutRef.current);
-      }
-      
+      // User scrolled up: stop RAF-loop immediately via ref (no 150ms wait)
+      isUserScrollingRef.current = true;
+
+      // Update React state slightly debounced (avoids flickering on small scrolls)
+      if (isScrollingTimeoutRef.current) clearTimeout(isScrollingTimeoutRef.current);
       isScrollingTimeoutRef.current = setTimeout(() => {
         if (!isAtBottom()) {
           setIsUserScrolling(true);
         }
-      }, 150);
+      }, 80);
     }
   }, [isAtBottom]);
 
@@ -91,36 +92,21 @@ export function useChatScroll({
     setShowNewMessageIndicator(false);
   }, []);
 
-  // Track new messages when user is scrolling up
+  // RAF-loop: continuously scroll to bottom during streaming
+  // The loop reads isUserScrollingRef synchronously — stops the instant the user scrolls up
   useEffect(() => {
-    const diff = messagesCount - lastMessageCountRef.current;
-    
-    if (diff > 0 && isUserScrolling) {
-      setNewMessageCount((prev) => prev + diff);
-      setShowNewMessageIndicator(true);
-    } else if (!isUserScrolling && diff > 0) {
-      // Auto-scroll when at bottom and new messages arrive
-      requestAnimationFrame(() => {
-        scrollToBottom("smooth");
-      });
-    }
-    
-    lastMessageCountRef.current = messagesCount;
-  }, [messagesCount, isUserScrolling, scrollToBottom]);
-
-  // RAF-loop: continuously scroll to bottom during streaming (content grows but messagesCount stays same)
-  // Uses behavior: "auto" (instant, no jank) — "smooth" causes visible jumping during streaming
-  useEffect(() => {
-    if (!isStreaming || isUserScrolling) return;
+    if (!isStreaming) return;
 
     let rafId: number;
     const scrollLoop = () => {
-      const container = containerRef.current;
-      if (container) {
-        // Only scroll if not already at bottom (avoids unnecessary layout thrashing)
-        const { scrollTop, scrollHeight, clientHeight } = container;
-        if (scrollHeight - scrollTop - clientHeight > 2) {
-          container.scrollTop = scrollHeight;
+      // Check ref (not state) for immediate reaction to user scroll
+      if (!isUserScrollingRef.current) {
+        const container = containerRef.current;
+        if (container) {
+          const { scrollTop, scrollHeight, clientHeight } = container;
+          if (scrollHeight - scrollTop - clientHeight > 2) {
+            container.scrollTop = scrollHeight;
+          }
         }
       }
       rafId = requestAnimationFrame(scrollLoop);
@@ -128,14 +114,28 @@ export function useChatScroll({
     rafId = requestAnimationFrame(scrollLoop);
 
     return () => cancelAnimationFrame(rafId);
-  }, [isStreaming, isUserScrolling, containerRef]);
+  }, [isStreaming, containerRef]);
 
-  // Cleanup timeout on unmount
+  // Track new messages when user is scrolling up
+  useEffect(() => {
+    const diff = messagesCount - lastMessageCountRef.current;
+
+    if (diff > 0 && isUserScrolling) {
+      setNewMessageCount((prev) => prev + diff);
+      setShowNewMessageIndicator(true);
+    } else if (!isUserScrolling && diff > 0) {
+      requestAnimationFrame(() => {
+        scrollToBottom("smooth");
+      });
+    }
+
+    lastMessageCountRef.current = messagesCount;
+  }, [messagesCount, isUserScrolling, scrollToBottom]);
+
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (isScrollingTimeoutRef.current) {
-        clearTimeout(isScrollingTimeoutRef.current);
-      }
+      if (isScrollingTimeoutRef.current) clearTimeout(isScrollingTimeoutRef.current);
     };
   }, []);
 
