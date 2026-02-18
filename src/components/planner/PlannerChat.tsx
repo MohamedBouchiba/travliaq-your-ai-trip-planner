@@ -297,6 +297,50 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
   // Widget cooldown system - prevents infinite widget loops
   const widgetCooldown = useWidgetCooldown();
 
+  // Listen for planifier:blocked event → inject in-chat guidance message
+  const { basketItems, explicitRequirements } = useTripBasketStore();
+  useEffect(() => {
+    const handlePlanifierBlocked = (data: { completedSteps: string[]; missingSteps: string[] }) => {
+      const { completedSteps, missingSteps } = data;
+
+      const stepStatus = (key: string, emoji: string, label: string, tab: string) => {
+        const done = completedSteps.includes(key);
+        const icon = done ? '✅' : '⬜';
+        const action = done ? '' : ` → [Voir](tab:${tab})`;
+        return `${icon} ${emoji} **${label}**${action}`;
+      };
+
+      const flightLine = stepStatus('flights', '✈️', 'Vol', 'flights');
+      const hotelLine = stepStatus('hotels', '🏨', 'Hôtel', 'stays');
+      const activitiesSkipped = explicitRequirements.wantsActivities === false;
+      const activitiesDone = completedSteps.includes('activities') || activitiesSkipped;
+      const activityLine = activitiesDone
+        ? `✅ 🧭 **Activités**${activitiesSkipped ? ' *(passées)*' : ''}`
+        : `⬜ 🧭 **Activités** *(optionnelles — ajoute des activités ou clique "Passer" dans la barre du bas)* → [Voir](tab:activities)`;
+
+      const missingCount = missingSteps.length;
+      const intro = missingCount === 0
+        ? "Tout est prêt ! 🚀"
+        : `Il te reste **${missingCount} étape${missingCount > 1 ? 's' : ''}** avant de pouvoir planifier :`;
+
+      const messageText = `${intro}\n\n${flightLine}\n${hotelLine}\n${activityLine}\n\n${missingCount > 0 ? '_Complète ces étapes, puis clique sur **Planifier** !_' : ''}`.trim();
+
+      const guidanceMessage = {
+        id: `planifier-blocked-${Date.now()}`,
+        role: 'assistant' as const,
+        text: messageText,
+        timestamp: Date.now(),
+        isStreaming: false,
+        isTyping: false,
+      };
+
+      setMessages((prev) => [...prev, guidanceMessage]);
+    };
+
+    eventBus.on('planifier:blocked', handlePlanifierBlocked);
+    return () => eventBus.off('planifier:blocked', handlePlanifierBlocked);
+  }, [explicitRequirements.wantsActivities, setMessages]);
+
   // Capture key eventBus events in debug store (dev only)
   useDebugEventBusCapture();
   
