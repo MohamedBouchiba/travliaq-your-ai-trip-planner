@@ -12,10 +12,10 @@ interface MarkdownMessageProps {
   isStreaming?: boolean;
 }
 
-/** Block dangerous URI schemes (javascript:, data:, vbscript:) */
+/** Block dangerous URI schemes (javascript:, data:, vbscript:, tab:) */
 function sanitizeHref(href: string | undefined): string {
   if (!href) return "#";
-  if (/^(javascript|data|vbscript):/i.test(href)) return "#";
+  if (/^(javascript|data|vbscript|tab):/i.test(href)) return "#";
   return href;
 }
 

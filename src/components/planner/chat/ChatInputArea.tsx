@@ -18,7 +18,6 @@ interface ChatInputAreaProps {
   onReportBug?: () => void;
   canReport?: boolean;
   isReporting?: boolean;
-  messagesUntilReport?: number;
 }
 
 export const ChatInputArea = memo(function ChatInputArea({
@@ -30,13 +29,13 @@ export const ChatInputArea = memo(function ChatInputArea({
   onReportBug,
   canReport = false,
   isReporting = false,
-  messagesUntilReport = 0,
 }: ChatInputAreaProps) {
   const { t } = useTranslation();
 
   return (
-    <div className="relative z-20 max-w-3xl mx-auto p-4 pt-0">
-      <div className="relative z-20 flex items-end gap-2 rounded-2xl border border-border bg-muted/30 p-2 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20">
+    <div className="max-w-3xl mx-auto px-4 pt-2 pb-3">
+      {/* Main input row */}
+      <div className="flex items-end gap-2 rounded-2xl border border-border/70 bg-muted/20 px-3 py-2 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/15 transition-all">
         <textarea
           ref={inputRef}
           value={input}
@@ -72,8 +71,8 @@ export const ChatInputArea = memo(function ChatInputArea({
           aria-label={t("planner.chat.inputPlaceholder")}
           rows={1}
           disabled={false}
-          className="pointer-events-auto flex-1 resize-none bg-transparent px-2 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-          style={{ minHeight: "40px", maxHeight: "120px" }}
+          className="pointer-events-auto flex-1 resize-none bg-transparent py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+          style={{ minHeight: "36px", maxHeight: "120px" }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -87,21 +86,23 @@ export const ChatInputArea = memo(function ChatInputArea({
           onClick={() => onSend(input)}
           disabled={!input.trim() || isLoading}
           className={cn(
-            "h-9 w-9 shrink-0 rounded-lg flex items-center justify-center transition-all",
+            "h-8 w-8 shrink-0 rounded-xl flex items-center justify-center transition-all mb-0.5",
             input.trim() && !isLoading
-              ? "bg-primary text-primary-foreground hover:bg-primary/90"
+              ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
               : "bg-muted text-muted-foreground cursor-not-allowed"
           )}
           aria-label={t("planner.chat.send")}
         >
-          <Send className="h-4 w-4" />
+          <Send className="h-3.5 w-3.5" />
         </button>
       </div>
+
+      {/* Bug report — only when eligible, pinned at bottom, ultra-subtle */}
       {(isReporting || canReport) && (
-        <p className="text-[10px] text-muted-foreground/50 text-center mt-1">
+        <p className="text-[10px] text-muted-foreground/40 text-center mt-1.5 leading-none">
           {isReporting ? (
             <span className="inline-flex items-center gap-1">
-              <Loader2 className="h-3 w-3 animate-spin" />
+              <Loader2 className="h-2.5 w-2.5 animate-spin" />
               {t("planner.chat.reportBugUploading")}
             </span>
           ) : (
@@ -110,7 +111,7 @@ export const ChatInputArea = memo(function ChatInputArea({
               <button
                 type="button"
                 onClick={onReportBug}
-                className="underline text-primary/60 hover:text-primary transition-colors cursor-pointer"
+                className="underline text-primary/50 hover:text-primary/80 transition-colors cursor-pointer ml-0.5"
               >
                 {t("planner.chat.reportBugLink")}
               </button>
