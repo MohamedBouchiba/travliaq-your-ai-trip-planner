@@ -303,43 +303,65 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     const handlePlanifierBlocked = (data: { completedSteps: string[]; missingSteps: string[] }) => {
       const { completedSteps, missingSteps } = data;
 
-      const stepStatus = (key: string, emoji: string, label: string, tab: string) => {
-        const done = completedSteps.includes(key);
-        const icon = done ? '✅' : '⬜';
-        const action = done ? '' : ` → [Voir](tab:${tab})`;
-        return `${icon} ${emoji} **${label}**${action}`;
-      };
-
-      const flightLine = stepStatus('flights', '✈️', 'Vol', 'flights');
-      const hotelLine = stepStatus('hotels', '🏨', 'Hôtel', 'stays');
       const activitiesSkipped = explicitRequirements.wantsActivities === false;
       const activitiesDone = completedSteps.includes('activities') || activitiesSkipped;
-      const activityLine = activitiesDone
-        ? `✅ 🧭 **Activités**${activitiesSkipped ? ' *(passées)*' : ''}`
-        : `⬜ 🧭 **Activités** *(optionnelles — ajoute des activités ou clique "Passer" dans la barre du bas)* → [Voir](tab:activities)`;
 
+      // Build clean status lines — NO markdown links (they cause browser navigation)
+      const statusLines: string[] = [];
+      statusLines.push(completedSteps.includes('flights') ? '✅ Vol sélectionné' : '☐ Vol — à sélectionner');
+      statusLines.push(completedSteps.includes('hotels') ? '✅ Hébergement sélectionné' : '☐ Hébergement — à sélectionner');
+      statusLines.push(
+        activitiesDone
+          ? `✅ Activités${activitiesSkipped ? ' (passées)' : ' sélectionnées'}`
+          : '☐ Activités — à ajouter ou passer'
+      );
+
+      const checklist = statusLines.map(l => `**${l}**`).join('\n');
       const missingCount = missingSteps.length;
 
-      const lines = `${flightLine}\n${hotelLine}\n${activityLine}`;
-
       const BLOCKED_VARIATIONS = [
-        (l: string) => `Presque ! 🎯\n\n${l}\n\n_Complète ces étapes pour débloquer **Planifier**._`,
-        (l: string) => `Ton voyage prend forme ✈️\n\n${l}\n\n_Une fois tout sélectionné, **Planifier** sera actif._`,
+        (l: string) => `Presque là ! 🎯\n\n${l}\n\n_Complète les étapes manquantes pour débloquer **Planifier**._`,
+        (l: string) => `Ton voyage prend forme ✈️\n\n${l}\n\n_Sélectionne les éléments restants, puis clique sur **Planifier**._`,
         (l: string) => `On y est presque 🚀\n\n${l}\n\n_Ces éléments sont nécessaires pour construire ton itinéraire._`,
-        (l: string) => `Encore quelques étapes !\n\n${l}\n\n_Ton voyage sera planifiable dès que tout est OK._`,
-        (l: string) => `Voici ce qu'il reste à faire 📋\n\n${l}\n\n_Complète ces étapes, puis clique sur **Planifier** !_`,
+        (l: string) => `Encore quelques étapes !\n\n${l}\n\n_Dès que tout est prêt, le bouton **Planifier** s'activera._`,
+        (l: string) => `Voici ce qu'il reste à faire 📋\n\n${l}\n\n_Clique sur un bouton ci-dessous pour continuer._`,
       ];
 
       const variation = BLOCKED_VARIATIONS[Math.floor(Math.random() * BLOCKED_VARIATIONS.length)];
-      const messageText = (missingCount > 0 ? variation(lines) : `Tout est prêt ! 🚀\n\n${lines}`).trim();
+      const messageText = (missingCount > 0 ? variation(checklist) : `Tout est prêt ! 🚀\n\n${checklist}\n\n_Clique sur **Planifier** pour générer ton itinéraire._`).trim();
 
-      const guidanceMessage = {
+      // Build quickReplies as proper navigation buttons (not markdown links)
+      const quickReplies: import('./chat/types').QuickReply[] = missingSteps
+        .filter(step => !activitiesDone || step !== 'activities')
+        .map(step => {
+          if (step === 'flights') return {
+            id: 'goto-flights',
+            label: '✈️ Voir les vols',
+            action: { type: 'navigate' as const, tab: 'flights' as const },
+            variant: 'primary' as const,
+          };
+          if (step === 'hotels') return {
+            id: 'goto-hotels',
+            label: '🏨 Voir les hôtels',
+            action: { type: 'navigate' as const, tab: 'stays' as const },
+            variant: 'primary' as const,
+          };
+          return {
+            id: 'goto-activities',
+            label: '🧭 Voir les activités',
+            action: { type: 'navigate' as const, tab: 'activities' as const },
+            variant: 'outline' as const,
+          };
+        });
+
+      const guidanceMessage: import('./chat/types').ChatMessage = {
         id: `planifier-blocked-${Date.now()}`,
-        role: 'assistant' as const,
+        role: 'assistant',
         text: messageText,
         timestamp: Date.now(),
         isStreaming: false,
         isTyping: false,
+        quickReplies: quickReplies.length > 0 ? quickReplies : undefined,
       };
 
       setMessages((prev) => [...prev, guidanceMessage]);
@@ -1064,6 +1086,23 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
                   onTriggerWidget={handleTriggerWidget}
                 />
               ))}
+
+              {/* SmartSuggestions — inside message area, ChatGPT-style empty state */}
+              {userMessageCount === 0 && (
+                <MemoizedSmartSuggestions
+                  memory={memory}
+                  mapContext={mapContext}
+                  inspireFlowStep={inspireFlowStep}
+                  destinationSuggestions={destinationSuggestions}
+                  lastAssistantMessage={messages.filter(m => m.role === 'assistant' && !m.isTyping && m.text && m.text.length > 10).at(-1)?.text}
+                  lastUserMessage={messages.filter(m => m.role === 'user').at(-1)?.text}
+                  conversationTurn={0}
+                  dynamicSuggestions={dynamicSuggestions}
+                  onSuggestionClick={handleSuggestionClick}
+                  isLoading={isLoading}
+                />
+              )}
+
               <div ref={messagesEndRef} />
             </div>
           </div>
@@ -1092,21 +1131,6 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
               onReportBug={handleReportBug}
               canReport={bugReport.canReport}
               isReporting={bugReport.isUploading}
-              messagesUntilReport={bugReport.messagesUntilReport}
-            />
-
-            {/* Smart Suggestions — below input, mirroring ChatGPT pattern */}
-            <MemoizedSmartSuggestions
-              memory={memory}
-              mapContext={mapContext}
-              inspireFlowStep={inspireFlowStep}
-              destinationSuggestions={destinationSuggestions}
-              lastAssistantMessage={messages.filter(m => m.role === 'assistant' && !m.isTyping && m.text && m.text.length > 10).at(-1)?.text}
-              lastUserMessage={messages.filter(m => m.role === 'user').at(-1)?.text}
-              conversationTurn={messages.filter(m => m.role === 'user').length}
-              dynamicSuggestions={dynamicSuggestions}
-              onSuggestionClick={handleSuggestionClick}
-              isLoading={isLoading}
             />
           </div>
 
