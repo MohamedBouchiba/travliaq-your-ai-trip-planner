@@ -64,14 +64,15 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
   const [isFlashing, setIsFlashing] = useState(false);
   const flashKeyRef = useRef(m._flashKey);
 
-  // When _flashKey changes (same message re-triggered), apply a brief highlight + scroll into view
+  // When _flashKey changes (same message re-triggered), apply a brief bounce + glow then fade
   useEffect(() => {
     if (m._flashKey && m._flashKey !== flashKeyRef.current) {
       flashKeyRef.current = m._flashKey;
       setIsFlashing(true);
       bubbleRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      const t = setTimeout(() => setIsFlashing(false), 800);
-      return () => clearTimeout(t);
+      // Hold the flash state for the full animation duration
+      const timer = setTimeout(() => setIsFlashing(false), 700);
+      return () => clearTimeout(timer);
     }
   }, [m._flashKey]);
 
@@ -85,13 +86,17 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
   return (
     <div ref={bubbleRef} className={cn("flex gap-2", m.role === "user" ? "flex-row-reverse" : "")}>
       <div className={cn("flex-1 min-w-0", m.role === "user" ? "text-right" : "")}>
-        <div className={cn(
-          "inline-block text-sm leading-relaxed px-4 py-3 rounded-2xl max-w-[85%] transition-shadow duration-700",
-          m.errorType
-            ? "bg-destructive/10 text-destructive border border-destructive/20 text-left"
-            : m.role === "user" ? "bg-primary text-primary-foreground text-left" : "bg-muted text-foreground text-left",
-          isFlashing && "ring-2 ring-primary/40 shadow-lg shadow-primary/10"
-        )}>
+        <div
+          className={cn(
+            "inline-block text-sm leading-relaxed px-4 py-3 rounded-2xl max-w-[85%]",
+            m.errorType
+              ? "bg-destructive/10 text-destructive border border-destructive/20 text-left"
+              : m.role === "user" ? "bg-primary text-primary-foreground text-left" : "bg-muted text-foreground text-left",
+          )}
+          style={isFlashing ? {
+            animation: "flash-attention 0.6s ease-out forwards",
+          } : undefined}
+        >
           {m.isTyping && !isLiveStreaming ? (
             <div className="flex gap-1 py-1" role="status" aria-label={t("planner.chat.assistantTyping")}>
               <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
