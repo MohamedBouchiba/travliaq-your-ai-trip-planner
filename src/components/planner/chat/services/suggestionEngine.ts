@@ -406,65 +406,58 @@ function convertAnticipatedToSuggestion(anticipated: AnticipatedSuggestion): Sug
 
 /**
  * Main function to get contextual suggestions
- * Prioritizes intelligent anticipated suggestions based on conversation context
+ * Priority: conversation-based replies > context-based suggestions
  */
 export function getSuggestions(context: SuggestionContext): Suggestion[] {
-  // 1. INTELLIGENT ANTICIPATION - Based on last assistant message
-  // This takes highest priority when we have conversation context
-  if (context.lastAssistantMessage) {
+  // 1. CONVERSATION-FIRST: If the assistant just said something, generate natural replies to it
+  //    This makes suggestions feel like "quick replies" to the last message, not generic buttons
+  if (context.lastAssistantMessage && context.lastAssistantMessage.length > 20) {
     const lastContent = analyzeLastAssistantMessage(context.lastAssistantMessage);
     const userIntent = analyzeUserIntent(context.lastUserMessage);
     const conversationTurn = context.conversationTurn ?? 0;
-    
-    // Use i18n language instead of text detection for default
     const currentLang = i18n.language?.split('-')[0] as 'fr' | 'en' || 'en';
-    
-    // Detect language from conversation (prefer user message, fallback to current i18n language)
-    const detectedLang = context.lastUserMessage 
-      ? detectLanguage(context.lastUserMessage) 
+    const detectedLang = context.lastUserMessage
+      ? detectLanguage(context.lastUserMessage)
       : currentLang;
-    
+
     const anticipated = getAnticipatedSuggestions(lastContent, userIntent, conversationTurn, detectedLang, context.lastAssistantMessage);
-    
+
     if (anticipated.length > 0) {
       return anticipated.map(convertAnticipatedToSuggestion).slice(0, 4);
     }
   }
-  
-  // 2. DESTINATIONS PROPOSED - after inspire flow with results
+
+  // 2. DESTINATIONS PROPOSED - after inspire flow
   if (context.inspireFlowStep === 'results' || context.hasProposedDestinations) {
     return getDestinationChoiceSuggestions(context).slice(0, 3);
   }
-  
-  // 3. During inspire flow (widgets active) - no static suggestions
+
+  // 3. During inspire flow widgets — no suggestions (let widget speak)
   if (context.inspireFlowStep && context.inspireFlowStep !== 'idle') {
-    return []; // Let widgets take precedence
+    return [];
   }
-  
-  // 4. INSPIRATION - no destination yet, show inspiring suggestions
+
+  // 4. INSPIRATION — no destination: starter suggestions
   if (!context.hasDestination) {
-    return getInspirationSuggestions().slice(0, 3);
+    return getInspirationSuggestions().slice(0, 4);
   }
-  
-  // 5. Has destination but no dates - help them pick dates
+
+  // 5. Has destination, no dates
   if (!context.hasDates) {
     return getDatesSuggestions(context).slice(0, 3);
   }
-  
-  // 6. Has destination & dates but no travelers
+
+  // 6. Has destination & dates, no travelers
   if (!context.hasTravelers) {
     return getTravelersSuggestions().slice(0, 3);
   }
-  
-  // 7. SEARCH READY (all info but on flights tab with no visible flights)
-  if (context.currentTab === 'flights' && context.visibleFlightsCount === 0) {
-    return getSearchReadySuggestions(context).slice(0, 3);
-  }
-  
-  // 8. TAB-BASED suggestions
+
+  // 7. Tab-based contextual suggestions
   switch (context.currentTab) {
     case 'flights':
-      return getFlightSuggestions(context).slice(0, 3);
+      return context.visibleFlightsCount === 0
+        ? getSearchReadySuggestions(context).slice(0, 3)
+        : getFlightSuggestions(context).slice(0, 3);
     case 'stays':
       return getStaysSuggestions(context).slice(0, 3);
     case 'activities':
@@ -472,7 +465,6 @@ export function getSuggestions(context: SuggestionContext): Suggestion[] {
     case 'preferences':
       return getPreferencesSuggestions(context).slice(0, 3);
     default:
-      // Fallback to inspiration if nothing else matches
       return getInspirationSuggestions().slice(0, 3);
   }
 }
