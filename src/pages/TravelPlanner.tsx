@@ -230,6 +230,15 @@ const TravelPlanner = () => {
     }
   }, []);
 
+  // On mobile: when a tab:change fires (e.g. from TripPriceBar step buttons),
+  // automatically switch to the maps view so the widget panel is visible.
+  useEffect(() => {
+    if (!isMobile) return;
+    const handler = () => setMobileView("maps");
+    eventBus.on("tab:change", handler);
+    return () => eventBus.off("tab:change", handler);
+  }, [isMobile]);
+
   // Leave confirmation if a conversation is in progress
   useEffect(() => {
     const handler = ({ dirty }: { dirty: boolean }) => setShouldConfirmLeave(dirty);

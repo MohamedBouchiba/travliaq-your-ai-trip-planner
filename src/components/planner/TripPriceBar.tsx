@@ -174,7 +174,7 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
                 )}
                 <div className="flex flex-col items-center gap-0.5">
                   <button
-                    onClick={() => !done && eventBus.emit('tab:change', { tab })}
+                    onClick={() => eventBus.emit('tab:change', { tab })}
                     aria-label={label}
                     className={cn(
                       'h-6 w-6 rounded-full flex items-center justify-center transition-all duration-300 border-2 text-[10px] font-semibold',
