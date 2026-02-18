@@ -207,6 +207,9 @@ export interface ChatMessage {
 
   // New: Rich Content (Phase 3)
   richContent?: RichContent[];
+
+  // Internal: used to trigger a flash/scroll-to animation when the same message is re-triggered
+  _flashKey?: number;
 }
 
 /**
