@@ -1,7 +1,8 @@
 import { useTripBasketStore } from '@/stores/tripBasketStore';
+import { useFlightMemoryStore } from '@/stores/hooks/useFlightMemoryStore';
 import { useUserPreferences } from '@/contexts/UserPreferencesContext';
 import { Button } from '@/components/ui/button';
-import { Plane, Hotel, Compass, Check, SkipForward } from 'lucide-react';
+import { Plane, Hotel, Compass, Check, SkipForward, MapPin, Calendar, Users } from 'lucide-react';
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { eventBus } from '@/lib/eventBus';
@@ -20,12 +21,22 @@ const STEP_CONFIG = [
   { key: 'activities', icon: Compass, label: 'Activités', tab: 'activities' as const },
 ] as const;
 
+function formatShortDate(date: Date | null): string | null {
+  if (!date) return null;
+  const d = new Date(date);
+  const months = ['jan', 'fév', 'mar', 'avr', 'mai', 'jun', 'jul', 'aoû', 'sep', 'oct', 'nov', 'déc'];
+  return `${d.getDate()} ${months[d.getMonth()]}`;
+}
+
 const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
   const basketItems = useTripBasketStore((s) => s.basketItems);
   const flexibleTripType = useTripBasketStore((s) => s.flexibleTripType);
   const explicitRequirements = useTripBasketStore((s) => s.explicitRequirements);
   const setExplicitRequirement = useTripBasketStore((s) => s.setExplicitRequirement);
   const { preferences } = useUserPreferences();
+
+  // Read trip memory directly from store — no prop drilling needed
+  const { memory } = useFlightMemoryStore();
 
   const currency = preferences.currency || 'EUR';
   const symbol = CURRENCY_SYMBOLS[currency] || currency;
@@ -92,8 +103,43 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
     setExplicitRequirement('wantsActivities', false);
   };
 
+  // Build trip memory chips from FlightMemory
+  const destination = memory.arrival?.city || memory.arrival?.country;
+  const depDate = formatShortDate(memory.departureDate);
+  const retDate = formatShortDate(memory.returnDate);
+  const totalTravelers = memory.passengers.adults + memory.passengers.children + memory.passengers.infants;
+  const hasNonDefaultTravelers = totalTravelers !== 1 || memory.passengers.children > 0 || memory.passengers.infants > 0;
+
+  const memoryChips = [
+    destination && { icon: <MapPin className="h-3 w-3" />, label: destination },
+    depDate && { icon: <Calendar className="h-3 w-3" />, label: retDate ? `${depDate} → ${retDate}` : depDate },
+    hasNonDefaultTravelers && { icon: <Users className="h-3 w-3" />, label: `${totalTravelers} voy.` },
+  ].filter(Boolean) as { icon: React.ReactNode; label: string }[];
+
   return (
     <div className="absolute bottom-0 left-0 right-0 z-20 bg-card/95 backdrop-blur-xl border-t border-border/40">
+
+      {/* Trip memory row — only shown when there's data */}
+      {memoryChips.length > 0 && (
+        <div className="flex items-center gap-2 px-5 pt-2.5 pb-0">
+          {memoryChips.map((chip, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground"
+            >
+              {chip.icon}
+              {chip.label}
+            </span>
+          ))}
+          {totalPrice > 0 && (
+            <span className="ml-auto text-[10px] font-semibold text-foreground tabular-nums">
+              {formattedPrice} {symbol}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Main row: steps + price + plan button */}
       <div className="flex items-center justify-between px-5 py-3 gap-4">
         {/* Step tracker */}
         <div className="flex items-center gap-0 flex-1 min-w-0">
@@ -172,8 +218,8 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
           })}
         </div>
 
-        {/* Price */}
-        {totalPrice > 0 && (
+        {/* Price — only shown when memory chips are absent (otherwise shown in memory row) */}
+        {totalPrice > 0 && memoryChips.length === 0 && (
           <div className="flex items-baseline gap-0.5 shrink-0">
             <span className="text-sm font-bold text-foreground tabular-nums">
               {formattedPrice}
