@@ -1,6 +1,6 @@
 /**
  * Airport Selection Widgets with Smart Recommendations
- * Premium / Futuristic redesign
+ * Premium / Futuristic redesign — v3 (aligned cards, compact badge, clean button)
  */
 
 import { useState } from "react";
@@ -88,7 +88,8 @@ export function DualAirportSelection({ choices, onSelect, disabled }: {
 }
 
 /* ─────────────── PremiumAirportCard (recommended) ───────────────
-   Compact premium card for one airport endpoint (departure OR arrival)
+   Full-height card — both departure and arrival are always the same height
+   because they live in a CSS grid with items-stretch.
    ──────────────────────────────────────────────────────────────── */
 
 function PremiumAirportCard({
@@ -112,20 +113,21 @@ function PremiumAirportCard({
   const pros = getAirportPros(airport, allAirports, t);
 
   return (
-    <div className="flex flex-col gap-2">
+    /* stretch wrapper — fills the grid cell height so both cards are equal */
+    <div className="flex flex-col gap-2 h-full">
       {/* Label */}
       <div className="flex items-center gap-1.5">
-        <Sparkles className="w-3 h-3 text-amber-400" />
-        <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">{label}</span>
+        <Sparkles className="w-3 h-3 text-amber-400 flex-shrink-0" />
+        <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest leading-none">{label}</span>
       </div>
 
-      {/* Main card */}
+      {/* Main card — flex-1 so both fill the same height */}
       <motion.div
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 380, damping: 28 }}
         className={cn(
-          "relative overflow-hidden rounded-2xl border p-4",
+          "relative overflow-hidden rounded-2xl border p-4 flex flex-col flex-1",
           "bg-gradient-to-br from-primary/10 via-card to-primary/5",
           "border-primary/20 shadow-lg shadow-primary/10",
         )}
@@ -133,32 +135,33 @@ function PremiumAirportCard({
         {/* Glow orb */}
         <div className="pointer-events-none absolute -top-6 -right-6 w-24 h-24 rounded-full bg-primary/15 blur-2xl" />
 
-        {/* IATA + badge */}
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <span className="text-4xl font-black tracking-tight text-primary leading-none">
-              {airport.iata}
-            </span>
-            <div className="flex items-center gap-1 mt-1">
-              <MapPin className="w-3 h-3 text-muted-foreground" />
-              <span className="text-[11px] text-muted-foreground">
-                {airport.distance_km.toFixed(0)} km
-              </span>
-            </div>
-          </div>
-          <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest bg-primary text-primary-foreground px-2 py-1 rounded-full shadow-sm">
-            <Zap className="w-2.5 h-2.5" />
+        {/* IATA + compact badge — inline on same row */}
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <span className="text-4xl font-black tracking-tight text-primary leading-none">
+            {airport.iata}
+          </span>
+          {/* ← small badge, not an oval pill */}
+          <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wide bg-primary text-primary-foreground px-1.5 py-0.5 rounded-md shadow-sm leading-none flex-shrink-0">
+            <Zap className="w-2 h-2" />
             {t("planner.airport.bestChoice")}
           </span>
         </div>
 
+        {/* Distance */}
+        <div className="flex items-center gap-1 mb-3">
+          <MapPin className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+          <span className="text-[11px] text-muted-foreground">
+            {airport.distance_km.toFixed(0)} km
+          </span>
+        </div>
+
         {/* Airport name */}
-        <p className="text-xs font-semibold text-foreground leading-snug mb-3 line-clamp-2">
+        <p className="text-xs font-semibold text-foreground leading-snug mb-3">
           {airport.name}
         </p>
 
         {/* Pros */}
-        <div className="space-y-1 mb-4">
+        <div className="space-y-1 mb-4 flex-1">
           {pros.map((pro, i) => (
             <div key={i} className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
@@ -167,23 +170,20 @@ function PremiumAirportCard({
           ))}
         </div>
 
-        {/* Actions */}
-        <div className="flex gap-2">
-          {/* See others */}
-          <button
-            onClick={onToggleAlts}
-            disabled={disabled}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-1.5",
-              "py-2 rounded-xl border border-border/60 text-xs font-medium",
-              "text-muted-foreground bg-muted/50 hover:bg-muted/80 transition-all",
-              disabled && "opacity-50 cursor-not-allowed"
-            )}
-          >
-            {showAlts ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            {t("planner.airport.seeOthers")}
-          </button>
-        </div>
+        {/* Toggle alternatives — always at bottom */}
+        <button
+          onClick={onToggleAlts}
+          disabled={disabled}
+          className={cn(
+            "w-full flex items-center justify-center gap-1.5 mt-auto",
+            "py-2 rounded-xl border border-border/60 text-xs font-medium",
+            "text-muted-foreground bg-muted/50 hover:bg-muted/80 transition-all",
+            disabled && "opacity-50 cursor-not-allowed"
+          )}
+        >
+          {showAlts ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          {t("planner.airport.seeOthers")}
+        </button>
       </motion.div>
 
       {/* Alternatives dropdown */}
@@ -236,7 +236,7 @@ function PremiumAirportCard({
 }
 
 /* ─────────────────── AirportConfirmationWidget ──────────────────
-   Main widget — premium redesign
+   Main widget — premium redesign v3
    ──────────────────────────────────────────────────────────────── */
 
 export function AirportConfirmationWidget({
@@ -357,32 +357,28 @@ export function AirportConfirmationWidget({
             >
               {/* Leg header */}
               <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40 bg-muted/30">
-                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-primary/20 text-primary text-[10px] font-black">
+                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-primary/20 text-primary text-[10px] font-black flex-shrink-0">
                   {idx + 1}
                 </span>
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <span className="text-sm font-bold text-foreground truncate">
-                    {leg.from.city}
-                  </span>
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <div className="w-6 h-px bg-border" />
-                    <Plane className="w-3 h-3 rotate-0" />
-                    <div className="w-6 h-px bg-border" />
+                  <span className="text-sm font-bold text-foreground truncate">{leg.from.city}</span>
+                  <div className="flex items-center gap-1 text-muted-foreground flex-shrink-0">
+                    <div className="w-4 h-px bg-border" />
+                    <Plane className="w-3 h-3" />
+                    <div className="w-4 h-px bg-border" />
                   </div>
-                  <span className="text-sm font-bold text-foreground truncate">
-                    {leg.to.city}
-                  </span>
+                  <span className="text-sm font-bold text-foreground truncate">{leg.to.city}</span>
                 </div>
                 {leg.date && (
-                  <span className="text-[11px] font-medium text-muted-foreground bg-muted px-2.5 py-1 rounded-full shrink-0">
+                  <span className="text-[11px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full shrink-0">
                     {(leg.date instanceof Date ? leg.date : new Date(leg.date))
                       .toLocaleDateString(i18n.language === "en" ? "en-US" : "fr-FR", { day: "numeric", month: "short" })}
                   </span>
                 )}
               </div>
 
-              {/* Cards grid */}
-              <div className="grid grid-cols-2 gap-3 p-4">
+              {/* Cards grid — items-stretch forces equal heights */}
+              <div className="grid grid-cols-2 gap-3 p-4 items-stretch">
                 <PremiumAirportCard
                   airport={selected.from}
                   label={t("planner.airport.departure")}
@@ -392,7 +388,6 @@ export function AirportConfirmationWidget({
                   onSelect={(a) => handleAirportChange(leg.legIndex, "from", a)}
                   disabled={isLoading}
                 />
-                {/* Divider */}
                 <PremiumAirportCard
                   airport={selected.to}
                   label={t("planner.airport.arrival")}
@@ -408,16 +403,16 @@ export function AirportConfirmationWidget({
         })}
       </div>
 
-      {/* Confirm button */}
+      {/* Confirm button — compact height, full width */}
       <motion.button
         onClick={handleConfirm}
         disabled={isLoading}
-        whileHover={{ scale: 1.015 }}
+        whileHover={{ scale: 1.012 }}
         whileTap={{ scale: 0.98 }}
         className={cn(
-          "relative mt-4 w-full py-3.5 rounded-2xl text-sm font-bold overflow-hidden",
+          "relative mt-4 w-full py-3 rounded-2xl text-sm font-bold overflow-hidden",
           "bg-primary text-primary-foreground",
-          "shadow-lg shadow-primary/30",
+          "shadow-md shadow-primary/25",
           "disabled:opacity-50 disabled:cursor-not-allowed",
           "flex items-center justify-center gap-2 transition-all"
         )}
@@ -435,10 +430,12 @@ export function AirportConfirmationWidget({
           </>
         ) : (
           <>
-            <Plane className="w-4 h-4" />
-            {data.legs.length > 1
-              ? t("planner.airport.searchFlightsPlural", { count: data.legs.length })
-              : t("planner.airport.searchFlights", { count: data.legs.length })}
+            <Plane className="w-4 h-4 relative z-10" />
+            <span className="relative z-10">
+              {data.legs.length > 1
+                ? t("planner.airport.searchFlightsPlural", { count: data.legs.length })
+                : t("planner.airport.searchFlights", { count: data.legs.length })}
+            </span>
           </>
         )}
       </motion.button>
