@@ -83,13 +83,14 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
   const isLiveStreaming = streamingText !== undefined;
 
   return (
-    <div ref={bubbleRef} className={cn("flex gap-2 transition-colors duration-300", m.role === "user" ? "flex-row-reverse" : "", isFlashing && "animate-pulse")}>
+    <div ref={bubbleRef} className={cn("flex gap-2", m.role === "user" ? "flex-row-reverse" : "")}>
       <div className={cn("flex-1 min-w-0", m.role === "user" ? "text-right" : "")}>
         <div className={cn(
-          "inline-block text-sm leading-relaxed px-4 py-3 rounded-2xl max-w-[85%]",
+          "inline-block text-sm leading-relaxed px-4 py-3 rounded-2xl max-w-[85%] transition-shadow duration-700",
           m.errorType
             ? "bg-destructive/10 text-destructive border border-destructive/20 text-left"
-            : m.role === "user" ? "bg-primary text-primary-foreground text-left" : "bg-muted text-foreground text-left"
+            : m.role === "user" ? "bg-primary text-primary-foreground text-left" : "bg-muted text-foreground text-left",
+          isFlashing && "ring-2 ring-primary/40 shadow-lg shadow-primary/10"
         )}>
           {m.isTyping && !isLiveStreaming ? (
             <div className="flex gap-1 py-1" role="status" aria-label={t("planner.chat.assistantTyping")}>
