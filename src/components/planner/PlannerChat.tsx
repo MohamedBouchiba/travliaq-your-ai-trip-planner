@@ -1068,7 +1068,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
       <div
         className={cn(
           // `relative` + z-index: ensure chat content (especially input) stays above any stray overlays within the panel group
-          "relative z-10 flex flex-col flex-1 overflow-hidden transition-all duration-300 ease-out",
+          "relative z-10 flex flex-col flex-1 transition-all duration-300 ease-out",
           isCollapsed ? "opacity-0 pointer-events-none scale-95" : "opacity-100 scale-100"
         )}
       >
@@ -1076,7 +1076,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
           <div
             ref={messagesContainerRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-y-auto"
+            className="flex-1 overflow-y-auto themed-scroll"
             role="log"
             aria-label={t("planner.chat.conversationMessages")}
             aria-live="polite"
