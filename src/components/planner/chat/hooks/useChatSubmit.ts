@@ -7,7 +7,6 @@
  */
 
 import { useCallback, useRef } from "react";
-import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
 import i18n from "@/i18n/config";
 import type { ChatMessage } from "../types";
@@ -123,6 +122,11 @@ export interface UseChatSubmitOptions {
   completedMessageIdsRef: React.MutableRefObject<Set<string>>;
   intentWidgetRef: React.MutableRefObject<WidgetType | null>;
   userMessageCountRef: React.MutableRefObject<number>;
+  /** Separate streaming state — updated on every SSE token, avoids array-copy batching */
+  setStreamingText: (text: string) => void;
+  setStreamingMessageId: (id: string | null) => void;
+  /** Ref to current streamingMessageId to detect first-token transition */
+  streamingMessageIdRef: React.MutableRefObject<string | null>;
 }
 
 export function useChatSubmit(opts: UseChatSubmitOptions) {
@@ -233,12 +237,22 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
           context,
           (id, text2, isComplete) => {
             if (opts.completedMessageIdsRef.current.has(id) && !isComplete) return;
-            if (isComplete) opts.completedMessageIdsRef.current.add(id);
-            // flushSync here is called from an async context (not inside RAF/lifecycle),
-            // so it is valid in React 18 and forces an immediate paint for each chunk.
-            flushSync(() => {
-              opts.setMessages(updateMessageById(id, { text: text2, isStreaming: !isComplete, isTyping: false }));
-            });
+            if (isComplete) {
+              opts.completedMessageIdsRef.current.add(id);
+              // Stream finished: clear live streaming state, merge final text into messages array
+              opts.setStreamingMessageId(null);
+              opts.setStreamingText("");
+              opts.setMessages(updateMessageById(id, { text: text2, isStreaming: false, isTyping: false }));
+            } else {
+              // Each token: update ONLY the lightweight string state (no array copy)
+              // On the very first token: also flip isTyping→false, isStreaming→true in the messages array
+              const isFirstToken = opts.streamingMessageIdRef.current !== id;
+              opts.setStreamingMessageId(id);
+              opts.setStreamingText(text2);
+              if (isFirstToken) {
+                opts.setMessages(updateMessageById(id, { isTyping: false, isStreaming: true }));
+              }
+            }
           }
         );
 
@@ -512,12 +526,10 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
     const realIdx = opts.messages.length - 1 - lastUserIdx;
     const lastUserMessage = opts.messages[realIdx];
 
-    // R2: flushSync ensures state is committed before sendText reads it via stableRef
-    flushSync(() => {
-      opts.setMessages((prev) => prev.filter((_, i) => i <= realIdx));
-    });
-
-    sendText(lastUserMessage.text);
+    // R2: trim messages then immediately send (stableRef.current is always up-to-date)
+    opts.setMessages((prev) => prev.filter((_, i) => i <= realIdx));
+    // Small delay to let React flush the state before sendText reads from stableRef
+    setTimeout(() => sendText(lastUserMessage.text), 0);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- reads from stableRef.current
   }, [sendText]);
 

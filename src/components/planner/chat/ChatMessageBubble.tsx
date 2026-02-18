@@ -28,6 +28,8 @@ interface ChatMessageBubbleProps {
   activeTools: ToolExecution[];
   isLoading: boolean;
   memory: FlightMemory;
+  /** Live streaming text for this bubble (set only when m.id === streamingMessageId) */
+  streamingText?: string;
   widgetFlow: WidgetRendererProps["widgetFlow"] & {
     handleAirportSelect: (msgId: string, field: string, airport: Airport, isDual?: boolean) => void;
     handleSearchButtonClick: (msgId: string) => void;
@@ -47,6 +49,7 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
   activeTools,
   isLoading,
   memory,
+  streamingText,
   widgetFlow,
   preferenceCallbacks,
   handleDestinationSelect,
@@ -58,6 +61,10 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
   onTriggerWidget,
 }: ChatMessageBubbleProps) {
   const { t } = useTranslation();
+  // Use live streamingText when this bubble is the active streaming target;
+  // otherwise fall back to m.text (persisted final content).
+  const displayText = streamingText !== undefined ? streamingText : m.text;
+  const isLiveStreaming = streamingText !== undefined;
 
   return (
     <div className={cn("flex gap-2", m.role === "user" ? "flex-row-reverse" : "")}>
@@ -68,7 +75,7 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
             ? "bg-destructive/10 text-destructive border border-destructive/20 text-left"
             : m.role === "user" ? "bg-primary text-primary-foreground text-left" : "bg-muted text-foreground text-left"
         )}>
-          {m.isTyping ? (
+          {m.isTyping && !isLiveStreaming ? (
             <div className="flex gap-1 py-1" role="status" aria-label={t("planner.chat.assistantTyping")}>
               <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
               <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
@@ -82,7 +89,7 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
                 <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               )}
               <div>
-                <p className="font-medium">{m.text}</p>
+                <p className="font-medium">{displayText}</p>
                 <button
                   onClick={onRegenerate}
                   className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive text-xs font-medium transition-colors"
@@ -94,7 +101,7 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
             </div>
           ) : (
             <>
-              <MarkdownMessage content={m.text} isStreaming={m.isStreaming} />
+              <MarkdownMessage content={displayText} isStreaming={isLiveStreaming || m.isStreaming} />
             </>
           )}
         </div>
@@ -168,7 +175,7 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
     </div>
   );
 }, (prev, next) => {
-  // Custom comparator: skip re-render if message content + tools haven't changed
+  // Custom comparator: skip re-render if message content + streaming text haven't changed
   const pm = prev.message;
   const nm = next.message;
   return (
@@ -182,6 +189,7 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
     pm.errorType === nm.errorType &&
     pm.hasSearchButton === nm.hasSearchButton &&
     prev.activeTools === next.activeTools &&
-    prev.isLoading === next.isLoading
+    prev.isLoading === next.isLoading &&
+    prev.streamingText === next.streamingText
   );
 });
