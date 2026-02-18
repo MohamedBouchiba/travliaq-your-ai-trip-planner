@@ -1,126 +1,68 @@
 
-## Diagnosis: Why Streaming Shows as Blocks
+## Root Cause Analysis
 
-After reading the full pipeline (`useChatSubmit.ts` → `useChatStream.ts` → `ChatMessageBubble.tsx`), the root cause is now clear.
+### Bug 1: Block Streaming (No Word-by-Word Effect)
 
-### The Actual Problem
+The problem is **entirely on the backend**, in `supabase/functions/planner-chat/index.ts`, inside `createSimulatedStreamingResponse` (used when the LLM response has already been pre-generated via tool calls).
 
-The streaming text is stored inside the `messages` array (`useState<ChatMessage[]>`). On every token, `setMessages(updateMessageById(...))` is called, which:
+```typescript
+// Current broken code — tight synchronous loop, no await
+const words = content.match(/\S+\s*/g) || [content];
+for (const word of words) {
+  controller.enqueue(encoder.encode(...));  // All enqueued in ONE microtask
+}
+controller.close();
+```
 
-1. Creates a **new array copy** of all messages
-2. Finds and replaces the target message object
-3. Triggers a React re-render of the entire list
+Because there is **no `await` between enqueue calls**, the Deno runtime buffers all words and flushes them in a single TCP packet. The client's `reader.read()` returns all of them at once — the frontend never has a chance to render intermediate states.
 
-Even with `flushSync`, React 18 detects that `setMessages` is being called inside a context that started with other state updates (`setIsLoading(true)` ran just before `streamResponse` was awaited), and **batches the synchronous flushSync calls** — resulting in all tokens being grouped into one paint at the end.
+The **real streaming path** (direct OpenAI stream, lines 1327-1356) works correctly because the `await reader.read()` naturally yields between chunks as the network delivers them. But when the backend has pre-collected the response (tool use path), it falls back to `createSimulatedStreamingResponse`, which is broken.
 
-The `ChatMessageBubble` is wrapped in `React.memo` with a custom comparator, which correctly detects changes to `pm.text`, but the problem is upstream: **React never paints the intermediate states**.
+**Fix:** Add `await new Promise(resolve => setTimeout(resolve, 0))` (or a small delay like 15ms) between each word enqueue to yield the event loop and let Deno flush each word as a separate TCP frame.
 
-### The Correct Fix: Separate Streaming State
+### Bug 2: Repeating Style Widget Loop
 
-The industry-standard solution (used by ChatGPT, Claude, Mistral) is to **decouple the streaming text from the messages array**:
+From the screenshots: when the user says "Je ne sais pas où partir, inspirez-moi" a second time (after already configuring their style), the bot shows the style selector again instead of recalling the previously chosen style.
 
-- Keep a **separate `useState<string>`** (`streamingText`) that holds only the in-flight content for the current message
-- Keep a **separate `useState<string>`** (`streamingMessageId`) to know which bubble to render it in
-- During streaming, update `streamingText` directly — this is a single, lightweight state update with no array copy
-- On stream completion, merge the final text back into `messages`
+This happens because:
+1. The `widgetCooldown` system tracks shown widgets, but the prompt sent to the LLM may not clearly state "style already configured" 
+2. OR the `styleAxesUserConfirmed` flag is not being sent in the `blockedWidgets` or `preferencesState` context, so the LLM re-triggers the style widget
 
-This way, `setMessages` is called only **twice** per exchange (once to add the typing bubble, once to finalize), while `setStreamingText` is called on every token — fast, isolated, batching-free.
-
-### Secondary Fix: Remove Dots During Streaming
-
-Currently `isTyping: true` shows the three dots until the first `onContentUpdate` call. The fix is:
-- Set `isTyping: false` and start showing `streamingText` as soon as the first content chunk arrives (even a single letter)
-- The `ChatMessageBubble` will render the live `streamingText` prop instead of dots
+**Fix:** When `styleAxesUserConfirmed` is true in the preference memory, explicitly add `"preferenceStyle"` to `blockedWidgets` before sending to the backend, so the LLM cannot trigger it again.
 
 ---
 
-## Implementation Plan
+## Technical Changes
 
-### 1. `src/components/planner/PlannerChat.tsx`
+### 1. `supabase/functions/planner-chat/index.ts` — Fix Simulated Streaming
 
-Add two new state variables:
-```
-const [streamingText, setStreamingText] = useState("")
-const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
-```
-
-Pass them down to `ChatMessageBubble` via `visibleMessages` — or better, inject them directly into the rendered bubble by checking `m.id === streamingMessageId` and substituting `streamingText` as the text prop.
-
-### 2. `src/components/planner/chat/hooks/useChatSubmit.ts`
-
-Modify the `onContentUpdate` callback:
+Replace the tight synchronous loop with one that yields every N words to allow the TCP stack to flush:
 
 ```typescript
-(id, text2, isComplete) => {
-  if (isComplete) {
-    // Finalize: merge into messages array (one update)
-    opts.setStreamingMessageId(null);
-    opts.setStreamingText("");
-    opts.setMessages(updateMessageById(id, { 
-      text: text2, 
-      isStreaming: false, 
-      isTyping: false 
-    }));
-  } else {
-    // Streaming: update ONLY the lightweight string state
-    opts.setStreamingMessageId(id);
-    opts.setStreamingText(text2);
-  }
+// NEW: yield every word to let Deno flush the stream buffer
+const words = content.match(/\S+\s*/g) || [content];
+for (const word of words) {
+  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "content", content: word })}\n\n`));
+  // Yield the Deno event loop so each word is flushed as a separate chunk
+  await new Promise(resolve => setTimeout(resolve, 0));
 }
 ```
 
-No `flushSync` needed. No RAF needed. React will paint each `setStreamingText` update immediately because it's a simple primitive state update on its own.
+The `setTimeout(resolve, 0)` yields to Deno's event loop, which allows the HTTP response buffer to flush the previously enqueued bytes before continuing. This is the standard technique for simulated streaming in server environments.
 
-### 3. `src/components/planner/chat/ChatMessageBubble.tsx`
+### 2. `src/components/planner/chat/hooks/buildLLMContext.ts` — Block Style Widget When Already Confirmed
 
-Add `streamingText?: string` prop. When the bubble's `m.id` matches the streaming message, render `streamingText` instead of `m.text`:
+When the user has already confirmed their travel style (`styleAxesUserConfirmed === true`), add `"preferenceStyle"` to `blockedWidgets` in the context sent to the backend. This prevents the LLM from re-triggering the widget.
 
-```tsx
-const displayText = streamingText !== undefined ? streamingText : m.text;
-```
+The `preferencesState` object already exists in the context — we need to ensure that when style is configured, it explicitly adds `preferenceStyle` to the blocked list.
 
-This makes the dots disappear on the very first letter and text appears word-by-word.
+### 3. `src/components/planner/chat/hooks/useChatStream.ts` — Remove Stale Comment
 
-### 4. `src/components/planner/chat/MarkdownMessage.tsx`
-
-No changes needed — it already handles `isStreaming` correctly (renders raw text during stream).
-
----
-
-## Flow After Fix
-
-```text
-User sends message
-  └─► setMessages([...prev, typingBubble])          ← isTyping: true → dots show
-  └─► streamResponse() begins
-
-First SSE token arrives
-  └─► setStreamingMessageId(messageId)
-  └─► setStreamingText("Bon")                        ← dots vanish, "Bon" appears
-  
-Second token arrives
-  └─► setStreamingText("Bonjour")                    ← "jour" appears immediately
-
-...every token: ONE lightweight setState, ONE React paint
-
-Stream ends
-  └─► setStreamingText("")
-  └─► setStreamingMessageId(null)
-  └─► setMessages(updateMessageById(...))            ← final text persisted
-```
-
-### Why This Works
-
-- `setStreamingText` updates a single `string` primitive — React schedules an immediate paint without batching interference
-- `setMessages` is only called at start and end — no expensive array copies during streaming
-- No `flushSync`, no `requestAnimationFrame`, no `MutationObserver` needed for streaming
-- The scroll hook (`useChatScroll`) continues to work via `MutationObserver` — it watches DOM mutations which will now happen on every token
+The comment about "direct calls let React's scheduler handle batching naturally" is misleading now that we understand the real fix is on the backend. Update to reflect the actual architecture.
 
 ---
 
 ## Files to Modify
 
-1. `src/components/planner/PlannerChat.tsx` — add `streamingText` / `streamingMessageId` state, inject into render
-2. `src/components/planner/chat/hooks/useChatSubmit.ts` — split `onContentUpdate` into streaming vs final path, remove `flushSync`
-3. `src/components/planner/chat/ChatMessageBubble.tsx` — accept and render `streamingText` prop
-4. `src/components/planner/chat/hooks/useChatStream.ts` — remove `flushSync` import (no longer needed there)
+1. **`supabase/functions/planner-chat/index.ts`** — Add `await` yield in `createSimulatedStreamingResponse` word loop (the critical fix)
+2. **`src/components/planner/chat/hooks/buildLLMContext.ts`** — Add `preferenceStyle` to blocked widgets when `styleAxesUserConfirmed` is true
