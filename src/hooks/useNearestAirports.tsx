@@ -66,16 +66,38 @@ function isCountryName(name: string): boolean {
   return COUNTRY_NAMES_LOWER.has(normalized);
 }
 
+// Reject strings that are clearly not city names (sentences, placeholder text, etc.)
+const NON_CITY_PHRASES = [
+  "destination", "en tête", "souhaitez", "aller", "voyage",
+  "où", "comment", "quand", "combien", "cherche", "inspire",
+];
+
+function looksLikeSentence(name: string): boolean {
+  if (!name || name.length < 2) return false;
+  const words = name.trim().split(/\s+/);
+  // Real city names rarely exceed 4 words
+  if (words.length > 4) return true;
+  const lower = name.toLowerCase().trim();
+  // Check if it contains known non-city phrases
+  return NON_CITY_PHRASES.some((phrase) => lower.includes(phrase));
+}
+
 export async function findNearestAirports(
   city: string,
   limit: number = 3,
   countryCode?: string,
   coords?: { lat: number; lon: number },
-  preferredRegion: string = "europe", // Bug D fix: default to "europe" to prioritize European results
+  preferredRegion: string = "europe",
 ): Promise<NearestAirportsResponse | null> {
   // Guard: don't call API with country names (unless we have coords fallback)
   if (!coords && isCountryName(city)) {
     console.warn(`[useNearestAirports] Rejected country name as city: "${city}"`);
+    return null;
+  }
+
+  // Guard: don't call API with sentences or placeholder text
+  if (!coords && looksLikeSentence(city)) {
+    console.warn(`[useNearestAirports] Rejected non-city string: "${city}"`);
     return null;
   }
 
