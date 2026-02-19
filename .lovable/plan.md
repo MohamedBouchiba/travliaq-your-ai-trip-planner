@@ -1,65 +1,109 @@
 
+## Plan : Activer le vrai streaming mot-a-mot (style ChatGPT)
 
-## Plan : Corriger les suggestions (pas d'auto-envoi, pas de doublons) + cap aeroport 50km
+### Diagnostic
 
-### Problemes identifies
+Le probleme vient du backend (edge function `planner-chat`). Voici ce qui se passe actuellement :
 
-1. **Pas d'auto-envoi** : Le code actuel dans `handleSuggestionClick` (lignes 1004-1007) fait deja `setInput(message)` sans envoyer -- c'est le bon comportement. Aucun auto-send n'existe dans le code actuel. Par contre, le probleme de "double suggestions" vient du fait que quand `setInput(message)` est appele, le contexte `MemoizedSmartSuggestions` change (car `lastUserMessage`, `conversationTurn`, etc. sont recalcules), ce qui regenere de nouvelles suggestions statiques immediatement, avant meme que le message soit envoye.
+1. **La boucle ReAct (ligne 1091) utilise toujours `stream: false`** pour l'appel OpenAI
+2. Quand le LLM repond directement sans outils (`loopCount === 0`), le contenu est deja genere en entier (ligne 1111)
+3. Ce contenu pre-genere est ensuite "simule" en streaming via `createSimulatedStreamingResponse` -- qui decoupe le texte mot par mot avec des `setTimeout(0)`, mais le navigateur recoit souvent tout en un seul bloc TCP
+4. Le vrai streaming (passthrough OpenAI SSE) n'est active que quand `loopCount > 0` ET `needsQuickReplies === false` -- ce qui arrive rarement car `generate_quick_replies` est presque toujours disponible
 
-2. **Double suggestions** : Deux fichiers morts existent (`RealtimeSuggestionChips.tsx` et `useRealtimeSuggestions.ts`) -- ils ne sont pas importes nulle part donc ne causent pas de doublons a l'ecran, mais creent de la confusion. Le vrai probleme est que les suggestions statiques (`getSuggestions`) se recalculent quand le contexte change, ce qui arrive des que `setInput` modifie l'etat et provoque un re-render.
-
-3. **Aeroports trop loin** : L'edge function n'a aucun filtre de distance max -- elle retourne les N plus proches sans plafond. Il faut ajouter un cap a 50km.
+Le frontend est correctement cable (`streamingText`, `setStreamingText`, `MarkdownMessage` en mode raw text pendant le streaming). Le probleme est **100% backend**.
 
 ---
 
-### Changements prevus
+### Solution
 
-#### 1. Bloquer les nouvelles suggestions tant que l'input est rempli (PlannerChat.tsx)
+Modifier l'edge function pour utiliser le vrai streaming OpenAI dans le cas `loopCount === 0` (reponse directe sans outils), qui represente la majorite des interactions.
 
-Dans le composant `MemoizedSmartSuggestions`, passer `isLoading={isLoading || !!input.trim()}` au lieu de `isLoading={isLoading}`. Quand l'input contient du texte (apres un clic sur une suggestion), les suggestions disparaissent et ne reapparaissent qu'apres que l'utilisateur a envoye le message (ce qui vide l'input).
+#### Changement 1 : Streaming reel pour les reponses directes (loopCount === 0)
 
-Cela corrige le "double suggestion" sans changer la logique d'envoi.
+Actuellement, quand le LLM repond sans appeler d'outils, le contenu est capture en bloc (ligne 1108-1113) puis simule. Le changement consiste a :
 
-#### 2. Supprimer le code mort des suggestions (2 fichiers)
+- Detecter le cas `loopCount === 0` + pas de tool_calls + `stream === true`
+- Au lieu de capturer le contenu en bloc, refaire un appel OpenAI avec `stream: true` et le passer directement via `createStreamingResponse`
+- Alternative plus simple : dans le premier appel de la boucle ReAct, si `stream === true`, passer `stream: true` a OpenAI. Si la reponse contient des tool_calls, les traiter normalement. Sinon, passer le flux SSE directement au client.
 
-- Supprimer `src/components/planner/chat/RealtimeSuggestionChips.tsx`
-- Supprimer `src/components/planner/chat/hooks/useRealtimeSuggestions.ts`
-
-Ces fichiers ne sont importes par aucun composant et creent de la confusion.
-
-#### 3. Cap aeroport a 50km (nearest-airports/index.ts)
-
-Dans l'edge function, ligne 348, ajouter un `.filter()` avant le `.slice()` :
+L'approche retenue est la **seconde** (plus performante, un seul appel LLM) :
 
 ```text
-// Avant:
-.sort((a, b) => a.distance_km - b.distance_km)
-.slice(0, limit);
+// Ligne ~1084-1091 : modifier pour supporter le streaming conditionnel
+// Si stream === true ET c'est le premier tour de boucle, on peut streamer
+// MAIS on doit d'abord verifier si le LLM veut appeler des outils
 
-// Apres:
-.sort((a, b) => a.distance_km - b.distance_km)
-.filter((a) => a.distance_km <= 50)
-.slice(0, limit);
+// Approche pragmatique : quand loopCount === 0 et pas de tool_calls,
+// refaire un appel rapide avec stream: true au lieu de retourner le contenu en bloc
 ```
 
-#### 4. Verification globale anti-auto-send
+Concretement, dans le bloc `if (!choice?.message?.tool_calls)` (ligne 1108) :
 
-Apres revue complete du code :
-- `handleSuggestionClick` : fait `setInput()` (pas d'envoi) -- OK
-- `handleSend` : appele uniquement par `ChatInputArea` quand l'utilisateur clique "Envoyer" ou appuie Entree -- OK
-- `onSuggestionClick` dans `SmartSuggestions.tsx` : appelle simplement le callback parent -- OK
-- Aucun `handleSend` n'est appele automatiquement nulle part dans le flow de suggestions -- confirme
+```text
+// AVANT (bloc actuel):
+finalContent = choice?.message?.content || "";
+break;
 
-Aucun auto-envoi n'existe dans le code. Le probleme percu etait les suggestions qui changeaient trop vite, resolu par le point 1.
+// APRES:
+if (stream && loopCount === 0) {
+  // Le LLM a repondu directement sans outils : relancer en streaming
+  // On reutilise les memes messages mais avec stream: true
+  const streamingResp = await fetchWithRetry(url, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      messages: conversationMessages,
+      temperature: 0.7,
+      max_tokens: MULTI_TOOL_CONFIG.REACT_MAX_TOKENS,
+      stream: true,
+    }),
+  }, log, "direct_stream");
+  
+  if (streamingResp.ok) {
+    normalizeExtractedYears(collectedData, currentDate);
+    return createStreamingResponse(streamingResp, collectedData, log, requestId, toolExecutionLog);
+  }
+  // Fallback si le streaming echoue
+  finalContent = choice?.message?.content || "";
+}
+finalContent = choice?.message?.content || "";
+break;
+```
+
+**IMPORTANT** : Cette approche fait un double appel LLM (un non-streame pour detecter les outils, un streame pour le contenu). C'est le prix a payer tant que la boucle ReAct a besoin de `stream: false` pour detecter les tool_calls.
+
+#### Changement 2 : Forcer le streaming reel meme quand quick replies sont demandees
+
+Actuellement, ligne 1178 : `const useRealStreaming = stream && !needsQuickReplies`. Comme `needsQuickReplies` est presque toujours `true`, le vrai streaming est quasi-jamais utilise pour le cas `loopCount > 0`.
+
+Solution : streamer le contenu en reel, puis faire un appel separe non-streame uniquement pour les quick replies :
+
+```text
+// AVANT:
+const useRealStreaming = stream && !needsQuickReplies;
+
+// APRES:
+const useRealStreaming = stream; // Toujours streamer le contenu
+// Les quick replies seront generees dans un appel separe si necessaire
+```
+
+Si `needsQuickReplies`, ajouter un second appel rapide apres le streaming pour generer les quick replies, et les emettre comme un evenement SSE supplementaire avant le `[DONE]`.
+
+#### Changement 3 : Ameliorer createStreamingResponse pour les quick replies post-stream
+
+Modifier `createStreamingResponse` pour accepter un callback optionnel qui s'execute apres la fin du flux OpenAI mais avant le `[DONE]`. Ce callback fera l'appel quick replies et emettra l'evenement SSE correspondant.
 
 ---
 
-### Details techniques
+### Fichiers modifies
 
-| Fichier | Action | Lignes |
-|---|---|---|
-| `src/components/planner/PlannerChat.tsx` | Changer `isLoading` prop en `isLoading OR input non vide` | ~1108 |
-| `src/components/planner/chat/RealtimeSuggestionChips.tsx` | Supprimer | entier |
-| `src/components/planner/chat/hooks/useRealtimeSuggestions.ts` | Supprimer | entier |
-| `supabase/functions/nearest-airports/index.ts` | Ajouter `.filter(a => a.distance_km <= 50)` | ~348 |
+| Fichier | Action |
+|---|---|
+| `supabase/functions/planner-chat/index.ts` | Ajouter streaming reel pour `loopCount === 0`, decouple quick replies du streaming |
 
+### Risques et mitigations
+
+- **Double appel LLM (loopCount === 0)** : Augmente la latence d'environ 200ms (temps de setup du second appel). Acceptable car l'utilisateur voit le texte arriver immediatement au lieu d'attendre 3-7 secondes en bloc.
+- **Quick replies en post-stream** : L'appel separe ajoute ~500ms apres la fin du contenu, mais les quick replies apparaissent deja apres le message donc l'UX n'est pas impactee.
+- **Fallback** : Si le streaming echoue, on retombe sur le comportement actuel (simulated streaming).
