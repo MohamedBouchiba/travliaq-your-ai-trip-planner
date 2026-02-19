@@ -323,39 +323,15 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
       const missingCount = missingSteps.length;
 
       const BLOCKED_VARIATIONS = [
-        (l: string) => `Presque là ! 🎯 Il te manque encore quelques éléments avant de pouvoir générer ton itinéraire :\n\n${l}\n\n_Clique sur un bouton ci-dessous pour compléter chaque étape._`,
+        (l: string) => `Presque là ! 🎯 Il te manque encore quelques éléments avant de pouvoir générer ton itinéraire :\n\n${l}\n\n_Complète chaque étape depuis les onglets en haut à droite, puis clique sur **Planifier**._`,
         (l: string) => `Ton voyage prend forme ✈️ Voici ce qu'il reste à faire :\n\n${l}\n\n_Une fois tout sélectionné, le bouton **Planifier** s'activera automatiquement._`,
-        (l: string) => `On y est presque ! 🚀 Ces étapes sont nécessaires pour construire ton itinéraire personnalisé :\n\n${l}\n\n_Clique sur un bouton ci-dessous pour continuer._`,
-        (l: string) => `Encore quelques étapes avant le grand départ ! 🗺️\n\n${l}\n\n_Complète-les une par une — le bouton **Planifier** s'activera dès que tout est prêt._`,
-        (l: string) => `Voici ce qu'il te reste à configurer 📋 :\n\n${l}\n\n_Utilise les boutons ci-dessous pour sélectionner chaque élément, puis clique sur **Planifier**._`,
+        (l: string) => `On y est presque ! 🚀 Ces étapes sont nécessaires pour construire ton itinéraire personnalisé :\n\n${l}\n\n_Utilise les onglets en haut à droite pour compléter chaque section._`,
+        (l: string) => `Encore quelques étapes avant le grand départ ! 🗺️\n\n${l}\n\n_Le bouton **Planifier** s'activera dès que tout est prêt._`,
+        (l: string) => `Voici ce qu'il te reste à configurer 📋 :\n\n${l}\n\n_Sélectionne chaque élément via les onglets, puis clique sur **Planifier**._`,
       ];
 
       const variation = BLOCKED_VARIATIONS[Math.floor(Math.random() * BLOCKED_VARIATIONS.length)];
       const messageText = (missingCount > 0 ? variation(checklist) : `Tout est prêt ! 🚀\n\n${checklist}\n\n_Clique sur **Planifier** pour générer ton itinéraire._`).trim();
-
-      // Build quickReplies as proper navigation buttons (not markdown links)
-      const quickReplies: import('./chat/types').QuickReply[] = missingSteps
-        .filter(step => !activitiesDone || step !== 'activities')
-        .map(step => {
-          if (step === 'flights') return {
-            id: 'goto-flights',
-            label: '✈️ Voir les vols',
-            action: { type: 'navigate' as const, tab: 'flights' as const },
-            variant: 'primary' as const,
-          };
-          if (step === 'hotels') return {
-            id: 'goto-hotels',
-            label: '🏨 Voir les hôtels',
-            action: { type: 'navigate' as const, tab: 'stays' as const },
-            variant: 'primary' as const,
-          };
-          return {
-            id: 'goto-activities',
-            label: '🧭 Voir les activités',
-            action: { type: 'navigate' as const, tab: 'activities' as const },
-            variant: 'outline' as const,
-          };
-        });
 
       const guidanceMessage: import('./chat/types').ChatMessage = {
         id: `planifier-blocked-${Date.now()}`,
@@ -364,7 +340,6 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
         timestamp: Date.now(),
         isStreaming: false,
         isTyping: false,
-        quickReplies: quickReplies.length > 0 ? quickReplies : undefined,
       };
 
       setMessages((prev) => {
