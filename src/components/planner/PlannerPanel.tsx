@@ -1415,6 +1415,7 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
       duration: flight.totalDuration,
       stops: flight.stops ?? 0,
       passengers: totalPassengers,
+      pricePerPerson: flight.price, // store per-person price for later recalculation
     };
 
     replaceItemsByType('flight', {
