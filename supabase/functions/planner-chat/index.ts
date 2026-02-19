@@ -1106,10 +1106,82 @@ serve(async (req) => {
       const choice = data.choices?.[0];
 
       if (!choice?.message?.tool_calls || choice.message.tool_calls.length === 0) {
-        // C4: Only use content as finalContent when there are NO tool calls
-        // (this is the LLM's actual response, not a placeholder during tool processing)
-        finalContent = choice?.message?.content || "";
         log.info("multi_tool", "No tool calls, ending loop", { loopCount });
+
+        // REAL STREAMING: If stream requested and this is the first loop (direct answer),
+        // re-call OpenAI with stream:true to get true word-by-word SSE
+        if (stream && loopCount === 0) {
+          log.info("streaming", "Re-calling OpenAI with stream:true for direct response");
+          
+          // Generate quick replies separately if needed
+          const qrTool = ALL_TOOLS.find(t => t.function.name === "generate_quick_replies");
+          const needsQR = qrTool && !collectedData.quickRepliesData;
+          
+          const streamingResp = await fetchWithRetry(url, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${OPENAI_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: OPENAI_MODEL,
+              messages: conversationMessages,
+              temperature: 0.7,
+              max_tokens: MULTI_TOOL_CONFIG.REACT_MAX_TOKENS,
+              stream: true,
+            }),
+          }, log, "direct_stream");
+
+          if (streamingResp.ok) {
+            normalizeExtractedYears(collectedData, currentDate);
+            
+            // If we need quick replies, generate them in a post-stream callback
+            const postStreamCallback = needsQR ? async (controller: ReadableStreamDefaultController, encoder: TextEncoder) => {
+              try {
+                const qrResp = await fetchWithRetry(url, {
+                  method: "POST",
+                  headers: {
+                    "Authorization": `Bearer ${OPENAI_API_KEY}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    model: OPENAI_MODEL,
+                    messages: conversationMessages,
+                    temperature: 0.7,
+                    max_tokens: 200,
+                    tools: [qrTool],
+                    tool_choice: { type: "function", function: { name: "generate_quick_replies" } },
+                    stream: false,
+                  }),
+                }, log, "post_stream_qr");
+                
+                if (qrResp.ok) {
+                  const qrData = await qrResp.json();
+                  const qrChoice = qrData.choices?.[0];
+                  if (qrChoice?.message?.tool_calls) {
+                    for (const tc of qrChoice.message.tool_calls) {
+                      if (tc.function?.name === "generate_quick_replies") {
+                        const { result, updatedData } = processToolCall(tc, requestId, collectedData, log, preferencesState, blockedWidgets);
+                        if (result.success && updatedData.quickRepliesData) {
+                          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "quickReplies", quickReplies: updatedData.quickRepliesData })}\n\n`));
+                          log.info("quick_replies", "Quick replies generated post-stream");
+                        }
+                      }
+                    }
+                  }
+                }
+              } catch (e) {
+                log.warn("quick_replies", "Post-stream QR generation failed", { error: String(e) });
+              }
+            } : undefined;
+            
+            return createStreamingResponse(streamingResp, collectedData, log, requestId, toolExecutionLog, postStreamCallback);
+          }
+          // Fallback if streaming call failed
+          log.warn("streaming", "Direct streaming call failed, falling back to simulated");
+        }
+
+        finalContent = choice?.message?.content || "";
         break;
       }
       
@@ -1174,8 +1246,8 @@ serve(async (req) => {
       log.info("multi_tool", "Making final content generation call");
 
       const needsQuickReplies = quickRepliesTool && !collectedData.quickRepliesData;
-      // A3: Use real streaming when we don't need to process tool_calls from the response
-      const useRealStreaming = stream && !needsQuickReplies;
+      // Always use real streaming — quick replies will be generated post-stream
+      const useRealStreaming = stream;
 
       const finalCallBody: Record<string, unknown> = {
         messages: conversationMessages,
@@ -1189,11 +1261,15 @@ serve(async (req) => {
         finalCallBody.tool_choice = "auto";
       }
 
-      // A3: Real streaming — emit collected data then stream OpenAI response directly
+      // Real streaming — emit collected data then stream OpenAI response directly
       if (useRealStreaming) {
         log.info("streaming", "Using real streaming for final content");
-        // Normalize dates before streaming (won't have access to content after)
         normalizeExtractedYears(collectedData, currentDate);
+
+        // Don't include quick replies tool in streaming call — generate post-stream
+        const streamFinalCallBody = { ...finalCallBody };
+        delete streamFinalCallBody.tools;
+        delete streamFinalCallBody.tool_choice;
 
         const streamingResponse = await fetchWithRetry(url, {
           method: "POST",
@@ -1201,13 +1277,52 @@ serve(async (req) => {
             "Authorization": `Bearer ${OPENAI_API_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ ...finalCallBody, model: OPENAI_MODEL }),
+          body: JSON.stringify({ ...streamFinalCallBody, model: OPENAI_MODEL, stream: true }),
         }, log, "final_content_stream");
 
         if (streamingResponse.ok) {
-          return createStreamingResponse(streamingResponse, collectedData, log, requestId, toolExecutionLog);
+          // Post-stream callback for quick replies
+          const postStreamCallback = needsQuickReplies ? async (controller: ReadableStreamDefaultController, encoder: TextEncoder) => {
+            try {
+              const qrResp = await fetchWithRetry(url, {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${OPENAI_API_KEY}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: OPENAI_MODEL,
+                  messages: conversationMessages,
+                  temperature: 0.7,
+                  max_tokens: 200,
+                  tools: [quickRepliesTool],
+                  tool_choice: { type: "function", function: { name: "generate_quick_replies" } },
+                  stream: false,
+                }),
+              }, log, "post_stream_qr_final");
+              
+              if (qrResp.ok) {
+                const qrData = await qrResp.json();
+                const qrChoice = qrData.choices?.[0];
+                if (qrChoice?.message?.tool_calls) {
+                  for (const tc of qrChoice.message.tool_calls) {
+                    if (tc.function?.name === "generate_quick_replies") {
+                      const { result, updatedData } = processToolCall(tc, requestId, collectedData, log, preferencesState, blockedWidgets);
+                      if (result.success && updatedData.quickRepliesData) {
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "quickReplies", quickReplies: updatedData.quickRepliesData })}\n\n`));
+                        log.info("quick_replies", "Quick replies generated post-stream (final)");
+                      }
+                    }
+                  }
+                }
+              }
+            } catch (e) {
+              log.warn("quick_replies", "Post-stream QR generation failed", { error: String(e) });
+            }
+          } : undefined;
+
+          return createStreamingResponse(streamingResponse, collectedData, log, requestId, toolExecutionLog, postStreamCallback);
         }
-        // If streaming call failed, fall through to non-streaming fallback
         log.warn("streaming", "Streaming call failed, falling back to non-streaming");
       }
 
@@ -1315,7 +1430,8 @@ function createStreamingResponse(
   collectedData: CollectedToolData,
   log: RequestLogger,
   requestId: string,
-  toolLog: { tool: string; status: string; latency_ms: number; summary: string; timestamp: number; loopIteration: number }[] = []
+  toolLog: { tool: string; status: string; latency_ms: number; summary: string; timestamp: number; loopIteration: number }[] = [],
+  postStreamCallback?: (controller: ReadableStreamDefaultController, encoder: TextEncoder) => Promise<void>
 ): Response {
   const encoder = new TextEncoder();
   
@@ -1339,7 +1455,7 @@ function createStreamingResponse(
             if (line.startsWith("data: ")) {
               const jsonStr = line.slice(6);
               if (jsonStr === "[DONE]") {
-                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                // Don't emit [DONE] yet — run post-stream callback first
                 continue;
               }
               try {
@@ -1354,6 +1470,13 @@ function createStreamingResponse(
             }
           }
         }
+        
+        // Run post-stream callback (e.g. quick replies generation) before [DONE]
+        if (postStreamCallback) {
+          await postStreamCallback(controller, encoder);
+        }
+        
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
       } finally {
         reader.releaseLock();
         log.flush();
