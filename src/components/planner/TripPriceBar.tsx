@@ -6,6 +6,7 @@ import { Plane, Hotel, Compass, Check, SkipForward, MapPin, Calendar, Users, Bed
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { eventBus } from '@/lib/eventBus';
+import type { FlightDetails } from '@/stores/slices/tripBasketTypes';
 
 interface TripPriceBarProps {
   onPlanTrip: () => void;
@@ -39,10 +40,31 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
   const currency = preferences.currency || 'EUR';
   const symbol = CURRENCY_SYMBOLS[currency] || currency;
 
-  const totalPrice = useMemo(
-    () => basketItems.reduce((total, item) => total + item.price, 0),
-    [basketItems]
-  );
+  // Current traveler count from flight memory
+  const currentTravelers = memory.passengers.adults + memory.passengers.children + memory.passengers.infants;
+
+  // Compute total price, recalculating flight items if traveler count has changed
+  const { totalPrice, isApproximation } = useMemo(() => {
+    let total = 0;
+    let approx = false;
+    for (const item of basketItems) {
+      if (item.type === 'flight') {
+        const flightDetails = item.details as FlightDetails;
+        const pricePerPerson = flightDetails?.pricePerPerson;
+        const originalPassengers = flightDetails?.passengers ?? 1;
+        if (pricePerPerson && currentTravelers !== originalPassengers) {
+          // Traveler count changed after flight was added → approximate
+          total += pricePerPerson * currentTravelers;
+          approx = true;
+        } else {
+          total += item.price;
+        }
+      } else {
+        total += item.price;
+      }
+    }
+    return { totalPrice: total, isApproximation: approx };
+  }, [basketItems, currentTravelers]);
 
   const formattedPrice = useMemo(() => {
     return new Intl.NumberFormat('fr-FR', {
@@ -242,11 +264,14 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
         {/* ── RIGHT: Price + Plan button ── */}
         <div className="flex items-center gap-2 shrink-0">
           {totalPrice > 0 && (
-            <div className="flex flex-col items-end leading-none">
+            <div className="flex flex-col items-end leading-none gap-0.5">
               <span className="text-xs font-bold text-foreground tabular-nums">
+                {isApproximation && <span className="text-muted-foreground font-normal mr-0.5">~</span>}
                 {formattedPrice} {symbol}
               </span>
-              <span className="text-[9px] text-muted-foreground">Total</span>
+              <span className="text-[9px] text-muted-foreground">
+                {isApproximation ? `Estimation · ${currentTravelers} voy.` : 'Total'}
+              </span>
             </div>
           )}
           <Button

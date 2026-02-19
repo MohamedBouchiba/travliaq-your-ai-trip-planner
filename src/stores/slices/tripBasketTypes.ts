@@ -57,6 +57,7 @@ export interface FlightDetails {
   stops?: number;
   cabinClass?: string;
   passengers?: number;
+  pricePerPerson?: number; // per-person base price at time of search (for recalculation when traveler count changes)
   isReturn?: boolean;
   legIndex?: number;
 }
