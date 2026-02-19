@@ -71,8 +71,11 @@ export function usePlannerState() {
       setSelectedPin(null);
       setIsPanelVisible(true);
       
+      // Emit tab:change so TravelPlanner's viewMode listener resets from 'itinerary' to 'map'
+      // (the usePlannerState tab:change listener will harmlessly re-set the same state)
+      eventBus.emit("tab:change", { tab });
+
       // Emit zoom change for the new tab (without changing center)
-      // The map will adjust zoom level to match the tab's default
       if (tab !== "preferences") {
         const newZoom = getZoomForTab(tab);
         eventBus.emit("map:zoomOnly", { zoom: newZoom });

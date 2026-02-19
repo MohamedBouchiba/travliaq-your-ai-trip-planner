@@ -239,6 +239,16 @@ const TravelPlanner = () => {
     return () => eventBus.off("tab:change", handler);
   }, [isMobile]);
 
+  // When a tab change fires (from TripPriceBar steps or any source) while in itinerary view,
+  // switch back to map so the panel is actually visible.
+  useEffect(() => {
+    const handler = () => {
+      setViewMode('map');
+    };
+    eventBus.on("tab:change", handler);
+    return () => eventBus.off("tab:change", handler);
+  }, []);
+
   // Leave confirmation if a conversation is in progress
   useEffect(() => {
     const handler = ({ dirty }: { dirty: boolean }) => setShouldConfirmLeave(dirty);
