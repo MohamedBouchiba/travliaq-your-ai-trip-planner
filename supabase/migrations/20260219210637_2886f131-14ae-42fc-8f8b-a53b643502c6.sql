@@ -1,0 +1,1 @@
+UPDATE cities SET latitude = 50.85045, longitude = 4.34878 WHERE id = '0a03915f-ff50-48e2-8469-0bfdcb895be7' AND name = 'Bruxelles' AND latitude IS NULL;
