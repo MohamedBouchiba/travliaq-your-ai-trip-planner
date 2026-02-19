@@ -24,6 +24,7 @@ interface UseChatResetDeps {
   resetAccommodationMemory: () => void;
   resetActivityMemory: () => void;
   resetPreferenceMemory: () => void;
+  clearBasket: () => void;
 }
 
 /**
@@ -56,6 +57,9 @@ export function useChatReset(deps: UseChatResetDeps) {
     deps.resetAccommodationMemory();
     deps.resetActivityMemory();
     deps.resetPreferenceMemory();
+
+    // Reset the trip basket (selections tied to this session)
+    deps.clearBasket();
   }, [deps]);
 
   const finishReset = useCallback((delayMs = 400) => {
