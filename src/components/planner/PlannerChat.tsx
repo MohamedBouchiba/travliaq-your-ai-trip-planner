@@ -93,7 +93,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
   const { getSerializedState: getTravelMemory, updateTravelers, resetMemory: resetTravelMemory } = useTravelMemoryStore();
   const { addManualActivity, updateActivity, getActivitiesByDestination, getSerializedState: getActivityMemory, resetMemory: resetActivityMemory } = useActivityMemoryStore();
   const { updatePreferences, resetToDefaults: resetPreferenceMemory, getSerializedState: getPreferenceMemory, getPreferences, memory: prefMemory, setStyleAxis, setStyleAxesOrder } = usePreferenceMemoryStore();
-  const { getBasketSummary } = useTripBasketStore();
+  const { getBasketSummary, clearBasket } = useTripBasketStore();
 
   // Chat translations
   const chatTranslations: ChatTranslations = useMemo(() => ({
@@ -809,6 +809,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
     isHardResetRef, isSwitchingSessionRef,
     widgetFlow, widgetCooldown,
     resetFlightMemory, resetTravelMemory, resetAccommodationMemory, resetActivityMemory, resetPreferenceMemory,
+    clearBasket,
   });
 
   const handleStartNewSession = useCallback(() => {

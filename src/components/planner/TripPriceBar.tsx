@@ -2,7 +2,7 @@ import { useTripBasketStore } from '@/stores/tripBasketStore';
 import { useFlightMemoryStore } from '@/stores/hooks/useFlightMemoryStore';
 import { useUserPreferences } from '@/contexts/UserPreferencesContext';
 import { Button } from '@/components/ui/button';
-import { Plane, Hotel, Compass, Check, SkipForward, MapPin, Calendar, Users } from 'lucide-react';
+import { Plane, Hotel, Compass, Check, SkipForward, MapPin, Calendar, Users, BedDouble, Star } from 'lucide-react';
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { eventBus } from '@/lib/eventBus';
@@ -100,37 +100,37 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
     setExplicitRequirement('wantsActivities', false);
   };
 
-  // Trip memory — derive contextual chips
+  // Trip memory — destination + dates + travelers
   const destination = memory.arrival?.city || memory.arrival?.country;
   const depDate = formatShortDate(memory.departureDate);
   const retDate = formatShortDate(memory.returnDate);
   const totalTravelers = memory.passengers.adults + memory.passengers.children + memory.passengers.infants;
   const hasNonDefaultTravelers = totalTravelers !== 1 || memory.passengers.children > 0 || memory.passengers.infants > 0;
 
-  // Build a compact single-line trip summary
-  const tripSummaryParts: string[] = [];
-  if (destination) tripSummaryParts.push(destination);
-  if (depDate) tripSummaryParts.push(retDate ? `${depDate}→${retDate}` : depDate);
-  if (hasNonDefaultTravelers) tripSummaryParts.push(`${totalTravelers} voy.`);
-  const hasTripMemory = tripSummaryParts.length > 0;
+  // Basket-derived context chips
+  const selectedHotel = useMemo(() => basketItems.find(i => i.type === 'hotel'), [basketItems]);
+  const activityCount = useMemo(() => basketItems.filter(i => i.type === 'activity').length, [basketItems]);
+
+  const hasLeftContent = !!(destination || depDate || selectedHotel || activityCount > 0);
 
   return (
     <div className="absolute bottom-0 left-0 right-0 z-20 bg-card/95 backdrop-blur-xl border-t border-border/40">
-      <div className="flex items-center px-4 py-2.5 gap-3 min-h-[56px]">
+      <div className="flex items-center px-3 py-2 gap-2 min-h-[52px]">
 
-        {/* ── LEFT: Trip context (destination, dates, travelers) ── */}
-        {hasTripMemory && (
+        {/* ── LEFT: Trip context ── */}
+        {hasLeftContent && (
           <>
-            <div className="flex flex-col justify-center gap-0.5 shrink-0 min-w-0 max-w-[120px]">
-              {destination && (
-                <div className="flex items-center gap-1">
-                  <MapPin className="h-2.5 w-2.5 text-primary shrink-0" />
-                  <span className="text-[10px] font-semibold text-foreground truncate">{destination}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col justify-center gap-0.5 shrink-0 min-w-0 flex-1 max-w-[180px]">
+              {/* Row 1: destination + dates + travelers */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {destination && (
+                  <div className="flex items-center gap-0.5">
+                    <MapPin className="h-2.5 w-2.5 text-primary shrink-0" />
+                    <span className="text-[10px] font-semibold text-foreground truncate max-w-[70px]">{destination}</span>
+                  </div>
+                )}
                 {depDate && (
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5">
                     <Calendar className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
                     <span className="text-[9px] text-muted-foreground whitespace-nowrap">
                       {retDate ? `${depDate}→${retDate}` : depDate}
@@ -138,12 +138,34 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
                   </div>
                 )}
                 {hasNonDefaultTravelers && (
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5">
                     <Users className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
                     <span className="text-[9px] text-muted-foreground">{totalTravelers}</span>
                   </div>
                 )}
               </div>
+
+              {/* Row 2: hotel + activities */}
+              {(selectedHotel || activityCount > 0) && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {selectedHotel && (
+                    <div className="flex items-center gap-0.5">
+                      <BedDouble className="h-2.5 w-2.5 text-primary shrink-0" />
+                      <span className="text-[9px] text-primary font-medium truncate max-w-[90px]">
+                        {selectedHotel.name}
+                      </span>
+                    </div>
+                  )}
+                  {activityCount > 0 && (
+                    <div className="flex items-center gap-0.5">
+                      <Star className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
+                      <span className="text-[9px] text-muted-foreground font-medium">
+                        {activityCount} activité{activityCount > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Thin separator */}
