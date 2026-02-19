@@ -1077,7 +1077,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
           <div
             ref={messagesContainerRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-y-auto themed-scroll"
+            className="flex-1 min-h-0 overflow-y-auto themed-scroll"
             role="log"
             aria-label={t("planner.chat.conversationMessages")}
             aria-live="polite"
