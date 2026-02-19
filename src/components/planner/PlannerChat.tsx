@@ -323,11 +323,11 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
       const missingCount = missingSteps.length;
 
       const BLOCKED_VARIATIONS = [
-        (l: string) => `Presque là ! 🎯\n\n${l}\n\n_Complète les étapes manquantes pour débloquer **Planifier**._`,
-        (l: string) => `Ton voyage prend forme ✈️\n\n${l}\n\n_Sélectionne les éléments restants, puis clique sur **Planifier**._`,
-        (l: string) => `On y est presque 🚀\n\n${l}\n\n_Ces éléments sont nécessaires pour construire ton itinéraire._`,
-        (l: string) => `Encore quelques étapes !\n\n${l}\n\n_Dès que tout est prêt, le bouton **Planifier** s'activera._`,
-        (l: string) => `Voici ce qu'il reste à faire 📋\n\n${l}\n\n_Clique sur un bouton ci-dessous pour continuer._`,
+        (l: string) => `Presque là ! 🎯 Il te manque encore quelques éléments avant de pouvoir générer ton itinéraire :\n\n${l}\n\n_Clique sur un bouton ci-dessous pour compléter chaque étape._`,
+        (l: string) => `Ton voyage prend forme ✈️ Voici ce qu'il reste à faire :\n\n${l}\n\n_Une fois tout sélectionné, le bouton **Planifier** s'activera automatiquement._`,
+        (l: string) => `On y est presque ! 🚀 Ces étapes sont nécessaires pour construire ton itinéraire personnalisé :\n\n${l}\n\n_Clique sur un bouton ci-dessous pour continuer._`,
+        (l: string) => `Encore quelques étapes avant le grand départ ! 🗺️\n\n${l}\n\n_Complète-les une par une — le bouton **Planifier** s'activera dès que tout est prêt._`,
+        (l: string) => `Voici ce qu'il te reste à configurer 📋 :\n\n${l}\n\n_Utilise les boutons ci-dessous pour sélectionner chaque élément, puis clique sur **Planifier**._`,
       ];
 
       const variation = BLOCKED_VARIATIONS[Math.floor(Math.random() * BLOCKED_VARIATIONS.length)];
