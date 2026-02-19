@@ -353,9 +353,9 @@ const TravelPlanner = () => {
                                 />
                               </PlannerErrorBoundary>
 
-                              {/* Widget Panel - positioned at top on mobile (max 35vh) */}
-                              {youtubePanel ? (
-                                <div className="absolute top-0 left-0 right-0 z-10 max-h-[35vh] overflow-hidden animate-fade-in">
+                              {/* YouTubePanel — shown on top when active (mobile) */}
+                              {youtubePanel && (
+                                <div className="absolute top-0 left-0 right-0 z-20 max-h-[35vh] overflow-hidden animate-fade-in">
                                   <div className="h-full overflow-hidden rounded-b-2xl bg-card/95 backdrop-blur-xl border-b border-x border-border/50 shadow-lg">
                                     <YouTubeShortsPanel
                                       city={youtubePanel.city}
@@ -365,43 +365,45 @@ const TravelPlanner = () => {
                                     />
                                   </div>
                                 </div>
-                              ) : isPanelVisible && (
-                                <PlannerErrorBoundary componentName="PlannerPanel">
-                                  <PlannerPanel
-                                    activeTab={activeTab}
-                                    layout="mobile-top"
-                                    isVisible={isPanelVisible}
-                                    onClose={() => {
-                                      setIsPanelVisible(false);
-                                      if (activeTab === "stays") {
-                                        setTimeout(() => {
-                                          eventBus.emit("hotels:fitToPrices", undefined);
-                                        }, 350);
-                                      }
-                                    }}
-                                    mapCenter={mapCenter}
-                                    onMapMove={(center, zoom) => {
-                                      setMapCenter(center);
-                                      setMapZoom(zoom);
-                                    }}
-                                    onFlightRoutesChange={setFlightRoutes}
-                                    flightFormData={flightFormData}
-                                    onFlightFormDataConsumed={() => setFlightFormData(null)}
-                                    onCountrySelected={handleCountrySelected}
-                                    onAskAirportChoice={handleAskAirportChoice}
-                                    onAskDualAirportChoice={handleAskDualAirportChoice}
-                                    onAskAirportConfirmation={handleAskAirportConfirmation}
-                                    selectedAirport={selectedAirport}
-                                    onSelectedAirportConsumed={() => setSelectedAirport(null)}
-                                    onUserLocationDetected={setUserLocation}
-                                    onSearchReady={handleSearchReady}
-                                    triggerSearch={triggerFlightSearch}
-                                    onSearchTriggered={() => setTriggerFlightSearch(false)}
-                                    confirmedMultiAirports={confirmedMultiAirports}
-                                    onConfirmedMultiAirportsConsumed={() => setConfirmedMultiAirports(null)}
-                                  />
-                                </PlannerErrorBoundary>
                               )}
+
+                              {/* PlannerPanel — always mounted, CSS-hidden when closed (mobile).
+                                  Prevents lazy panels from losing state on every open/close. */}
+                              <PlannerErrorBoundary componentName="PlannerPanel">
+                                <PlannerPanel
+                                  activeTab={activeTab}
+                                  layout="mobile-top"
+                                  isVisible={isPanelVisible && !youtubePanel}
+                                  onClose={() => {
+                                    setIsPanelVisible(false);
+                                    if (activeTab === "stays") {
+                                      setTimeout(() => {
+                                        eventBus.emit("hotels:fitToPrices", undefined);
+                                      }, 350);
+                                    }
+                                  }}
+                                  mapCenter={mapCenter}
+                                  onMapMove={(center, zoom) => {
+                                    setMapCenter(center);
+                                    setMapZoom(zoom);
+                                  }}
+                                  onFlightRoutesChange={setFlightRoutes}
+                                  flightFormData={flightFormData}
+                                  onFlightFormDataConsumed={() => setFlightFormData(null)}
+                                  onCountrySelected={handleCountrySelected}
+                                  onAskAirportChoice={handleAskAirportChoice}
+                                  onAskDualAirportChoice={handleAskDualAirportChoice}
+                                  onAskAirportConfirmation={handleAskAirportConfirmation}
+                                  selectedAirport={selectedAirport}
+                                  onSelectedAirportConsumed={() => setSelectedAirport(null)}
+                                  onUserLocationDetected={setUserLocation}
+                                  onSearchReady={handleSearchReady}
+                                  triggerSearch={triggerFlightSearch}
+                                  onSearchTriggered={() => setTriggerFlightSearch(false)}
+                                  confirmedMultiAirports={confirmedMultiAirports}
+                                  onConfirmedMultiAirportsConsumed={() => setConfirmedMultiAirports(null)}
+                                />
+                              </PlannerErrorBoundary>
 
                               {/* GPS Location Button */}
                               <MobileLocationButton
@@ -521,8 +523,9 @@ const TravelPlanner = () => {
                               />
                             </PlannerErrorBoundary>
 
-                            {youtubePanel ? (
-                              <aside className="pointer-events-none absolute top-16 left-4 bottom-4 w-[320px] sm:w-[360px] md:w-[400px] lg:w-[420px] xl:w-[480px] 2xl:w-[540px] z-10">
+                            {/* YouTubePanel — shown on top when active */}
+                            {youtubePanel && (
+                              <aside className="pointer-events-none absolute top-16 left-4 bottom-4 w-[320px] sm:w-[360px] md:w-[400px] lg:w-[420px] xl:w-[480px] 2xl:w-[540px] z-20">
                                 <div className="pointer-events-auto h-full overflow-hidden rounded-2xl bg-card/95 backdrop-blur-xl border border-border/50 shadow-lg">
                                   <YouTubeShortsPanel
                                     city={youtubePanel.city}
@@ -532,45 +535,46 @@ const TravelPlanner = () => {
                                   />
                                 </div>
                               </aside>
-                            ) : (
-                              <div>
-                                <PlannerErrorBoundary componentName="PlannerPanel">
-                                  <PlannerPanel
-                                    activeTab={activeTab}
-                                    layout="overlay"
-                                    isVisible={isPanelVisible}
-                                    onClose={() => {
-                                      setIsPanelVisible(false);
-                                      if (activeTab === "stays") {
-                                        setTimeout(() => {
-                                          eventBus.emit("hotels:fitToPrices", undefined);
-                                        }, 350);
-                                      }
-                                    }}
-                                    mapCenter={mapCenter}
-                                    onMapMove={(center, zoom) => {
-                                      setMapCenter(center);
-                                      setMapZoom(zoom);
-                                    }}
-                                    onFlightRoutesChange={setFlightRoutes}
-                                    flightFormData={flightFormData}
-                                    onFlightFormDataConsumed={() => setFlightFormData(null)}
-                                    onCountrySelected={handleCountrySelected}
-                                    onAskAirportChoice={handleAskAirportChoice}
-                                    onAskDualAirportChoice={handleAskDualAirportChoice}
-                                    onAskAirportConfirmation={handleAskAirportConfirmation}
-                                    selectedAirport={selectedAirport}
-                                    onSelectedAirportConsumed={() => setSelectedAirport(null)}
-                                    onUserLocationDetected={setUserLocation}
-                                    onSearchReady={handleSearchReady}
-                                    triggerSearch={triggerFlightSearch}
-                                    onSearchTriggered={() => setTriggerFlightSearch(false)}
-                                    confirmedMultiAirports={confirmedMultiAirports}
-                                    onConfirmedMultiAirportsConsumed={() => setConfirmedMultiAirports(null)}
-                                  />
-                                </PlannerErrorBoundary>
-                              </div>
                             )}
+
+                            {/* PlannerPanel — always mounted, hidden via CSS when not visible.
+                                Never unmount: lazy panels (AccommodationPanel, ActivitiesPanel…)
+                                lose their state when unmounted, causing widget flicker. */}
+                            <PlannerErrorBoundary componentName="PlannerPanel">
+                              <PlannerPanel
+                                activeTab={activeTab}
+                                layout="overlay"
+                                isVisible={isPanelVisible && !youtubePanel}
+                                onClose={() => {
+                                  setIsPanelVisible(false);
+                                  if (activeTab === "stays") {
+                                    setTimeout(() => {
+                                      eventBus.emit("hotels:fitToPrices", undefined);
+                                    }, 350);
+                                  }
+                                }}
+                                mapCenter={mapCenter}
+                                onMapMove={(center, zoom) => {
+                                  setMapCenter(center);
+                                  setMapZoom(zoom);
+                                }}
+                                onFlightRoutesChange={setFlightRoutes}
+                                flightFormData={flightFormData}
+                                onFlightFormDataConsumed={() => setFlightFormData(null)}
+                                onCountrySelected={handleCountrySelected}
+                                onAskAirportChoice={handleAskAirportChoice}
+                                onAskDualAirportChoice={handleAskDualAirportChoice}
+                                onAskAirportConfirmation={handleAskAirportConfirmation}
+                                selectedAirport={selectedAirport}
+                                onSelectedAirportConsumed={() => setSelectedAirport(null)}
+                                onUserLocationDetected={setUserLocation}
+                                onSearchReady={handleSearchReady}
+                                triggerSearch={triggerFlightSearch}
+                                onSearchTriggered={() => setTriggerFlightSearch(false)}
+                                confirmedMultiAirports={confirmedMultiAirports}
+                                onConfirmedMultiAirportsConsumed={() => setConfirmedMultiAirports(null)}
+                              />
+                            </PlannerErrorBoundary>
 
                             <DestinationPopup
                               cityName={destinationPopup?.cityName || ""}

@@ -70,7 +70,10 @@ const PlannerPanel = ({ activeTab, onMapMove, mapCenter, layout = "sidebar", onC
   const { t } = useTranslation();
   const tabLabels = getTabLabels(t);
   
-  if (!isVisible && (layout === "overlay" || layout === "mobile-top")) return null;
+  // CRITICAL: Never unmount PlannerPanel when isVisible=false — unmounting destroys
+  // lazy-loaded panel state (flight results, hotel data, etc.) and causes widgets to
+  // flicker/disappear. Use CSS visibility instead so React keeps the tree alive.
+  const isHidden = !isVisible && (layout === "overlay" || layout === "mobile-top");
 
   const wrapperClass =
     layout === "mobile-top"
@@ -87,7 +90,14 @@ const PlannerPanel = ({ activeTab, onMapMove, mapCenter, layout = "sidebar", onC
       : "";
 
   return (
-    <aside className={wrapperClass} aria-label={t("planner.flights.closePanel")} data-tour="widgets-panel">
+    <aside
+      className={wrapperClass}
+      aria-label={t("planner.flights.closePanel")}
+      data-tour="widgets-panel"
+      // Hide via CSS instead of unmounting — keeps React tree alive so lazy panels
+      // (AccommodationPanel, ActivitiesPanel…) don't lose their state/data on every toggle.
+      style={isHidden ? { visibility: "hidden", pointerEvents: "none" } : undefined}
+    >
       <div className={cn(
         innerClass, 
         layout === "mobile-top" && "rounded-b-2xl bg-card/95 backdrop-blur-xl border-b border-x border-border/50 shadow-lg overflow-hidden",
