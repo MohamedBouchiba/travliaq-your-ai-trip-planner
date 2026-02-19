@@ -219,9 +219,9 @@ Deno.serve(async (req) => {
           const scoreName = toMatchScore(cityOrPartsNorm, nameNorm);
           const scoreSlug = toMatchScore(cityOrPartsNorm, slugNorm);
 
-          // Prefer rows with coordinates.
+          // Strongly prefer rows with coordinates — without them the lookup will fail.
           const hasCityCoords = c.latitude != null && c.longitude != null;
-          const coordsBoost = hasCityCoords ? 3 : 0;
+          const coordsBoost = hasCityCoords ? 20 : 0;
 
           // Prefer same country if provided.
           const countryBoost = countryCode && c.country_code === countryCode ? 5 : 0;
@@ -240,40 +240,55 @@ Deno.serve(async (req) => {
         })
         .sort((a, b) => b.score - a.score);
 
-      const bestCity = ranked[0]?.city;
+      // Pick the best city that actually has coordinates; fall back to best overall.
+      // Use a generous threshold: multilingual city names (Bruxelles/Brussels) can differ significantly.
+      const bestCityWithCoords = ranked.find((r) => r.city.latitude != null && r.city.longitude != null);
+      const bestOverall = ranked[0];
+      const best = bestCityWithCoords && bestCityWithCoords.scoreRaw >= Math.min((bestOverall?.scoreRaw ?? 0) - 40, 50)
+        ? bestCityWithCoords
+        : bestOverall;
+      const bestCity = best?.city;
 
       // 2) Determine city center (prefer `cities` coords; else infer from airports table)
       centerLat = bestCity?.latitude ?? null;
       centerLon = bestCity?.longitude ?? null;
       matchedCity = bestCity?.name ?? cityOrParts;
       matchedCityId = bestCity?.id ?? "";
-      matchScore = ranked[0]?.scoreRaw ?? 0;
+      matchScore = best?.scoreRaw ?? 0;
 
       if (centerLat == null || centerLon == null) {
-        // Infer center from airports matching city name (handles rows like Bruxelles without coords)
-        let airportsForCityQ = supabase
-          .from("airports")
-          .select("iata,name,city_name,country_code,latitude,longitude")
-          .eq("scheduled_service", "yes")
-          .ilike("city_name", `%${cityOrParts}%`)
-          .limit(250);
+        // Infer center from airports matching city name (try matched name + original query)
+        const airportSearchTerms = [matchedCity, cityOrParts].filter((v, i, a) => a.indexOf(v) === i);
+        let allCityAirports: AirportRow[] = [];
 
-        if (countryCode) airportsForCityQ = airportsForCityQ.eq("country_code", countryCode);
+        for (const term of airportSearchTerms) {
+          let airportsForCityQ = supabase
+            .from("airports")
+            .select("iata,name,city_name,country_code,latitude,longitude")
+            .eq("scheduled_service", "yes")
+            .ilike("city_name", `%${term}%`)
+            .limit(250);
 
-        const { data: airportsForCity, error: airportsForCityErr } = await airportsForCityQ;
-        if (airportsForCityErr) {
-          console.warn("[nearest-airports] airports city lookup failed:", airportsForCityErr.message);
+          if (countryCode) airportsForCityQ = airportsForCityQ.eq("country_code", countryCode);
+
+          const { data: airportsForCity, error: airportsForCityErr } = await airportsForCityQ;
+          if (airportsForCityErr) {
+            console.warn("[nearest-airports] airports city lookup failed:", airportsForCityErr.message);
+          }
+          if (airportsForCity && airportsForCity.length > 0) {
+            allCityAirports = airportsForCity as AirportRow[];
+            break;
+          }
         }
 
-        const cityAirports = (airportsForCity ?? []) as AirportRow[];
-        if (cityAirports.length > 0) {
-          const avgLat = cityAirports.reduce((s, a) => s + a.latitude, 0) / cityAirports.length;
-          const avgLon = cityAirports.reduce((s, a) => s + a.longitude, 0) / cityAirports.length;
+        if (allCityAirports.length > 0) {
+          const avgLat = allCityAirports.reduce((s, a) => s + a.latitude, 0) / allCityAirports.length;
+          const avgLon = allCityAirports.reduce((s, a) => s + a.longitude, 0) / allCityAirports.length;
           centerLat = avgLat;
           centerLon = avgLon;
 
           if (!bestCity) {
-            matchedCity = cityAirports[0]?.city_name ?? cityOrParts;
+            matchedCity = allCityAirports[0]?.city_name ?? cityOrParts;
             matchScore = 100;
           }
         }
