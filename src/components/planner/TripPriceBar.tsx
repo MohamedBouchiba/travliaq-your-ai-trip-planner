@@ -3,7 +3,8 @@ import { useFlightMemoryStore } from '@/stores/hooks/useFlightMemoryStore';
 import { useUserPreferences } from '@/contexts/UserPreferencesContext';
 import { Button } from '@/components/ui/button';
 import { Plane, Hotel, Compass, Check, SkipForward, MapPin, Calendar, Users, BedDouble, Star } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { eventBus } from '@/lib/eventBus';
 import type { FlightDetails } from '@/stores/slices/tripBasketTypes';
@@ -30,6 +31,7 @@ function formatShortDate(date: Date | null): string | null {
 }
 
 const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
+  const [wiggling, setWiggling] = useState(false);
   const basketItems = useTripBasketStore((s) => s.basketItems);
   const flexibleTripType = useTripBasketStore((s) => s.flexibleTripType);
   const explicitRequirements = useTripBasketStore((s) => s.explicitRequirements);
@@ -110,13 +112,16 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
     return !completedSteps.includes(s.key);
   });
 
-  const handleBlockedClick = () => {
+  const handleBlockedClick = useCallback(() => {
+    // Wiggle the button to give visual feedback
+    setWiggling(true);
+    setTimeout(() => setWiggling(false), 500);
     const missingSteps: string[] = [];
     if (!flightsDone) missingSteps.push('flights');
     if (!hotelsDone) missingSteps.push('hotels');
     if (!activitiesDone) missingSteps.push('activities');
     eventBus.emit('planifier:blocked', { completedSteps, missingSteps });
-  };
+  }, [flightsDone, hotelsDone, activitiesDone, completedSteps]);
 
   const handleSkipActivities = () => {
     setExplicitRequirement('wantsActivities', false);
@@ -274,18 +279,23 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
               </span>
             </div>
           )}
-          <Button
-            variant={isComplete ? 'hero' : 'secondary'}
-            size="sm"
-            onClick={isComplete ? onPlanTrip : handleBlockedClick}
-            className={cn(
-              "gap-1.5 text-xs h-8 px-3 transition-all duration-300 shrink-0",
-              !isComplete && "opacity-50"
-            )}
+          <motion.div
+            animate={wiggling ? { x: [0, -6, 6, -5, 5, -3, 3, 0] } : {}}
+            transition={{ duration: 0.45, ease: "easeInOut" }}
           >
-            <Plane className="h-3 w-3" />
-            Planifier
-          </Button>
+            <Button
+              variant={isComplete ? 'hero' : 'secondary'}
+              size="sm"
+              onClick={isComplete ? onPlanTrip : handleBlockedClick}
+              className={cn(
+                "gap-1.5 text-xs h-8 px-3 transition-all duration-300 shrink-0",
+                !isComplete && "opacity-50"
+              )}
+            >
+              <Plane className="h-3 w-3" />
+              Planifier
+            </Button>
+          </motion.div>
         </div>
 
       </div>

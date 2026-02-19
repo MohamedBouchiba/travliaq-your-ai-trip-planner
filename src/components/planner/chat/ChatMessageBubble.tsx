@@ -128,10 +128,7 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
           )}
         </div>
 
-        {/* Copy / Like / Dislike actions for assistant messages */}
-        {m.role === "assistant" && !m.isTyping && !m.isStreaming && m.text && (
-          <MessageActions messageId={m.id} text={m.text} onRegenerate={onRegenerate} />
-        )}
+        {/* MessageActions toolbar removed — was causing layout issues */}
 
         {/* Airport choices */}
         {m.airportChoices && (
