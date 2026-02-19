@@ -30,6 +30,8 @@ export type PlannerEvents = {
   "tab:change": { tab: "flights" | "activities" | "stays" | "preferences" };
   "tab:flash": { tab: "flights" | "activities" | "stays" | "preferences" };
   "panel:toggle": { visible: boolean };
+  /** Reset the right-panel view to 'map' (from itinerary). Separate from tab:change to avoid loops. */
+  "viewMode:reset": undefined;
 
   // Map interactions
   "map:zoom": { center: [number, number]; zoom: number };

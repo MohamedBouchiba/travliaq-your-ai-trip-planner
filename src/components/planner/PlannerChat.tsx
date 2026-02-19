@@ -1065,11 +1065,11 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
         />
       )}
 
-      {/* Collapsible content */}
+      {/* Collapsible content — flex-1 + min-h-0 is critical so the flex column
+           never overflows past the aside boundary and the input stays pinned at bottom */}
       <div
         className={cn(
-          // `relative` + z-index: ensure chat content (especially input) stays above any stray overlays within the panel group
-          "relative z-10 flex flex-col flex-1 transition-all duration-300 ease-out",
+          "relative z-10 flex flex-col flex-1 min-h-0 transition-all duration-300 ease-out",
           isCollapsed ? "opacity-0 pointer-events-none scale-95" : "opacity-100 scale-100"
         )}
       >
