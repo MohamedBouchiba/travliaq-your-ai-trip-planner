@@ -483,15 +483,17 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
         widget = "tripRecap" as WidgetType;
       }
 
+      // C3: Read and clear intentWidgetRef BEFORE the state updater (StrictMode-safe)
+      const intentWidget = opts.intentWidgetRef.current;
+      opts.intentWidgetRef.current = null;
+
       opts.setMessages((prev) =>
         prev.map((m) => {
           if (m.id !== messageId) return m;
-          // C3: Don't fall back to m.widget (ghost widget from SSE) — if no widget determined, clear it
-          const finalWidget = widget || opts.intentWidgetRef.current || null;
+          const finalWidget = widget || intentWidget || null;
           const finalWidgetData = tripRecapData
             ? { tripRecap: tripRecapData }
-            : widget ? widgetData : (opts.intentWidgetRef.current ? undefined : null);
-          if (opts.intentWidgetRef.current) opts.intentWidgetRef.current = null;
+            : widget ? widgetData : (intentWidget ? undefined : null);
           return { ...m, text: cleanContent, isTyping: false, isStreaming: false, widget: finalWidget, widgetData: finalWidgetData };
         })
       );
