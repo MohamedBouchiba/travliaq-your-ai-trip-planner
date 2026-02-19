@@ -31,7 +31,7 @@ function formatShortDate(date: Date | null): string | null {
 }
 
 const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
-  const [wiggling, setWiggling] = useState(false);
+  
   const basketItems = useTripBasketStore((s) => s.basketItems);
   const flexibleTripType = useTripBasketStore((s) => s.flexibleTripType);
   const explicitRequirements = useTripBasketStore((s) => s.explicitRequirements);
@@ -113,9 +113,6 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
   });
 
   const handleBlockedClick = useCallback(() => {
-    // Wiggle the button to give visual feedback
-    setWiggling(true);
-    setTimeout(() => setWiggling(false), 500);
     const missingSteps: string[] = [];
     if (!flightsDone) missingSteps.push('flights');
     if (!hotelsDone) missingSteps.push('hotels');
@@ -279,10 +276,7 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
               </span>
             </div>
           )}
-          <motion.div
-            animate={wiggling ? { x: [0, -6, 6, -5, 5, -3, 3, 0] } : {}}
-            transition={{ duration: 0.45, ease: "easeInOut" }}
-          >
+          <div>
             <Button
               variant={isComplete ? 'hero' : 'secondary'}
               size="sm"
@@ -295,7 +289,7 @@ const TripPriceBar = ({ onPlanTrip }: TripPriceBarProps) => {
               <Plane className="h-3 w-3" />
               Planifier
             </Button>
-          </motion.div>
+          </div>
         </div>
 
       </div>
