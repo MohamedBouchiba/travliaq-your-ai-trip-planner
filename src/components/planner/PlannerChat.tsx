@@ -1105,7 +1105,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
               conversationTurn={userMessageCount}
               dynamicSuggestions={dynamicSuggestions}
               onSuggestionClick={handleSuggestionClick}
-              isLoading={isLoading}
+              isLoading={isLoading || !!input.trim()}
             />
 
             <ChatInputArea
