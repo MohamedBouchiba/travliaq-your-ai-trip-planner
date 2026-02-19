@@ -24,7 +24,7 @@ export function ScrollToBottomButton({ show, newMessageCount, onClick }: ScrollT
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 12, scale: 0.85 }}
           transition={{ type: "spring", stiffness: 380, damping: 28 }}
-          className="absolute bottom-2 left-0 right-0 flex justify-center z-30 pointer-events-none"
+          className="absolute -top-14 left-0 right-0 flex justify-center z-30 pointer-events-none"
         >
           {/* Pulsing halo */}
           <motion.div

@@ -1108,18 +1108,17 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
             </div>
           </div>
 
-          {/* Scroll to bottom button */}
-          <ScrollToBottomButton
-            show={isUserScrolling || showNewMessageIndicator}
-            newMessageCount={newMessageCount}
-            onClick={() => {
-              scrollToBottom();
-              markMessagesAsRead();
-            }}
-          />
-
           {/* Input zone — no visible border, suggestions float above input */}
           <div className="relative z-20 bg-background" aria-hidden={isCollapsed}>
+            {/* Scroll to bottom button — floats just above suggestions/input */}
+            <ScrollToBottomButton
+              show={isUserScrolling || showNewMessageIndicator}
+              newMessageCount={newMessageCount}
+              onClick={() => {
+                scrollToBottom();
+                markMessagesAsRead();
+              }}
+            />
             {/* Suggestion chips — float just above the input, no separator */}
             <MemoizedSmartSuggestions
               memory={memory}
