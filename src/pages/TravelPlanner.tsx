@@ -67,6 +67,8 @@ const TravelPlanner = () => {
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
   const [shouldConfirmLeave, setShouldConfirmLeave] = useState(false);
   const [viewMode, setViewMode] = useState<'map' | 'itinerary'>('map');
+  // Ref mirrors viewMode so event handlers can read it without stale closure
+  const viewModeRef = useRef<'map' | 'itinerary'>('map');
   
   // Mobile responsiveness
   const isMobile = useIsMobile();
@@ -239,14 +241,28 @@ const TravelPlanner = () => {
     return () => eventBus.off("tab:change", handler);
   }, [isMobile]);
 
-  // When a tab change fires (from TripPriceBar steps or any source) while in itinerary view,
-  // switch back to map so the panel is actually visible.
+  // Keep the viewModeRef in sync so event handlers never read stale closures
+  useEffect(() => {
+    viewModeRef.current = viewMode;
+  }, [viewMode]);
+
+  // When a tab change fires from an external source (TripPriceBar step buttons) OR
+  // the user clicks a tab while in itinerary view, reset back to map.
+  // CRITICAL: only call setViewMode when we're actually in itinerary mode.
+  // Calling setViewMode('map') when already in map causes an unnecessary re-render
+  // that unmounts/remounts PlannerPanel — making widgets disappear.
   useEffect(() => {
     const handler = () => {
-      setViewMode('map');
+      if (viewModeRef.current === 'itinerary') {
+        setViewMode('map');
+      }
     };
+    eventBus.on("viewMode:reset", handler);
     eventBus.on("tab:change", handler);
-    return () => eventBus.off("tab:change", handler);
+    return () => {
+      eventBus.off("viewMode:reset", handler);
+      eventBus.off("tab:change", handler);
+    };
   }, []);
 
   // Leave confirmation if a conversation is in progress
