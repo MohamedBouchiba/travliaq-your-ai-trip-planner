@@ -346,6 +346,7 @@ Deno.serve(async (req) => {
         };
       })
       .sort((a, b) => a.distance_km - b.distance_km)
+      .filter((a) => a.distance_km <= 50)
       .slice(0, limit);
 
     return json(200, {
