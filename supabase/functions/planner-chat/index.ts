@@ -697,7 +697,7 @@ Le widget EST l'interface — il affiche déjà les options. Tu ne dois JAMAIS l
 RÈGLE ABSOLUE : NE FAIS JAMAIS de liste à puces (- ou •) quand un widget est affiché. Le widget EST la liste.
 
 Exemples corrects par widget :
-- preferenceStyle → "On va d'abord cerner ton style de voyage pour te faire les meilleures recommandations :"
+- preferenceStyle → EXCEPTION : 2-3 phrases max. Inclure une micro-explication du fonctionnement des curseurs : chaque axe a deux pôles (ex: Relax ↔ Intense, Économique ↔ Luxe), l'utilisateur glisse le curseur vers le pôle qui lui correspond, et il peut réorganiser les axes par priorité (drag & drop). Exemple : "Définissons ton style de voyage ! ✨ Chaque curseur représente un axe : glisse-le vers le côté qui te ressemble le plus. Tu peux aussi réordonner les axes pour indiquer ce qui compte le plus pour toi. C'est parti !"
 - preferenceInterests → "Sélectionne les activités qui te tentent le plus :"
 - dietary → "Indique tes restrictions alimentaires ci-dessous :"
 - dateRangePicker → "Choisis tes dates de voyage :"
