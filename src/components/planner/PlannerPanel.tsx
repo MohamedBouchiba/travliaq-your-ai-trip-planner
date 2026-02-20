@@ -96,7 +96,12 @@ const PlannerPanel = ({ activeTab, onMapMove, mapCenter, layout = "sidebar", onC
       data-tour="widgets-panel"
       // Hide via CSS instead of unmounting — keeps React tree alive so lazy panels
       // (AccommodationPanel, ActivitiesPanel…) don't lose their state/data on every toggle.
-      style={isHidden ? { visibility: "hidden", pointerEvents: "none" } : undefined}
+      style={{
+        opacity: isHidden ? 0 : 1,
+        visibility: isHidden ? "hidden" : "visible",
+        pointerEvents: isHidden ? "none" : "auto",
+        transition: "opacity 150ms ease-out, visibility 0s linear " + (isHidden ? "150ms" : "0s"),
+      }}
     >
       <div className={cn(
         innerClass, 
