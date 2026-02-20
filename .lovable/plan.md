@@ -1,115 +1,125 @@
 
-## Plan : Corriger la disparition des widgets (cause profonde)
 
-### Diagnostic
+## Plan : Corriger le clignotement des prix sur la carte (onglet Vols)
 
-La cause profonde est **structurelle** : malgre les commentaires dans le code qui disent "never unmount PlannerPanel", le composant est demonte dans deux scenarios :
+### Diagnostic - 3 causes identifiees
 
-1. **Mobile** : `PlannerPanel` est a l'interieur du conditionnel `{mobileView === "chat" ? <Chat/> : <MapsWithPanel/>}` (TravelPlanner.tsx, ligne 317). Quand l'utilisateur passe du chat aux cartes, **tout le sous-arbre est demonte puis remonte**, y compris les panels lazy-loaded (AccommodationPanel, ActivitiesPanel).
+**Cause 1 : `useMapPrices.fetchPrices` cree un nouvel objet `prices` a chaque appel, meme quand tout est cache**
 
-2. **Mobile + Desktop** : `PlannerPanel` est a l'interieur de `{viewMode === 'itinerary' ? <Itinerary/> : <>...<PlannerPanel/>...</>}` (lignes 329 et 502). Le passage en mode itineraire **demonte** PlannerPanel et toute sa sous-arborescence.
+Dans `useMapPrices.ts` ligne 288, `setPrices({ ...pricesRef.current })` est appele a CHAQUE invocation de `fetchPrices`, meme si toutes les destinations sont deja en cache et que rien n'a change. Cela cree une nouvelle reference objet, ce qui declenche le useEffect de `FlightPriceMarkers` (ligne 312, depend de `prices`).
 
-De plus, la fonction `performHardReset()` (nouveau chat) emet `panel:toggle { visible: false }` qui cache le panel. C'est correct, mais combine avec les problemes de demontage ci-dessus, ca cree une experience ou le panel semble "disparu" apres un nouveau chat.
+Chaine de declenchement :
+```text
+moveend (map bouge) 
+  -> fetchAirports -> setAirports (nouvelle ref)
+  -> destinationIatas recalcule (useMemo)
+  -> fetchPrices appele
+  -> setPrices({...pricesRef.current}) meme si 0 changements
+  -> FlightPriceMarkers effect se relance
+  -> tous les markers sont re-synces
+```
+
+**Cause 2 : `updateMarkerPrice` ecrase le DOM meme quand le prix n'a pas change**
+
+La fonction `updateMarkerPrice` (ligne 169) fait `priceSpan.innerHTML = ...` a chaque appel, meme si le contenu est identique. Cela provoque un flash visuel (le navigateur reparse et re-rend le HTML).
+
+**Cause 3 : L'effet de sync des markers depend de `prices` ET `airports` ensemble**
+
+Le useEffect ligne 249-312 a `[map, airports, prices, isFlightsTab, ...]` comme dependances. Tout changement de `airports` OU `prices` relance le sync complet. Comme les deux changent souvent (chaque mouvement de carte), le sync se fait 2 fois par mouvement.
 
 ### Solution
 
-Restructurer le JSX de `TravelPlanner.tsx` pour que `PlannerPanel` soit **toujours monte**, en dehors de tout conditionnel, avec un controle de visibilite par CSS uniquement.
+#### Changement 1 : Eviter les re-renders inutiles dans `useMapPrices.ts`
 
-### Changements
-
-#### Fichier : `src/pages/TravelPlanner.tsx`
-
-**Mobile (lignes 316-448)** : Sortir `PlannerPanel` du conditionnel `mobileView === "chat"`. Au lieu de :
+Ne pas appeler `setPrices` quand aucune donnee n'a change. Ajouter une comparaison avant de mettre a jour l'etat :
 
 ```text
-{mobileView === "chat" ? (
-  <Chat />
-) : (
-  <div>
-    {viewMode === 'itinerary' ? (
-      <Itinerary />
-    ) : (
-      <>
-        <Map />
-        <PlannerPanel />  // <-- DEMONTE quand mobileView === "chat"
-      </>
-    )}
-  </div>
-)}
-```
-
-Restructurer en :
-
-```text
-{mobileView === "chat" ? (
-  <Chat />
-) : (
-  <div>
-    {viewMode === 'itinerary' ? (
-      <Itinerary />
-    ) : (
-      <Map />
-    )}
-  </div>
-)}
-
-{/* PlannerPanel TOUJOURS monte, hors de tout conditionnel */}
-<PlannerPanel
-  isVisible={mobileView !== "chat" && viewMode !== "itinerary" && isPanelVisible && !youtubePanel}
-  layout="mobile-top"
-  ...
-/>
-```
-
-**Desktop (lignes 500-577)** : Meme principe, sortir `PlannerPanel` du conditionnel `viewMode` :
-
-```text
-{/* Avant: PlannerPanel est DANS le else de viewMode */}
-{viewMode === 'itinerary' ? (
-  <Itinerary />
-) : (
-  <>
-    <Map />
-    <PlannerPanel />  // <-- DEMONTE en mode itineraire
-  </>
-)}
-
-{/* Apres: PlannerPanel est AU MEME NIVEAU que le conditionnel */}
-{viewMode === 'itinerary' ? (
-  <Itinerary />
-) : (
-  <Map />
-)}
-<PlannerPanel
-  isVisible={viewMode !== 'itinerary' && isPanelVisible && !youtubePanel}
-  layout="overlay"
-  ...
-/>
-```
-
-#### Fichier : `src/components/planner/PlannerPanel.tsx`
-
-Ajuster la logique `isHidden` (ligne 76) pour ne plus limiter le CSS-hide aux seuls layouts `overlay` et `mobile-top` :
-
-```text
-// AVANT:
-const isHidden = !isVisible && (layout === "overlay" || layout === "mobile-top");
+// AVANT (ligne 288):
+setPrices({ ...pricesRef.current });
 
 // APRES:
-const isHidden = !isVisible;
+// Ne mettre a jour que si de nouvelles valeurs ont ete hydratees du cache
+if (hydratedFromCache) {
+  setPrices({ ...pricesRef.current });
+}
 ```
 
-Cela garantit que quel que soit le layout, un panel invisible est cache par CSS (visibility: hidden + pointerEvents: none) au lieu d'etre demonte.
+Et a la fin du fetch (ligne 382-383), ne faire le `setPrices` que si des prix ont reellement ete ajoutes/modifies.
 
-### Pourquoi ca resout le probleme
+#### Changement 2 : Empecher les ecritures DOM inutiles dans `FlightPriceMarkers.tsx`
 
-- Les panels lazy-loaded (Suspense + lazy) ne sont charges qu'une seule fois et leur etat React interne est preserve.
-- Les recherches de vols, resultats d'hotels, etc. ne sont jamais perdus lors des changements de vue.
-- Le "nouveau chat" qui emet `panel:toggle { visible: false }` cache le panel par CSS ; le prochain clic sur un onglet (qui fait `setIsPanelVisible(true)`) le re-affiche sans remontage.
+Dans `updateMarkerPrice` (ligne 169), verifier si le contenu a change avant d'ecraser le DOM :
+
+```text
+function updateMarkerPrice(el, price, isOrigin, departureLabel, currencySymbol) {
+  const priceSpan = el.querySelector(".airport-price");
+  if (!priceSpan) return;
+  
+  let newContent: string;
+  let newColor: string;
+  
+  if (isOrigin) {
+    newContent = departureLabel;
+    newColor = "#64748b";
+  } else if (price === undefined) {
+    newContent = createLoadingDots();
+    newColor = "#0369a1";
+  } else if (price !== null) {
+    newContent = price + currencySymbol;
+    newColor = "#0369a1";
+  } else {
+    return; // null = no flight, marker should have been removed
+  }
+  
+  // SKIP DOM update if content hasn't changed (prevents flash)
+  if (priceSpan.textContent === newContent.replace(/<[^>]*>/g, '') 
+      && !newContent.includes('loading-dots')) {
+    return;
+  }
+  
+  priceSpan.innerHTML = newContent;
+  priceSpan.style.color = newColor;
+}
+```
+
+#### Changement 3 : Utiliser `pricesRef` au lieu de `prices` state dans le sync effect
+
+Dans `FlightPriceMarkers`, le sync effect depend de `prices` (state) qui change de reference a chaque setPrices. A la place, utiliser `dataRef` pour les prix (deja mis a jour via `dataRef.current = {...}` ligne 204), et ne dependre que de `airports` et `isFlightsTab` pour le declenchement :
+
+```text
+// AVANT (ligne 312):
+}, [map, airports, prices, isFlightsTab, handleClick, updatePositions]);
+
+// APRES - retirer prices des deps, utiliser dataRef.current.prices :
+}, [map, airports, isFlightsTab, handleClick, updatePositions]);
+```
+
+Et ajouter un useEffect separe, leger, pour mettre a jour les prix des markers existants quand `prices` change, sans re-sync complet :
+
+```text
+// Effet leger : mettre a jour les prix des markers existants
+useEffect(() => {
+  if (!isFlightsTab) return;
+  
+  markersRef.current.forEach(({ el, airport, isOrigin }, hubId) => {
+    const price = getHubPrice(airport, prices);
+    updateMarkerPrice(el, price, isOrigin, departureLabel, currencySymbol);
+  });
+}, [prices, isFlightsTab, departureLabel, currencySymbol]);
+```
+
+Cela decouple : le gros sync (creation/suppression de markers) ne se fait que quand les aeroports changent, et la mise a jour des prix (legere, juste changer le texte) se fait separement.
 
 ### Fichiers modifies
 
-| Fichier | Action |
+| Fichier | Changement |
 |---|---|
-| `src/pages/TravelPlanner.tsx` | Sortir PlannerPanel des conditionnels mobileView et viewMode (mobile + desktop) |
-| `src/components/planner/PlannerPanel.tsx` | Simplifier isHidden pour couvrir tous les layouts |
+| `src/hooks/useMapPrices.ts` | Eviter setPrices quand rien n'a change (ligne 288), tracker si des prix ont ete hydrates |
+| `src/components/planner/FlightPriceMarkers.tsx` | Skip DOM update si contenu identique, decoupler sync markers et update prix |
+
+### Impact
+
+- Les prix s'affichent une fois et restent stables tant qu'ils ne changent pas
+- Les loading dots ne reapparaissent plus pour des destinations deja connues
+- Les mouvements de carte ne provoquent plus de flash sur les marqueurs existants
+- Performance amelioree : moins de re-renders React, moins d'ecritures DOM
