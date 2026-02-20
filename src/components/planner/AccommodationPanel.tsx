@@ -271,7 +271,7 @@ const AccommodationPanel = ({ onMapMove, mapCenter }: AccommodationPanelProps) =
       // Build destination info from legs, filtering out "return home" destinations
       const destinationInfos = legs
         .filter((leg) => {
-          if (!leg.arrival?.city || !leg.arrival?.lat || !leg.arrival?.lng) return false;
+          if (!leg.arrival?.city) return false;
           // Skip if arrival city is the same as the first departure city (returning home)
           if (firstDepartureCity && leg.arrival.city.toLowerCase() === firstDepartureCity) return false;
           return true;
@@ -287,8 +287,8 @@ const AccommodationPanel = ({ onMapMove, mapCenter }: AccommodationPanelProps) =
             city: leg.arrival!.city!,
             country: leg.arrival?.country || "",
             countryCode: leg.arrival?.countryCode || "",
-            lat: leg.arrival!.lat!,
-            lng: leg.arrival!.lng!,
+            lat: leg.arrival!.lat || 0,
+            lng: leg.arrival!.lng || 0,
             checkIn: arrivalDate,
             checkOut: departureDate,
           };
@@ -458,11 +458,25 @@ const AccommodationPanel = ({ onMapMove, mapCenter }: AccommodationPanelProps) =
             syncedFromFlight: true,
           });
         }
-      } else if (departure.lat && departure.lng) {
+      } else if (departure.city) {
         // Update first accommodation with destination info + dates
         const first = memory.accommodations[0];
         if (first && !first.city) {
           updateAccommodation(first.id, {
+            city: departure.city,
+            country: departure.country || "",
+            countryCode: departure.countryCode || "",
+            lat: departure.lat,
+            lng: departure.lng,
+            checkIn: departureDate,
+            checkOut: returnDate || null,
+            syncedFromFlight: true,
+            userModifiedDates: false,
+          });
+        } else if (!memory.accommodations.some(
+          a => a.city?.toLowerCase() === departure.city!.toLowerCase()
+        )) {
+          addAccommodation({
             city: departure.city,
             country: departure.country || "",
             countryCode: departure.countryCode || "",
