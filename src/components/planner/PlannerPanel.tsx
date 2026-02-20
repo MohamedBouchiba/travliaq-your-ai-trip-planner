@@ -73,7 +73,7 @@ const PlannerPanel = ({ activeTab, onMapMove, mapCenter, layout = "sidebar", onC
   // CRITICAL: Never unmount PlannerPanel when isVisible=false — unmounting destroys
   // lazy-loaded panel state (flight results, hotel data, etc.) and causes widgets to
   // flicker/disappear. Use CSS visibility instead so React keeps the tree alive.
-  const isHidden = !isVisible && (layout === "overlay" || layout === "mobile-top");
+  const isHidden = !isVisible;
 
   const wrapperClass =
     layout === "mobile-top"
