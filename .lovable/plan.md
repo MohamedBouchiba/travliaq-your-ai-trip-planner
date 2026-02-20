@@ -1,125 +1,79 @@
 
+## Plan : Corriger les prix de vols qui ne chargent jamais sur la carte
 
-## Plan : Corriger le clignotement des prix sur la carte (onglet Vols)
+### Diagnostic
 
-### Diagnostic - 3 causes identifiees
+Apres investigation en direct (navigation sur /planner, envoi de "Je pars de Bruxelles", verification des logs et requetes reseau) :
 
-**Cause 1 : `useMapPrices.fetchPrices` cree un nouvel objet `prices` a chaque appel, meme quand tout est cache**
+1. **airports-in-bounds** est appele et retourne 25 aeroports -> les marqueurs avec loading dots s'affichent
+2. **map-prices** n'est JAMAIS appele par le navigateur (0 requetes dans les logs analytics et les network requests)
+3. **Aucun log `[useMapPrices]`** n'apparait dans la console -> `fetchPrices` n'est jamais execute
 
-Dans `useMapPrices.ts` ligne 288, `setPrices({ ...pricesRef.current })` est appele a CHAQUE invocation de `fetchPrices`, meme si toutes les destinations sont deja en cache et que rien n'a change. Cela cree une nouvelle reference objet, ce qui declenche le useEffect de `FlightPriceMarkers` (ligne 312, depend de `prices`).
+### Causes racines
 
-Chaine de declenchement :
-```text
-moveend (map bouge) 
-  -> fetchAirports -> setAirports (nouvelle ref)
-  -> destinationIatas recalcule (useMemo)
-  -> fetchPrices appele
-  -> setPrices({...pricesRef.current}) meme si 0 changements
-  -> FlightPriceMarkers effect se relance
-  -> tous les markers sont re-synces
-```
+**Cause 1 : Marqueurs affiches sans aeroport de depart**
 
-**Cause 2 : `updateMarkerPrice` ecrase le DOM meme quand le prix n'a pas change**
+`FlightPriceMarkers` cree des marqueurs pour TOUS les aeroports visibles des que `isFlightsTab=true`. Quand `departureAirports` est vide (pas encore de depart defini), `useMapPrices` a `enabled=false` et ne fetche jamais. Resultat : loading dots eternels.
 
-La fonction `updateMarkerPrice` (ligne 169) fait `priceSpan.innerHTML = ...` a chaque appel, meme si le contenu est identique. Cela provoque un flash visuel (le navigateur reparse et re-rend le HTML).
+**Cause 2 : Le guard `departureAirports.length === 0` dans l'effet empeche le premier appel**
 
-**Cause 3 : L'effet de sync des markers depend de `prices` ET `airports` ensemble**
+Dans `useDepartureAirports.ts` (ligne 165), si `departureAirports` est encore `[]` quand les airports chargent, l'effet retourne sans appeler `fetchPrices`. Quand `departureAirports` est ensuite mis a jour, `destinationIatas` se recalcule, mais le timing entre la recreation de `fetchPrices` (via `enabled` qui change) et la propagation de l'etat peut causer un "missed render" ou l'effet ne se relance pas avec les bonnes valeurs.
 
-Le useEffect ligne 249-312 a `[map, airports, prices, isFlightsTab, ...]` comme dependances. Tout changement de `airports` OU `prices` relance le sync complet. Comme les deux changent souvent (chaque mouvement de carte), le sync se fait 2 fois par mouvement.
+**Cause 3 : Debounce 1200ms trop long + reset a chaque changement d'airports**
+
+Chaque changement de `destinationIatas` (cause par un changement d'airports) relance l'effet, qui appelle `fetchPrices`, qui CLEAR le debounce precedent et en demarre un nouveau. Si les airports changent plusieurs fois en sequence rapide, le debounce est perpetuellement reset.
 
 ### Solution
 
-#### Changement 1 : Eviter les re-renders inutiles dans `useMapPrices.ts`
+#### Fichier 1 : `src/components/planner/FlightPriceMarkers.tsx`
 
-Ne pas appeler `setPrices` quand aucune donnee n'a change. Ajouter une comparaison avant de mettre a jour l'etat :
+**Ne pas afficher de loading dots quand aucun depart n'est defini.**
 
-```text
-// AVANT (ligne 288):
-setPrices({ ...pricesRef.current });
+Ajouter une prop `hasDeparture` (derivee de `departureAirports.length > 0`) et l'utiliser dans la logique de creation de marqueurs :
 
-// APRES:
-// Ne mettre a jour que si de nouvelles valeurs ont ete hydratees du cache
-if (hydratedFromCache) {
-  setPrices({ ...pricesRef.current });
-}
-```
+- Si `hasDeparture = false` et `price === undefined` : ne pas creer de marqueur (au lieu d'afficher des loading dots)
+- Si `hasDeparture = true` et `price === undefined` : afficher les loading dots normalement
 
-Et a la fin du fetch (ligne 382-383), ne faire le `setPrices` que si des prix ont reellement ete ajoutes/modifies.
+Modification de `createMarkerElement` et du sync effect pour respecter cette logique.
 
-#### Changement 2 : Empecher les ecritures DOM inutiles dans `FlightPriceMarkers.tsx`
+#### Fichier 2 : `src/hooks/useMapPrices.ts`
 
-Dans `updateMarkerPrice` (ligne 169), verifier si le contenu a change avant d'ecraser le DOM :
+**Rendre le fetch plus resilient :**
 
-```text
-function updateMarkerPrice(el, price, isOrigin, departureLabel, currencySymbol) {
-  const priceSpan = el.querySelector(".airport-price");
-  if (!priceSpan) return;
-  
-  let newContent: string;
-  let newColor: string;
-  
-  if (isOrigin) {
-    newContent = departureLabel;
-    newColor = "#64748b";
-  } else if (price === undefined) {
-    newContent = createLoadingDots();
-    newColor = "#0369a1";
-  } else if (price !== null) {
-    newContent = price + currencySymbol;
-    newColor = "#0369a1";
-  } else {
-    return; // null = no flight, marker should have been removed
-  }
-  
-  // SKIP DOM update if content hasn't changed (prevents flash)
-  if (priceSpan.textContent === newContent.replace(/<[^>]*>/g, '') 
-      && !newContent.includes('loading-dots')) {
-    return;
-  }
-  
-  priceSpan.innerHTML = newContent;
-  priceSpan.style.color = newColor;
-}
-```
+1. Reduire le debounce de 1200ms a 800ms
+2. Ne PAS reset le debounce si les destinations a fetcher sont un sous-ensemble de celles deja en attente. Ajouter un `pendingFetchDestinations` ref pour tracker ce qui est deja programme dans le timeout en cours
+3. Ajouter un log au tout debut de `fetchPrices` (avant le guard `enabled`) pour diagnostiquer les appels futurs
 
-#### Changement 3 : Utiliser `pricesRef` au lieu de `prices` state dans le sync effect
+#### Fichier 3 : `src/components/planner/map/useDepartureAirports.ts`
 
-Dans `FlightPriceMarkers`, le sync effect depend de `prices` (state) qui change de reference a chaque setPrices. A la place, utiliser `dataRef` pour les prix (deja mis a jour via `dataRef.current = {...}` ligne 204), et ne dependre que de `airports` et `isFlightsTab` pour le declenchement :
+**Forcer le fetch quand le depart change :**
+
+Ajouter un `useEffect` specifique qui re-fetch les prix quand `departureAirports` passe de vide a non-vide, avec un delai court (300ms) pour laisser le temps a `destinationIatas` de se recalculer :
 
 ```text
-// AVANT (ligne 312):
-}, [map, airports, prices, isFlightsTab, handleClick, updatePositions]);
-
-// APRES - retirer prices des deps, utiliser dataRef.current.prices :
-}, [map, airports, isFlightsTab, handleClick, updatePositions]);
-```
-
-Et ajouter un useEffect separe, leger, pour mettre a jour les prix des markers existants quand `prices` change, sans re-sync complet :
-
-```text
-// Effet leger : mettre a jour les prix des markers existants
 useEffect(() => {
-  if (!isFlightsTab) return;
+  if (departureAirports.length === 0 || destinationIatas.length === 0) return;
   
-  markersRef.current.forEach(({ el, airport, isOrigin }, hubId) => {
-    const price = getHubPrice(airport, prices);
-    updateMarkerPrice(el, price, isOrigin, departureLabel, currencySymbol);
-  });
-}, [prices, isFlightsTab, departureLabel, currencySymbol]);
+  // Petit delai pour laisser React se stabiliser
+  const timer = setTimeout(() => {
+    fetchPrices(departureAirports, destinationIatas);
+  }, 300);
+  
+  return () => clearTimeout(timer);
+}, [departureAirports.length > 0]); // Seulement quand le flag change
 ```
-
-Cela decouple : le gros sync (creation/suppression de markers) ne se fait que quand les aeroports changent, et la mise a jour des prix (legere, juste changer le texte) se fait separement.
 
 ### Fichiers modifies
 
 | Fichier | Changement |
 |---|---|
-| `src/hooks/useMapPrices.ts` | Eviter setPrices quand rien n'a change (ligne 288), tracker si des prix ont ete hydrates |
-| `src/components/planner/FlightPriceMarkers.tsx` | Skip DOM update si contenu identique, decoupler sync markers et update prix |
+| `src/components/planner/FlightPriceMarkers.tsx` | Ne pas afficher loading dots sans depart, ajouter prop `hasDeparture` |
+| `src/hooks/useMapPrices.ts` | Reduire debounce a 800ms, ne pas reset si destinations deja en attente, ajouter logs diagnostiques |
+| `src/components/planner/map/useDepartureAirports.ts` | Forcer re-fetch quand departure passe de vide a non-vide |
+| `src/components/planner/PlannerMap.tsx` | Passer `hasDeparture` a FlightPriceMarkers |
 
 ### Impact
 
-- Les prix s'affichent une fois et restent stables tant qu'ils ne changent pas
-- Les loading dots ne reapparaissent plus pour des destinations deja connues
-- Les mouvements de carte ne provoquent plus de flash sur les marqueurs existants
-- Performance amelioree : moins de re-renders React, moins d'ecritures DOM
+- Plus de loading dots eternels quand aucun depart n'est defini
+- Les prix chargent effectivement quand un depart est configure
+- Le debounce ne bloque plus le chargement initial des prix
