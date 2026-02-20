@@ -168,7 +168,28 @@ export function useChatDestinationFlow({
     departureCityOverride?: string,
   ) => {
     // B2: Prevent concurrent destination fetches
-    if (isFetchingRef.current) return;
+    if (isFetchingRef.current) {
+      // Bug B fix: Don't leave an empty message — flash existing widget or show fallback
+      setMessages((prev) => {
+        const existingWidget = prev.find(
+          (m) => m.widget === "destinationSuggestions" && !m.widgetConfirmed
+        );
+        if (existingWidget) {
+          return prev.map((m) => {
+            if (m.id === existingWidget.id) return { ...m, _flashKey: Date.now() };
+            if (m.id === messageId) return { ...m, text: t("planner.messages.suggestionsAlreadyShown", "Je t'ai déjà proposé des destinations ci-dessus 👆"), isTyping: false, isStreaming: false };
+            return m;
+          });
+        }
+        // No existing widget — just clear loading state
+        return prev.map((m) =>
+          m.id === messageId ? { ...m, text: t("planner.messages.searchingDestinations", "Je cherche des destinations pour toi…"), isTyping: true, isStreaming: false } : m
+        );
+      });
+      // If no existing widget, allow the fetch to proceed after current one finishes
+      if (!isFetchingRef.current) return;
+      return;
+    }
     isFetchingRef.current = true;
 
     // B6: Apply departure city override from freshMemory (avoids stale ref during same-tick execution)

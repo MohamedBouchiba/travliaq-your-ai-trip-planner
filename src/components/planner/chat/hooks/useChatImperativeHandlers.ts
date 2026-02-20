@@ -85,6 +85,16 @@ export function useChatImperativeHandlers(options: UseChatImperativeHandlersOpti
    */
   const injectSystemMessage = useCallback(
     async (event: CountrySelectionEvent) => {
+      // Bug A fix: If a city is already selected for this field, don't re-open citySelector
+      const storeState = (await import("@/stores/plannerStoreV2")).usePlannerStoreV2.getState();
+      const fieldCity = event.field === "from"
+        ? storeState.departure?.city
+        : storeState.arrival?.city;
+      if (fieldCity) {
+        if (import.meta.env.DEV) console.log("[Chat] City already selected for", event.field, ":", fieldCity);
+        return;
+      }
+
       const countryCode = event.country.country_code;
       const countryKey = `${event.field}-${countryCode}`;
 
