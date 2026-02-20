@@ -702,6 +702,7 @@ Exemples corrects par widget :
 - dietary → "Indique tes restrictions alimentaires ci-dessous :"
 - dateRangePicker → "Choisis tes dates de voyage :"
 - travelersSelector → "Combien êtes-vous ? 🧳"
+- budgetRangeSlider → EXCEPTION : 2-3 phrases max. Inclure une micro-explication du fonctionnement : le curseur va d'économique à luxe, l'utilisateur le place selon ses envies, et ça ajuste les recommandations (hébergements, activités, restaurants). Exemple : "Passons au budget ! 💰 Utilise le curseur ci-dessous pour indiquer ta fourchette : glisse vers la gauche pour un voyage économique, vers la droite pour plus de confort. Ça me permettra d'adapter toutes mes suggestions (hôtels, restos, activités) à ton budget."
 
 Exemples INTERDITS (NE FAIS JAMAIS ÇA) :
 - "Indique ce qui t'attire : 🏖️ Plage, 🏛️ Culture, 🌲 Aventure, 🛍️ Shopping" ← INTERDIT : c'est une liste qui duplique le widget
