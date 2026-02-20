@@ -135,8 +135,7 @@ function debouncedSave(): void {
 }
 
 export function useMapPrices(options: UseMapPricesOptions = {}): UseMapPricesResult {
-  // Increased debounce from 800ms to 1200ms for better performance during map movements
-  const { enabled = true, debounceMs = 1200 } = options;
+  const { enabled = true, debounceMs = 800 } = options;
   
   // Load cache on first mount
   useEffect(() => {
@@ -242,7 +241,11 @@ export function useMapPrices(options: UseMapPricesOptions = {}): UseMapPricesRes
     return missing;
   }, []);
 
+  // Track pending fetch destinations to avoid resetting debounce unnecessarily
+  const pendingFetchDestsRef = useRef<Set<string>>(new Set());
+
   const fetchPrices = useCallback((origins: string[], destinations: string[]) => {
+    console.log(`[useMapPrices] fetchPrices called: enabled=${enabled}, origins=${origins.length}, destinations=${destinations.length}`);
     if (!enabled || origins.length === 0 || destinations.length === 0) {
       return;
     }
@@ -257,11 +260,6 @@ export function useMapPrices(options: UseMapPricesOptions = {}): UseMapPricesRes
       console.log(`[useMapPrices] Origins changed: ${lastOriginsKey.current} -> ${originsKey}, resetting prices`);
       pricesRef.current = {};
       lastOriginsKey.current = originsKey;
-    }
-
-    // Clear previous debounce
-    if (debounceTimeout.current) {
-      clearTimeout(debounceTimeout.current);
     }
 
     // Check if we will actually fetch anything
@@ -300,12 +298,29 @@ export function useMapPrices(options: UseMapPricesOptions = {}): UseMapPricesRes
       return;
     }
 
+    // Check if new uncached destinations are already covered by the pending debounce
+    const newUncached = uncachedDestinations.filter(d => !pendingFetchDestsRef.current.has(d));
+    if (newUncached.length === 0 && debounceTimeout.current) {
+      console.log(`[useMapPrices] All ${uncachedDestinations.length} uncached destinations already pending, skipping debounce reset`);
+      return;
+    }
+
+    // Clear previous debounce since we have new destinations
+    if (debounceTimeout.current) {
+      clearTimeout(debounceTimeout.current);
+    }
+
+    // Track what's pending in the new debounce
+    uncachedDestinations.forEach(d => pendingFetchDestsRef.current.add(d));
+
     // We will fetch, set loading
-    console.log(`[useMapPrices] Will fetch ${uncachedDestinations.length}/${destinations.length} destinations after debounce`);
+    console.log(`[useMapPrices] Will fetch ${uncachedDestinations.length} destinations after debounce (${newUncached.length} new)`);
     setIsLoading(true);
     setError(null);
 
     debounceTimeout.current = setTimeout(async () => {
+      // Clear pending tracking
+      pendingFetchDestsRef.current.clear();
       // Mark destinations as pending
       const pendingKeys = uncachedDestinations.map(dest => getCacheKey(origins, dest));
       pendingKeys.forEach(key => pendingRequests.add(key));

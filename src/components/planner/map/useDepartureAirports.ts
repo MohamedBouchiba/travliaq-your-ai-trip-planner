@@ -167,6 +167,24 @@ export function useDepartureAirports(opts: {
     fetchPrices(departureAirports, destinationIatas);
   }, [activeTab, departureAirports, destinationIatas, fetchPrices]);
 
+  // Force fetch when departure transitions from empty -> non-empty
+  // Short delay to let destinationIatas stabilize
+  const hadDepartureRef = useRef(departureAirports.length > 0);
+  useEffect(() => {
+    const hasDeparture = departureAirports.length > 0;
+    const justGotDeparture = hasDeparture && !hadDepartureRef.current;
+    hadDepartureRef.current = hasDeparture;
+
+    if (!justGotDeparture || destinationIatas.length === 0) return;
+
+    const timer = setTimeout(() => {
+      console.log(`[useDepartureAirports] Departure just set, forcing price fetch for ${destinationIatas.length} destinations`);
+      fetchPrices(departureAirports, destinationIatas);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [departureAirports, destinationIatas, fetchPrices]);
+
   // Fetch airports when map moves (only on flights tab)
   // IMPORTANT: Add buffer to bounds for stability during small pan/zoom movements
   useEffect(() => {

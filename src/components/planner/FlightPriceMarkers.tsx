@@ -15,6 +15,8 @@ interface FlightPriceMarkersProps {
   departureAirports: string[];
   currentZoom: number;
   isFlightsTab: boolean;
+  /** Whether a departure airport is set (controls loading dots display) */
+  hasDeparture?: boolean;
   /** i18n label for departure marker (e.g. "Départ" / "Departure") */
   departureLabel?: string;
   /** Currency symbol for price display (e.g. "€", "$") */
@@ -78,6 +80,7 @@ function createMarkerElement(
     priceContent = departureLabel;
     priceColor = "#64748b";
   } else if (price === undefined) {
+    // hasDeparture is passed via closure from the caller
     priceContent = createLoadingDots();
   } else {
     priceContent = `${price}${currencySymbol}`;
@@ -206,6 +209,7 @@ function FlightPriceMarkersInner({
   departureAirports,
   currentZoom,
   isFlightsTab,
+  hasDeparture = false,
   departureLabel = "Departure",
   currencySymbol = "€",
 }: FlightPriceMarkersProps) {
@@ -287,8 +291,8 @@ function FlightPriceMarkersInner({
       
       const price = getHubPrice(airport, currentPrices);
       
-      // Skip destinations with no flights
-      if (price === null && !isOrigin) {
+      // Skip destinations with no flights OR no departure set and no price yet
+      if ((price === null && !isOrigin) || (price === undefined && !isOrigin && !hasDeparture)) {
         // Remove existing marker if any
         const existing = markersRef.current.get(hubId);
         if (existing) {

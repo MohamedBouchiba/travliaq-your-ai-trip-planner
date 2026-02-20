@@ -138,6 +138,7 @@ const PlannerMap = ({
         departureAirports={departureAirports}
         currentZoom={currentZoom}
         isFlightsTab={activeTab === "flights"}
+        hasDeparture={departureAirports.length > 0}
         departureLabel={t("planner.flights.departureMarker")}
         currencySymbol="€"
       />
