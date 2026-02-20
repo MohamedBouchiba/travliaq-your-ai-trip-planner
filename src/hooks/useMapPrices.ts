@@ -267,6 +267,7 @@ export function useMapPrices(options: UseMapPricesOptions = {}): UseMapPricesRes
     // Check if we will actually fetch anything
     const now = Date.now();
     const uncachedDestinations: string[] = [];
+    let hydratedFromCache = false;
 
     for (const dest of normalizedDestinations) {
       const cacheKey = getCacheKey(normalizedOrigins, dest);
@@ -274,7 +275,10 @@ export function useMapPrices(options: UseMapPricesOptions = {}): UseMapPricesRes
 
       if (cached && now - cached.timestamp < CACHE_TTL) {
         // Hydrate from cache immediately (includes null = no flight)
-        pricesRef.current[dest] = cached.data;
+        if (pricesRef.current[dest] === undefined || pricesRef.current[dest] !== cached.data) {
+          pricesRef.current[dest] = cached.data;
+          hydratedFromCache = true;
+        }
         continue;
       }
 
@@ -284,8 +288,10 @@ export function useMapPrices(options: UseMapPricesOptions = {}): UseMapPricesRes
       uncachedDestinations.push(dest);
     }
 
-    // Update state with cached values immediately
-    setPrices({ ...pricesRef.current });
+    // Only update state if new values were actually hydrated from cache
+    if (hydratedFromCache) {
+      setPrices({ ...pricesRef.current });
+    }
 
     // If nothing to fetch, done
     if (uncachedDestinations.length === 0) {

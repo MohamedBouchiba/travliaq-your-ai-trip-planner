@@ -170,16 +170,30 @@ function updateMarkerPrice(el: HTMLElement, price: number | null | undefined, is
   const priceSpan = el.querySelector(".airport-price") as HTMLElement;
   if (!priceSpan) return;
   
+  let newContent: string;
+  let newColor: string;
+  
   if (isOrigin) {
-    priceSpan.innerHTML = departureLabel;
-    priceSpan.style.color = "#64748b";
+    newContent = departureLabel;
+    newColor = "#64748b";
   } else if (price === undefined) {
-    priceSpan.innerHTML = createLoadingDots();
-    priceSpan.style.color = "#0369a1";
+    newContent = createLoadingDots();
+    newColor = "#0369a1";
   } else if (price !== null) {
-    priceSpan.innerHTML = `${price}${currencySymbol}`;
-    priceSpan.style.color = "#0369a1";
+    newContent = `${price}${currencySymbol}`;
+    newColor = "#0369a1";
+  } else {
+    return; // null = no flight, marker should have been removed
   }
+  
+  // Skip DOM update if content hasn't changed (prevents flash)
+  const plainText = newContent.replace(/<[^>]*>/g, '');
+  if (priceSpan.textContent === plainText && !newContent.includes('loading-dots')) {
+    return;
+  }
+  
+  priceSpan.innerHTML = newContent;
+  priceSpan.style.color = newColor;
 }
 
 // Main component using direct DOM manipulation for smooth updates
@@ -245,7 +259,7 @@ function FlightPriceMarkersInner({
     });
   }, [map]);
   
-  // Sync markers with airports data
+  // Sync markers with airports data (creation/removal only - prices handled separately)
   useEffect(() => {
     if (!map || !isFlightsTab || !containerRef.current) {
       // Clear all markers when not on flights tab
@@ -254,7 +268,7 @@ function FlightPriceMarkersInner({
       return;
     }
     
-    const { departureIata: depIata, departureCity: depCity, departureAirports: depAirports } = dataRef.current;
+    const { departureIata: depIata, departureCity: depCity, departureAirports: depAirports, prices: currentPrices } = dataRef.current;
     const userDepIata = depIata?.toUpperCase();
     const userDepCity = depCity?.toLowerCase().trim();
     const depSet = new Set(depAirports.map((d) => d.toUpperCase()));
@@ -271,7 +285,7 @@ function FlightPriceMarkersInner({
         (userDepCity && airport.cityName?.toLowerCase().trim() === userDepCity) ||
         depSet.has(airport.iata.toUpperCase());
       
-      const price = getHubPrice(airport, prices);
+      const price = getHubPrice(airport, currentPrices);
       
       // Skip destinations with no flights
       if (price === null && !isOrigin) {
@@ -309,7 +323,17 @@ function FlightPriceMarkersInner({
     
     // Update positions immediately
     updatePositions();
-  }, [map, airports, prices, isFlightsTab, handleClick, updatePositions]);
+  }, [map, airports, isFlightsTab, handleClick, updatePositions, departureLabel, currencySymbol]);
+  
+  // Lightweight effect: update prices on existing markers without full re-sync
+  useEffect(() => {
+    if (!isFlightsTab) return;
+    
+    markersRef.current.forEach(({ el, airport, isOrigin }) => {
+      const price = getHubPrice(airport, prices);
+      updateMarkerPrice(el, price, isOrigin, departureLabel, currencySymbol);
+    });
+  }, [prices, isFlightsTab, departureLabel, currencySymbol]);
   
   // Set up smooth position updates on map move
   useEffect(() => {
