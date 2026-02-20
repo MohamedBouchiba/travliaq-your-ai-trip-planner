@@ -440,8 +440,8 @@ const AccommodationPanel = ({ onMapMove, mapCenter }: AccommodationPanelProps) =
       if (syncSignature === prevFlightSyncRef.current) return;
       prevFlightSyncRef.current = syncSignature;
       
-      // Only sync if we have destination and at least departure date
-      if (!departure?.city || !departureDate) return;
+      // Only sync if we have a destination city
+      if (!departure?.city) return;
       
       // Find if we have an accommodation for this destination
       const existingIndex = memory.accommodations.findIndex(
