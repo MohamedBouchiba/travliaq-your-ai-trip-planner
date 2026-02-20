@@ -418,8 +418,14 @@ export function useChatSubmit(opts: UseChatSubmitOptions) {
           .replace(/Autre chose à mentionner[^\n]*/gi, "") // follow-up prompts
           .replace(/\n{3,}/g, "\n\n")                     // collapse extra newlines
           .trim();
-        if (cleanedContent !== rawContent.trim()) {
-          opts.setMessages(updateMessageById(messageId, { text: cleanedContent || rawContent.trim() }));
+        const finalContent = cleanedContent || rawContent.trim();
+        if (finalContent !== rawContent.trim() || !finalContent) {
+          // Bug B fix: Ensure message always has visible text (never empty)
+          opts.setMessages(updateMessageById(messageId, {
+            text: finalContent || t("planner.messages.searchingDestinations", "Je cherche des destinations pour toi…"),
+            isTyping: true,
+            isStreaming: false,
+          }));
         }
         // B6: Pass fresh departure city to avoid stale departureCityRef (not yet updated by React re-render)
         const freshDeparture = freshMemory?.departure?.city;

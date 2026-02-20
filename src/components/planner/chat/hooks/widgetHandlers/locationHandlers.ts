@@ -96,7 +96,8 @@ export function handleCitySelect(
     detail: `${cityName}, ${countryName}`,
   });
 
-  refs.citySelectionShownForCountry.current = null;
+  // Keep citySelectionShownForCountry set to block re-triggering of injectSystemMessage
+  // for the same country. Reset only happens on new user text message (useChatSubmit.ts).
   updateMemory({ arrival: { city: cityName, country: countryName, countryCode } });
   tracking.trackCitySelect(cityName, countryName);
 
