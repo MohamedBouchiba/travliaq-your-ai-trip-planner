@@ -77,7 +77,7 @@ export function VideoPlaceholder({ className = "" }: VideoPlaceholderProps) {
                 </>
               ) : (
                 <iframe
-                  src={`https://www.youtube-nocookie.com/embed/${YOUTUBE_VIDEO_ID}?autoplay=1&rel=0&modestbranding=1&showinfo=0`}
+                  src={`https://www.youtube-nocookie.com/embed/${YOUTUBE_VIDEO_ID}?autoplay=1&rel=0&modestbranding=1&showinfo=0&vq=hd1080`}
                   title={t("landing.video.title")}
                   className="w-full h-full"
                   allow="autoplay; encrypted-media"
