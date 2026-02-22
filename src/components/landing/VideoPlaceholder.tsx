@@ -8,8 +8,8 @@ import { Play, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-// Placeholder image - will be replaced with actual planner screenshot
-const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1200&h=675&fit=crop";
+const YOUTUBE_VIDEO_ID = "QKlaAFYbljs";
+const THUMBNAIL_URL = `https://img.youtube.com/vi/${YOUTUBE_VIDEO_ID}/maxresdefault.jpg`;
 
 interface VideoPlaceholderProps {
   className?: string;
@@ -53,18 +53,13 @@ export function VideoPlaceholder({ className = "" }: VideoPlaceholderProps) {
             <div className="aspect-video relative">
               {!isPlaying ? (
                 <>
-                  {/* Thumbnail/Placeholder */}
                   <img
-                    src={PLACEHOLDER_IMAGE}
+                    src={THUMBNAIL_URL}
                     alt={t("landing.video.altPreview")}
                     className="w-full h-full object-cover"
                     loading="lazy"
                   />
-
-                  {/* Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-
-                  {/* Play Button */}
                   <motion.button
                     data-video-play
                     onClick={() => setIsPlaying(true)}
@@ -73,24 +68,22 @@ export function VideoPlaceholder({ className = "" }: VideoPlaceholderProps) {
                     whileTap={{ scale: 0.95 }}
                   >
                     <div className="relative">
-                      {/* Pulse animation */}
                       <div className="absolute inset-0 bg-primary/30 rounded-full animate-ping" />
                       <div className="relative w-20 h-20 md:w-24 md:h-24 bg-primary rounded-full flex items-center justify-center shadow-lg group-hover:bg-primary/90 transition-colors">
                         <Play className="w-8 h-8 md:w-10 md:h-10 text-white ml-1" fill="white" />
                       </div>
                     </div>
                   </motion.button>
-
-                  {/* Coming soon badge */}
-                  <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm rounded-full px-4 py-2 text-white/90 text-sm font-medium">
-                    {t("landing.video.comingSoon")}
-                  </div>
                 </>
               ) : (
-                /* Video embed placeholder - replace with actual video */
-                <div className="w-full h-full bg-black flex items-center justify-center">
-                  <p className="text-white text-lg">{t("landing.video.loading")}</p>
-                </div>
+                <iframe
+                  src={`https://www.youtube-nocookie.com/embed/${YOUTUBE_VIDEO_ID}?autoplay=1&rel=0&modestbranding=1&showinfo=0`}
+                  title={t("landing.video.title")}
+                  className="w-full h-full"
+                  allow="autoplay; encrypted-media"
+                  allowFullScreen
+                  loading="lazy"
+                />
               )}
             </div>
           </div>
