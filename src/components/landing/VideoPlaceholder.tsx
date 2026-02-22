@@ -7,9 +7,9 @@ import { motion } from "framer-motion";
 import { Play, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import videoThumbnail from "@/assets/video-thumbnail-fr.png";
 
 const YOUTUBE_VIDEO_ID = "QKlaAFYbljs";
-const THUMBNAIL_URL = `https://img.youtube.com/vi/${YOUTUBE_VIDEO_ID}/maxresdefault.jpg`;
 
 interface VideoPlaceholderProps {
   className?: string;
@@ -54,7 +54,7 @@ export function VideoPlaceholder({ className = "" }: VideoPlaceholderProps) {
               {!isPlaying ? (
                 <>
                   <img
-                    src={THUMBNAIL_URL}
+                    src={videoThumbnail}
                     alt={t("landing.video.altPreview")}
                     className="w-full h-full object-cover"
                     loading="lazy"
