@@ -531,59 +531,54 @@ const FlightsPanel = ({ onMapMove, onFlightRoutesChange, flightFormData, onFligh
   // Detect user's city from IP on mount and add to memory
   useEffect(() => {
     const detectUserCity = async () => {
-      try {
-        const response = await fetch("https://ipapi.co/json/");
-        if (response.ok) {
-          const data = await response.json();
-          if (data.city && data.country_name && data.latitude && data.longitude) {
-            const userCity = `${data.city}, ${data.country_name}`;
-            
-            // Create a location object with coordinates
-            const userLocationData = {
-              id: "user-location",
-              name: data.city,
-              type: "city" as const,
-              country_code: data.country_code || "",
-              country_name: data.country_name,
-              lat: data.latitude,
-              lng: data.longitude,
-              display_name: userCity,
-            };
-            
-            setLegs((prev) => {
-              if (prev.length > 0 && !prev[0].from) {
-                return prev.map((leg, idx) =>
-                  idx === 0 ? { ...leg, from: userCity, fromLocation: userLocationData } : leg
-                );
-              }
-              return prev;
-            });
-            
-            // Add to flight memory as departure point
-            updateMemory({
-              departure: {
-                city: data.city,
-                country: data.country_name,
-                countryCode: data.country_code,
-                lat: data.latitude,
-                lng: data.longitude,
-              },
-            });
-            
-            // Notify parent with location coordinates for map marker
-            onUserLocationDetected?.({
-              lat: data.latitude,
-              lng: data.longitude,
-              city: userCity,
-            });
+      const data = await getIpGeolocation();
+      if (!data) return;
+      if (data.city && data.country_name && data.latitude && data.longitude) {
+        const userCity = `${data.city}, ${data.country_name}`;
+
+        // Create a location object with coordinates
+        const userLocationData = {
+          id: "user-location",
+          name: data.city,
+          type: "city" as const,
+          country_code: data.country_code || "",
+          country_name: data.country_name,
+          lat: data.latitude,
+          lng: data.longitude,
+          display_name: userCity,
+        };
+
+        setLegs((prev) => {
+          if (prev.length > 0 && !prev[0].from) {
+            return prev.map((leg, idx) =>
+              idx === 0 ? { ...leg, from: userCity, fromLocation: userLocationData } : leg
+            );
           }
-        }
-      } catch {
-        // Silently fail - user can enter city manually
+          return prev;
+        });
+
+        // Add to flight memory as departure point
+        updateMemory({
+          departure: {
+            city: data.city,
+            country: data.country_name,
+            countryCode: data.country_code,
+            lat: data.latitude,
+            lng: data.longitude,
+          },
+        });
+
+        // Notify parent with location coordinates for map marker
+        onUserLocationDetected?.({
+          lat: data.latitude,
+          lng: data.longitude,
+          city: userCity,
+        });
       }
     };
     detectUserCity();
   }, [onUserLocationDetected, updateMemory]);
+
 
   // Track what we last wrote into the widget from memory, to avoid overriding manual typing
   const lastSyncedRef = useRef<{ from?: string; to?: string }>({});
