@@ -393,7 +393,7 @@ const PlannerChatComponent = forwardRef<PlannerChatRef, PlannerChatProps>(({ isC
   // Use stable primitives as deps to avoid infinite loops from object references
   const debugSyncKey = `${getMemorySummary()}|${missingFields?.join(",")}|${widgetTracking.interactions.length}|${widgetCooldown.getBlockedWidgets().join(",")}`;
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production") {
+    if (import.meta.env.MODE !== "production") {
       const { setMemoryContext } = useDebugStore.getState();
       const prefState = getPreferenceMemory();
       const prefCtx = prefState

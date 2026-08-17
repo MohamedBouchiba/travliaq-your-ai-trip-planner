@@ -28,7 +28,7 @@ if (typeof window !== 'undefined') {
   });
 
   // Mock IntersectionObserver
-  global.IntersectionObserver = class IntersectionObserver {
+  globalThis.IntersectionObserver = class IntersectionObserver {
     constructor() {}
     disconnect() {}
     observe() {}
