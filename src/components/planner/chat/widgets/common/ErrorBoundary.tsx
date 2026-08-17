@@ -145,7 +145,7 @@ export function WidgetErrorFallback({
           ? i18n.t("planner.widget.loadError", { widget: widgetName, defaultValue: `${widgetName} failed to load` })
           : i18n.t("planner.widget.loadErrorGeneric", "Loading error")}
       </p>
-      {error && process.env.NODE_ENV === "development" && (
+      {error && import.meta.env.DEV && (
         <p className="text-xs text-red-500 dark:text-red-400 mt-1 text-center max-w-xs truncate">
           {error.message}
         </p>

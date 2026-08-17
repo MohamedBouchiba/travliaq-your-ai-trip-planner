@@ -128,7 +128,7 @@ function saveCacheToStorage(): void {
 }
 
 // Debounced save to avoid excessive writes
-let saveTimeout: NodeJS.Timeout | null = null;
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 function debouncedSave(): void {
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(saveCacheToStorage, 2000);
@@ -149,7 +149,7 @@ export function useMapPrices(options: UseMapPricesOptions = {}): UseMapPricesRes
   const [error, setError] = useState<string | null>(null);
   const [priceVersion, setPriceVersion] = useState(0);
   
-  const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortController = useRef<AbortController | null>(null);
   const lastOriginsKey = useRef<string>('');
 
