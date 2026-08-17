@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from 'react-i18next';
+import { getIpGeolocation } from '@/services/geo/ipGeolocation';
 
 export type Currency = 'EUR' | 'USD' | 'GBP';
 export type Language = 'fr' | 'en' | 'es';
@@ -87,27 +88,21 @@ export const UserPreferencesProvider: React.FC<{ children: React.ReactNode }> = 
     }
   }, []);
 
-  // Détection automatique par géolocalisation
+  // Détection automatique par géolocalisation (via edge function, pas d'appel direct)
   const detectPreferences = useCallback(async (): Promise<UserPreferences> => {
-    try {
-      // Utiliser l'API de géolocalisation IP
-      const response = await fetch('https://ipapi.co/json/');
-      if (response.ok) {
-        const data = await response.json();
-        const countryCode = data.country_code?.toUpperCase();
-        const countryPrefs = countryToPreferences[countryCode];
-        if (countryPrefs) {
-          return { ...defaultPreferences, ...countryPrefs };
-        }
-      }
-    } catch {
-      // Fallback sur navigator.language
-      const browserLang = navigator.language?.toLowerCase();
-      if (browserLang?.startsWith('en')) {
-        return { ...defaultPreferences, language: 'en' };
-      } else if (browserLang?.startsWith('es')) {
-        return { ...defaultPreferences, language: 'es' };
-      }
+    const data = await getIpGeolocation();
+    const countryCode = data?.country_code?.toUpperCase();
+    const countryPrefs = countryCode ? countryToPreferences[countryCode] : undefined;
+    if (countryPrefs) {
+      return { ...defaultPreferences, ...countryPrefs };
+    }
+
+    // Fallback sur navigator.language
+    const browserLang = navigator.language?.toLowerCase();
+    if (browserLang?.startsWith('en')) {
+      return { ...defaultPreferences, language: 'en' };
+    } else if (browserLang?.startsWith('es')) {
+      return { ...defaultPreferences, language: 'es' };
     }
     return defaultPreferences;
   }, []);

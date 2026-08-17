@@ -1,17 +1,17 @@
 import { useEffect, useRef } from "react";
-import mapboxgl from "mapbox-gl";
+import * as maplibregl from "maplibre-gl";
 import type { UserLocation } from "./types";
 
 /**
  * Renders the pulsing blue dot for the user's current location on the map.
  */
 export function useUserLocationMarker(opts: {
-  map: React.MutableRefObject<mapboxgl.Map | null>;
+  map: React.MutableRefObject<maplibregl.Map | null>;
   mapLoaded: boolean;
   userLocation?: UserLocation | null;
 }) {
   const { map, mapLoaded, userLocation } = opts;
-  const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const userMarkerRef = useRef<maplibregl.Marker | null>(null);
 
   // Show user location marker after animation completes
   useEffect(() => {
@@ -63,7 +63,7 @@ export function useUserLocationMarker(opts: {
       document.head.appendChild(style);
     }
 
-    const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
+    const marker = new maplibregl.Marker({ element: el, anchor: "center" })
       .setLngLat([userLocation.lng, userLocation.lat])
       .addTo(map.current);
 

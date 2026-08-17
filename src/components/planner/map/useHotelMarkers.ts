@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import mapboxgl from "mapbox-gl";
+import * as maplibregl from "maplibre-gl";
 import type { TabType } from "@/pages/TravelPlanner";
 import { useAccommodationMemoryStore } from "@/stores/hooks";
 import { STORAGE_KEYS } from "@/config/storageKeys";
@@ -21,15 +21,15 @@ interface HotelResult {
  * hotel event bus subscriptions, and auto-fit bounds.
  */
 export function useHotelMarkers(opts: {
-  map: React.MutableRefObject<mapboxgl.Map | null>;
+  map: React.MutableRefObject<maplibregl.Map | null>;
   mapLoaded: boolean;
   activeTab: TabType;
   suppressNextStaysAutoZoomRef: React.MutableRefObject<boolean>;
 }) {
   const { map, mapLoaded, activeTab, suppressNextStaysAutoZoomRef } = opts;
 
-  const hotelMarkersRef = useRef<mapboxgl.Marker[]>([]);
-  const accommodationMarkersRef = useRef<mapboxgl.Marker[]>([]);
+  const hotelMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const accommodationMarkersRef = useRef<maplibregl.Marker[]>([]);
 
   // Hotel search results state
   const [hotelResults, setHotelResults] = useState<{ hotels: HotelResult[] }>({ hotels: [] });
@@ -78,7 +78,7 @@ export function useHotelMarkers(opts: {
       if (hotelResults.hotels.length === 0) return;
 
       // Calculate bounds of all hotels
-      const bounds = new mapboxgl.LngLatBounds();
+      const bounds = new maplibregl.LngLatBounds();
       hotelResults.hotels.forEach((hotel) => {
         bounds.extend([hotel.lng, hotel.lat]);
       });
@@ -135,7 +135,7 @@ export function useHotelMarkers(opts: {
     previousHotelCountRef.current = currentCount;
 
     // Calculate bounds of all hotels
-    const bounds = new mapboxgl.LngLatBounds();
+    const bounds = new maplibregl.LngLatBounds();
     hotelResults.hotels.forEach((hotel) => {
       bounds.extend([hotel.lng, hotel.lat]);
     });
@@ -225,7 +225,7 @@ export function useHotelMarkers(opts: {
         eventBus.emit("hotels:openDetail", { hotel: hotel as any });
       });
 
-      const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
+      const marker = new maplibregl.Marker({ element: el, anchor: "bottom" })
         .setLngLat([hotel.lng, hotel.lat])
         .addTo(map.current!);
 
@@ -332,7 +332,7 @@ export function useHotelMarkers(opts: {
         pinEl.style.transform = "translateY(0) scale(1)";
       });
 
-      const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
+      const marker = new maplibregl.Marker({ element: el, anchor: "bottom" })
         .setLngLat([acc.lng, acc.lat])
         .addTo(map.current!);
 

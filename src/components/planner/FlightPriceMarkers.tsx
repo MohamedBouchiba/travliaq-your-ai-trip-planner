@@ -1,13 +1,13 @@
 import { memo, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import mapboxgl from "mapbox-gl";
+import * as maplibregl from "maplibre-gl";
 import type { AirportMarker } from "@/hooks/useAirportsInBounds";
 import type { MapPricesResult } from "@/hooks/useMapPrices";
 import eventBus from "@/lib/eventBus";
 import { escapeHtml } from "@/components/planner/chat/utils/security";
 
 interface FlightPriceMarkersProps {
-  map: mapboxgl.Map | null;
+  map: maplibregl.Map | null;
   airports: AirportMarker[];
   prices: MapPricesResult;
   departureIata?: string;

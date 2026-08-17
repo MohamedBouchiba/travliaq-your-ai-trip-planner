@@ -126,7 +126,7 @@ const PlannerMap = ({
 
   return (
     <div className="absolute inset-0 w-full h-full relative" data-tour="map-area">
-      <div ref={mapContainer} className="absolute inset-0 w-full h-full [&_.mapboxgl-ctrl-bottom-left]:!bottom-10 [&_.mapboxgl-ctrl-bottom-right]:!bottom-10 [&_.mapboxgl-ctrl-logo]:opacity-40 [&_.mapboxgl-ctrl-logo]:hover:opacity-100 [&_.mapboxgl-ctrl-logo]:transition-opacity [&_.mapboxgl-ctrl-attrib]:opacity-30 [&_.mapboxgl-ctrl-attrib]:hover:opacity-100 [&_.mapboxgl-ctrl-attrib]:transition-opacity" style={{ minHeight: "100%" }} />
+      <div ref={mapContainer} className="absolute inset-0 w-full h-full [&_.maplibregl-ctrl-bottom-left]:!bottom-10 [&_.maplibregl-ctrl-bottom-right]:!bottom-10 [&_.maplibregl-ctrl-logo]:opacity-40 [&_.maplibregl-ctrl-logo]:hover:opacity-100 [&_.maplibregl-ctrl-logo]:transition-opacity [&_.maplibregl-ctrl-attrib]:opacity-30 [&_.maplibregl-ctrl-attrib]:hover:opacity-100 [&_.maplibregl-ctrl-attrib]:transition-opacity" style={{ minHeight: "100%" }} />
 
       {/* Flight Price Markers - React Portal for stable rendering */}
       <FlightPriceMarkers

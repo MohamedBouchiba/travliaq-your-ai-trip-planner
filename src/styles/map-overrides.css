@@ -1,24 +1,24 @@
 /* Mapbox control theming to blend with site (dark, no white bands) */
 /* Only style the navigation button group - NOT the attribution container */
-.mapboxgl-ctrl-group {
+.maplibregl-ctrl-group {
   background-color: hsl(var(--background) / 0.9) !important;
   border: 1px solid hsl(var(--border)) !important;
   color: hsl(var(--foreground)) !important;
   box-shadow: 0 6px 20px hsl(var(--primary) / 0.15) !important;
 }
 
-.mapboxgl-ctrl-group button {
+.maplibregl-ctrl-group button {
   filter: invert(1) hue-rotate(180deg) brightness(0.9);
 }
 
 /* Ensure logo wrapper has no background */
-.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl {
+.maplibregl-ctrl-bottom-left .maplibregl-ctrl {
   background: transparent !important;
   box-shadow: none !important;
   border: none !important;
 }
 
-.mapboxgl-ctrl-attrib, .mapboxgl-ctrl-attrib-inner {
+.maplibregl-ctrl-attrib, .maplibregl-ctrl-attrib-inner {
   background-color: transparent !important;
   color: hsl(var(--muted-foreground)) !important;
   border: none !important;
@@ -29,43 +29,43 @@
 }
 
 /* Remove white background from attribution container wrapper */
-.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl,
-.mapboxgl-ctrl-bottom-right .mapboxgl-ctrl-attrib {
+.maplibregl-ctrl-bottom-left .maplibregl-ctrl,
+.maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib {
   background: transparent !important;
   box-shadow: none !important;
   border: none !important;
 }
 
-.mapboxgl-ctrl-attrib.mapboxgl-compact {
+.maplibregl-ctrl-attrib.maplibregl-compact {
   min-height: 18px !important;
   padding: 0 !important;
   background: transparent !important;
 }
 
-.mapboxgl-ctrl-attrib.mapboxgl-compact::after {
+.maplibregl-ctrl-attrib.maplibregl-compact::after {
   width: 16px !important;
   height: 16px !important;
 }
 
-.mapboxgl-ctrl-attrib a {
+.maplibregl-ctrl-attrib a {
   font-size: 9px !important;
   opacity: 0.6;
 }
 
-.mapboxgl-compact { background: transparent !important; }
+.maplibregl-compact { background: transparent !important; }
 
 /* Make logo less intrusive (required by Mapbox TOS) */
-.mapboxgl-ctrl-logo {
+.maplibregl-ctrl-logo {
   filter: invert(1) opacity(0.4);
   transform: scale(0.7);
   transform-origin: bottom left;
 }
 
-.mapboxgl-ctrl-bottom-right {
+.maplibregl-ctrl-bottom-right {
   opacity: 0.5;
   transition: opacity 0.2s;
 }
 
-.mapboxgl-ctrl-bottom-right:hover {
+.maplibregl-ctrl-bottom-right:hover {
   opacity: 1;
 }
