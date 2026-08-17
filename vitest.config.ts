@@ -20,10 +20,8 @@ export default defineConfig({
       '**/dist/**',
       'e2e/**',
     ],
-    environmentMatchGlobs: [
-      // Use node environment for pure utility tests
-      ['**/utils/__tests__/**', 'node'],
-    ],
+    // Pure utility tests can opt into node via `// @vitest-environment node`
+
     deps: {
       optimizer: {
         web: {
