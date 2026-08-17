@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface ErrorFallbackProps {
-  error: Error;
-  resetErrorBoundary: () => void;
+  error: unknown;
+  resetErrorBoundary: (...args: unknown[]) => void;
   componentName?: string;
 }
 
 function ErrorFallback({ error, resetErrorBoundary, componentName }: ErrorFallbackProps) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
   return (
     <div className="flex items-center justify-center p-8 h-full w-full">
       <Card className="max-w-md w-full border-destructive/50">
@@ -32,7 +33,7 @@ function ErrorFallback({ error, resetErrorBoundary, componentName }: ErrorFallba
         <CardContent className="space-y-4">
           <div className="bg-muted rounded-lg p-3">
             <p className="text-sm text-muted-foreground font-mono break-words">
-              {error.message || "Erreur inconnue"}
+              {message || "Erreur inconnue"}
             </p>
           </div>
           <div className="flex flex-col gap-2">
