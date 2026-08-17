@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import mapboxgl from "mapbox-gl";
+import maplibregl from "maplibre-gl";
 import type { TabType } from "@/pages/TravelPlanner";
 import type { MemoryRoutePoint } from "@/stores/hooks";
 import type { DestinationClickEvent } from "./types";
@@ -10,7 +10,7 @@ import { generateGreatCircleArc, cssHsl } from "./constants";
  * from the flight memory store. Also handles legacy route cleanup.
  */
 export function useFlightRoutes(opts: {
-  map: React.MutableRefObject<mapboxgl.Map | null>;
+  map: React.MutableRefObject<maplibregl.Map | null>;
   mapLoaded: boolean;
   activeTab: TabType;
   getRoutePoints: () => MemoryRoutePoint[];
@@ -18,8 +18,8 @@ export function useFlightRoutes(opts: {
 }) {
   const { map, mapLoaded, activeTab, getRoutePoints, onDestinationClick } = opts;
 
-  const memoryMarkersRef = useRef<mapboxgl.Marker[]>([]);
-  const routeMarkersRef = useRef<mapboxgl.Marker[]>([]);
+  const memoryMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const routeMarkersRef = useRef<maplibregl.Marker[]>([]);
 
   // Ref to track if routes have been drawn (persists across tab changes)
   const routesDrawnRef = useRef(false);
@@ -320,7 +320,7 @@ export function useFlightRoutes(opts: {
       }
 
       // Use bottom-center anchor so the pin tip touches the exact coordinate
-      const marker = new mapboxgl.Marker({ element: container, anchor: "bottom" })
+      const marker = new maplibregl.Marker({ element: container, anchor: "bottom" })
         .setLngLat([point.lng, point.lat])
         .addTo(map.current!);
 
@@ -330,7 +330,7 @@ export function useFlightRoutes(opts: {
     // Draw lines between route points (supports multi-destination)
     if (memoryPoints.length >= 2) {
       const routeColor = cssHsl("--primary", "221.2 83.2% 53.3%");
-      const bounds = new mapboxgl.LngLatBounds();
+      const bounds = new maplibregl.LngLatBounds();
 
       // Build segments between consecutive points
       const segments: { start: [number, number]; end: [number, number]; index: number }[] = [];
@@ -435,7 +435,7 @@ export function useFlightRoutes(opts: {
         });
 
         // Update the source
-        (map.current.getSource(memorySourceId) as mapboxgl.GeoJSONSource).setData({
+        (map.current.getSource(memorySourceId) as maplibregl.GeoJSONSource).setData({
           type: "Feature",
           properties: {},
           geometry: {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import mapboxgl from "mapbox-gl";
+import maplibregl from "maplibre-gl";
 import type { TabType } from "@/pages/TravelPlanner";
 import type { UserLocation } from "./types";
 import { useAccommodationMemoryStore, useActivityMemoryStore } from "@/stores/hooks";
@@ -11,7 +11,7 @@ import eventBus from "@/lib/eventBus";
  * mobile padding, initial animation, and center/zoom sync.
  */
 export function useMapCamera(opts: {
-  map: React.MutableRefObject<mapboxgl.Map | null>;
+  map: React.MutableRefObject<maplibregl.Map | null>;
   mapLoaded: boolean;
   activeTab: TabType;
   center: [number, number];

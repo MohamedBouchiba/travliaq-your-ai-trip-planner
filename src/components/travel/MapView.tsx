@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { MAPBOX_ACCESS_TOKEN } from "@/config/mapbox";
 import "@/styles/mapbox-overrides.css";
 import { Maximize2, Minimize2 } from 'lucide-react';
@@ -31,8 +31,8 @@ interface MapViewProps {
 const MapView = ({ days, activeDay, onScrollToDay, activeDayData }: MapViewProps) => {
   const { t } = useTranslation();
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const markers = useRef<{ [key: number]: mapboxgl.Marker }>({});
+  const map = useRef<maplibregl.Map | null>(null);
+  const markers = useRef<{ [key: number]: maplibregl.Marker }>({});
   const [isLoaded, setIsLoaded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const isMobile = useIsMobile();
@@ -43,14 +43,14 @@ const MapView = ({ days, activeDay, onScrollToDay, activeDayData }: MapViewProps
     
     if (map.current) return;
 
-    mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
+    maplibregl.accessToken = MAPBOX_ACCESS_TOKEN;
 
     try {
       const firstValidCoordinate = days.find(d => 
         d.coordinates && !(d.coordinates[0] === 0 && d.coordinates[1] === 0)
       )?.coordinates || [139.6917, 35.6895];
 
-      map.current = new mapboxgl.Map({
+      map.current = new maplibregl.Map({
         container: mapContainer.current,
         style: "mapbox://styles/mapbox/dark-v11",
         center: firstValidCoordinate,
@@ -65,8 +65,8 @@ const MapView = ({ days, activeDay, onScrollToDay, activeDayData }: MapViewProps
         }, 100);
       });
 
-      map.current.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "top-right");
-      map.current.addControl(new mapboxgl.AttributionControl({ compact: true }), "bottom-right");
+      map.current.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+      map.current.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
       map.current.scrollZoom.disable();
 
       map.current.on('style.load', () => {
@@ -169,7 +169,7 @@ const MapView = ({ days, activeDay, onScrollToDay, activeDayData }: MapViewProps
         });
 
         if (map.current) {
-          const marker = new mapboxgl.Marker(el).setLngLat(day.coordinates).addTo(map.current);
+          const marker = new maplibregl.Marker(el).setLngLat(day.coordinates).addTo(map.current);
           markers.current[day.id] = marker;
         }
       });

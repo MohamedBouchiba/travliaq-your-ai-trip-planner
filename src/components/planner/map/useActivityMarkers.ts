@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import mapboxgl from "mapbox-gl";
+import maplibregl from "maplibre-gl";
 import { useTranslation } from "react-i18next";
 import type { TabType, MapPin } from "@/pages/TravelPlanner";
 import { useActivityMemoryStore } from "@/stores/hooks";
@@ -12,7 +12,7 @@ import { escapeHtml, escapeHtmlAttribute } from "@/components/planner/chat/utils
  * attraction search-result pins, and activity pin overlays.
  */
 export function useActivityMarkers(opts: {
-  map: React.MutableRefObject<mapboxgl.Map | null>;
+  map: React.MutableRefObject<maplibregl.Map | null>;
   mapLoaded: boolean;
   activeTab: TabType;
   selectedPinId?: string;
@@ -24,9 +24,9 @@ export function useActivityMarkers(opts: {
   // Get activity entries for markers
   const { state: activityState, allDestinations: activityAllDestinations } = useActivityMemoryStore();
 
-  const markersRef = useRef<mapboxgl.Marker[]>([]);
-  const activityDestinationMarkersRef = useRef<mapboxgl.Marker[]>([]);
-  const attractionPinsRef = useRef<mapboxgl.Marker[]>([]);
+  const markersRef = useRef<maplibregl.Marker[]>([]);
+  const activityDestinationMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const attractionPinsRef = useRef<maplibregl.Marker[]>([]);
 
   // Get pins based on active tab
   const getPinsForTab = useCallback((tab: TabType): MapPin[] => {
@@ -120,7 +120,7 @@ export function useActivityMarkers(opts: {
         onPinClick(pin);
       });
 
-      const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
+      const marker = new maplibregl.Marker({ element: el, anchor: "center" })
         .setLngLat([pin.lng, pin.lat])
         .addTo(map.current!);
 
@@ -220,7 +220,7 @@ export function useActivityMarkers(opts: {
         pinEl.style.transform = "translateY(0) scale(1)";
       });
 
-      const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
+      const marker = new maplibregl.Marker({ element: el, anchor: "bottom" })
         .setLngLat([dest.lng, dest.lat])
         .addTo(map.current!);
 
@@ -300,7 +300,7 @@ export function useActivityMarkers(opts: {
       `;
 
       // Create hover tooltip (compact preview)
-      const tooltip = new mapboxgl.Popup({
+      const tooltip = new maplibregl.Popup({
         closeButton: false,
         closeOnClick: false,
         offset: [0, -50],
@@ -348,7 +348,7 @@ export function useActivityMarkers(opts: {
         eventBus.emit("attraction:click", { attraction: attraction as any });
       });
 
-      const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
+      const marker = new maplibregl.Marker({ element: el, anchor: "bottom" })
         .setLngLat([lng, lat])
         .addTo(map.current!);
 

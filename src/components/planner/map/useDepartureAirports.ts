@@ -5,7 +5,7 @@ import { useAirportsInBounds, type AirportMarker } from "@/hooks/useAirportsInBo
 import { useMapPrices } from "@/hooks/useMapPrices";
 import { findNearestAirports } from "@/hooks/useNearestAirports";
 import type { UserLocation } from "./types";
-import mapboxgl from "mapbox-gl";
+import maplibregl from "maplibre-gl";
 import eventBus from "@/lib/eventBus";
 
 /**
@@ -13,7 +13,7 @@ import eventBus from "@/lib/eventBus";
  * airport fetching for the flights tab, and map-prices API integration.
  */
 export function useDepartureAirports(opts: {
-  map: React.MutableRefObject<mapboxgl.Map | null>;
+  map: React.MutableRefObject<maplibregl.Map | null>;
   mapLoaded: boolean;
   activeTab: TabType;
   currentZoom: number;
@@ -248,7 +248,7 @@ export function useDepartureAirports(opts: {
 
   // Track which airports are currently displayed (by hub id) - LEGACY markers (now handled by FlightPriceMarkers)
   // Keep refs for cleanup but rendering is done by React Portal component
-  const displayedAirportsRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
+  const displayedAirportsRef = useRef<Map<string, maplibregl.Marker>>(new Map());
   const airportRemovalTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // Cleanup old DOM markers when switching to new Portal system
