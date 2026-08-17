@@ -10,6 +10,7 @@ import type { LocationResult } from "@/hooks/useLocationAutocomplete";
 import { findNearestAirports, Airport } from "@/hooks/useNearestAirports";
 import FlightResults, { FlightOffer, generateMockFlights } from "./FlightResults";
 import eventBus from "@/lib/eventBus";
+import { getIpGeolocation } from "@/services/geo/ipGeolocation";
 import { useFlightMemoryStore, type AirportInfo } from "@/stores/hooks";
 import { useTripBasketStore } from "@/stores/tripBasketStore";
 import { SUPABASE_URL } from "@/integrations/supabase/client";
