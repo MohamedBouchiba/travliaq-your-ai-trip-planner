@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import maplibregl from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
 import type { TabType } from "@/pages/TravelPlanner";
 import { useAccommodationMemoryStore } from "@/stores/hooks";
 import { STORAGE_KEYS } from "@/config/storageKeys";

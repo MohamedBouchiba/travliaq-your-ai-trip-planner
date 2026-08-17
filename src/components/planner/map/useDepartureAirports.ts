@@ -5,7 +5,7 @@ import { useAirportsInBounds, type AirportMarker } from "@/hooks/useAirportsInBo
 import { useMapPrices } from "@/hooks/useMapPrices";
 import { findNearestAirports } from "@/hooks/useNearestAirports";
 import type { UserLocation } from "./types";
-import maplibregl from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
 import eventBus from "@/lib/eventBus";
 
 /**

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import maplibregl from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
 import { useTranslation } from "react-i18next";
 import type { TabType, MapPin } from "@/pages/TravelPlanner";
 import { useActivityMemoryStore } from "@/stores/hooks";
