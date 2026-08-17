@@ -1,99 +1,50 @@
+# Migration Mapbox → MapLibre GL + tuiles OSM, et remise en marche du site
 
+## Objectif
 
-## Plan : Synchroniser automatiquement les hebergements avec la destination de vol
+1. Supprimer totalement la dépendance Mapbox (coût de facturation) et passer à MapLibre GL avec des tuiles OpenStreetMap gratuites.
+2. Faire un audit complet des erreurs actuelles du site et corriger ce qui bloque.
 
-### Probleme
+## État constaté
 
-Quand tu selectionnes un itineraire (ex: Bruxelles -> Havana) via le chat ou le widget, l'onglet Hebergements ne se met pas a jour avec la ville de destination. Deux conditions bloquantes dans `AccommodationPanel.tsx` :
+- Le typecheck TypeScript de l'app passe désormais sans erreur (corrections précédentes appliquées).
+- Aucune erreur runtime remontée dans le preview actuel, aucun log console capturé.
+- Mapbox est utilisé dans 11 fichiers (~3 600 lignes de code carte) :
+  - `src/config/mapbox.ts` (token public en dur)
+  - `src/components/travel/MapView.tsx`
+  - `src/components/planner/PlannerMap.tsx`, `FlightPriceMarkers.tsx`
+  - 8 hooks dans `src/components/planner/map/` (init, caméra, marqueurs aéroports/hôtels/activités, routes de vol, position utilisateur)
+  - `src/styles/mapbox-overrides.css` (surcharges des classes `.mapboxgl-*`)
+- Styles utilisés : `mapbox://styles/mapbox/outdoors-v12` (planner) et `dark-v11` (travel).
 
-1. **Ligne 274 (multi-destination)** : `if (!leg.arrival?.city || !leg.arrival?.lat || !leg.arrival?.lng)` -- exige des coordonnees GPS
-2. **Ligne 461 (aller-retour/aller simple)** : `else if (departure.lat && departure.lng)` -- exige aussi des coordonnees
+## Étape 1 — Audit des erreurs (avant toute migration)
 
-Or, la selection de ville via le chat ne fournit que `city`, `country`, `countryCode` (pas de lat/lng). Resultat : la sync est ignoree.
+- Vérification du build de production et du typecheck.
+- Exécution des suites de tests existantes (vitest + suites internes) et relevé des échecs.
+- Parcours automatisé du site en navigateur (accueil, planner, questionnaire, blog) avec capture des erreurs console, des requêtes réseau en échec et des edge functions en erreur.
+- Vérification des edge functions Supabase (logs récents, clés API manquantes ou expirées).
+- Livrable : une liste priorisée des erreurs (bloquantes / gênantes / cosmétiques). Je corrige les bloquantes dans la foulée, et je te présente le reste pour arbitrage.
 
-### Solution
+## Étape 2 — Migration vers MapLibre GL
 
-**Fichier unique : `src/components/planner/AccommodationPanel.tsx`**
+Approche : MapLibre GL JS est un fork de Mapbox GL JS v1, l'API (`Map`, `Marker`, `Popup`, `LngLatBounds`, sources/layers GeoJSON) est quasi identique. La migration est donc mécanique, pas une réécriture.
 
-3 modifications dans le useEffect de sync (lignes 261-488) :
+1. Ajouter `maplibre-gl`, retirer `mapbox-gl` du projet.
+2. Remplacer `src/config/mapbox.ts` par un module de configuration carte unique (`src/config/map.ts`) exposant le style et les URLs de tuiles — aucune valeur en dur dispersée, une seule source de configuration.
+3. Définir un style MapLibre en JSON (tuiles raster OSM + variante sombre) reproduisant au plus près les rendus actuels `outdoors` et `dark`. Attribution OSM affichée comme requis par la licence.
+4. Remplacer les imports `mapbox-gl` par `maplibre-gl` dans les 10 fichiers concernés et adapter les rares différences d'API (options d'init, `projection`, `fog`/`terrain` si utilisés, contrôles).
+5. Renommer les surcharges CSS `.mapboxgl-*` en `.maplibregl-*` (MapLibre émet les deux préfixes, mais on nettoie).
+6. Vérifier que chaque fonctionnalité carte fonctionne encore : marqueurs prix de vols, aéroports de départ, hôtels, activités, routes de vol animées, recentrage caméra, bouton "rechercher dans cette zone", position utilisateur, fallback WebGL.
 
-**Modification 1 -- Ligne 274 : Relaxer le filtre multi-destination**
+## Étape 3 — Vérification
 
-```
-// AVANT
-if (!leg.arrival?.city || !leg.arrival?.lat || !leg.arrival?.lng) return false;
+- Contrôle visuel en navigateur du planner : chargement de la carte, marqueurs, popups, zoom, sélection de destination.
+- Contrôle du parcours travel/MapView.
+- Confirmation qu'aucune requête ne part plus vers `api.mapbox.com` (donc plus aucune facturation).
 
-// APRES
-if (!leg.arrival?.city) return false;
-```
+## Détails techniques
 
-**Modification 2 -- Lignes 290-291 : Rendre lat/lng optionnels dans le map**
-
-```
-// AVANT
-lat: leg.arrival!.lat!,
-lng: leg.arrival!.lng!,
-
-// APRES
-lat: leg.arrival!.lat || 0,
-lng: leg.arrival!.lng || 0,
-```
-
-**Modification 3 -- Ligne 461 : Relaxer la condition aller-retour + ajouter creation si ville absente**
-
-```
-// AVANT
-} else if (departure.lat && departure.lng) {
-  const first = memory.accommodations[0];
-  if (first && !first.city) {
-    updateAccommodation(first.id, { ... });
-  }
-}
-
-// APRES
-} else if (departure.city) {
-  const first = memory.accommodations[0];
-  if (first && !first.city) {
-    // Remplir la premiere accommodation vide
-    updateAccommodation(first.id, {
-      city: departure.city,
-      country: departure.country || "",
-      countryCode: departure.countryCode || "",
-      lat: departure.lat,
-      lng: departure.lng,
-      checkIn: departureDate,
-      checkOut: returnDate || null,
-      syncedFromFlight: true,
-      userModifiedDates: false,
-    });
-  } else if (!memory.accommodations.some(
-    a => a.city?.toLowerCase() === departure.city!.toLowerCase()
-  )) {
-    // Aucune accommodation pour cette ville -> en creer une
-    addAccommodation({
-      city: departure.city,
-      country: departure.country || "",
-      countryCode: departure.countryCode || "",
-      lat: departure.lat,
-      lng: departure.lng,
-      checkIn: departureDate,
-      checkOut: returnDate || null,
-      syncedFromFlight: true,
-      userModifiedDates: false,
-    });
-  }
-}
-```
-
-### Fichiers modifies
-
-| Fichier | Changement |
-|---|---|
-| `src/components/planner/AccommodationPanel.tsx` | 3 modifications : relaxer les conditions lat/lng dans le filtre multi, le map, et la branche aller-retour ; ajouter creation d'accommodation si ville absente |
-
-### Comportement attendu apres fix
-
-- Selectionner Bruxelles -> Havana dans le chat -> l'onglet Hebergements affiche immediatement "Havana" comme destination
-- Multi-destinations (ex: Paris -> Tokyo -> Bangkok) -> 2 accommodations creees automatiquement (Tokyo + Bangkok)
-- Si l'utilisateur modifie manuellement la ville dans l'hebergement, la sync ne l'ecrase pas (garde `userModifiedDates` existant)
-
+- Tuiles par défaut : serveur de tuiles OSM standard, configurable via variable d'environnement pour pouvoir basculer plus tard vers un fournisseur payant/auto-hébergé sans toucher au code.
+- Les tuiles raster OSM ne supportent pas les styles vectoriels (rotation d'étiquettes, 3D). Si le rendu actuel dépend de couches vectorielles, je te le signale et on choisira une alternative de style gratuite compatible.
+- Aucun token requis pour OSM ; le fichier de config accepte quand même une clé optionnelle pour un fournisseur de tuiles futur.
+- Le géocodage, l'autocomplétion de lieux et la recherche d'aéroports passent déjà par des edge functions dédiées, ils ne sont pas impactés par le changement de fournisseur de carte.
