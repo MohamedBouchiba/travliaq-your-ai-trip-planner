@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.generate-chat-title]
 verify_jwt = false
+
+[functions.ip-geolocation]
+verify_jwt = false
