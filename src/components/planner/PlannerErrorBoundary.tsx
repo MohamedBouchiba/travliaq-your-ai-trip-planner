@@ -33,7 +33,7 @@ function ErrorFallback({ error, resetErrorBoundary, componentName }: ErrorFallba
         <CardContent className="space-y-4">
           <div className="bg-muted rounded-lg p-3">
             <p className="text-sm text-muted-foreground font-mono break-words">
-              {error.message || "Erreur inconnue"}
+              {message || "Erreur inconnue"}
             </p>
           </div>
           <div className="flex flex-col gap-2">
