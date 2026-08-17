@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import "@/styles/mapbox-overrides.css";
+import "@/styles/map-overrides.css";
 import eventBus from "@/lib/eventBus";
-import { MAPBOX_ACCESS_TOKEN } from "@/config/mapbox";
+import { getMapStyle, MAP_ATTRIBUTION } from "@/config/map";
 
 /**
  * Initializes the Mapbox GL map instance, handles resize observation,
@@ -53,11 +53,10 @@ export function useMapInit(
 
     window.addEventListener("destination-popup-close", handlePopupClose);
 
-    maplibregl.accessToken = MAPBOX_ACCESS_TOKEN;
 
     map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: "mapbox://styles/mapbox/outdoors-v12",
+      style: getMapStyle("light"),
       center: [initialCenter[0], initialCenter[1]],
       zoom: initialZoom,
       attributionControl: false,
@@ -65,7 +64,7 @@ export function useMapInit(
 
     // Compact attribution control
     map.current.addControl(
-      new maplibregl.AttributionControl({ compact: true, customAttribution: "" }),
+      new maplibregl.AttributionControl({ compact: true, customAttribution: MAP_ATTRIBUTION }),
       "bottom-right"
     );
     map.current.addControl(new maplibregl.NavigationControl(), "bottom-right");

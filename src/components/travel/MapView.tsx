@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { MAPBOX_ACCESS_TOKEN } from "@/config/mapbox";
-import "@/styles/mapbox-overrides.css";
+import { getMapStyle, MAP_ATTRIBUTION } from "@/config/map";
+import "@/styles/map-overrides.css";
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -43,7 +43,6 @@ const MapView = ({ days, activeDay, onScrollToDay, activeDayData }: MapViewProps
     
     if (map.current) return;
 
-    maplibregl.accessToken = MAPBOX_ACCESS_TOKEN;
 
     try {
       const firstValidCoordinate = days.find(d => 
@@ -52,7 +51,7 @@ const MapView = ({ days, activeDay, onScrollToDay, activeDayData }: MapViewProps
 
       map.current = new maplibregl.Map({
         container: mapContainer.current,
-        style: "mapbox://styles/mapbox/dark-v11",
+        style: getMapStyle("dark"),
         center: firstValidCoordinate,
         zoom: 11,
         attributionControl: false,
