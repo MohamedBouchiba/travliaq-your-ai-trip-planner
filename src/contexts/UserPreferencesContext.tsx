@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from 'react-i18next';
+import { getIpGeolocation } from '@/services/geo/ipGeolocation';
 
 export type Currency = 'EUR' | 'USD' | 'GBP';
 export type Language = 'fr' | 'en' | 'es';
