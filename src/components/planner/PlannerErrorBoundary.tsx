@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface ErrorFallbackProps {
-  error: Error;
-  resetErrorBoundary: () => void;
+  error: unknown;
+  resetErrorBoundary: (...args: unknown[]) => void;
   componentName?: string;
 }
 
 function ErrorFallback({ error, resetErrorBoundary, componentName }: ErrorFallbackProps) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
   return (
     <div className="flex items-center justify-center p-8 h-full w-full">
       <Card className="max-w-md w-full border-destructive/50">
